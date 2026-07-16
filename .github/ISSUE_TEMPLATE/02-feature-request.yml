@@ -1,0 +1,76 @@
+name: Feature request
+description: Propose a scoped, deliverable, and testable improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem before proposing a solution. Every request needs clear context, a defined goal, controlled scope, and explicit acceptance criteria.
+  - type: textarea
+    id: background
+    attributes:
+      label: Context and problem to solve
+      description: What is happening now, and why must it be solved? Describe the problem rather than jumping directly to an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: users
+    attributes:
+      label: Target users
+      description: Who will use or benefit from this? In what context and how often do they encounter this problem?
+    validations:
+      required: true
+  - type: textarea
+    id: current_scope
+    attributes:
+      label: In-scope work
+      description: What capabilities, scenarios, and boundaries will this delivery include?
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Name deferred, excluded, or unsupported scenarios to prevent scope creep.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Describe completion with testable, observable statements.
+      placeholder: |
+        - Given ..., when ..., the system should ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: affected_modules
+    attributes:
+      label: Affected modules (optional)
+      description: Which code, assets, documentation, build, or release modules are involved?
+  - type: textarea
+    id: data_model
+    attributes:
+      label: Data model changes (optional)
+      description: What data will be added, changed, or migrated? Describe compatibility and defaults.
+  - type: textarea
+    id: api_contract
+    attributes:
+      label: API or interface contract (optional)
+      description: For APIs, events, configuration, or file formats, specify inputs, outputs, errors, and compatibility expectations.
+  - type: textarea
+    id: existing_behavior
+    attributes:
+      label: Impact on existing behavior (optional)
+      description: Which existing behaviors will change? Is compatibility, migration, or a feature flag needed?
+  - type: textarea
+    id: task_breakdown
+    attributes:
+      label: Task breakdown (optional)
+      description: Break the work into independently verifiable research, implementation, testing, documentation, and release tasks.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and dependencies (optional)
+      description: Describe technical, compatibility, performance, licensing, schedule, or external-dependency risks and mitigations.

@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible defect or regression.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the facts and impact, not only a proposed solution. Every issue needs clear context, a defined goal, controlled scope, and verifiable acceptance criteria.
+  - type: textarea
+    id: background
+    attributes:
+      label: Context and problem
+      description: What were you doing, what happened, and what impact did it have?
+    validations:
+      required: true
+  - type: textarea
+    id: trigger_conditions
+    attributes:
+      label: Trigger conditions and reproduction steps
+      description: Include prerequisites, inputs, actions, and reproduction frequency. Provide a minimal reproducible example.
+      placeholder: |
+        1. With ...
+        2. Do ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: Expected result
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Impacted scope
+      description: Which users, modules, platforms, versions, or assets are affected? Identify known unaffected areas.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: How will the fix be verified? Use observable and testable conditions.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings (optional)
+      description: Drag and drop images or recordings here, or paste a link.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output (optional)
+      description: Paste redacted logs, stack traces, or terminal output.
+      render: shell
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context (optional)
+      description: For example, version, environment, workaround, or related issues.

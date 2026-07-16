@@ -1,0 +1,48 @@
+name: Experiment
+description: Record a hypothesis, approach, or technical trial that needs validation.
+title: "[Experiment]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An experiment is not open-ended research. Limit the validation scope and define the conclusion and exit criteria before starting.
+  - type: textarea
+    id: background
+    attributes:
+      label: Context and question to validate
+      description: What uncertainty is blocking a decision, and why is an experiment needed?
+    validations:
+      required: true
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Experiment goal and hypothesis
+      description: What should be validated? Which outcomes would support or disprove the hypothesis?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Experiment scope and boundaries
+      description: Which approaches, modules, data, or environments are involved? State exclusions and time or cost limits.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Experiment approach
+      description: Describe the steps, control approach, samples, measurement method, or prototype plan.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Conclusion and acceptance criteria
+      description: What evidence is sufficient to end the experiment? What conclusion, recommendation, or next action should it produce?
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and dependencies (optional)
+      description: Describe factors that could invalidate the result, expand the scope, or prevent timely completion.
