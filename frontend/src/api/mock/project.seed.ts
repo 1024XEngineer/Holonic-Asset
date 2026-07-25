@@ -83,8 +83,6 @@ function createAsset(
 const moonlitOrchardAssetGroups: AssetGroup[] = [
   {
     kind: "character",
-    title: "Character",
-    accentClassName: "bg-rose-500",
     assets: [
       createAsset({
         id: "forager-hero",
@@ -117,8 +115,6 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
   },
   {
     kind: "object",
-    title: "Object",
-    accentClassName: "bg-amber-500",
     assets: [
       createAsset({
         id: "copper-watering-can",
@@ -151,8 +147,6 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
   },
   {
     kind: "tiles",
-    title: "Tiles",
-    accentClassName: "bg-emerald-500",
     assets: [
       createAsset({
         id: "orchard-ground-set",
@@ -185,8 +179,6 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
   },
   {
     kind: "scenery",
-    title: "Scenery",
-    accentClassName: "bg-sky-500",
     assets: [
       createAsset({
         id: "moonlit-orchard-scene",

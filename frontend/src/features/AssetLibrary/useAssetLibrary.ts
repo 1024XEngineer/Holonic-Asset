@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { getAssetTypeConfig } from "@/components/ui/custom/asset-type-config";
 import type { AssetGroup } from "@/types/asset-library";
 import { assetKinds, type AssetKind } from "@/types/asset-kind";
 
@@ -21,9 +22,9 @@ export function useAssetLibrary(assetGroups: AssetGroup[], query: string) {
           )
           .map((asset) => ({
             ...asset,
-            accentClassName: group.accentClassName,
             kind: group.kind,
-            kindLabel: group.title,
+            accentClassName: getAssetTypeConfig(group.kind).accentClassName,
+            kindLabel: getAssetTypeConfig(group.kind).label,
           })),
       );
   }, [assetGroups, query, selectedKinds]);

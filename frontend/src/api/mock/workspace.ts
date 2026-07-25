@@ -25,10 +25,6 @@ function createMockWorkspaceState(): MockWorkspaceState {
   };
 }
 
-function titleForKind(kind: AssetKind) {
-  return kind === "ui" ? "UI" : `${kind[0].toUpperCase()}${kind.slice(1)}`;
-}
-
 export async function listMockProjects() {
   return structuredClone(workspace.projects);
 }
@@ -84,8 +80,6 @@ export async function addMockAsset(
           ...groups,
           {
             kind,
-            title: titleForKind(kind),
-            accentClassName: "bg-slate-500",
             assets: [structuredClone(asset)],
           },
         ],

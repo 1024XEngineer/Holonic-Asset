@@ -3,8 +3,6 @@ import type { AssetKind } from "@/types/asset-kind";
 
 export type AssetGroup = {
   kind: AssetKind;
-  title: string;
-  accentClassName: string;
   assets: ProjectAsset[];
 };
 
