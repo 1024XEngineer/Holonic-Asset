@@ -1,11 +1,10 @@
 import type { EditorSceneryLayer } from "@/types/record";
 import {
   SceneryCanvas,
-  type SceneryCanvasEvent,
+  useSceneryCanvasStateMachine,
 } from "@/modules/scenery-canvas";
 
 import { SceneryLayerTree } from "../AssetTree/SceneryLayerTree";
-import { useSceneryStageMachine } from "../Canvas/StateMachine/sceneryStageMachine";
 import { Inspector } from "../Inspector/Inspector";
 import type { EditorModeProps } from "./types";
 
@@ -17,16 +16,10 @@ export function SceneryEditorMode({
   renderHeader,
   layers,
 }: EditorModeProps & { layers: EditorSceneryLayer[] }) {
-  const stage = useSceneryStageMachine(layers);
+  const stage = useSceneryCanvasStateMachine(layers);
   const selection = stage.selectedLayers.length
     ? stage.selectedLayers.join(", ")
     : "Nothing selected";
-  const handleCanvasEvent = (event: SceneryCanvasEvent) => {
-    if (event.type === "layer.selection.toggled") {
-      stage.toggleLayer(event.layerId);
-    }
-  };
-
   return (
     <>
       {renderHeader(selection)}
@@ -35,8 +28,12 @@ export function SceneryEditorMode({
           layers={layers}
           selectedLayers={stage.selectedLayers}
           visibleLayers={stage.visibleLayers}
-          onToggleLayer={stage.toggleLayer}
-          onToggleVisibility={stage.toggleVisibility}
+          onToggleLayer={(layerId) =>
+            stage.send({ type: "layer.selection.toggled", layerId })
+          }
+          onToggleVisibility={(layerId) =>
+            stage.send({ type: "layer.visibility.toggled", layerId })
+          }
         />
         <SceneryCanvas
           model={{
@@ -44,7 +41,7 @@ export function SceneryEditorMode({
             selectedLayerIds: stage.selectedLayers,
             visibleLayerIds: stage.visibleLayers,
           }}
-          onEvent={handleCanvasEvent}
+          onEvent={stage.send}
         />
         <Inspector
           selectedNodes={[]}

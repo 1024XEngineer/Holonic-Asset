@@ -1,11 +1,10 @@
 import type { SpriteSheetRecordContent } from "@/types/record";
 import {
   SpriteSheetCanvas,
-  type SpriteSheetCanvasEvent,
+  useSpriteSheetCanvasStateMachine,
 } from "@/modules/sprite-sheet-canvas";
 
 import { StaticAssetTree } from "../AssetTree/StaticAssetTree";
-import { useSpriteSheetStageMachine } from "../Canvas/StateMachine/spriteSheetStageMachine";
 import { Inspector } from "../Inspector/Inspector";
 import type { EditorModeProps } from "./types";
 
@@ -20,16 +19,10 @@ export function SpriteSheetEditorMode({
   spriteSheet: SpriteSheetRecordContent["spriteSheet"];
 }) {
   const items = spriteSheet.items;
-  const stage = useSpriteSheetStageMachine(items);
+  const stage = useSpriteSheetCanvasStateMachine(items);
   const selection = stage.selectedLabels.length
     ? stage.selectedLabels.join(", ")
     : "Nothing selected";
-  const handleCanvasEvent = (event: SpriteSheetCanvasEvent) => {
-    if (event.type === "cell.selection.toggled") {
-      stage.toggleCell(event.cellIndex);
-    }
-  };
-
   return (
     <>
       {renderHeader(selection)}
@@ -38,15 +31,17 @@ export function SpriteSheetEditorMode({
           items={items}
           selectedItems={stage.selectedItems}
           isTileSelected={stage.isTileSelected}
-          onToggleItem={stage.toggleItem}
-          onToggleTile={stage.toggleTile}
+          onToggleItem={(itemId) => stage.send({ type: "item.toggle", itemId })}
+          onToggleTile={(itemId, tileId) =>
+            stage.send({ type: "item-tile.toggle", itemId, tileId })
+          }
         />
         <SpriteSheetCanvas
           model={{
             gridSize: spriteSheet.gridSize,
             selectedCellIndexes: stage.selectedCells,
           }}
-          onEvent={handleCanvasEvent}
+          onEvent={stage.send}
         />
         <Inspector
           selectedNodes={[]}

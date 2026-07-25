@@ -2,6 +2,8 @@ import { useReducer } from "react";
 
 import type { EditorSpriteSheetItem } from "@/types/record";
 
+import type { SpriteSheetCanvasEvent } from "./SpriteSheetCanvas.interface";
+
 type ItemTileSelection = {
   type: "item-tile";
   itemId: string;
@@ -15,26 +17,26 @@ type CanvasCellSelection = {
 
 type SpriteSheetSelection = ItemTileSelection | CanvasCellSelection;
 
-export type SpriteSheetStageState = {
+export type SpriteSheetCanvasState = {
   selectedItems: string[];
   selectedTargets: SpriteSheetSelection[];
 };
 
-export type SpriteSheetStageEvent =
+export type SpriteSheetCanvasStateEvent =
   | { type: "item.toggle"; itemId: string }
   | { type: "item-tile.toggle"; itemId: string; tileId: string }
-  | { type: "canvas-cell.toggle"; cellIndex: number };
+  | SpriteSheetCanvasEvent;
 
-export const initialSpriteSheetStageState: SpriteSheetStageState = {
+export const initialSpriteSheetCanvasState: SpriteSheetCanvasState = {
   selectedItems: [],
   selectedTargets: [],
 };
 
-export function reduceSpriteSheetStage(
-  state: SpriteSheetStageState,
-  event: SpriteSheetStageEvent,
+export function reduceSpriteSheetCanvas(
+  state: SpriteSheetCanvasState,
+  event: SpriteSheetCanvasStateEvent,
   items: EditorSpriteSheetItem[],
-): SpriteSheetStageState {
+): SpriteSheetCanvasState {
   if (event.type === "item.toggle") {
     const selected = state.selectedItems.includes(event.itemId);
     return {
@@ -50,13 +52,18 @@ export function reduceSpriteSheetStage(
     };
   }
 
-  if (event.type === "canvas-cell.toggle") {
+  if (event.type === "cell.selection.toggled") {
+    const target = findCellTarget(event.cellIndex, items);
+    if (target.type === "item-tile") {
+      return reduceSpriteSheetCanvas(
+        state,
+        { ...target, type: "item-tile.toggle" },
+        items,
+      );
+    }
     return {
       ...state,
-      selectedTargets: toggleSelection(state.selectedTargets, {
-        type: "canvas-cell",
-        cellIndex: event.cellIndex,
-      }),
+      selectedTargets: toggleSelection(state.selectedTargets, target),
     };
   }
 
@@ -119,11 +126,13 @@ export function reduceSpriteSheetStage(
   };
 }
 
-export function useSpriteSheetStageMachine(items: EditorSpriteSheetItem[]) {
+export function useSpriteSheetCanvasStateMachine(
+  items: EditorSpriteSheetItem[],
+) {
   const [state, dispatch] = useReducer(
-    (current: SpriteSheetStageState, event: SpriteSheetStageEvent) =>
-      reduceSpriteSheetStage(current, event, items),
-    initialSpriteSheetStageState,
+    (current: SpriteSheetCanvasState, event: SpriteSheetCanvasStateEvent) =>
+      reduceSpriteSheetCanvas(current, event, items),
+    initialSpriteSheetCanvasState,
   );
 
   return {
@@ -136,22 +145,12 @@ export function useSpriteSheetStageMachine(items: EditorSpriteSheetItem[]) {
         itemId,
         tileId,
       }),
-    toggleItem: (itemId: string) => dispatch({ type: "item.toggle", itemId }),
-    toggleTile: (itemId: string, tileId: string) =>
-      dispatch({ type: "item-tile.toggle", itemId, tileId }),
-    toggleCell: (cellIndex: number) => {
-      const target = findCellTarget(cellIndex, items);
-      dispatch(
-        target.type === "item-tile"
-          ? { ...target, type: "item-tile.toggle" }
-          : { ...target, type: "canvas-cell.toggle" },
-      );
-    },
+    send: (event: SpriteSheetCanvasStateEvent) => dispatch(event),
   };
 }
 
 export function getSelectedCells(
-  state: SpriteSheetStageState,
+  state: SpriteSheetCanvasState,
   items: EditorSpriteSheetItem[],
 ) {
   return [
@@ -173,7 +172,7 @@ export function getSelectedCells(
 }
 
 export function getSelectedLabels(
-  state: SpriteSheetStageState,
+  state: SpriteSheetCanvasState,
   items: EditorSpriteSheetItem[],
 ) {
   return [
