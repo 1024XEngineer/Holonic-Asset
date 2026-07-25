@@ -5,8 +5,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/custom/native-select";
 import { Textarea } from "@/components/ui/textarea";
-
-import type { BackgroundAssetCreationDraft } from "./create-asset-draft";
+import type { BackgroundAssetCreationDraft } from "@/modules/asset-creation";
 
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 

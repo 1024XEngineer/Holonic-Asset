@@ -3,8 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-
-import type { UiAssetCreationDraft } from "./create-asset-draft";
+import type { UiAssetCreationDraft } from "@/modules/asset-creation";
 
 export function UiAssetFields({
   draft,

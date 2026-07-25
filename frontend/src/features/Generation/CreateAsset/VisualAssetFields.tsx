@@ -4,9 +4,8 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/custom/native-select";
+import type { VisualAssetCreationDraft } from "@/modules/asset-creation";
 import type { CreationRequest } from "@/types/generation";
-
-import type { VisualAssetCreationDraft } from "./create-asset-draft";
 
 export function VisualAssetFields({
   draft,
