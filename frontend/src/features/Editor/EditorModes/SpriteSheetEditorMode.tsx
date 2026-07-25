@@ -18,21 +18,8 @@ export function SpriteSheetEditorMode({
 }) {
   const items = spriteSheet.items;
   const stage = useSpriteSheetStageMachine(items);
-  const selectedItems = [
-    ...stage.selectedItems,
-    ...stage.selectedTiles.map((tile) => {
-      const separator = tile.lastIndexOf(":");
-      const item = tile.slice(0, separator);
-      const tileIndex = Number(tile.slice(separator + 1));
-      const itemData = items.find((candidate) => candidate.id === item);
-
-      return item === "Canvas"
-        ? `Tile ${tileIndex + 1}`
-        : `${itemData?.label ?? item} / ${itemData?.tiles[tileIndex]?.label ?? `Tile ${tileIndex + 1}`}`;
-    }),
-  ];
-  const selection = selectedItems.length
-    ? selectedItems.join(", ")
+  const selection = stage.selectedLabels.length
+    ? stage.selectedLabels.join(", ")
     : "Nothing selected";
 
   return (
@@ -42,21 +29,19 @@ export function SpriteSheetEditorMode({
         <StaticAssetTree
           items={items}
           selectedItems={stage.selectedItems}
-          selectedTiles={stage.selectedTiles}
+          isTileSelected={stage.isTileSelected}
           onToggleItem={stage.toggleItem}
           onToggleTile={stage.toggleTile}
         />
         <SpriteSheetStage
           gridSize={spriteSheet.gridSize}
-          items={items}
-          selectedItems={stage.selectedItems}
-          selectedTiles={stage.selectedTiles}
-          onToggleTile={stage.toggleTile}
+          selectedCells={stage.selectedCells}
+          onToggleCell={stage.toggleCell}
         />
         <Inspector
           selectedNodes={[]}
           selectedFrames={[]}
-          selectedItems={selectedItems}
+          selectedItems={stage.selectedLabels}
           prompt={prompt}
           onPromptChange={onPromptChange}
           onAction={onAction}

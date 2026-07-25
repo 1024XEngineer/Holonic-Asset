@@ -21,15 +21,15 @@ const itemIcons = {
 export function StaticAssetTree({
   items,
   selectedItems,
-  selectedTiles,
+  isTileSelected,
   onToggleItem,
   onToggleTile,
 }: {
   items: EditorSpriteSheetItem[];
   selectedItems: string[];
-  selectedTiles: string[];
+  isTileSelected: (itemId: string, tileId: string) => boolean;
   onToggleItem: (item: string) => void;
-  onToggleTile: (tile: string) => void;
+  onToggleTile: (itemId: string, tileId: string) => void;
 }) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
@@ -87,9 +87,8 @@ export function StaticAssetTree({
                   </div>
                   {expanded ? (
                     <div className="ml-4 grid grid-cols-4 gap-1 border-l border-black/10 py-1 pl-2">
-                      {item.tiles.map((tile, index) => {
-                        const tileId = `${item.id}:${index}`;
-                        const tileSelected = selectedTiles.includes(tileId);
+                      {item.tiles.map((tile) => {
+                        const tileSelected = isTileSelected(item.id, tile.id);
 
                         return (
                           <button
@@ -97,7 +96,7 @@ export function StaticAssetTree({
                             type="button"
                             aria-label={`${item.label}: ${tile.label}`}
                             aria-pressed={tileSelected}
-                            onClick={() => onToggleTile(tileId)}
+                            onClick={() => onToggleTile(item.id, tile.id)}
                             className={`grid aspect-square place-items-center rounded-md border transition-colors ${tileSelected ? "border-[#b86b70] bg-[#b86b70]/10 text-[#8b4e53]" : "border-black/10 text-[#6d8fbd] hover:bg-black/[.04]"}`}
                           >
                             <Grid2X2 className="size-3.5" />

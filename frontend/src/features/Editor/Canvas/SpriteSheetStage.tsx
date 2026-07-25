@@ -1,45 +1,15 @@
-import type { EditorSpriteSheetItem } from "@/types/record";
-
 type SpriteSheetStageProps = {
   gridSize: number;
-  items: EditorSpriteSheetItem[];
-  selectedItems: string[];
-  selectedTiles: string[];
-  onToggleTile: (tile: string) => void;
+  selectedCells: number[];
+  onToggleCell: (cellIndex: number) => void;
 };
 
 export function SpriteSheetStage({
   gridSize,
-  items,
-  selectedItems,
-  selectedTiles,
-  onToggleTile,
+  selectedCells,
+  onToggleCell,
 }: SpriteSheetStageProps) {
-  const highlightedCells = new Set([
-    ...selectedItems.flatMap(
-      (itemId) =>
-        items
-          .find((item) => item.id === itemId)
-          ?.tiles.flatMap((tile) => tile.cells) ?? [],
-    ),
-    ...selectedTiles.flatMap((tileId) => {
-      const separator = tileId.lastIndexOf(":");
-      const itemId = tileId.slice(0, separator);
-      const tileIndex = Number(tileId.slice(separator + 1));
-      if (itemId === "Canvas") return [tileIndex];
-      return (
-        items.find((item) => item.id === itemId)?.tiles[tileIndex]?.cells ?? []
-      );
-    }),
-  ]);
-  const mappedTiles = new Map<number, string>();
-  for (const item of items) {
-    item.tiles.forEach((tile, tileIndex) => {
-      tile.cells.forEach((cell) => {
-        mappedTiles.set(cell, `${item.id}:${tileIndex}`);
-      });
-    });
-  }
+  const highlightedCells = new Set(selectedCells);
   const hasSelection = highlightedCells.size > 0;
 
   return (
@@ -57,15 +27,13 @@ export function SpriteSheetStage({
             }}
           >
             {Array.from({ length: gridSize * gridSize }, (_, index) => {
-              const tileId = mappedTiles.get(index) ?? `Canvas:${index}`;
-
               return (
                 <button
                   key={index}
                   type="button"
                   aria-label={`Tile ${index + 1}`}
                   aria-pressed={highlightedCells.has(index)}
-                  onClick={() => onToggleTile(tileId)}
+                  onClick={() => onToggleCell(index)}
                   className={`relative overflow-hidden rounded-sm border bg-[#b5ce9c] transition-all duration-200 ${highlightedCells.has(index) ? "z-10 border-[#b86b70] ring-2 ring-inset ring-[#b86b70]/60" : hasSelection ? "border-black/5 opacity-35 hover:opacity-70" : "border-black/10 hover:border-[#b86b70]/60"}`}
                 >
                   <span
