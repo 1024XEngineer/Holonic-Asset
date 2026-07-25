@@ -10,9 +10,18 @@ import {
 
 const idleSaveState = { phase: "idle" } as const;
 
+function createSpriteSheetDocument(prompt: string) {
+  return {
+    mode: "sprite-sheet" as const,
+    prompt,
+    spriteSheet: { gridSize: 8, items: [] },
+  };
+}
+
 describe("asset editor session commands", () => {
   it("creates an isolated clean snapshot", () => {
     const initialDocument = {
+      mode: "character" as const,
       prompt: "Base prompt",
       character: {
         nodePositions: { prototype: { x: 20, y: 40 } },
@@ -24,6 +33,7 @@ describe("asset editor session commands", () => {
 
     expect(getAssetEditorSessionSnapshot(store, idleSaveState)).toEqual({
       document: {
+        mode: "character",
         prompt: "Base prompt",
         character: {
           nodePositions: { prototype: { x: 20, y: 40 } },
@@ -37,7 +47,11 @@ describe("asset editor session commands", () => {
   });
 
   it("applies document commands as one undo step each", () => {
-    const store = createAssetEditorSessionStore({ prompt: "Base prompt" });
+    const store = createAssetEditorSessionStore({
+      mode: "character",
+      prompt: "Base prompt",
+      character: { nodePositions: {} },
+    });
 
     dispatchAssetEditorCommand(store, {
       type: "prompt.set",
@@ -51,6 +65,7 @@ describe("asset editor session commands", () => {
 
     expect(getAssetEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
       document: {
+        mode: "character",
         prompt: "Add a blue scarf",
         character: {
           nodePositions: { prototype: { x: 120, y: 160 } },
@@ -63,7 +78,9 @@ describe("asset editor session commands", () => {
 
     dispatchAssetEditorCommand(store, { type: "history.undo" });
     expect(store.getState().document).toEqual({
+      mode: "character",
       prompt: "Add a blue scarf",
+      character: { nodePositions: {} },
     });
 
     dispatchAssetEditorCommand(store, { type: "history.undo" });
@@ -77,6 +94,7 @@ describe("asset editor session commands", () => {
     dispatchAssetEditorCommand(store, { type: "history.redo" });
     dispatchAssetEditorCommand(store, { type: "history.redo" });
     expect(store.getState().document).toEqual({
+      mode: "character",
       prompt: "Add a blue scarf",
       character: {
         nodePositions: { prototype: { x: 120, y: 160 } },
@@ -85,16 +103,21 @@ describe("asset editor session commands", () => {
   });
 
   it("resets the draft, saved baseline, and history together", () => {
-    const store = createAssetEditorSessionStore({ prompt: "Base prompt" });
+    const store = createAssetEditorSessionStore(
+      createSpriteSheetDocument("Base prompt"),
+    );
     dispatchAssetEditorCommand(store, {
       type: "prompt.set",
       value: "Temporary edit",
     });
 
-    resetAssetEditorSessionStore(store, { prompt: "Replacement document" });
+    resetAssetEditorSessionStore(
+      store,
+      createSpriteSheetDocument("Replacement document"),
+    );
 
     expect(getAssetEditorSessionSnapshot(store, idleSaveState)).toEqual({
-      document: { prompt: "Replacement document" },
+      document: createSpriteSheetDocument("Replacement document"),
       dirty: false,
       canUndo: false,
       canRedo: false,
@@ -103,7 +126,9 @@ describe("asset editor session commands", () => {
   });
 
   it("marks a cloned save baseline without changing history", () => {
-    const store = createAssetEditorSessionStore({ prompt: "Base prompt" });
+    const store = createAssetEditorSessionStore(
+      createSpriteSheetDocument("Base prompt"),
+    );
     dispatchAssetEditorCommand(store, {
       type: "prompt.set",
       value: "Saved prompt",

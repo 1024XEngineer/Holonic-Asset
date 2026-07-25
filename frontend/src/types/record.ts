@@ -45,21 +45,64 @@ export type EditorSpriteSheetItem = {
   tiles: EditorSpriteSheetTile[];
 };
 
-export type RecordContent = {
+export type CharacterAssetKind = "character" | "object";
+export type SceneryAssetKind = "scenery";
+export type SpriteSheetAssetKind = Exclude<
+  AssetKind,
+  CharacterAssetKind | SceneryAssetKind
+>;
+
+export type CharacterRecordContent = {
+  mode: "character";
   prompt: string;
-  character?: {
+  character: {
     prototypeName?: string;
     animations?: EditorCharacterAnimation[];
     nodePositions: Record<string, EditorCanvasPosition>;
   };
-  scenery?: {
+};
+
+export type SceneryRecordContent = {
+  mode: "scenery";
+  prompt: string;
+  scenery: {
     layers: EditorSceneryLayer[];
   };
-  spriteSheet?: {
+};
+
+export type SpriteSheetRecordContent = {
+  mode: "sprite-sheet";
+  prompt: string;
+  spriteSheet: {
     gridSize: number;
     items: EditorSpriteSheetItem[];
   };
 };
+
+export type RecordContent =
+  | CharacterRecordContent
+  | SceneryRecordContent
+  | SpriteSheetRecordContent;
+
+export type RecordContentForKind<K extends AssetKind> =
+  K extends CharacterAssetKind
+    ? CharacterRecordContent
+    : K extends SceneryAssetKind
+      ? SceneryRecordContent
+      : SpriteSheetRecordContent;
+
+export function recordModeForAssetKind(kind: AssetKind): RecordContent["mode"] {
+  if (kind === "character" || kind === "object") return "character";
+  if (kind === "scenery") return "scenery";
+  return "sprite-sheet";
+}
+
+export function isRecordContentForAssetKind<K extends AssetKind>(
+  kind: K,
+  content: RecordContent,
+): content is RecordContentForKind<K> {
+  return content.mode === recordModeForAssetKind(kind);
+}
 
 export type AssetRecord = {
   id: string;
@@ -71,17 +114,19 @@ export type AssetRecord = {
   content?: RecordContent;
 };
 
-export type RecordWorkspaceAsset = {
+export type RecordWorkspaceAsset<K extends AssetKind = AssetKind> = {
   id: string;
   projectId: string;
-  kind: AssetKind;
+  kind: K;
   name: string;
   version: string;
   history: AssetRecord[];
 };
 
-export type RecordData = {
+export type RecordDataForKind<K extends AssetKind> = {
   projectName: string;
-  asset: RecordWorkspaceAsset;
-  content: RecordContent;
+  asset: RecordWorkspaceAsset<K>;
+  content: RecordContentForKind<K>;
 };
+
+export type RecordData = RecordDataForKind<AssetKind>;

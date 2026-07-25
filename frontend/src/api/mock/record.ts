@@ -46,7 +46,7 @@ export function getMockRecord(
         version: asset.version,
         history: structuredClone(asset.history),
       },
-      content: mergeRecord(fallback, currentRecord?.content),
-    };
+      content: mergeRecord(group.kind, fallback, currentRecord?.content),
+    } as RecordData;
   }, options);
 }

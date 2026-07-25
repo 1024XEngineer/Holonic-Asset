@@ -9,9 +9,19 @@ import { saveAssetEditorSessionRevision } from "./asset-editor-session-save";
 
 const idleSaveState = { phase: "idle" } as const;
 
+function createSpriteSheetDocument(prompt: string) {
+  return {
+    mode: "sprite-sheet" as const,
+    prompt,
+    spriteSheet: { gridSize: 8, items: [] },
+  };
+}
+
 describe("asset editor session save", () => {
   it("marks only the submitted snapshot as saved", async () => {
-    const store = createAssetEditorSessionStore({ prompt: "First edit" });
+    const store = createAssetEditorSessionStore(
+      createSpriteSheetDocument("First edit"),
+    );
     let finishSave: (() => void) | undefined;
     const saveRevision = () =>
       new Promise<void>((resolve) => {
@@ -38,7 +48,9 @@ describe("asset editor session save", () => {
   });
 
   it("preserves the baseline when saving fails", async () => {
-    const store = createAssetEditorSessionStore({ prompt: "Base prompt" });
+    const store = createAssetEditorSessionStore(
+      createSpriteSheetDocument("Base prompt"),
+    );
     dispatchAssetEditorCommand(store, {
       type: "prompt.set",
       value: "Unsaved prompt",
@@ -58,7 +70,9 @@ describe("asset editor session save", () => {
   });
 
   it("ignores a result for a replaced session", async () => {
-    const store = createAssetEditorSessionStore({ prompt: "Base prompt" });
+    const store = createAssetEditorSessionStore(
+      createSpriteSheetDocument("Base prompt"),
+    );
     dispatchAssetEditorCommand(store, {
       type: "prompt.set",
       value: "Unsaved prompt",

@@ -1,5 +1,9 @@
 import type { AssetKind } from "@/types/asset-kind";
-import type { AssetRecord, AssetRecordStatus } from "@/types/record";
+import type {
+  AssetRecord,
+  AssetRecordStatus,
+  EditorSceneryLayer,
+} from "@/types/record";
 
 export type Asset = {
   id: string;
@@ -19,13 +23,7 @@ export type AssetAnimation = {
   status: AssetRecordStatus;
 };
 
-export type SceneryLayer = {
-  id: string;
-  label: string;
-  detail: string;
-  imageUrl: string;
-  blendMode: "normal" | "multiply";
-};
+export type SceneryLayer = EditorSceneryLayer;
 
 export type SceneryAssetData = {
   layers: SceneryLayer[];

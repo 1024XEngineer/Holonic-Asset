@@ -7,6 +7,7 @@ import {
   listMockGenerationRuns,
   listMockProjects,
   resetMockWorkspace,
+  saveMockAssetRevision,
 } from "./workspace";
 
 afterEach(resetMockWorkspace);
@@ -43,5 +44,15 @@ describe("Mock Workspace", () => {
 
     expect(await listMockAssetGroups("moonlit-orchard")).not.toEqual([]);
     expect(await listMockGenerationRuns("moonlit-orchard")).toEqual([]);
+  });
+
+  it("rejects a record document whose mode does not match the asset kind", async () => {
+    await expect(
+      saveMockAssetRevision("moonlit-orchard", "forager-hero", {
+        mode: "sprite-sheet",
+        prompt: "Invalid mode",
+        spriteSheet: { gridSize: 8, items: [] },
+      }),
+    ).rejects.toThrow("Record content does not match the asset kind.");
   });
 });

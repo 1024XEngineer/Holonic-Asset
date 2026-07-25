@@ -4,7 +4,10 @@ import type { ProjectAsset } from "@/types/asset";
 import type { AssetKind } from "@/types/asset-kind";
 import type { GenerationRun } from "@/types/generation";
 import type { ProjectSummary } from "@/types/project";
-import type { RecordContent } from "@/types/record";
+import {
+  isRecordContentForAssetKind,
+  type RecordContent,
+} from "@/types/record";
 
 type MockWorkspaceState = {
   projects: ProjectSummary[];
@@ -149,6 +152,12 @@ export async function saveMockAssetRevision(
   content: RecordContent,
 ) {
   const groups = workspace.assetGroupsByProject[projectId] ?? [];
+  const assetGroup = groups.find((group) =>
+    group.assets.some((asset) => asset.id === assetId),
+  );
+  if (assetGroup && !isRecordContentForAssetKind(assetGroup.kind, content)) {
+    throw new Error("Record content does not match the asset kind.");
+  }
   const savedAt = new Date();
 
   workspace.assetGroupsByProject = {

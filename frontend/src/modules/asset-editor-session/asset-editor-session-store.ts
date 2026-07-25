@@ -30,17 +30,26 @@ export function createAssetEditorSessionStore(initialDocument: RecordContent) {
         setPrompt: (prompt) =>
           set((state) => ({ document: { ...state.document, prompt } })),
         setCharacterNodePosition: (nodeId, position) =>
-          set((state) => ({
-            document: {
-              ...state.document,
-              character: {
-                nodePositions: {
-                  ...state.document.character?.nodePositions,
-                  [nodeId]: position,
+          set((state) => {
+            if (state.document.mode !== "character") {
+              throw new Error(
+                "Character node positions require a character record document.",
+              );
+            }
+
+            return {
+              document: {
+                ...state.document,
+                character: {
+                  ...state.document.character,
+                  nodePositions: {
+                    ...state.document.character.nodePositions,
+                    [nodeId]: position,
+                  },
                 },
               },
-            },
-          })),
+            };
+          }),
       }),
       {
         limit: 100,

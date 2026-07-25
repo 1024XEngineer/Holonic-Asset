@@ -77,38 +77,52 @@ export function EditorWorkspace({
   const modeProps = {
     prompt: snapshot.document.prompt,
     history: asset.history,
-    characterNodePositions: snapshot.document.character?.nodePositions,
-    characterAnimations: snapshot.document.character?.animations ?? [],
     onAction: reportAction,
-    onCharacterPositionChange: (
-      nodeId: string,
-      position: EditorCanvasPosition,
-    ) =>
-      session.dispatch({
-        type: "character.node-position.set",
-        nodeId,
-        position,
-      }),
     onPromptChange: (value: string) =>
       session.dispatch({ type: "prompt.set", value }),
     renderHeader,
   };
 
+  const editorMode = (() => {
+    switch (snapshot.document.mode) {
+      case "character":
+        return (
+          <CharacterEditorMode
+            {...modeProps}
+            characterAnimations={snapshot.document.character.animations ?? []}
+            characterNodePositions={snapshot.document.character.nodePositions}
+            onCharacterPositionChange={(
+              nodeId: string,
+              position: EditorCanvasPosition,
+            ) =>
+              session.dispatch({
+                type: "character.node-position.set",
+                nodeId,
+                position,
+              })
+            }
+          />
+        );
+      case "scenery":
+        return (
+          <SceneryEditorMode
+            {...modeProps}
+            layers={snapshot.document.scenery.layers}
+          />
+        );
+      case "sprite-sheet":
+        return (
+          <SpriteSheetEditorMode
+            {...modeProps}
+            spriteSheet={snapshot.document.spriteSheet}
+          />
+        );
+    }
+  })();
+
   return (
     <div className="asset-workspace-shell flex h-screen min-h-0 w-screen flex-col overflow-hidden bg-[#f7f5f0] text-[#2d2923] selection:bg-[#d99096] selection:text-[#2d2923]">
-      {asset.kind === "character" || asset.kind === "object" ? (
-        <CharacterEditorMode {...modeProps} />
-      ) : asset.kind === "scenery" ? (
-        <SceneryEditorMode
-          {...modeProps}
-          layers={snapshot.document.scenery?.layers ?? []}
-        />
-      ) : (
-        <SpriteSheetEditorMode
-          {...modeProps}
-          spriteSheet={snapshot.document.spriteSheet}
-        />
-      )}
+      {editorMode}
     </div>
   );
 }

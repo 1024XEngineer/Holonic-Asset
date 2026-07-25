@@ -1,4 +1,4 @@
-import type { RecordContent } from "@/types/record";
+import type { SpriteSheetRecordContent } from "@/types/record";
 
 import { StaticAssetTree } from "../AssetTree/StaticAssetTree";
 import { SpriteSheetStage } from "../Canvas/SpriteSheetStage";
@@ -14,9 +14,9 @@ export function SpriteSheetEditorMode({
   renderHeader,
   spriteSheet,
 }: EditorModeProps & {
-  spriteSheet: RecordContent["spriteSheet"];
+  spriteSheet: SpriteSheetRecordContent["spriteSheet"];
 }) {
-  const items = spriteSheet?.items ?? [];
+  const items = spriteSheet.items;
   const stage = useSpriteSheetStageMachine(items);
   const selectedItems = [
     ...stage.selectedItems,
@@ -47,7 +47,7 @@ export function SpriteSheetEditorMode({
           onToggleTile={stage.toggleTile}
         />
         <SpriteSheetStage
-          gridSize={spriteSheet?.gridSize ?? 8}
+          gridSize={spriteSheet.gridSize}
           items={items}
           selectedItems={stage.selectedItems}
           selectedTiles={stage.selectedTiles}

@@ -7,6 +7,10 @@ import {
   type CharacterCanvasNodeId,
   type CharacterCanvasSelection,
 } from "@/modules/character-canvas";
+import type {
+  EditorCanvasPosition,
+  EditorCharacterAnimation,
+} from "@/types/record";
 
 import { AssetTree } from "../AssetTree/AssetTree";
 import { Inspector } from "../Inspector/Inspector";
@@ -21,7 +25,14 @@ export function CharacterEditorMode({
   onCharacterPositionChange,
   onPromptChange,
   renderHeader,
-}: EditorModeProps) {
+}: EditorModeProps & {
+  characterAnimations: EditorCharacterAnimation[];
+  characterNodePositions: Record<string, EditorCanvasPosition>;
+  onCharacterPositionChange: (
+    nodeId: string,
+    position: EditorCanvasPosition,
+  ) => void;
+}) {
   const [canvasSelection, setCanvasSelection] =
     useState<CharacterCanvasSelection>({
       nodeIds: [],

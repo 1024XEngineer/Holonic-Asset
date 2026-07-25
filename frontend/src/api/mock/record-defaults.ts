@@ -1,10 +1,15 @@
 import type { ProjectAsset } from "@/types/asset";
 import type { AssetKind } from "@/types/asset-kind";
 import type {
+  CharacterRecordContent,
   RecordContent,
+  RecordContentForKind,
+  SceneryRecordContent,
+  SpriteSheetRecordContent,
   EditorCharacterAnimation,
   EditorSpriteSheetItem,
 } from "@/types/record";
+import { isRecordContentForAssetKind } from "@/types/record";
 
 const defaultCharacterAnimations: EditorCharacterAnimation[] = [
   {
@@ -73,83 +78,107 @@ const objectItems: EditorSpriteSheetItem[] = [
   },
 ];
 
-export function createDefaultRecord(
-  kind: AssetKind,
+export function createDefaultRecord<K extends AssetKind>(
+  kind: K,
   asset: ProjectAsset,
-): RecordContent {
+): RecordContentForKind<K> {
   const base = { prompt: asset.description };
 
   if (kind === "character" || kind === "object") {
     return {
+      mode: "character",
       ...base,
       character: {
         prototypeName: `${asset.id}-prototype.png`,
         animations: structuredClone(defaultCharacterAnimations),
         nodePositions: {},
       },
-    };
+    } as RecordContentForKind<K>;
   }
 
   if (kind === "scenery") {
     return {
+      mode: "scenery",
       ...base,
       scenery: {
         layers: structuredClone(asset.scenery?.layers ?? []),
       },
-    };
+    } as RecordContentForKind<K>;
   }
 
   return {
+    mode: "sprite-sheet",
     ...base,
     spriteSheet: {
       gridSize: 8,
       items: structuredClone(kind === "tiles" ? tilesetItems : objectItems),
     },
+  } as RecordContentForKind<K>;
+}
+
+export function mergeRecord<K extends AssetKind>(
+  kind: K,
+  fallback: RecordContentForKind<K>,
+  saved: RecordContent | undefined,
+): RecordContentForKind<K> {
+  if (!saved || !isRecordContentForAssetKind(kind, saved)) return fallback;
+
+  switch (fallback.mode) {
+    case "character":
+      return mergeCharacterRecord(
+        fallback as CharacterRecordContent,
+        saved as CharacterRecordContent,
+      ) as RecordContentForKind<K>;
+    case "scenery":
+      return mergeSceneryRecord(
+        saved as SceneryRecordContent,
+      ) as RecordContentForKind<K>;
+    case "sprite-sheet":
+      return mergeSpriteSheetRecord(
+        saved as SpriteSheetRecordContent,
+      ) as RecordContentForKind<K>;
+  }
+}
+
+function mergeCharacterRecord(
+  fallback: CharacterRecordContent,
+  saved: CharacterRecordContent,
+): CharacterRecordContent {
+  return {
+    mode: "character",
+    prompt: saved.prompt,
+    character: {
+      prototypeName:
+        saved.character.prototypeName ??
+        fallback.character.prototypeName ??
+        "prototype.png",
+      animations:
+        saved.character.animations ?? fallback.character.animations ?? [],
+      nodePositions: {
+        ...fallback.character.nodePositions,
+        ...saved.character.nodePositions,
+      },
+    },
   };
 }
 
-export function mergeRecord(
-  fallback: RecordContent,
-  saved: RecordContent | undefined,
-): RecordContent {
-  if (!saved) return fallback;
-
+function mergeSceneryRecord(saved: SceneryRecordContent): SceneryRecordContent {
   return {
-    ...fallback,
-    ...structuredClone(saved),
-    character:
-      fallback.character || saved.character
-        ? {
-            prototypeName:
-              saved.character?.prototypeName ??
-              fallback.character?.prototypeName ??
-              "prototype.png",
-            animations:
-              saved.character?.animations ??
-              fallback.character?.animations ??
-              [],
-            nodePositions: {
-              ...fallback.character?.nodePositions,
-              ...saved.character?.nodePositions,
-            },
-          }
-        : undefined,
-    scenery:
-      fallback.scenery || saved.scenery
-        ? {
-            layers: saved.scenery?.layers ?? fallback.scenery?.layers ?? [],
-          }
-        : undefined,
-    spriteSheet:
-      fallback.spriteSheet || saved.spriteSheet
-        ? {
-            gridSize:
-              saved.spriteSheet?.gridSize ??
-              fallback.spriteSheet?.gridSize ??
-              8,
-            items:
-              saved.spriteSheet?.items ?? fallback.spriteSheet?.items ?? [],
-          }
-        : undefined,
+    mode: "scenery",
+    prompt: saved.prompt,
+    scenery: { layers: saved.scenery.layers },
+  };
+}
+
+function mergeSpriteSheetRecord(
+  saved: SpriteSheetRecordContent,
+): SpriteSheetRecordContent {
+  return {
+    mode: "sprite-sheet",
+    prompt: saved.prompt,
+    spriteSheet: {
+      gridSize: saved.spriteSheet.gridSize,
+      items: saved.spriteSheet.items,
+    },
   };
 }
