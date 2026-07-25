@@ -5,8 +5,12 @@ import {
   useGenerateQuickAssetMutation,
   useQuickAssetsQuery,
 } from "@/api/quick-generation";
-import type { QuickGenerationAsset } from "@/domain/quick-generation";
-import { quickGenerationSizes } from "./QuickGeneration.constants";
+import {
+  createQuickGenerationDraft,
+  quickGenerationSizes,
+  toGenerateQuickAssetInput,
+  type QuickGenerationAsset,
+} from "@/domain/quick-generation";
 
 export function useQuickGeneration() {
   const assetsQuery = useQuickAssetsQuery();
@@ -15,12 +19,9 @@ export function useQuickGeneration() {
   const [currentAssetId, setCurrentAssetId] = useState<
     string | null | undefined
   >(undefined);
-  const [description, setDescription] = useState("");
-  const [referenceImage, setReferenceImage] = useState("");
-  const [referenceFileName, setReferenceFileName] = useState<
-    string | undefined
-  >();
-  const [size, setSize] = useState(quickGenerationSizes[1]);
+  const [draft, setDraft] = useState(() =>
+    createQuickGenerationDraft<string>(),
+  );
   const referencePreviews = useRef<Record<string, string>>({});
   const ownedReferenceUrls = useRef(new Set<string>());
   const assets = assetsQuery.data ?? [];
@@ -35,10 +36,7 @@ export function useQuickGeneration() {
     if (assetsQuery.isPending || currentAssetId !== undefined) return;
     const firstAsset = assets[0];
     setCurrentAssetId(firstAsset?.id ?? null);
-    if (firstAsset) {
-      setSize(firstAsset.size);
-      setReferenceFileName(firstAsset.referenceFileName);
-    }
+    setDraft(createQuickGenerationDraft(firstAsset));
   }, [assets, assetsQuery.isPending, currentAssetId]);
 
   useEffect(
@@ -54,41 +52,32 @@ export function useQuickGeneration() {
   function selectAsset(asset: QuickGenerationAsset) {
     releaseUncommittedReference();
     setCurrentAssetId(asset.id);
-    setDescription("");
-    setReferenceImage(referencePreviews.current[asset.id] ?? "");
-    setReferenceFileName(asset.referenceFileName);
-    setSize(asset.size);
+    setDraft(
+      createQuickGenerationDraft(
+        asset,
+        referencePreviews.current[asset.id] ?? "",
+      ),
+    );
   }
 
   function newAsset() {
     releaseUncommittedReference();
     setCurrentAssetId(null);
-    setDescription("");
-    setReferenceImage("");
-    setReferenceFileName(undefined);
-    setSize(quickGenerationSizes[1]);
+    setDraft(createQuickGenerationDraft());
   }
 
   function generate() {
-    if (!description.trim()) return;
-    const previousAssetId = currentAsset?.id;
-    const submittedReferenceImage = referenceImage;
+    const request = toGenerateQuickAssetInput(draft);
+    if (!request) return;
+    const submittedReferenceImage = draft.reference ?? "";
 
-    generateMutation.mutate(
-      {
-        assetId: previousAssetId,
-        prompt: description,
-        size,
-        referenceFileName,
+    generateMutation.mutate(request, {
+      onSuccess: (asset) => {
+        commitReferencePreview(asset.id, submittedReferenceImage);
+        setCurrentAssetId(asset.id);
+        setDraft(createQuickGenerationDraft(asset, submittedReferenceImage));
       },
-      {
-        onSuccess: (asset) => {
-          commitReferencePreview(asset.id, submittedReferenceImage);
-          setCurrentAssetId(asset.id);
-          setDescription("");
-        },
-      },
-    );
+    });
   }
 
   function deleteCurrentAsset() {
@@ -102,12 +91,12 @@ export function useQuickGeneration() {
         releaseReferencePreview(deletedAssetId);
         const nextAsset = remaining[0];
         setCurrentAssetId(nextAsset?.id ?? null);
-        setReferenceImage(
-          nextAsset ? (referencePreviews.current[nextAsset.id] ?? "") : "",
+        setDraft(
+          createQuickGenerationDraft(
+            nextAsset,
+            nextAsset ? (referencePreviews.current[nextAsset.id] ?? "") : "",
+          ),
         );
-        setReferenceFileName(nextAsset?.referenceFileName);
-        setSize(nextAsset?.size ?? quickGenerationSizes[1]);
-        setDescription("");
       },
     });
   }
@@ -117,14 +106,20 @@ export function useQuickGeneration() {
     releaseUncommittedReference();
     const previewUrl = URL.createObjectURL(file);
     ownedReferenceUrls.current.add(previewUrl);
-    setReferenceImage(previewUrl);
-    setReferenceFileName(file.name);
+    setDraft((current) => ({
+      ...current,
+      reference: previewUrl,
+      referenceFileName: file.name,
+    }));
   }
 
   function clearReference() {
     releaseUncommittedReference();
-    setReferenceImage("");
-    setReferenceFileName(undefined);
+    setDraft((current) => ({
+      ...current,
+      reference: "",
+      referenceFileName: undefined,
+    }));
   }
 
   function releaseUncommittedReference() {
@@ -132,8 +127,8 @@ export function useQuickGeneration() {
       typeof currentAssetId === "string"
         ? referencePreviews.current[currentAssetId]
         : undefined;
-    if (referenceImage && referenceImage !== committedReference) {
-      revokeOwnedUrl(referenceImage);
+    if (draft.reference && draft.reference !== committedReference) {
+      revokeOwnedUrl(draft.reference);
     }
   }
 
@@ -147,7 +142,6 @@ export function useQuickGeneration() {
     } else {
       delete referencePreviews.current[assetId];
     }
-    setReferenceImage(previewUrl);
   }
 
   function releaseReferencePreview(assetId: string) {
@@ -172,7 +166,7 @@ export function useQuickGeneration() {
     currentAsset,
     currentAssetId: currentAssetId ?? null,
     deleteCurrentAsset,
-    description,
+    description: draft.prompt,
     generate,
     isDeleting: deleteMutation.isPending,
     isGenerating: generateMutation.isPending,
@@ -181,11 +175,12 @@ export function useQuickGeneration() {
     loadError: assetsQuery.error,
     newAsset,
     quickGenerationSizes,
-    referenceImage,
+    referenceImage: draft.reference ?? "",
     reload: assetsQuery.refetch,
     selectAsset,
-    setDescription,
-    setSize,
-    size,
+    setDescription: (prompt: string) =>
+      setDraft((current) => ({ ...current, prompt })),
+    setSize: (size: string) => setDraft((current) => ({ ...current, size })),
+    size: draft.size,
   };
 }

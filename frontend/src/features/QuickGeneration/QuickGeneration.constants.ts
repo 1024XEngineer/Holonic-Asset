@@ -1,11 +1,3 @@
-export const quickGenerationSizes = [
-  "32 × 32 px",
-  "64 × 64 px",
-  "128 × 128 px",
-  "256 × 256 px",
-  "512 × 512 px",
-];
-
 const seededPreviewClassNames: Record<string, string> = {
   "mushroom-courier":
     "bg-[radial-gradient(circle_at_35%_28%,#f4c665_0,transparent_25%),linear-gradient(145deg,#243847,#708d78)]",
