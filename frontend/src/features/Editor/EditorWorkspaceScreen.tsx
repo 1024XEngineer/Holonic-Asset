@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { RecordData } from "@/types/record";
+import type { RecordData } from "@/domain/asset";
 
 import { EditorWorkspace } from "./EditorWorkspace";
 

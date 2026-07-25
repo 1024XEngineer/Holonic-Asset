@@ -1,4 +1,4 @@
-import type { AssetRecord } from "@/types/record";
+import type { AssetRecord } from "@/domain/asset";
 
 export type EditorModeProps = {
   prompt: string;

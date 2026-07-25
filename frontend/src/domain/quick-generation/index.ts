@@ -5,7 +5,6 @@ export type QuickGenerationAsset = {
   referenceFileName?: string;
   previewUrl?: string;
 };
-
 export type GenerateQuickAssetInput = {
   assetId?: string;
   prompt: string;

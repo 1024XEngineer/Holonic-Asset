@@ -1,23 +1,23 @@
-import type { CreatableAssetKind } from "@/types/asset-kind";
+import type { CreatableAssetKind } from "@/domain/asset";
 
-export type CreationRequest = {
+export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
   name: string;
   prompt: string;
   canvasSize: string;
   perspective?: "top-down" | "side-on" | "isometric";
   directionCount?: "1" | "4" | "8";
-  reference?: File;
+  reference?: Reference;
   useProjectContext: boolean;
   backgroundType?: "scenery" | "tiles";
   style?: string;
   aspectRatio?: string;
   layers?: { description: string }[];
-  tiles?: { description: string; reference?: File }[];
+  tiles?: { description: string; reference?: Reference }[];
   components?: { name: string; description: string; isCustom: boolean }[];
 };
 
-export type GenerationRun = CreationRequest & {
+export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
   id: string;
   projectId: string;
   status: "queued" | "processing" | "failed";

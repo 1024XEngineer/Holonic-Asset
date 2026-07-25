@@ -2,7 +2,7 @@ import { listMockAssetGroups, listMockProjects } from "./workspace";
 import { DataApiError } from "@/api/api-error";
 import { createDefaultRecord, mergeRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "./request";
-import type { RecordData } from "@/types/record";
+import type { RecordData } from "@/domain/asset";
 
 export type GetRecordInput = {
   projectId: string;

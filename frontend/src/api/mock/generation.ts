@@ -1,6 +1,6 @@
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
-import type { GenerationRun } from "@/types/generation";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetKind } from "@/domain/asset";
+import type { GenerationRun } from "@/domain/generation";
 
 export type MockGeneratedAsset = {
   asset: ProjectAsset;

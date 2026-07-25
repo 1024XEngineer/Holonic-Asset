@@ -4,7 +4,7 @@ import {
   listMockProjects,
   updateMockProject,
 } from "@/api/mock";
-import type { ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/domain/project";
 
 export const projectApi = {
   list: (): Promise<ProjectSummary[]> => listMockProjects(),

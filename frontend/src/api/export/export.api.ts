@@ -1,5 +1,5 @@
 import { createMockExportJob, mockExportJobs } from "@/api/mock";
-import type { ExportSpecification } from "@/types/export";
+import type { ExportSpecification } from "@/domain/export";
 
 export const exportApi = {
   list: async () => structuredClone(mockExportJobs),

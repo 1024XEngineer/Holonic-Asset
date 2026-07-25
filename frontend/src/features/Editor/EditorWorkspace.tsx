@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { EditorCanvasPosition, RecordData } from "@/types/record";
+import type { EditorCanvasPosition, RecordData } from "@/domain/asset";
 import { useAssetEditorSession } from "@/modules/asset-editor-session";
 import { useTimeout } from "@/hooks/use-timeout";
 

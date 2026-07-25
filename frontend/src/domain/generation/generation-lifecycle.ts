@@ -1,22 +1,15 @@
-import type { AssetGroup } from "@/types/asset-library";
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
-import type { CreationRequest, GenerationRun } from "@/types/generation";
+import type { AssetGroup, AssetKind, ProjectAsset } from "@/domain/asset";
 
-export type GenerationInput = {
-  projectId: string;
-  request: CreationRequest;
-};
+import type { CreationRequest, GenerationRun } from "./generation";
 
+export type GenerationInput = { projectId: string; request: CreationRequest };
 export type GenerationLifecycleUpdate =
   | { kind: "run-upserted"; run: GenerationRun }
   | { kind: "run-removed"; projectId: string; runId: string };
-
 export type GenerationLifecycleResult = {
   assetGroups?: AssetGroup[];
   run: GenerationRun;
 };
-
 export type GenerationLifecycleAdapter = {
   createRun: (run: Omit<GenerationRun, "id" | "status">) => GenerationRun;
   updateRun: (run: GenerationRun) => GenerationRun;
@@ -40,13 +33,11 @@ export function createGenerationLifecycle(adapter: GenerationLifecycleAdapter) {
     ): Promise<GenerationLifecycleResult> {
       const queuedRun = adapter.createRun({ ...request, projectId });
       onUpdate({ kind: "run-upserted", run: queuedRun });
-
       const processingRun = adapter.updateRun({
         ...queuedRun,
         status: "processing",
       });
       onUpdate({ kind: "run-upserted", run: processingRun });
-
       const removeRun = () => {
         adapter.removeRun(processingRun.id);
         onUpdate({
@@ -55,14 +46,12 @@ export function createGenerationLifecycle(adapter: GenerationLifecycleAdapter) {
           runId: processingRun.id,
         });
       };
-
       try {
         const generated = await adapter.completeGeneration(processingRun);
         if (!adapter.hasProject(projectId)) {
           removeRun();
           return { run: processingRun };
         }
-
         const assetGroups = await adapter.addAsset(
           projectId,
           generated.kind,
@@ -75,7 +64,6 @@ export function createGenerationLifecycle(adapter: GenerationLifecycleAdapter) {
           removeRun();
           return { run: processingRun };
         }
-
         const failedRun = adapter.updateRun({
           ...processingRun,
           status: "failed",

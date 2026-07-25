@@ -7,7 +7,7 @@ import {
 
 import { audioApi } from "@/api/audio/audio.api";
 import { audioKeys } from "@/api/audio/audio.keys";
-import type { AudioTrack } from "@/types/audio";
+import type { AudioTrack } from "@/domain/audio";
 
 export function addAudioTrackMutationOptions(queryClient: QueryClient) {
   return mutationOptions({

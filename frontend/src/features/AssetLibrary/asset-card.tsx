@@ -15,8 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetKind } from "@/domain/asset";
 import { AssetTypeIcon } from "@/components/ui/custom/AssetTypeIcon";
 import { AssetPreview } from "./asset-preview";
 

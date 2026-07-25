@@ -3,7 +3,7 @@ import { CreateAssetToolbar, GenerationQueue } from "@/features/Generation";
 import { ProjectSidebar } from "@/features/Project";
 import { AppHeader } from "@/components/layouts/AppHeader";
 import { ProjectChrome } from "@/components/layouts/ProjectChrome";
-import { creatableAssetKinds } from "@/types/asset-kind";
+import { creatableAssetKinds } from "@/domain/asset";
 import { useProjectLibrary } from "./useProjectLibrary";
 
 export function ProjectLibraryPage() {

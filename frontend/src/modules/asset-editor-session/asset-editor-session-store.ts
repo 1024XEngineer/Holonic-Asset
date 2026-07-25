@@ -1,7 +1,7 @@
 import { createStore } from "zustand";
 import { temporal } from "zundo";
 
-import type { RecordContent, EditorCanvasPosition } from "@/types/record";
+import type { RecordContent, EditorCanvasPosition } from "@/domain/asset";
 
 import type {
   AssetEditorCommand,

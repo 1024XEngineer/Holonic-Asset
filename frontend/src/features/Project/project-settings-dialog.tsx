@@ -17,15 +17,15 @@ import { Input } from "@/components/ui/input";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
-
-import type { ProjectSummary } from "@/types/project";
 import {
   applyProjectSettings,
   createProjectSettingsDraft,
   editableProjectContextOptions,
   projectContextOptions,
+  updateProjectSettingsDraft,
   type ProjectSettingsDraft,
-} from "./project-context";
+} from "@/domain/project/project-context";
+import type { ProjectSummary } from "@/domain/project";
 
 export function ProjectSettingsDialog({
   project,
@@ -56,7 +56,10 @@ export function ProjectSettingsDialog({
     key: K,
     value: ProjectSettingsDraft[K],
   ) {
-    form.setFieldValue("draft", { ...form.state.values.draft, [key]: value });
+    form.setFieldValue(
+      "draft",
+      updateProjectSettingsDraft(form.state.values.draft, key, value),
+    );
   }
 
   function uploadDirection(file: File | undefined) {
@@ -117,19 +120,13 @@ export function ProjectSettingsDialog({
               label="Game type"
               value={values.gameType}
               options={[...editableProjectContextOptions.gameTypes]}
-              onChange={(value) => {
-                update("gameType", value);
-                if (value !== "Other") update("customGameType", "");
-              }}
+              onChange={(value) => update("gameType", value)}
             />
             <DropdownField
               label="Visual style"
               value={values.visualStyle}
               options={[...editableProjectContextOptions.visualStyles]}
-              onChange={(value) => {
-                update("visualStyle", value);
-                if (value !== "Other") update("customVisualStyle", "");
-              }}
+              onChange={(value) => update("visualStyle", value)}
             />
             {values.gameType === "Other" ? (
               <label

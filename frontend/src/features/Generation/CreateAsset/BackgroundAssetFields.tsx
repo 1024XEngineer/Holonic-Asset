@@ -5,7 +5,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/custom/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import type { BackgroundAssetCreationDraft } from "@/modules/asset-creation";
+import type { BackgroundAssetCreationDraft } from "@/domain/asset/asset-creation";
 
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 
@@ -13,8 +13,8 @@ export function BackgroundAssetFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft;
-  onChange: (draft: BackgroundAssetCreationDraft) => void;
+  draft: BackgroundAssetCreationDraft<File>;
+  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
 }) {
   return draft.backgroundType === "scenery" ? (
     <SceneryFields draft={draft} onChange={onChange} />
@@ -27,8 +27,8 @@ export function BackgroundAssetTypeField({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft;
-  onChange: (draft: BackgroundAssetCreationDraft) => void;
+  draft: BackgroundAssetCreationDraft<File>;
+  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
 }) {
   return (
     <div
@@ -65,8 +65,8 @@ function SceneryFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft;
-  onChange: (draft: BackgroundAssetCreationDraft) => void;
+  draft: BackgroundAssetCreationDraft<File>;
+  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
 }) {
   return (
     <>
@@ -140,12 +140,12 @@ function TileSetFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft;
-  onChange: (draft: BackgroundAssetCreationDraft) => void;
+  draft: BackgroundAssetCreationDraft<File>;
+  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
 }) {
   const updateTile = (
     index: number,
-    patch: Partial<BackgroundAssetCreationDraft["tiles"][number]>,
+    patch: Partial<BackgroundAssetCreationDraft<File>["tiles"][number]>,
   ) =>
     onChange({
       ...draft,

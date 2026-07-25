@@ -1,6 +1,6 @@
 import { useReducer } from "react";
 
-import type { EditorSpriteSheetItem } from "@/types/record";
+import type { EditorSpriteSheetItem } from "@/domain/asset";
 
 import type { SpriteSheetCanvasEvent } from "./SpriteSheetCanvas.interface";
 

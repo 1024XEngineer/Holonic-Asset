@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { assetKinds, type AssetKind } from "@/types/asset-kind";
+import { assetKinds, type AssetKind } from "@/domain/asset";
 import { getAssetTypeConfig } from "@/components/ui/custom/asset-type-config";
 import { AssetTypeIcon } from "@/components/ui/custom/AssetTypeIcon";
 

@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Layers3 } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { EditorSceneryLayer } from "@/types/record";
+import type { EditorSceneryLayer } from "@/domain/asset";
 
 export function SceneryLayerTree({
   layers,

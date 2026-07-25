@@ -7,7 +7,7 @@ import {
 
 import { quickGenerationApi } from "@/api/quick-generation/quick-generation.api";
 import { quickGenerationKeys } from "@/api/quick-generation/quick-generation.keys";
-import type { QuickGenerationAsset } from "@/types/quick-generation";
+import type { QuickGenerationAsset } from "@/domain/quick-generation";
 
 export function generateQuickAssetMutationOptions(queryClient: QueryClient) {
   return mutationOptions({

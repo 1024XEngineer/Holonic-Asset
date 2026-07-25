@@ -1,7 +1,7 @@
-import type { AssetGroup, AssetGroupsByProject } from "@/types/asset-library";
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetRecord } from "@/types/record";
-import type { ProjectSummary } from "@/types/project";
+import type { AssetGroup, AssetGroupsByProject } from "@/domain/asset";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetRecord } from "@/domain/asset";
+import type { ProjectSummary } from "@/domain/project";
 
 export const projectSummaries: ProjectSummary[] = [
   {

@@ -1,13 +1,13 @@
 import { assetGroupsByProject, projectSummaries } from "./project.seed";
-import type { AssetGroupsByProject } from "@/types/asset-library";
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
-import type { GenerationRun } from "@/types/generation";
-import type { ProjectSummary } from "@/types/project";
+import type { AssetGroupsByProject } from "@/domain/asset";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetKind } from "@/domain/asset";
+import type { GenerationRun } from "@/domain/generation";
+import type { ProjectSummary } from "@/domain/project";
 import {
   isRecordContentForAssetKind,
   type RecordContent,
-} from "@/types/record";
+} from "@/domain/asset";
 
 type MockWorkspaceState = {
   projects: ProjectSummary[];

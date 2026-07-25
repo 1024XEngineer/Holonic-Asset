@@ -1,12 +1,12 @@
 import { useForm } from "@tanstack/react-form";
 import { ArrowLeft, Gamepad2, Lightbulb, Sparkles } from "lucide-react";
 
-import type { ProjectSummary } from "@/types/project";
 import {
   createNewProjectDraft,
   projectContextOptions,
   toProjectSummary,
-} from "./project-context";
+} from "@/domain/project/project-context";
+import type { ProjectSummary } from "@/domain/project";
 
 export function NewProjectScreen({
   onCancel,

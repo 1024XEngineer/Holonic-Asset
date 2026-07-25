@@ -6,7 +6,7 @@ import {
   removeMockGenerationRun,
   updateMockGenerationRun,
 } from "./workspace";
-import { createGenerationLifecycle } from "@/api/generation/generation-lifecycle";
+import { createGenerationLifecycle } from "@/domain/generation";
 
 export const mockGenerationLifecycle = createGenerationLifecycle({
   createRun: createMockGenerationRun,

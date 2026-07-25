@@ -17,8 +17,8 @@ import {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "@/api/project";
-import type { CreationRequest } from "@/types/generation";
-import type { ProjectSummary } from "@/types/project";
+import type { CreationRequest } from "@/domain/generation";
+import type { ProjectSummary } from "@/domain/project";
 
 export function useProjectLibrary() {
   const navigate = useNavigate({ from: "/projects" });

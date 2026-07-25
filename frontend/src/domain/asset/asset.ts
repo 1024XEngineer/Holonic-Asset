@@ -1,9 +1,9 @@
-import type { AssetKind } from "@/types/asset-kind";
+import type { AssetKind } from "./asset-kind";
 import type {
   AssetRecord,
   AssetRecordStatus,
   EditorSceneryLayer,
-} from "@/types/record";
+} from "./record";
 
 export type Asset = {
   id: string;
@@ -25,9 +25,7 @@ export type AssetAnimation = {
 
 export type SceneryLayer = EditorSceneryLayer;
 
-export type SceneryAssetData = {
-  layers: SceneryLayer[];
-};
+export type SceneryAssetData = { layers: SceneryLayer[] };
 
 export type ProjectAsset = {
   id: string;

@@ -7,7 +7,7 @@ import type {
   AudioTrackTone,
   GenerateAudioVariationInput,
   UpdateAudioTrackInput,
-} from "@/types/audio";
+} from "@/domain/audio";
 
 const generatedTrackTones: AudioTrackTone[] = [
   "blue",

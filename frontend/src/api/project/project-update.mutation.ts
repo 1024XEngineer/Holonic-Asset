@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { projectApi } from "./project.api";
-import type { ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/domain/project";
 import { projectKeys } from "./keys";
 
 export function useUpdateProjectMutation() {

@@ -1,14 +1,11 @@
 export type ExportFormat = "zip" | "spritesheet" | "tileset";
-
 export type ExportStatus = "queued" | "processing" | "ready" | "failed";
-
 export type ExportSpecification = {
   projectId: string;
   assetIds: string[];
   format: ExportFormat;
   includeSourceFiles: boolean;
 };
-
 export type ExportJob = ExportSpecification & {
   id: string;
   status: ExportStatus;

@@ -5,9 +5,9 @@ import {
   listMockAssetGroups,
   saveMockAssetRevision,
 } from "@/api/mock";
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
-import type { RecordContent } from "@/types/record";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetKind } from "@/domain/asset";
+import type { RecordContent } from "@/domain/asset";
 
 export const assetApi = {
   listGroups: (projectId: string) => listMockAssetGroups(projectId),

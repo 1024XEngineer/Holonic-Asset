@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   EditorCharacterAnimation,
   EditorCharacterAnimationId,
-} from "@/types/record";
+} from "@/domain/asset";
 import {
   characterNodeMeta,
   type CharacterCanvasNodeId,

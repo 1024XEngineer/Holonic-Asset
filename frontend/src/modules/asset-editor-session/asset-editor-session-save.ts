@@ -1,4 +1,4 @@
-import type { RecordContent } from "@/types/record";
+import type { RecordContent } from "@/domain/asset";
 
 import {
   markAssetEditorSessionSaved,

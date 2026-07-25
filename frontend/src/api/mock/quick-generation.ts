@@ -4,7 +4,7 @@ import { quickGenerationAssetSeed } from "./quick-generation.seed";
 import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,
-} from "@/types/quick-generation";
+} from "@/domain/quick-generation";
 
 const GENERATION_DELAY_MS = 700;
 

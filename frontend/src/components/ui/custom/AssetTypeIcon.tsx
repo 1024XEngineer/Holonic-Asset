@@ -4,7 +4,7 @@
  */
 
 import type { ComponentProps } from "react";
-import type { CreatableAssetKind } from "@/types/asset-kind";
+import type { CreatableAssetKind } from "@/domain/asset";
 import { getAssetTypeConfig } from "./asset-type-config";
 
 export function AssetTypeIcon({

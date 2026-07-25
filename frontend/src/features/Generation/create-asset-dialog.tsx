@@ -16,14 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getAssetTypeConfig } from "@/components/ui/custom/asset-type-config";
-import type { CreatableAssetKind } from "@/types/asset-kind";
-import type { CreationRequest } from "@/types/generation";
-import type { ProjectSummary } from "@/types/project";
+import type { CreatableAssetKind } from "@/domain/asset";
+import type { CreationRequest } from "@/domain/generation";
+import type { ProjectSummary } from "@/domain/project";
 import {
   createAssetCreationDraft,
   toCreationRequest,
   type AssetCreationDraft,
-} from "@/modules/asset-creation";
+} from "@/domain/asset/asset-creation";
 
 import {
   BackgroundAssetFields,
@@ -45,18 +45,18 @@ export function CreateAssetDialog({
 }) {
   const [open, setOpen] = useState(false);
   const form = useForm({
-    defaultValues: { draft: createAssetCreationDraft("character") },
+    defaultValues: { draft: createAssetCreationDraft<File>("character") },
     onSubmit: ({ value }) => {
       onCreate(toCreationRequest(value.draft));
       setOpen(false);
     },
   });
   const draft = form.state.values.draft;
-  const setDraft = (nextDraft: AssetCreationDraft) =>
+  const setDraft = (nextDraft: AssetCreationDraft<File>) =>
     form.setFieldValue("draft", nextDraft);
 
   const openDialog = (kind: CreatableAssetKind) => {
-    form.reset({ draft: createAssetCreationDraft(kind, initialPrompt) });
+    form.reset({ draft: createAssetCreationDraft<File>(kind, initialPrompt) });
     setOpen(true);
   };
 

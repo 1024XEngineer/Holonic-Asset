@@ -4,15 +4,15 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/custom/native-select";
-import type { VisualAssetCreationDraft } from "@/modules/asset-creation";
-import type { CreationRequest } from "@/types/generation";
+import type { VisualAssetCreationDraft } from "@/domain/asset/asset-creation";
+import type { CreationRequest } from "@/domain/generation";
 
 export function VisualAssetFields({
   draft,
   onChange,
 }: {
-  draft: VisualAssetCreationDraft;
-  onChange: (draft: VisualAssetCreationDraft) => void;
+  draft: VisualAssetCreationDraft<File>;
+  onChange: (draft: VisualAssetCreationDraft<File>) => void;
 }) {
   const isSpriteAsset = draft.kind === "character" || draft.kind === "object";
 
@@ -38,7 +38,7 @@ export function VisualAssetFields({
               onChange({
                 ...draft,
                 perspective: event.target.value as NonNullable<
-                  CreationRequest["perspective"]
+                  CreationRequest<File>["perspective"]
                 >,
               })
             }
@@ -64,7 +64,7 @@ export function VisualAssetFields({
                 onChange({
                   ...draft,
                   directionCount: event.target.value as NonNullable<
-                    CreationRequest["directionCount"]
+                    CreationRequest<File>["directionCount"]
                   >,
                 })
               }

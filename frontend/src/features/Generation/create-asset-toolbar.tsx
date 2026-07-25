@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 
-import type { ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/domain/project";
 import { AssetTypeIcon } from "@/components/ui/custom/AssetTypeIcon";
 import { getAssetTypeConfig } from "@/components/ui/custom/asset-type-config";
-import type { CreatableAssetKind } from "@/types/asset-kind";
-import type { CreationRequest } from "@/types/generation";
+import type { CreatableAssetKind } from "@/domain/asset";
+import type { CreationRequest } from "@/domain/generation";
 import { CreateAssetDialog } from "./create-asset-dialog";
 
 export function CreateAssetToolbar({

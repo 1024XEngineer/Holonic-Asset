@@ -1,4 +1,9 @@
-import type { ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/domain/project";
+
+import type {
+  NewProjectDraft,
+  ProjectSettingsDraft,
+} from "./ProjectContext.interface";
 
 export const projectContextOptions = {
   gameTypes: [
@@ -16,25 +21,6 @@ export const editableProjectContextOptions = {
   gameTypes: [...projectContextOptions.gameTypes, "Other"],
   visualStyles: [...projectContextOptions.visualStyles, "Other"],
 } as const;
-
-export type NewProjectDraft = {
-  name: string;
-  gameType: string;
-  platform: string;
-  description: string;
-  visualStyle: string;
-};
-
-export type ProjectSettingsDraft = {
-  name: string;
-  gameType: string;
-  customGameType: string;
-  visualStyle: string;
-  customVisualStyle: string;
-  platform: string;
-  description: string;
-  visualDirection: string;
-};
 
 export function createNewProjectDraft(): NewProjectDraft {
   return {
@@ -87,6 +73,25 @@ export function createProjectSettingsDraft(
     description: project.description,
     visualDirection: project.visualDirection,
   };
+}
+
+export function updateProjectSettingsDraft<
+  K extends keyof ProjectSettingsDraft,
+>(
+  draft: ProjectSettingsDraft,
+  key: K,
+  value: ProjectSettingsDraft[K],
+): ProjectSettingsDraft {
+  const nextDraft = { ...draft, [key]: value } as ProjectSettingsDraft;
+
+  if (key === "gameType" && value !== "Other") {
+    return { ...nextDraft, customGameType: "" };
+  }
+  if (key === "visualStyle" && value !== "Other") {
+    return { ...nextDraft, customVisualStyle: "" };
+  }
+
+  return nextDraft;
 }
 
 export function applyProjectSettings(

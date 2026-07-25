@@ -2,7 +2,7 @@ import { LoaderCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
-import type { GenerationRun } from "@/types/generation";
+import type { GenerationRun } from "@/domain/generation";
 import { AssetTypeIcon } from "@/components/ui/custom/AssetTypeIcon";
 import { getAssetTypeConfig } from "@/components/ui/custom/asset-type-config";
 

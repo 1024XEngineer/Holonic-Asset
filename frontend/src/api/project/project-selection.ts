@@ -1,4 +1,4 @@
-import type { ProjectSummary } from "@/types/project";
+import type { ProjectSummary } from "@/domain/project";
 
 const LAST_PROJECT_STORAGE_KEY = "game-asset-pack:last-project-id";
 

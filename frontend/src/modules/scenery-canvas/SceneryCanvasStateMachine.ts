@@ -1,6 +1,6 @@
 import { useReducer } from "react";
 
-import type { EditorSceneryLayer } from "@/types/record";
+import type { EditorSceneryLayer } from "@/domain/asset";
 
 import type { SceneryCanvasEvent } from "./SceneryCanvas.interface";
 

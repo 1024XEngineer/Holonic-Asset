@@ -10,7 +10,7 @@ import {
 import type {
   EditorCanvasPosition,
   EditorCharacterAnimation,
-} from "@/types/record";
+} from "@/domain/asset";
 
 import { AssetTree } from "../AssetTree/AssetTree";
 import { Inspector } from "../Inspector/Inspector";

@@ -1,4 +1,4 @@
-import type { QuickGenerationAsset } from "@/types/quick-generation";
+import type { QuickGenerationAsset } from "@/domain/quick-generation";
 
 export const quickGenerationAssetSeed = [
   {

@@ -1,4 +1,4 @@
-import type { SpriteSheetRecordContent } from "@/types/record";
+import type { SpriteSheetRecordContent } from "@/domain/asset";
 import {
   SpriteSheetCanvas,
   useSpriteSheetCanvasStateMachine,

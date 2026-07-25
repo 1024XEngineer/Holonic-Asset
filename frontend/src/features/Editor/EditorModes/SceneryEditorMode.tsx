@@ -1,4 +1,4 @@
-import type { EditorSceneryLayer } from "@/types/record";
+import type { EditorSceneryLayer } from "@/domain/asset";
 import {
   SceneryCanvas,
   useSceneryCanvasStateMachine,

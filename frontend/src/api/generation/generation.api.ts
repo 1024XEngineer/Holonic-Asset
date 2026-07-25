@@ -2,7 +2,7 @@ import { listMockGenerationRuns, mockGenerationLifecycle } from "@/api/mock";
 import type {
   GenerationInput,
   GenerationLifecycleUpdate,
-} from "./generation-lifecycle";
+} from "@/domain/generation";
 
 export const generationApi = {
   listRuns: (projectId: string) => listMockGenerationRuns(projectId),

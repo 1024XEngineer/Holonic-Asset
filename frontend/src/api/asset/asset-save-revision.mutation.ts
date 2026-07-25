@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { assetApi } from "./asset.api";
 import { recordKeys } from "@/api/record/record.keys";
-import type { RecordContent, RecordData } from "@/types/record";
+import type { RecordContent, RecordData } from "@/domain/asset";
 import { assetKeys } from "./keys";
 
 type SaveAssetRevisionInput = {

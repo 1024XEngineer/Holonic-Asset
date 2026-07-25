@@ -5,7 +5,7 @@ import {
   useGenerateQuickAssetMutation,
   useQuickAssetsQuery,
 } from "@/api/quick-generation";
-import type { QuickGenerationAsset } from "@/types/quick-generation";
+import type { QuickGenerationAsset } from "@/domain/quick-generation";
 import { quickGenerationSizes } from "./QuickGeneration.constants";
 
 export function useQuickGeneration() {

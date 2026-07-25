@@ -1,5 +1,5 @@
-import type { ProjectAsset } from "@/types/asset";
-import type { AssetKind } from "@/types/asset-kind";
+import type { ProjectAsset } from "@/domain/asset";
+import type { AssetKind } from "@/domain/asset";
 import type {
   CharacterRecordContent,
   RecordContent,
@@ -8,8 +8,8 @@ import type {
   SpriteSheetRecordContent,
   EditorCharacterAnimation,
   EditorSpriteSheetItem,
-} from "@/types/record";
-import { isRecordContentForAssetKind } from "@/types/record";
+} from "@/domain/asset";
+import { isRecordContentForAssetKind } from "@/domain/asset";
 
 const defaultCharacterAnimations: EditorCharacterAnimation[] = [
   {

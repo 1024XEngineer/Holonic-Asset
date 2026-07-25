@@ -3,18 +3,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { UiAssetCreationDraft } from "@/modules/asset-creation";
+import type { UiAssetCreationDraft } from "@/domain/asset/asset-creation";
 
 export function UiAssetFields({
   draft,
   onChange,
 }: {
-  draft: UiAssetCreationDraft;
-  onChange: (draft: UiAssetCreationDraft) => void;
+  draft: UiAssetCreationDraft<File>;
+  onChange: (draft: UiAssetCreationDraft<File>) => void;
 }) {
   const updateComponent = (
     index: number,
-    patch: Partial<UiAssetCreationDraft["components"][number]>,
+    patch: Partial<UiAssetCreationDraft<File>["components"][number]>,
   ) =>
     onChange({
       ...draft,

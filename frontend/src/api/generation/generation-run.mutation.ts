@@ -4,8 +4,8 @@ import { generationApi } from "./generation.api";
 import type {
   GenerationInput,
   GenerationLifecycleUpdate,
-} from "./generation-lifecycle";
-import type { GenerationRun } from "@/types/generation";
+} from "@/domain/generation";
+import type { GenerationRun } from "@/domain/generation";
 import { assetKeys } from "@/api/asset/keys";
 import { generationKeys } from "./keys";
 

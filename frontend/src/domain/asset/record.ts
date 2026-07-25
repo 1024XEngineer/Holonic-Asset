@@ -1,29 +1,19 @@
-import type { AssetKind } from "@/types/asset-kind";
+import type { AssetKind } from "./asset-kind";
 
 export type AssetRecordStatus = "ready" | "generating" | "failed";
-
-export type EditorCanvasPosition = {
-  x: number;
-  y: number;
-};
-
+export type EditorCanvasPosition = { x: number; y: number };
 export type EditorCharacterAnimationId =
   | "idle"
   | "walk"
   | "harvest"
   | "jump"
   | "celebrate";
-
 export type EditorCharacterAnimation = {
   id: EditorCharacterAnimationId;
   label: string;
   frameCount: number;
-  audio?: {
-    label: string;
-    time: string;
-  };
+  audio?: { label: string; time: string };
 };
-
 export type EditorSceneryLayer = {
   id: string;
   label: string;
@@ -31,27 +21,23 @@ export type EditorSceneryLayer = {
   imageUrl: string;
   blendMode: "normal" | "multiply";
 };
-
 export type EditorSpriteSheetTile = {
   id: string;
   label: string;
   cells: number[];
 };
-
 export type EditorSpriteSheetItem = {
   id: string;
   label: string;
   icon: "bed" | "lamp" | "fence" | "object";
   tiles: EditorSpriteSheetTile[];
 };
-
 export type CharacterAssetKind = "character" | "object";
 export type SceneryAssetKind = "scenery";
 export type SpriteSheetAssetKind = Exclude<
   AssetKind,
   CharacterAssetKind | SceneryAssetKind
 >;
-
 export type CharacterRecordContent = {
   mode: "character";
   prompt: string;
@@ -61,49 +47,37 @@ export type CharacterRecordContent = {
     nodePositions: Record<string, EditorCanvasPosition>;
   };
 };
-
 export type SceneryRecordContent = {
   mode: "scenery";
   prompt: string;
-  scenery: {
-    layers: EditorSceneryLayer[];
-  };
+  scenery: { layers: EditorSceneryLayer[] };
 };
-
 export type SpriteSheetRecordContent = {
   mode: "sprite-sheet";
   prompt: string;
-  spriteSheet: {
-    gridSize: number;
-    items: EditorSpriteSheetItem[];
-  };
+  spriteSheet: { gridSize: number; items: EditorSpriteSheetItem[] };
 };
-
 export type RecordContent =
   | CharacterRecordContent
   | SceneryRecordContent
   | SpriteSheetRecordContent;
-
 export type RecordContentForKind<K extends AssetKind> =
   K extends CharacterAssetKind
     ? CharacterRecordContent
     : K extends SceneryAssetKind
       ? SceneryRecordContent
       : SpriteSheetRecordContent;
-
 export function recordModeForAssetKind(kind: AssetKind): RecordContent["mode"] {
   if (kind === "character" || kind === "object") return "character";
   if (kind === "scenery") return "scenery";
   return "sprite-sheet";
 }
-
 export function isRecordContentForAssetKind<K extends AssetKind>(
   kind: K,
   content: RecordContent,
 ): content is RecordContentForKind<K> {
   return content.mode === recordModeForAssetKind(kind);
 }
-
 export type AssetRecord = {
   id: string;
   version: string;
@@ -113,7 +87,6 @@ export type AssetRecord = {
   isCurrent: boolean;
   content?: RecordContent;
 };
-
 export type RecordWorkspaceAsset<K extends AssetKind = AssetKind> = {
   id: string;
   projectId: string;
@@ -122,11 +95,9 @@ export type RecordWorkspaceAsset<K extends AssetKind = AssetKind> = {
   version: string;
   history: AssetRecord[];
 };
-
 export type RecordDataForKind<K extends AssetKind> = {
   projectName: string;
   asset: RecordWorkspaceAsset<K>;
   content: RecordContentForKind<K>;
 };
-
 export type RecordData = RecordDataForKind<AssetKind>;

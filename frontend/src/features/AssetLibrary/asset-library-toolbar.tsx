@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 
-import type { AssetKind } from "@/types/asset-kind";
+import type { AssetKind } from "@/domain/asset";
 import { AssetFilters } from "./asset-filters";
 
 export function AssetLibraryToolbar({

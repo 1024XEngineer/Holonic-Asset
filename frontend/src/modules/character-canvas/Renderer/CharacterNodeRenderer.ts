@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from "pixi.js";
 
-import type { EditorCharacterAnimation } from "@/types/record";
+import type { EditorCharacterAnimation } from "@/domain/asset";
 import {
   findCharacterAnimation,
   getCharacterNodeLabel,

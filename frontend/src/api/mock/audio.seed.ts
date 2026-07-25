@@ -1,4 +1,4 @@
-import type { AudioTrack } from "@/types/audio";
+import type { AudioTrack } from "@/domain/audio";
 
 export const audioTrackSeed = [
   {

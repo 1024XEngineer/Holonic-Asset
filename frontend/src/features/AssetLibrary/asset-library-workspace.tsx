@@ -1,8 +1,8 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { useAssetLibrary } from "./useAssetLibrary";
-import type { ProjectSummary } from "@/types/project";
-import type { AssetGroup } from "@/types/asset-library";
+import type { ProjectSummary } from "@/domain/project";
+import type { AssetGroup } from "@/domain/asset";
 import { AssetCard } from "./asset-card";
 import { AssetLibraryToolbar } from "./asset-library-toolbar";
 

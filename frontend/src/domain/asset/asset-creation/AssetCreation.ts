@@ -1,13 +1,15 @@
-import { getDefaultAssetCanvasSize } from "@/types/asset-kind";
-import type { CreatableAssetKind } from "@/types/asset-kind";
-import type { CreationRequest } from "@/types/generation";
+import {
+  getDefaultAssetCanvasSize,
+  type CreatableAssetKind,
+} from "@/domain/asset";
+import type { CreationRequest } from "@/domain/generation";
 
 import type { AssetCreationDraft } from "./AssetCreation.interface";
 
-export function createAssetCreationDraft(
+export function createAssetCreationDraft<Reference = unknown>(
   kind: CreatableAssetKind,
   initialPrompt = "",
-): AssetCreationDraft {
+): AssetCreationDraft<Reference> {
   const common = {
     name: "",
     prompt: initialPrompt.trim(),
@@ -48,7 +50,9 @@ export function createAssetCreationDraft(
   }
 }
 
-export function toCreationRequest(draft: AssetCreationDraft): CreationRequest {
+export function toCreationRequest<Reference>(
+  draft: AssetCreationDraft<Reference>,
+): CreationRequest<Reference> {
   const common = {
     kind: draft.kind,
     name: draft.name.trim(),

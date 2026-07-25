@@ -1,4 +1,4 @@
-import type { EditorCharacterAnimation } from "@/types/record";
+import type { EditorCharacterAnimation } from "@/domain/asset";
 import { findCharacterAnimation, type NodeId } from "../character-node";
 import {
   ANIMATION_NODES,

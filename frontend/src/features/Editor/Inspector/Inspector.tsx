@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { AssetRecord } from "@/types/record";
+import type { AssetRecord } from "@/domain/asset";
 import {
   characterNodeMeta,
   type CharacterCanvasNodeId,
