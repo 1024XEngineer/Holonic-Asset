@@ -1,7 +1,10 @@
 import type { SpriteSheetRecordContent } from "@/types/record";
+import {
+  SpriteSheetCanvas,
+  type SpriteSheetCanvasEvent,
+} from "@/modules/sprite-sheet-canvas";
 
 import { StaticAssetTree } from "../AssetTree/StaticAssetTree";
-import { SpriteSheetStage } from "../Canvas/SpriteSheetStage";
 import { useSpriteSheetStageMachine } from "../Canvas/StateMachine/spriteSheetStageMachine";
 import { Inspector } from "../Inspector/Inspector";
 import type { EditorModeProps } from "./types";
@@ -21,6 +24,11 @@ export function SpriteSheetEditorMode({
   const selection = stage.selectedLabels.length
     ? stage.selectedLabels.join(", ")
     : "Nothing selected";
+  const handleCanvasEvent = (event: SpriteSheetCanvasEvent) => {
+    if (event.type === "cell.selection.toggled") {
+      stage.toggleCell(event.cellIndex);
+    }
+  };
 
   return (
     <>
@@ -33,10 +41,12 @@ export function SpriteSheetEditorMode({
           onToggleItem={stage.toggleItem}
           onToggleTile={stage.toggleTile}
         />
-        <SpriteSheetStage
-          gridSize={spriteSheet.gridSize}
-          selectedCells={stage.selectedCells}
-          onToggleCell={stage.toggleCell}
+        <SpriteSheetCanvas
+          model={{
+            gridSize: spriteSheet.gridSize,
+            selectedCellIndexes: stage.selectedCells,
+          }}
+          onEvent={handleCanvasEvent}
         />
         <Inspector
           selectedNodes={[]}
