@@ -4,7 +4,7 @@ import {
   deleteMockAsset,
   listMockAssetGroups,
   saveMockAssetRevision,
-} from "@/api/project/project-asset.mock";
+} from "@/api/mock";
 import type { ProjectAsset } from "@/types/asset";
 import type { AssetKind } from "@/types/asset-kind";
 import type { RecordContent } from "@/types/record";

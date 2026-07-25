@@ -4,7 +4,7 @@ import {
   generateMockAudioVariation,
   listMockAudioTracks,
   updateMockAudioTrack,
-} from "@/api/audio/audio.mock";
+} from "@/api/mock";
 import type {
   AddAudioTrackInput,
   AudioTrack,

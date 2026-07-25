@@ -3,7 +3,7 @@ import {
   deleteMockProject,
   listMockProjects,
   updateMockProject,
-} from "./project-asset.mock";
+} from "@/api/mock";
 import type { ProjectSummary } from "@/types/project";
 
 export const projectApi = {

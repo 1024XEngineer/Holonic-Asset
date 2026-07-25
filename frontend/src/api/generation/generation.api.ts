@@ -1,5 +1,4 @@
-import { mockGenerationLifecycle } from "./generation.mock-lifecycle";
-import { listMockGenerationRuns } from "./generation-run.mock";
+import { listMockGenerationRuns, mockGenerationLifecycle } from "@/api/mock";
 import type {
   GenerationInput,
   GenerationLifecycleUpdate,

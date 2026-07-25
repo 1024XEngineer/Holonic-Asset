@@ -1,4 +1,4 @@
-import { createMockPresignedUploadTarget, mockMediaAssets } from "./media.mock";
+import { createMockPresignedUploadTarget, mockMediaAssets } from "@/api/mock";
 import type { PresignedUploadRequest } from "@/types/media";
 
 export const mediaApi = {

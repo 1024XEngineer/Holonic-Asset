@@ -1,4 +1,4 @@
-import { DataApiError } from "@/api/api-error";
+import { DataApiError } from "../api-error";
 
 export const DEFAULT_MOCK_DELAY_MS = 300;
 

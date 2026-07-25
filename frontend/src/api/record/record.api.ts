@@ -1,4 +1,4 @@
-import { getMockRecord, type GetRecordInput } from "@/api/record/record.mock";
+import { getMockRecord, type GetRecordInput } from "@/api/mock";
 import type { RecordData } from "@/types/record";
 
 export type RecordApi = {

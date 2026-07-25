@@ -1,10 +1,7 @@
-import {
-  listMockAssetGroups,
-  listMockProjects,
-} from "@/api/project/project-asset.mock";
+import { listMockAssetGroups, listMockProjects } from "./workspace";
 import { DataApiError } from "@/api/api-error";
-import { createDefaultRecord, mergeRecord } from "@/api/record/record.seed";
-import { runMockRequest, type MockRequestOptions } from "@/api/mock-request";
+import { createDefaultRecord, mergeRecord } from "./record-defaults";
+import { runMockRequest, type MockRequestOptions } from "./request";
 import type { RecordData } from "@/types/record";
 
 export type GetRecordInput = {

@@ -1,6 +1,6 @@
 import { DataApiError } from "@/api/api-error";
-import { runMockRequest, type MockRequestOptions } from "@/api/mock-request";
-import { audioTrackSeed } from "@/api/audio/audio.seed";
+import { runMockRequest, type MockRequestOptions } from "./request";
+import { audioTrackSeed } from "./audio.seed";
 import type {
   AddAudioTrackInput,
   AudioTrack,

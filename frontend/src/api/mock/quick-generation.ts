@@ -1,6 +1,6 @@
 import { DataApiError } from "@/api/api-error";
-import { runMockRequest, type MockRequestOptions } from "@/api/mock-request";
-import { quickGenerationAssetSeed } from "@/api/quick-generation/quick-generation.seed";
+import { runMockRequest, type MockRequestOptions } from "./request";
+import { quickGenerationAssetSeed } from "./quick-generation.seed";
 import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,

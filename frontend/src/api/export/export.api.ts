@@ -1,4 +1,4 @@
-import { createMockExportJob, mockExportJobs } from "./export.mock";
+import { createMockExportJob, mockExportJobs } from "@/api/mock";
 import type { ExportSpecification } from "@/types/export";
 
 export const exportApi = {
