@@ -6,6 +6,7 @@ import { useSaveAssetRevisionMutation } from "@/api/asset";
 import {
   createAssetEditorSessionStore,
   dispatchAssetEditorCommand,
+  getAssetEditorSessionSnapshot,
   resetAssetEditorSessionStore,
   type AssetEditorSessionStore,
 } from "./asset-editor-session-store";
@@ -34,16 +35,12 @@ export function useAssetEditorSession({
     phase: "idle",
   });
   const saveRevisionMutation = useSaveAssetRevisionMutation();
-  const document = useStore(store, (state) => state.document);
-  const savedDocument = useStore(store, (state) => state.savedDocument);
-  const canUndo = useStore(
-    store.temporal,
-    (state) => state.pastStates.length > 0,
-  );
-  const canRedo = useStore(
-    store.temporal,
-    (state) => state.futureStates.length > 0,
-  );
+  // These subscriptions keep the React adapter current. Snapshot semantics stay
+  // in the session store so production and its tests cross the same seam.
+  useStore(store, (state) => state.document);
+  useStore(store, (state) => state.savedDocument);
+  useStore(store.temporal, (state) => state.pastStates.length > 0);
+  useStore(store.temporal, (state) => state.futureStates.length > 0);
 
   useEffect(() => {
     // Query refreshes for the same target must not overwrite an active draft.
@@ -62,13 +59,7 @@ export function useAssetEditorSession({
   );
 
   return {
-    snapshot: {
-      document,
-      dirty: JSON.stringify(document) !== JSON.stringify(savedDocument),
-      canUndo,
-      canRedo,
-      saveState,
-    },
+    snapshot: getAssetEditorSessionSnapshot(store, saveState),
     dispatch,
     save: async () => {
       const submittedIdentity = identity;
