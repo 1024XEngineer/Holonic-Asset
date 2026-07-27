@@ -54,17 +54,16 @@ export type EditorSceneryLayer = {
   blendMode: "normal" | "multiply";
 };
 
-export type EditorSpriteSheetTile = {
-  id: string;
-  label: string;
-  cells: number[];
-};
+/** Global [column, row] coordinate in the tileset grid. */
+export type EditorSpriteSheetCell = [column: number, row: number];
 
 export type EditorSpriteSheetItem = {
   id: string;
   label: string;
-  icon: "bed" | "lamp" | "fence" | "object";
-  tiles: EditorSpriteSheetTile[];
+  /** Complete generated item image; tiles are only a front-end interaction map. */
+  imageUrl?: string;
+  /** Every tileset tile occupied by this complete item, as [column, row]. */
+  tiles: EditorSpriteSheetCell[];
 };
 
 export type CharacterAssetKind = "character" | "object";
@@ -288,22 +287,19 @@ function isEditorSpriteSheetItem(
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.label === "string" &&
-    (value.icon === "bed" ||
-      value.icon === "lamp" ||
-      value.icon === "fence" ||
-      value.icon === "object") &&
-    isArrayOf(value.tiles, isEditorSpriteSheetTile)
+    (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
+    isArrayOf(value.tiles, isEditorSpriteSheetCell)
   );
 }
 
-function isEditorSpriteSheetTile(
+function isEditorSpriteSheetCell(
   value: unknown,
-): value is EditorSpriteSheetTile {
+): value is EditorSpriteSheetCell {
   return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
-    isArrayOf(value.cells, isFiniteNumber)
+    Array.isArray(value) &&
+    value.length === 2 &&
+    isFiniteNumber(value[0]) &&
+    isFiniteNumber(value[1])
   );
 }
 

@@ -19,7 +19,7 @@ export function SpriteSheetEditorMode({
   spriteSheet: SpriteSheetEditorDocument["spriteSheet"];
 }) {
   const items = spriteSheet.items;
-  const stage = useSpriteSheetCanvasStateMachine(items);
+  const stage = useSpriteSheetCanvasStateMachine(items, spriteSheet.gridSize);
   const selection = stage.selectedLabels.length
     ? stage.selectedLabels.join(", ")
     : "Nothing selected";
@@ -30,15 +30,16 @@ export function SpriteSheetEditorMode({
         <StaticAssetTree
           items={items}
           selectedItems={stage.selectedItems}
-          isTileSelected={stage.isTileSelected}
+          isCellSelected={stage.isCellSelected}
           onToggleItem={(itemId) => stage.send({ type: "item.toggle", itemId })}
-          onToggleTile={(itemId, tileId) =>
-            stage.send({ type: "item-tile.toggle", itemId, tileId })
+          onToggleCell={(itemId, cellIndex) =>
+            stage.send({ type: "item-cell.toggle", itemId, cellIndex })
           }
         />
         <SpriteSheetCanvas
           model={{
             gridSize: spriteSheet.gridSize,
+            items,
             selectedCellIndexes: stage.selectedCells,
           }}
           onEvent={stage.send}

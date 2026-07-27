@@ -1,35 +1,21 @@
-import {
-  BedDouble,
-  ChevronDown,
-  Fence,
-  Grid2X2,
-  LampDesk,
-  PackageOpen,
-} from "lucide-react";
+import { ChevronDown, PackageOpen } from "lucide-react";
 import { useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { EditorSpriteSheetItem } from "../../domain";
 
-const itemIcons = {
-  bed: BedDouble,
-  lamp: LampDesk,
-  fence: Fence,
-  object: PackageOpen,
-};
-
 export function StaticAssetTree({
   items,
   selectedItems,
-  isTileSelected,
+  isCellSelected,
   onToggleItem,
-  onToggleTile,
+  onToggleCell,
 }: {
   items: EditorSpriteSheetItem[];
   selectedItems: string[];
-  isTileSelected: (itemId: string, tileId: string) => boolean;
-  onToggleItem: (item: string) => void;
-  onToggleTile: (itemId: string, tileId: string) => void;
+  isCellSelected: (itemId: string, cellIndex: number) => boolean;
+  onToggleItem: (itemId: string) => void;
+  onToggleCell: (itemId: string, cellIndex: number) => void;
 }) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
@@ -42,9 +28,9 @@ export function StaticAssetTree({
           </p>
           <div className="space-y-1">
             {items.map((item) => {
-              const Icon = itemIcons[item.icon];
               const expanded = expandedItems.includes(item.id);
               const selected = selectedItems.includes(item.id);
+              const layout = getCellLayout(item);
 
               return (
                 <div key={item.id}>
@@ -57,10 +43,8 @@ export function StaticAssetTree({
                       onClick={() => onToggleItem(item.id)}
                       className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-xs font-medium"
                     >
-                      <Icon className="size-4 text-[#4c7e5e]" />
-                      <span className="min-w-0 flex-1 truncate">
-                        {item.label}
-                      </span>
+                      <PackageOpen className="size-4 text-[#4c7e5e]" />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       <span className="font-mono text-[10px] text-[#81786d]">
                         {item.tiles.length}
                       </span>
@@ -72,9 +56,7 @@ export function StaticAssetTree({
                       onClick={() =>
                         setExpandedItems((current) =>
                           current.includes(item.id)
-                            ? current.filter(
-                                (candidate) => candidate !== item.id,
-                              )
+                            ? current.filter((candidate) => candidate !== item.id)
                             : [...current, item.id],
                         )
                       }
@@ -86,21 +68,34 @@ export function StaticAssetTree({
                     </button>
                   </div>
                   {expanded ? (
-                    <div className="ml-4 grid grid-cols-4 gap-1 border-l border-black/10 py-1 pl-2">
-                      {item.tiles.map((tile) => {
-                        const tileSelected = isTileSelected(item.id, tile.id);
+                    <div
+                      aria-label={`${item.label} tile layout`}
+                      className="ml-8 mt-2 grid w-fit overflow-visible bg-white outline outline-1 outline-[#5dabb0]/80"
+                      style={{
+                        width: `${layout.width * 44}px`,
+                        height: `${layout.height * 44}px`,
+                        gridTemplateColumns: `repeat(${layout.width}, 44px)`,
+                        gridTemplateRows: `repeat(${layout.height}, 44px)`,
+                        backgroundImage:
+                          "repeating-linear-gradient(to right, rgb(93 171 176 / 80%) 0 1px, transparent 1px 44px), repeating-linear-gradient(to bottom, rgb(93 171 176 / 80%) 0 1px, transparent 1px 44px)",
+                      }}
+                    >
+                      {item.tiles.map(([x, y], cellIndex) => {
+                        const tileSelected = isCellSelected(item.id, cellIndex);
 
                         return (
                           <button
-                            key={tile.id}
+                            key={`${x}:${y}`}
                             type="button"
-                            aria-label={`${item.label}: ${tile.label}`}
+                            aria-label={`${item.label}: Tile ${cellIndex + 1}`}
                             aria-pressed={tileSelected}
-                            onClick={() => onToggleTile(item.id, tile.id)}
-                            className={`grid aspect-square place-items-center rounded-md border transition-colors ${tileSelected ? "border-[#b86b70] bg-[#b86b70]/10 text-[#8b4e53]" : "border-black/10 text-[#6d8fbd] hover:bg-black/[.04]"}`}
-                          >
-                            <Grid2X2 className="size-3.5" />
-                          </button>
+                            onClick={() => onToggleCell(item.id, cellIndex)}
+                            style={{
+                              gridColumn: x - layout.minX + 1,
+                              gridRow: y - layout.minY + 1,
+                            }}
+                            className={`z-10 size-11 border-0 transition-colors ${tileSelected ? "bg-[#b86b70]/25" : "hover:bg-black/5"}`}
+                          />
                         );
                       })}
                     </div>
@@ -113,4 +108,13 @@ export function StaticAssetTree({
       </ScrollArea>
     </aside>
   );
+}
+
+function getCellLayout(item: EditorSpriteSheetItem) {
+  const minX = Math.min(...item.tiles.map(([x]) => x));
+  const minY = Math.min(...item.tiles.map(([, y]) => y));
+  const maxX = Math.max(...item.tiles.map(([x]) => x));
+  const maxY = Math.max(...item.tiles.map(([, y]) => y));
+
+  return { minX, minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }

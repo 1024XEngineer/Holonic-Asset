@@ -4,10 +4,10 @@ import type { EditorSpriteSheetItem } from "../../domain";
 
 import type { SpriteSheetCanvasEvent } from "./SpriteSheetCanvas.interface";
 
-type ItemTileSelection = {
-  type: "item-tile";
+type ItemCellSelection = {
+  type: "item-cell";
   itemId: string;
-  tileId: string;
+  cellIndex: number;
 };
 
 type CanvasCellSelection = {
@@ -15,7 +15,7 @@ type CanvasCellSelection = {
   cellIndex: number;
 };
 
-type SpriteSheetSelection = ItemTileSelection | CanvasCellSelection;
+type SpriteSheetSelection = ItemCellSelection | CanvasCellSelection;
 
 export type SpriteSheetCanvasState = {
   selectedItems: string[];
@@ -24,7 +24,7 @@ export type SpriteSheetCanvasState = {
 
 export type SpriteSheetCanvasStateEvent =
   | { type: "item.toggle"; itemId: string }
-  | { type: "item-tile.toggle"; itemId: string; tileId: string }
+  | { type: "item-cell.toggle"; itemId: string; cellIndex: number }
   | SpriteSheetCanvasEvent;
 
 export const initialSpriteSheetCanvasState: SpriteSheetCanvasState = {
@@ -36,6 +36,7 @@ export function reduceSpriteSheetCanvas(
   state: SpriteSheetCanvasState,
   event: SpriteSheetCanvasStateEvent,
   items: EditorSpriteSheetItem[],
+  gridSize: number,
 ): SpriteSheetCanvasState {
   if (event.type === "item.toggle") {
     const selected = state.selectedItems.includes(event.itemId);
@@ -47,54 +48,49 @@ export function reduceSpriteSheetCanvas(
         ? state.selectedTargets
         : state.selectedTargets.filter(
             (target) =>
-              target.type !== "item-tile" || target.itemId !== event.itemId,
+              target.type !== "item-cell" || target.itemId !== event.itemId,
           ),
     };
   }
 
   if (event.type === "cell.selection.toggled") {
-    const target = findCellTarget(event.cellIndex, items);
-    if (target.type === "item-tile") {
-      return reduceSpriteSheetCanvas(
-        state,
-        { ...target, type: "item-tile.toggle" },
-        items,
-      );
-    }
-    return {
-      ...state,
-      selectedTargets: toggleSelection(state.selectedTargets, target),
-    };
+    const target = findCellTarget(event.cellIndex, items, gridSize);
+    return target.type === "item-cell"
+      ? reduceSpriteSheetCanvas(
+          state,
+          { ...target, type: "item-cell.toggle" },
+          items,
+          gridSize,
+        )
+      : {
+          ...state,
+          selectedTargets: toggleSelection(state.selectedTargets, target),
+        };
   }
 
-  const target: ItemTileSelection = {
-    type: "item-tile",
+  const target: ItemCellSelection = {
+    type: "item-cell",
     itemId: event.itemId,
-    tileId: event.tileId,
+    cellIndex: event.cellIndex,
   };
   const item = items.find((candidate) => candidate.id === target.itemId);
   const itemTargets = item
-    ? item.tiles.map((tile) => ({
-        type: "item-tile" as const,
+    ? item.tiles.map((_, cellIndex) => ({
+        type: "item-cell" as const,
         itemId: item.id,
-        tileId: tile.id,
+        cellIndex,
       }))
     : [];
 
   if (item && state.selectedItems.includes(target.itemId)) {
     return {
-      selectedItems: state.selectedItems.filter(
-        (selectedItem) => selectedItem !== target.itemId,
-      ),
+      selectedItems: state.selectedItems.filter((id) => id !== target.itemId),
       selectedTargets: [
         ...state.selectedTargets.filter(
           (selection) =>
-            selection.type !== "item-tile" ||
-            selection.itemId !== target.itemId,
+            selection.type !== "item-cell" || selection.itemId !== target.itemId,
         ),
-        ...itemTargets.filter(
-          (itemTarget) => !sameSelection(itemTarget, target),
-        ),
+        ...itemTargets.filter((itemTarget) => !sameSelection(itemTarget, target)),
       ],
     };
   }
@@ -110,12 +106,10 @@ export function reduceSpriteSheetCanvas(
     );
   if (restoresItem) {
     return {
-      selectedItems: state.selectedItems.includes(target.itemId)
-        ? state.selectedItems
-        : [...state.selectedItems, target.itemId],
+      selectedItems: [...state.selectedItems, target.itemId],
       selectedTargets: state.selectedTargets.filter(
         (selection) =>
-          selection.type !== "item-tile" || selection.itemId !== target.itemId,
+          selection.type !== "item-cell" || selection.itemId !== target.itemId,
       ),
     };
   }
@@ -128,50 +122,49 @@ export function reduceSpriteSheetCanvas(
 
 export function useSpriteSheetCanvasStateMachine(
   items: EditorSpriteSheetItem[],
+  gridSize: number,
 ) {
   const [state, dispatch] = useReducer(
     (current: SpriteSheetCanvasState, event: SpriteSheetCanvasStateEvent) =>
-      reduceSpriteSheetCanvas(current, event, items),
+      reduceSpriteSheetCanvas(current, event, items, gridSize),
     initialSpriteSheetCanvasState,
   );
 
   return {
     selectedItems: state.selectedItems,
-    selectedCells: getSelectedCells(state, items),
+    selectedCells: getSelectedCells(state, items, gridSize),
     selectedLabels: getSelectedLabels(state, items),
-    isTileSelected: (itemId: string, tileId: string) =>
+    isCellSelected: (itemId: string, cellIndex: number) =>
+      state.selectedItems.includes(itemId) ||
       hasSelection(state.selectedTargets, {
-        type: "item-tile",
+        type: "item-cell",
         itemId,
-        tileId,
+        cellIndex,
       }),
     send: (event: SpriteSheetCanvasStateEvent) => dispatch(event),
   };
 }
 
-export function getSelectedCells(
+function getSelectedCells(
   state: SpriteSheetCanvasState,
   items: EditorSpriteSheetItem[],
+  gridSize: number,
 ) {
   return [
-    ...state.selectedItems.flatMap(
-      (itemId) =>
-        items
-          .find((item) => item.id === itemId)
-          ?.tiles.flatMap((tile) => tile.cells) ?? [],
+    ...state.selectedItems.flatMap((itemId) =>
+      getItemCells(items.find((item) => item.id === itemId), gridSize),
     ),
     ...state.selectedTargets.flatMap((target) => {
       if (target.type === "canvas-cell") return [target.cellIndex];
-      return (
-        items
-          .find((item) => item.id === target.itemId)
-          ?.tiles.find((tile) => tile.id === target.tileId)?.cells ?? []
-      );
+      return getItemCells(
+        items.find((item) => item.id === target.itemId),
+        gridSize,
+      )[target.cellIndex] ?? [];
     }),
   ];
 }
 
-export function getSelectedLabels(
+function getSelectedLabels(
   state: SpriteSheetCanvasState,
   items: EditorSpriteSheetItem[],
 ) {
@@ -182,10 +175,7 @@ export function getSelectedLabels(
     ...state.selectedTargets.map((target) => {
       if (target.type === "canvas-cell") return `Tile ${target.cellIndex + 1}`;
       const item = items.find((candidate) => candidate.id === target.itemId);
-      const tile = item?.tiles.find(
-        (candidate) => candidate.id === target.tileId,
-      );
-      return `${item?.label ?? target.itemId} / ${tile?.label ?? target.tileId}`;
+      return `${item?.label ?? target.itemId} / Tile ${target.cellIndex + 1}`;
     }),
   ];
 }
@@ -193,16 +183,22 @@ export function getSelectedLabels(
 function findCellTarget(
   cellIndex: number,
   items: EditorSpriteSheetItem[],
+  gridSize: number,
 ): SpriteSheetSelection {
-  let target: SpriteSheetSelection = { type: "canvas-cell", cellIndex };
-  for (const item of items) {
-    for (const tile of item.tiles) {
-      if (tile.cells.includes(cellIndex)) {
-        target = { type: "item-tile", itemId: item.id, tileId: tile.id };
-      }
-    }
-  }
-  return target;
+  const item = items.find((candidate) =>
+    getItemCells(candidate, gridSize).includes(cellIndex),
+  );
+  if (!item) return { type: "canvas-cell", cellIndex };
+
+  return {
+    type: "item-cell",
+    itemId: item.id,
+    cellIndex: getItemCells(item, gridSize).indexOf(cellIndex),
+  };
+}
+
+function getItemCells(item: EditorSpriteSheetItem | undefined, gridSize: number) {
+  return item?.tiles.map(([x, y]) => y * gridSize + x) ?? [];
 }
 
 function toggleSelection(
@@ -221,15 +217,9 @@ function hasSelection(
   return selections.some((selection) => sameSelection(selection, target));
 }
 
-function sameSelection(
-  left: SpriteSheetSelection,
-  right: SpriteSheetSelection,
-) {
-  if (left.type === "item-tile" && right.type === "item-tile") {
-    return left.itemId === right.itemId && left.tileId === right.tileId;
+function sameSelection(left: SpriteSheetSelection, right: SpriteSheetSelection) {
+  if (left.type === "item-cell" && right.type === "item-cell") {
+    return left.itemId === right.itemId && left.cellIndex === right.cellIndex;
   }
-  if (left.type === "canvas-cell" && right.type === "canvas-cell") {
-    return left.cellIndex === right.cellIndex;
-  }
-  return false;
+  return left.type === "canvas-cell" && right.type === "canvas-cell" && left.cellIndex === right.cellIndex;
 }
