@@ -26,14 +26,10 @@ export type EditorSpriteSheetCell = [column: number, row: number];
 export type EditorSpriteSheetItem = {
   id: string;
   label: string;
-  icon: "bed" | "lamp" | "fence" | "object";
-  /**
-   * The complete generated item image. Tiles are a selection/rendering map,
-   * not independently stored images.
-   */
-  image?: { url: string; width: number; height: number };
-  /** Every tileset grid cell occupied by this complete item. */
-  cells: EditorSpriteSheetCell[];
+  /** Complete generated item image; tiles are only a front-end interaction map. */
+  imageUrl?: string;
+  /** Every tileset tile occupied by this complete item, as [column, row]. */
+  tiles: EditorSpriteSheetCell[];
 };
 export type CharacterAssetKind = "character" | "object";
 export type SceneryAssetKind = "scenery";

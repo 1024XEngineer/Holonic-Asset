@@ -1,15 +1,8 @@
-import { BedDouble, ChevronDown, PackageOpen } from "lucide-react";
+import { ChevronDown, PackageOpen } from "lucide-react";
 import { useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { EditorSpriteSheetItem } from "@/features/assets/domain";
-
-const itemIcons = {
-  bed: BedDouble,
-  lamp: PackageOpen,
-  fence: PackageOpen,
-  object: PackageOpen,
-};
 
 export function StaticAssetTree({
   items,
@@ -35,7 +28,6 @@ export function StaticAssetTree({
           </p>
           <div className="space-y-1">
             {items.map((item) => {
-              const Icon = itemIcons[item.icon];
               const expanded = expandedItems.includes(item.id);
               const selected = selectedItems.includes(item.id);
               const layout = getCellLayout(item);
@@ -51,10 +43,10 @@ export function StaticAssetTree({
                       onClick={() => onToggleItem(item.id)}
                       className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-xs font-medium"
                     >
-                      <Icon className="size-4 text-[#4c7e5e]" />
+                      <PackageOpen className="size-4 text-[#4c7e5e]" />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       <span className="font-mono text-[10px] text-[#81786d]">
-                        {item.cells.length}
+                        {item.tiles.length}
                       </span>
                     </button>
                     <button
@@ -88,7 +80,7 @@ export function StaticAssetTree({
                           "repeating-linear-gradient(to right, rgb(93 171 176 / 80%) 0 1px, transparent 1px 44px), repeating-linear-gradient(to bottom, rgb(93 171 176 / 80%) 0 1px, transparent 1px 44px)",
                       }}
                     >
-                      {item.cells.map(([x, y], cellIndex) => {
+                      {item.tiles.map(([x, y], cellIndex) => {
                         const tileSelected = isCellSelected(item.id, cellIndex);
 
                         return (
@@ -119,10 +111,10 @@ export function StaticAssetTree({
 }
 
 function getCellLayout(item: EditorSpriteSheetItem) {
-  const minX = Math.min(...item.cells.map(([x]) => x));
-  const minY = Math.min(...item.cells.map(([, y]) => y));
-  const maxX = Math.max(...item.cells.map(([x]) => x));
-  const maxY = Math.max(...item.cells.map(([, y]) => y));
+  const minX = Math.min(...item.tiles.map(([x]) => x));
+  const minY = Math.min(...item.tiles.map(([, y]) => y));
+  const maxX = Math.max(...item.tiles.map(([x]) => x));
+  const maxY = Math.max(...item.tiles.map(([, y]) => y));
 
   return { minX, minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }

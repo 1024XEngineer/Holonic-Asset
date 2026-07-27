@@ -19,13 +19,13 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
             }}
           >
             {model.items.flatMap((item) => {
-              if (!item.image) return [];
+              if (!item.imageUrl) return [];
               const bounds = getItemBounds(item);
 
               return (
                 <img
                   key={item.id}
-                  src={item.image.url}
+                  src={item.imageUrl}
                   alt={item.label}
                   draggable={false}
                   className="pointer-events-none z-10 size-full object-fill [image-rendering:pixelated]"
@@ -82,10 +82,10 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
 }
 
 function getItemBounds(item: SpriteSheetCanvasProps["model"]["items"][number]) {
-  const minX = Math.min(...item.cells.map(([x]) => x));
-  const minY = Math.min(...item.cells.map(([, y]) => y));
-  const maxX = Math.max(...item.cells.map(([x]) => x));
-  const maxY = Math.max(...item.cells.map(([, y]) => y));
+  const minX = Math.min(...item.tiles.map(([x]) => x));
+  const minY = Math.min(...item.tiles.map(([, y]) => y));
+  const maxX = Math.max(...item.tiles.map(([x]) => x));
+  const maxY = Math.max(...item.tiles.map(([, y]) => y));
 
   return {
     x: minX,

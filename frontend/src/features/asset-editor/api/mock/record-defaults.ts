@@ -39,32 +39,19 @@ const tilesetAssetBase = "/assets/split_same_32px_grid_assets";
 function createTilesetItem({
   id,
   label,
-  icon,
-  file,
-  width,
-  height,
-  position,
+  imageUrl,
+  tiles,
 }: {
   id: string;
   label: string;
-  icon: EditorSpriteSheetItem["icon"];
-  file: string;
-  width: number;
-  height: number;
-  position: { x: number; y: number };
+  imageUrl: string;
+  tiles: EditorSpriteSheetItem["tiles"];
 }): EditorSpriteSheetItem {
-  const columns = width / 32;
-  const rows = height / 32;
-
   return {
     id,
     label,
-    icon,
-    image: { url: `${tilesetAssetBase}/${file}`, width, height },
-    cells: Array.from({ length: columns * rows }, (_, index) => [
-      position.x + (index % columns),
-      position.y + Math.floor(index / columns),
-    ]),
+    imageUrl: `${tilesetAssetBase}/${imageUrl}`,
+    tiles,
   };
 }
 
@@ -72,57 +59,39 @@ const tilesetItems: EditorSpriteSheetItem[] = [
   createTilesetItem({
     id: "sofa-01",
     label: "Sofa 01",
-    icon: "object",
-    file: "sofas/sofa_01_96x64.png",
-    width: 96,
-    height: 64,
-    position: { x: 0, y: 0 },
+    imageUrl: "sofas/sofa_01_96x64.png",
+    tiles: [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]],
   }),
   createTilesetItem({
     id: "sofa-02",
     label: "Sofa 02",
-    icon: "object",
-    file: "sofas/sofa_02_96x64.png",
-    width: 96,
-    height: 64,
-    position: { x: 3, y: 0 },
+    imageUrl: "sofas/sofa_02_96x64.png",
+    tiles: [[3, 0], [4, 0], [5, 0], [3, 1], [4, 1], [5, 1]],
   }),
   createTilesetItem({
     id: "sofa-03",
     label: "Sofa 03",
-    icon: "object",
-    file: "sofas/sofa_03_96x64.png",
-    width: 96,
-    height: 64,
-    position: { x: 0, y: 2 },
+    imageUrl: "sofas/sofa_03_96x64.png",
+    tiles: [[0, 2], [1, 2], [2, 2], [0, 3], [1, 3], [2, 3]],
   }),
   createTilesetItem({
     id: "sofa-04",
     label: "Sofa 04",
-    icon: "object",
-    file: "sofas/sofa_04_96x64.png",
-    width: 96,
-    height: 64,
-    position: { x: 3, y: 2 },
+    imageUrl: "sofas/sofa_04_96x64.png",
+    tiles: [[3, 2], [4, 2], [5, 2], [3, 3], [4, 3], [5, 3]],
   }),
   createTilesetItem({
     id: "sofa-05",
     label: "Sofa 05",
-    icon: "object",
-    file: "sofas/sofa_05_96x64.png",
-    width: 96,
-    height: 64,
-    position: { x: 0, y: 4 },
+    imageUrl: "sofas/sofa_05_96x64.png",
+    tiles: [[0, 4], [1, 4], [2, 4], [0, 5], [1, 5], [2, 5]],
   }),
   ...Array.from({ length: 4 }, (_, index) =>
     createTilesetItem({
       id: `bed-${index + 1}`,
       label: `Bed ${String(index + 1).padStart(2, "0")}`,
-      icon: "bed",
-      file: `beds/bed_${String(index + 1).padStart(2, "0")}_32x64.png`,
-      width: 32,
-      height: 64,
-      position: { x: 6, y: index * 2 },
+      imageUrl: `beds/bed_${String(index + 1).padStart(2, "0")}_32x64.png`,
+      tiles: [[6, index * 2], [6, index * 2 + 1]],
     }),
   ),
   ...["barrel_01", "barrel_02", "barrel_03", "barrel_04", "barrel_05", "jar_01", "jar_02", "jar_03"].map(
@@ -130,11 +99,8 @@ const tilesetItems: EditorSpriteSheetItem[] = [
       createTilesetItem({
         id: name.replace("_", "-"),
         label: name.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
-        icon: "object",
-        file: `items/${name}_32x32.png`,
-        width: 32,
-        height: 32,
-        position: { x: 7, y: index },
+        imageUrl: `items/${name}_32x32.png`,
+        tiles: [[7, index]],
       }),
   ),
 ];
@@ -143,8 +109,7 @@ const objectItems: EditorSpriteSheetItem[] = [
   {
     id: "Object",
     label: "Object",
-    icon: "object",
-    cells: [[3, 3]],
+    tiles: [[3, 3]],
   },
 ];
 

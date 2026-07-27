@@ -75,7 +75,7 @@ export function reduceSpriteSheetCanvas(
   };
   const item = items.find((candidate) => candidate.id === target.itemId);
   const itemTargets = item
-    ? item.cells.map((_, cellIndex) => ({
+    ? item.tiles.map((_, cellIndex) => ({
         type: "item-cell" as const,
         itemId: item.id,
         cellIndex,
@@ -198,7 +198,7 @@ function findCellTarget(
 }
 
 function getItemCells(item: EditorSpriteSheetItem | undefined, gridSize: number) {
-  return item?.cells.map(([x, y]) => y * gridSize + x) ?? [];
+  return item?.tiles.map(([x, y]) => y * gridSize + x) ?? [];
 }
 
 function toggleSelection(
