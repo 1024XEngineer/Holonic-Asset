@@ -1,5 +1,8 @@
+import type { EditorSpriteSheetItem } from "@/features/assets/domain";
+
 export type SpriteSheetCanvasModel = {
   gridSize: number;
+  items: EditorSpriteSheetItem[];
   selectedCellIndexes: number[];
 };
 

@@ -9,15 +9,33 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
       <div className="flex h-full min-h-[36rem] flex-col gap-4">
         <section
           aria-label="Tileset canvas"
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 items-center justify-center [container-type:size]"
         >
           <div
-            className="grid min-h-0 flex-1 gap-1"
+            className="relative grid size-[min(100cqw,100cqh)] overflow-hidden bg-white"
             style={{
               gridTemplateColumns: `repeat(${model.gridSize}, minmax(0, 1fr))`,
               gridTemplateRows: `repeat(${model.gridSize}, minmax(0, 1fr))`,
             }}
           >
+            {model.items.flatMap((item) => {
+              if (!item.image) return [];
+              const bounds = getItemBounds(item);
+
+              return (
+                <img
+                  key={item.id}
+                  src={item.image.url}
+                  alt={item.label}
+                  draggable={false}
+                  className="pointer-events-none z-10 size-full object-fill [image-rendering:pixelated]"
+                  style={{
+                    gridColumn: `${bounds.x + 1} / span ${bounds.width}`,
+                    gridRow: `${bounds.y + 1} / span ${bounds.height}`,
+                  }}
+                />
+              );
+            })}
             {Array.from(
               { length: model.gridSize * model.gridSize },
               (_, index) => (
@@ -32,17 +50,47 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
                       cellIndex: index,
                     })
                   }
-                  className={`relative overflow-hidden rounded-sm border bg-[#b5ce9c] transition-all duration-200 ${highlightedCells.has(index) ? "z-10 border-[#b86b70] ring-2 ring-inset ring-[#b86b70]/60" : hasSelection ? "border-black/5 opacity-35 hover:opacity-70" : "border-black/10 hover:border-[#b86b70]/60"}`}
-                >
-                  <span
-                    className={`absolute inset-[18%] rounded ${index % 4 === 0 ? "bg-[#6f9b6b]" : "bg-[#d9b078]"}`}
-                  />
-                </button>
+                  style={{
+                    gridColumn: (index % model.gridSize) + 1,
+                    gridRow: Math.floor(index / model.gridSize) + 1,
+                  }}
+                  className={`relative z-20 aspect-square border-0 transition-colors ${highlightedCells.has(index) ? "bg-[#b86b70]/25" : hasSelection ? "opacity-35 hover:bg-black/5 hover:opacity-70" : "hover:bg-black/5"}`}
+                />
               ),
             )}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30">
+              {Array.from({ length: model.gridSize + 1 }, (_, index) => (
+                <span
+                  key={`vertical-${index}`}
+                  className="absolute top-0 bottom-0 w-px bg-[#5dabb0]/80"
+                  style={{ left: `${(index / model.gridSize) * 100}%` }}
+                />
+              ))}
+              {Array.from({ length: model.gridSize + 1 }, (_, index) => (
+                <span
+                  key={`horizontal-${index}`}
+                  className="absolute right-0 left-0 h-px bg-[#5dabb0]/80"
+                  style={{ top: `${(index / model.gridSize) * 100}%` }}
+                />
+              ))}
+            </div>
           </div>
         </section>
       </div>
     </main>
   );
+}
+
+function getItemBounds(item: SpriteSheetCanvasProps["model"]["items"][number]) {
+  const minX = Math.min(...item.cells.map(([x]) => x));
+  const minY = Math.min(...item.cells.map(([, y]) => y));
+  const maxX = Math.max(...item.cells.map(([x]) => x));
+  const maxY = Math.max(...item.cells.map(([, y]) => y));
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
 }

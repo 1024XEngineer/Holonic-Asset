@@ -21,16 +21,19 @@ export type EditorSceneryLayer = {
   imageUrl: string;
   blendMode: "normal" | "multiply";
 };
-export type EditorSpriteSheetTile = {
-  id: string;
-  label: string;
-  cells: number[];
-};
+/** Global [column, row] coordinate in the tileset grid. */
+export type EditorSpriteSheetCell = [column: number, row: number];
 export type EditorSpriteSheetItem = {
   id: string;
   label: string;
   icon: "bed" | "lamp" | "fence" | "object";
-  tiles: EditorSpriteSheetTile[];
+  /**
+   * The complete generated item image. Tiles are a selection/rendering map,
+   * not independently stored images.
+   */
+  image?: { url: string; width: number; height: number };
+  /** Every tileset grid cell occupied by this complete item. */
+  cells: EditorSpriteSheetCell[];
 };
 export type CharacterAssetKind = "character" | "object";
 export type SceneryAssetKind = "scenery";
