@@ -1,10 +1,9 @@
 export const assetKinds = [
   "character",
   "object",
-  "tiles",
+  "tileset",
   "scenery",
   "audio",
-  "background",
   "ui",
 ] as const;
 
@@ -17,10 +16,9 @@ export const defaultAssetCanvasSize = "32 × 32 px";
 const defaultCanvasSizeByAssetKind: Record<AssetKind, string> = {
   character: defaultAssetCanvasSize,
   object: defaultAssetCanvasSize,
-  tiles: "16 × 16 px",
+  tileset: "16 × 16 px",
   scenery: defaultAssetCanvasSize,
   audio: defaultAssetCanvasSize,
-  background: defaultAssetCanvasSize,
   ui: defaultAssetCanvasSize,
 };
 
@@ -31,7 +29,8 @@ export function getDefaultAssetCanvasSize(kind: AssetKind) {
 export const creatableAssetKinds: CreatableAssetKind[] = [
   "character",
   "object",
-  "background",
+  "tileset",
+  "scenery",
   "ui",
   "audio",
 ];

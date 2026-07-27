@@ -20,16 +20,20 @@ export function createAssetCreationDraft<Reference = unknown>(
   switch (kind) {
     case "audio":
       return { ...common, kind };
-    case "background":
+    case "scenery":
       return {
         ...common,
         kind,
-        backgroundType: "scenery",
         style: "",
         aspectRatio: "16:9",
         layers: [{ description: "" }],
-        tiles: [{ description: "", reference: undefined }],
         reference: undefined,
+      };
+    case "tileset":
+      return {
+        ...common,
+        kind,
+        tiles: [{ description: "", reference: undefined }],
       };
     case "ui":
       return {
@@ -64,16 +68,15 @@ export function toCreationRequest<Reference>(
   switch (draft.kind) {
     case "audio":
       return common;
-    case "background":
+    case "scenery":
       return {
         ...common,
-        backgroundType: draft.backgroundType,
         style: draft.style,
-        aspectRatio:
-          draft.backgroundType === "scenery" ? draft.aspectRatio : undefined,
-        layers: draft.backgroundType === "scenery" ? draft.layers : undefined,
-        tiles: draft.backgroundType === "tiles" ? draft.tiles : undefined,
+        aspectRatio: draft.aspectRatio,
+        layers: draft.layers,
       };
+    case "tileset":
+      return { ...common, tiles: draft.tiles };
     case "ui":
       return {
         ...common,

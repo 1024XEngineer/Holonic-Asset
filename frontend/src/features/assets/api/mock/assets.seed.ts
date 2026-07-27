@@ -100,7 +100,7 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
     ],
   },
   {
-    kind: "tiles",
+    kind: "tileset",
     assets: [
       createAsset({
         id: "orchard-ground-set",
@@ -121,8 +121,8 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
         tags: ["terrain", "wall"],
       }),
       createAsset({
-        id: "pond-rim-tiles",
-        name: "Pond Rim Tiles",
+        id: "pond-rim-tileset",
+        name: "Pond Rim Tileset",
         description: "Water border kit",
         version: "v3",
         canvasSize: "16 × 16 px",

@@ -7,7 +7,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   Box,
   Grid3X3,
-  Image,
   Mountain,
   PanelsTopLeft,
   UserRound,
@@ -29,14 +28,9 @@ const assetTypeConfigs: Record<AssetKind, AssetTypeConfig> = {
     accentClassName: "bg-rose-500",
   },
   object: { label: "Object", icon: Box, accentClassName: "bg-amber-500" },
-  tiles: { label: "Tiles", icon: Grid3X3, accentClassName: "bg-emerald-500" },
+  tileset: { label: "Tileset", icon: Grid3X3, accentClassName: "bg-emerald-500" },
   scenery: { label: "Scenery", icon: Mountain, accentClassName: "bg-sky-500" },
   audio: { label: "Audio", icon: Volume2, accentClassName: "bg-slate-500" },
-  background: {
-    label: "Background",
-    icon: Image,
-    accentClassName: "bg-slate-500",
-  },
   ui: { label: "UI", icon: PanelsTopLeft, accentClassName: "bg-slate-500" },
 };
 

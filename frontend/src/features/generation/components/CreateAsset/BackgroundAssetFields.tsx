@@ -5,68 +5,39 @@ import {
   NativeSelectOption,
 } from "@/components/ui/custom/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import type { BackgroundAssetCreationDraft } from "@/features/generation/domain/asset-creation";
+import type {
+  SceneryAssetCreationDraft,
+  TilesetAssetCreationDraft,
+} from "@/features/generation/domain/asset-creation";
 
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 
-export function BackgroundAssetFields({
+export function SceneryAssetFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft<File>;
-  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
+  draft: SceneryAssetCreationDraft<File>;
+  onChange: (draft: SceneryAssetCreationDraft<File>) => void;
 }) {
-  return draft.backgroundType === "scenery" ? (
-    <SceneryFields draft={draft} onChange={onChange} />
-  ) : (
-    <TileSetFields draft={draft} onChange={onChange} />
-  );
+  return <SceneryFields draft={draft} onChange={onChange} />;
 }
 
-export function BackgroundAssetTypeField({
+export function TilesetAssetFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft<File>;
-  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
+  draft: TilesetAssetCreationDraft<File>;
+  onChange: (draft: TilesetAssetCreationDraft<File>) => void;
 }) {
-  return (
-    <div
-      aria-label="Background asset type"
-      className="grid grid-cols-2 rounded-lg border bg-muted p-1"
-      role="tablist"
-    >
-      {(
-        [
-          ["scenery", "Scenery"],
-          ["tiles", "Tile set"],
-        ] as const
-      ).map(([type, label]) => (
-        <button
-          key={type}
-          type="button"
-          role="tab"
-          aria-selected={draft.backgroundType === type}
-          className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            draft.backgroundType === type
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => onChange({ ...draft, backgroundType: type })}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  return <TilesetFields draft={draft} onChange={onChange} />;
 }
 
 function SceneryFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft<File>;
-  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
+  draft: SceneryAssetCreationDraft<File>;
+  onChange: (draft: SceneryAssetCreationDraft<File>) => void;
 }) {
   return (
     <>
@@ -136,16 +107,16 @@ function SceneryFields({
   );
 }
 
-function TileSetFields({
+function TilesetFields({
   draft,
   onChange,
 }: {
-  draft: BackgroundAssetCreationDraft<File>;
-  onChange: (draft: BackgroundAssetCreationDraft<File>) => void;
+  draft: TilesetAssetCreationDraft<File>;
+  onChange: (draft: TilesetAssetCreationDraft<File>) => void;
 }) {
   const updateTile = (
     index: number,
-    patch: Partial<BackgroundAssetCreationDraft<File>["tiles"][number]>,
+    patch: Partial<TilesetAssetCreationDraft<File>["tiles"][number]>,
   ) =>
     onChange({
       ...draft,

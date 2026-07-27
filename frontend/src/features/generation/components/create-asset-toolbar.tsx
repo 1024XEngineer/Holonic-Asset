@@ -19,7 +19,7 @@ export function CreateAssetToolbar({
   return (
     <CreateAssetDialog project={project} onCreate={onCreate}>
       {(openDialog) => (
-        <div className="grid grid-cols-1 rounded-2xl border bg-background p-1 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 rounded-2xl border bg-background p-1 shadow-sm sm:grid-cols-2 lg:grid-cols-6">
           {assetKinds.map((kind) => (
             <Button
               key={kind}

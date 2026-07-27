@@ -9,7 +9,6 @@ export type CreationRequest<Reference = unknown> = {
   directionCount?: "1" | "4" | "8";
   reference?: Reference;
   useProjectContext: boolean;
-  backgroundType?: "scenery" | "tiles";
   style?: string;
   aspectRatio?: string;
   layers?: { description: string }[];

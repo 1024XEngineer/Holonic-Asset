@@ -79,7 +79,7 @@ export function HomeProjectStory() {
             <p className="text-lg leading-8 text-white/70">
               Every project records the game type, platform, visual style, and
               visual direction that guide new generations. Assets stay grouped
-              by type, from characters and objects to scenery, tiles, and UI.
+              by type, from characters and objects to scenery, tilesets, and UI.
             </p>
             <p className="mt-5 text-sm leading-7 text-white/50">
               Keep useful details attached to every asset: canvas size,

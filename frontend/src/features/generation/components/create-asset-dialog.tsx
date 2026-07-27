@@ -26,8 +26,8 @@ import {
 } from "@/features/generation/domain/asset-creation";
 
 import {
-  BackgroundAssetFields,
-  BackgroundAssetTypeField,
+  SceneryAssetFields,
+  TilesetAssetFields,
 } from "./CreateAsset/BackgroundAssetFields";
 import { UiAssetFields } from "./CreateAsset/UiAssetFields";
 import { VisualAssetFields } from "./CreateAsset/VisualAssetFields";
@@ -83,10 +83,6 @@ export function CreateAssetDialog({
             void form.handleSubmit();
           }}
         >
-          {draft.kind === "background" ? (
-            <BackgroundAssetTypeField draft={draft} onChange={setDraft} />
-          ) : null}
-
           <label className="grid gap-2 text-sm font-medium">
             Asset name
             <Input
@@ -120,8 +116,10 @@ export function CreateAssetDialog({
             />
           </label>
 
-          {draft.kind === "background" ? (
-            <BackgroundAssetFields draft={draft} onChange={setDraft} />
+          {draft.kind === "scenery" ? (
+            <SceneryAssetFields draft={draft} onChange={setDraft} />
+          ) : draft.kind === "tileset" ? (
+            <TilesetAssetFields draft={draft} onChange={setDraft} />
           ) : draft.kind === "ui" ? (
             <UiAssetFields draft={draft} onChange={setDraft} />
           ) : draft.kind === "audio" ? null : (

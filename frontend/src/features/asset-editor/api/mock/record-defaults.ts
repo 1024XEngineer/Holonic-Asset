@@ -267,7 +267,7 @@ export function createDefaultEditorDocument<K extends AssetKind>(
     ...base,
     spriteSheet: {
       gridSize: 8,
-      items: structuredClone(kind === "tiles" ? tilesetItems : objectItems),
+      items: structuredClone(kind === "tileset" ? tilesetItems : objectItems),
     },
   } as EditorDocumentForKind<K>;
 }

@@ -11,21 +11,24 @@ type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
 
 export type VisualAssetCreationDraft<Reference = unknown> =
   CommonAssetCreationDraft<
-    Exclude<CreatableAssetKind, "audio" | "background" | "ui">
+    Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "ui">
   > & {
     perspective: NonNullable<CreationRequest["perspective"]>;
     directionCount: NonNullable<CreationRequest["directionCount"]>;
     reference: Reference | undefined;
   };
 
-export type BackgroundAssetCreationDraft<Reference = unknown> =
-  CommonAssetCreationDraft<"background"> & {
-    backgroundType: "scenery" | "tiles";
+export type SceneryAssetCreationDraft<Reference = unknown> =
+  CommonAssetCreationDraft<"scenery"> & {
     style: string;
     aspectRatio: string;
     layers: { description: string }[];
-    tiles: { description: string; reference: Reference | undefined }[];
     reference: Reference | undefined;
+  };
+
+export type TilesetAssetCreationDraft<Reference = unknown> =
+  CommonAssetCreationDraft<"tileset"> & {
+    tiles: { description: string; reference: Reference | undefined }[];
   };
 
 export type UiAssetCreationDraft<Reference = unknown> =
@@ -39,6 +42,7 @@ export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
 
 export type AssetCreationDraft<Reference = unknown> =
   | VisualAssetCreationDraft<Reference>
-  | BackgroundAssetCreationDraft<Reference>
+  | SceneryAssetCreationDraft<Reference>
+  | TilesetAssetCreationDraft<Reference>
   | UiAssetCreationDraft<Reference>
   | AudioAssetCreationDraft;

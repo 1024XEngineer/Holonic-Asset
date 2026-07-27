@@ -1,7 +1,8 @@
 export { createAssetCreationDraft, toCreationRequest } from "./AssetCreation";
 export type {
   AssetCreationDraft,
-  BackgroundAssetCreationDraft,
+  SceneryAssetCreationDraft,
+  TilesetAssetCreationDraft,
   UiAssetCreationDraft,
   VisualAssetCreationDraft,
 } from "./AssetCreation.interface";
