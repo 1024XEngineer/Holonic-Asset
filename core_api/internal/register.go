@@ -3,8 +3,8 @@ package internal
 import (
 	"github.com/labstack/echo/v4"
 
-	ai "github.com/1024XEngineer/Holonic-Asset/internal/ai/router"
 	asset "github.com/1024XEngineer/Holonic-Asset/internal/asset/router"
+	generation "github.com/1024XEngineer/Holonic-Asset/internal/generation/router"
 	media "github.com/1024XEngineer/Holonic-Asset/internal/media/router"
 	project "github.com/1024XEngineer/Holonic-Asset/internal/project/router"
 	taxonomy "github.com/1024XEngineer/Holonic-Asset/internal/taxonomy/router"
@@ -14,7 +14,7 @@ import (
 func Register(
 	as asset.AssetRouter,
 	pr project.ProjectRouter,
-	ar ai.AIRouter,
+	gr generation.GenerationRouter,
 	mr media.MediaRouter,
 	tr taxonomy.TaxonomyRouter,
 ) *echo.Echo {
@@ -26,8 +26,8 @@ func Register(
 	if pr != nil {
 		project.RegisterRoutes(api, pr)
 	}
-	if ar != nil {
-		ai.RegisterRoutes(api, ar)
+	if gr != nil {
+		generation.RegisterRoutes(api, gr)
 	}
 	if mr != nil {
 		media.RegisterRoutes(api, mr)

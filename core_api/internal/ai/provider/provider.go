@@ -1,3 +1,4 @@
+// Package provider defines provider-neutral ports for external AI models.
 package provider
 
 import (
@@ -5,98 +6,116 @@ import (
 	"encoding/json"
 )
 
-type Size struct {
-	Width  uint `json:"width"`
-	Height uint `json:"height"`
-}
-
-type ImageGenerationInput struct {
-	Prompt        string   `json:"prompt"`
-	ReferenceURLs []string `json:"referenceUrls,omitempty"`
-	Size          Size     `json:"size"`
-}
-
 type MessageRole string
-
-type ContentPartType string
 
 const (
 	MessageRoleSystem    MessageRole = "system"
 	MessageRoleUser      MessageRole = "user"
 	MessageRoleAssistant MessageRole = "assistant"
 	MessageRoleTool      MessageRole = "tool"
-
-	ContentPartText     ContentPartType = "text"
-	ContentPartImageURL ContentPartType = "image_url"
 )
 
-type ContentPart struct {
-	Type      ContentPartType `json:"type"`
-	Text      string          `json:"text,omitempty"`
-	URL       string          `json:"url,omitempty"`
-	MediaType string          `json:"mediaType,omitempty"`
+type Message struct {
+	Role    MessageRole
+	Content string
 }
 
-type LLMMessage struct {
-	Role    MessageRole   `json:"role"`
-	Content []ContentPart `json:"content"`
+type Usage struct {
+	InputTokens         uint
+	OutputTokens        uint
+	GeneratedImages     uint
+	AudioDurationMillis uint64
 }
 
-type LLMUsage struct {
-	InputTokens  uint `json:"inputTokens"`
-	OutputTokens uint `json:"outputTokens"`
-	TotalTokens  uint `json:"totalTokens"`
+type StructuredTextRequest struct {
+	RequestID      string
+	Model          string
+	Messages       []Message
+	ResponseSchema json.RawMessage
 }
 
-type LLMRequest struct {
-	RequestID      string          `json:"requestId"`
-	Model          string          `json:"model"`
-	Messages       []LLMMessage    `json:"messages"`
-	ResponseFormat json.RawMessage `json:"responseFormat,omitempty"`
+type StructuredTextResult struct {
+	ProviderRequestID string
+	Model             string
+	Output            json.RawMessage
+	Usage             Usage
 }
 
-type LLMResponse struct {
-	ID      string     `json:"id"`
-	Model   string     `json:"model"`
-	Message LLMMessage `json:"message"`
-	Usage   LLMUsage   `json:"usage"`
+type Size struct {
+	Width  uint
+	Height uint
 }
 
 type ImageGenerationRequest struct {
-	RequestID string `json:"requestId"`
-	Model     string `json:"model"`
-	ImageGenerationInput
+	RequestID     string
+	Model         string
+	Prompt        string
+	ReferenceURLs []string
+	Size          Size
 }
 
 type ImageEditRequest struct {
-	RequestID  string   `json:"requestId"`
-	Model      string   `json:"model"`
-	Prompt     string   `json:"prompt"`
-	TargetURLs []string `json:"targetUrls"`
+	RequestID  string
+	Model      string
+	Prompt     string
+	TargetURLs []string
+	MaskURL    string
 }
 
-type GenerationStatus string
+type AudioGenerationRequest struct {
+	RequestID      string
+	Model          string
+	Prompt         string
+	ReferenceURLs  []string
+	DurationMillis uint64
+}
+
+type AudioEditRequest struct {
+	RequestID  string
+	Model      string
+	Prompt     string
+	TargetURLs []string
+}
+
+type OperationStatus string
 
 const (
-	GenerationStatusPending   GenerationStatus = "pending"
-	GenerationStatusRunning   GenerationStatus = "running"
-	GenerationStatusSucceeded GenerationStatus = "succeeded"
-	GenerationStatusFailed    GenerationStatus = "failed"
-	GenerationStatusCancelled GenerationStatus = "cancelled"
+	OperationStatusPending   OperationStatus = "pending"
+	OperationStatusRunning   OperationStatus = "running"
+	OperationStatusSucceeded OperationStatus = "succeeded"
+	OperationStatusFailed    OperationStatus = "failed"
+	OperationStatusCancelled OperationStatus = "cancelled"
 )
 
-type GenerationResult struct {
-	GenerationID string           `json:"generationId"`
-	Status       GenerationStatus `json:"status"`
-	OutputURLs   []string         `json:"outputUrls,omitempty"`
-	ErrorMessage string           `json:"errorMessage,omitempty"`
+type Output struct {
+	URL       string
+	MediaType string
 }
 
-// LLMClient defines the model provider port required by the AI module.
-type LLMClient interface {
-	Chat(ctx context.Context, request *LLMRequest) (*LLMResponse, error)
-	GenerateImage(ctx context.Context, request *ImageGenerationRequest) (*GenerationResult, error)
-	EditImage(ctx context.Context, request *ImageEditRequest) (*GenerationResult, error)
-	GetGenerationResult(ctx context.Context, generationID string) (*GenerationResult, error)
-	CancelGeneration(ctx context.Context, generationID string) error
+type OperationResult struct {
+	OperationID       string
+	ProviderRequestID string
+	Model             string
+	Status            OperationStatus
+	Outputs           []Output
+	Usage             Usage
+	ErrorMessage      string
+}
+
+type TextProvider interface {
+	CompleteStructured(ctx context.Context, request *StructuredTextRequest) (*StructuredTextResult, error)
+}
+
+type ImageProvider interface {
+	Generate(ctx context.Context, request *ImageGenerationRequest) (*OperationResult, error)
+	Edit(ctx context.Context, request *ImageEditRequest) (*OperationResult, error)
+	GetOperation(ctx context.Context, operationID string) (*OperationResult, error)
+	CancelOperation(ctx context.Context, operationID string) error
+}
+
+type AudioProvider interface {
+	Generate(ctx context.Context, request *AudioGenerationRequest) (*OperationResult, error)
+	Edit(ctx context.Context, request *AudioEditRequest) (*OperationResult, error)
+	GetOperation(ctx context.Context, operationID string) (*OperationResult, error)
+	CancelOperation(ctx context.Context, operationID string) error
 }
