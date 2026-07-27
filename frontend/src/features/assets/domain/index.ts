@@ -1,5 +1,10 @@
-export * from "./asset";
-export * from "./asset-kind";
-export * from "./asset-library";
-export * from "./asset-revision";
-export * from "./asset-taxonomy";
+export type { ProjectAsset } from "./asset";
+export {
+  assetKinds,
+  creatableAssetKinds,
+  getDefaultAssetCanvasSize,
+  type AssetKind,
+  type CreatableAssetKind,
+} from "./asset-kind";
+export type { AssetGroup, AssetGroupsByProject } from "./asset-library";
+export type { AssetRevision } from "./asset-revision";

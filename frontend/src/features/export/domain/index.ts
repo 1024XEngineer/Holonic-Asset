@@ -1,5 +1,5 @@
-export type ExportFormat = "zip" | "spritesheet" | "tileset";
-export type ExportStatus = "queued" | "processing" | "ready" | "failed";
+type ExportFormat = "zip" | "spritesheet" | "tileset";
+type ExportStatus = "queued" | "processing" | "ready" | "failed";
 export type ExportSpecification = {
   projectId: string;
   assetIds: string[];

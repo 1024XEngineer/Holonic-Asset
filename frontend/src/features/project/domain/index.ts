@@ -7,8 +7,5 @@ export {
   toProjectSummary,
   updateProjectSettingsDraft,
 } from "./project-context";
-export type {
-  NewProjectDraft,
-  ProjectSettingsDraft,
-} from "./project-context.types";
-export type { Project, ProjectSummary } from "./project";
+export type { ProjectSettingsDraft } from "./project-context.types";
+export type { ProjectSummary } from "./project";

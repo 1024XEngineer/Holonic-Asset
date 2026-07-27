@@ -1,1 +1,18 @@
-export * from "./editor-document";
+export {
+  getEditorCharacterAnimationClips,
+  isEditorCharacterAnimationGroup,
+  isEditorDocumentForAssetKind,
+  type CharacterEditorDocument,
+  type EditorCanvasPosition,
+  type EditorCharacterAnimation,
+  type EditorCharacterAnimationClip,
+  type EditorCharacterAnimationGroup,
+  type EditorCharacterSpriteSheet,
+  type EditorDocument,
+  type EditorDocumentForKind,
+  type EditorSceneryLayer,
+  type EditorSpriteSheetItem,
+  type EditorWorkspaceData,
+  type SceneryEditorDocument,
+  type SpriteSheetEditorDocument,
+} from "./editor-document";
