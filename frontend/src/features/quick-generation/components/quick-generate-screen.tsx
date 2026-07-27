@@ -1,6 +1,7 @@
 import { Download, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 
 import { useQuickGeneration } from "../state/use-quick-generation";
+import { quickGenerationSizes } from "../domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,30 +9,26 @@ import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { getQuickAssetPreviewClassName } from "./quick-generation.constants";
 
 export function QuickGenerateScreen() {
+  const { model, actions } = useQuickGeneration();
+  const { assets, currentAsset, currentAssetId, draft, status } = model;
   const {
-    actionError,
-    assets,
     chooseReference,
     clearReference,
-    currentAsset,
-    currentAssetId,
     deleteCurrentAsset,
-    description,
     generate,
+    reload,
+    selectAsset,
+    startNewAsset,
+    updateDraft,
+  } = actions;
+  const {
+    actionError,
     isDeleting,
     isGenerating,
     isLoading,
     isMutating,
     loadError,
-    newAsset,
-    quickGenerationSizes,
-    referenceImage,
-    reload,
-    selectAsset,
-    setDescription,
-    setSize,
-    size,
-  } = useQuickGeneration();
+  } = status;
 
   return (
     <main className="relative flex min-h-[calc(100vh-3.5rem)] flex-1 flex-col bg-muted/30">
@@ -56,7 +53,7 @@ export function QuickGenerateScreen() {
           <Button
             className="w-full"
             variant="outline"
-            onClick={newAsset}
+            onClick={startNewAsset}
             disabled={isLoading || isMutating}
           >
             <Plus data-icon="inline-start" />
@@ -234,8 +231,8 @@ export function QuickGenerateScreen() {
             Size
             <select
               className="h-9 rounded-lg border bg-transparent px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              value={size}
-              onChange={(event) => setSize(event.target.value)}
+              value={draft.size}
+              onChange={(event) => updateDraft({ size: event.target.value })}
             >
               {quickGenerationSizes.map((option) => (
                 <option key={option}>{option}</option>
@@ -246,7 +243,7 @@ export function QuickGenerateScreen() {
           <div className="mt-5 overflow-hidden rounded-2xl border bg-background shadow-sm focus-within:ring-3 focus-within:ring-ring/50">
             <ImageDropzone
               className="m-3 min-h-20"
-              previewUrl={referenceImage || undefined}
+              previewUrl={draft.reference || undefined}
               onSelect={chooseReference}
               onClear={clearReference}
             />
@@ -258,15 +255,15 @@ export function QuickGenerateScreen() {
                   ? "Describe how you want to update this asset, you can upload or drag an image here for reference"
                   : "Describe the asset you want to create, you can upload or drag an image here for reference"
               }
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              value={draft.prompt}
+              onChange={(event) => updateDraft({ prompt: event.target.value })}
             />
             <div className="flex items-center justify-between gap-3 p-3 pt-0">
               <span className="text-xs leading-4 text-muted-foreground">
                 PNG, JPEG, or WebP
               </span>
               <Button
-                disabled={!description.trim() || isLoading || isMutating}
+                disabled={!draft.prompt.trim() || isLoading || isMutating}
                 onClick={generate}
               >
                 {isGenerating ? (
