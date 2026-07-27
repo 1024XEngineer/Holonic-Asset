@@ -1,9 +1,5 @@
 import type { AssetKind } from "./asset-kind";
-import type {
-  AssetRecord,
-  AssetRecordStatus,
-  EditorSceneryLayer,
-} from "./record";
+import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 
 export type Asset = {
   id: string;
@@ -20,10 +16,16 @@ export type AssetAnimation = {
   id: string;
   name: string;
   frameCount: number;
-  status: AssetRecordStatus;
+  status: AssetRevisionStatus;
 };
 
-export type SceneryLayer = EditorSceneryLayer;
+export type SceneryLayer = {
+  id: string;
+  label: string;
+  detail: string;
+  imageUrl: string;
+  blendMode: "normal" | "multiply";
+};
 
 export type SceneryAssetData = { layers: SceneryLayer[] };
 
@@ -35,7 +37,7 @@ export type ProjectAsset = {
   canvasSize: string;
   perspective: string;
   tags: string[];
-  history: AssetRecord[];
+  history: AssetRevision[];
   animations: AssetAnimation[];
   scenery?: SceneryAssetData;
 };

@@ -1,8 +1,8 @@
-import type { AssetRecord } from "@/features/assets/domain";
+import type { AssetRevision } from "@/features/assets/domain";
 
 export type EditorModeProps = {
   prompt: string;
-  history: AssetRecord[];
+  history: AssetRevision[];
   onAction: (message: string) => void;
   onPromptChange: (value: string) => void;
   renderHeader: (selection: string) => React.ReactNode;

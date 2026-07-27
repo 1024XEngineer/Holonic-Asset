@@ -1,15 +1,13 @@
-import type { ProjectAsset } from "@/features/assets/domain";
-import type { AssetKind } from "@/features/assets/domain";
+import type { AssetKind, ProjectAsset } from "@/features/assets/domain";
 import type {
-  CharacterRecordContent,
-  RecordContent,
-  RecordContentForKind,
-  SceneryRecordContent,
-  SpriteSheetRecordContent,
+  CharacterEditorDocument,
   EditorCharacterAnimation,
   EditorSpriteSheetItem,
-} from "@/features/assets/domain";
-import { isRecordContentForAssetKind } from "@/features/assets/domain";
+  EditorDocumentForKind,
+  SceneryEditorDocument,
+  SpriteSheetEditorDocument,
+} from "../../domain";
+import { isEditorDocumentForAssetKind } from "../../domain";
 
 const defaultCharacterAnimations: EditorCharacterAnimation[] = [
   {
@@ -78,10 +76,10 @@ const objectItems: EditorSpriteSheetItem[] = [
   },
 ];
 
-export function createDefaultRecord<K extends AssetKind>(
+export function createDefaultEditorDocument<K extends AssetKind>(
   kind: K,
   asset: ProjectAsset,
-): RecordContentForKind<K> {
+): EditorDocumentForKind<K> {
   const base = { prompt: asset.description };
 
   if (kind === "character" || kind === "object") {
@@ -93,7 +91,7 @@ export function createDefaultRecord<K extends AssetKind>(
         animations: structuredClone(defaultCharacterAnimations),
         nodePositions: {},
       },
-    } as RecordContentForKind<K>;
+    } as EditorDocumentForKind<K>;
   }
 
   if (kind === "scenery") {
@@ -103,7 +101,7 @@ export function createDefaultRecord<K extends AssetKind>(
       scenery: {
         layers: structuredClone(asset.scenery?.layers ?? []),
       },
-    } as RecordContentForKind<K>;
+    } as EditorDocumentForKind<K>;
   }
 
   return {
@@ -113,37 +111,37 @@ export function createDefaultRecord<K extends AssetKind>(
       gridSize: 8,
       items: structuredClone(kind === "tiles" ? tilesetItems : objectItems),
     },
-  } as RecordContentForKind<K>;
+  } as EditorDocumentForKind<K>;
 }
 
-export function mergeRecord<K extends AssetKind>(
+export function mergeEditorDocument<K extends AssetKind>(
   kind: K,
-  fallback: RecordContentForKind<K>,
-  saved: RecordContent | undefined,
-): RecordContentForKind<K> {
-  if (!saved || !isRecordContentForAssetKind(kind, saved)) return fallback;
+  fallback: EditorDocumentForKind<K>,
+  saved: unknown,
+): EditorDocumentForKind<K> {
+  if (!saved || !isEditorDocumentForAssetKind(kind, saved)) return fallback;
 
   switch (fallback.mode) {
     case "character":
       return mergeCharacterRecord(
-        fallback as CharacterRecordContent,
-        saved as CharacterRecordContent,
-      ) as RecordContentForKind<K>;
+        fallback as CharacterEditorDocument,
+        saved as CharacterEditorDocument,
+      ) as EditorDocumentForKind<K>;
     case "scenery":
       return mergeSceneryRecord(
-        saved as SceneryRecordContent,
-      ) as RecordContentForKind<K>;
+        saved as SceneryEditorDocument,
+      ) as EditorDocumentForKind<K>;
     case "sprite-sheet":
       return mergeSpriteSheetRecord(
-        saved as SpriteSheetRecordContent,
-      ) as RecordContentForKind<K>;
+        saved as SpriteSheetEditorDocument,
+      ) as EditorDocumentForKind<K>;
   }
 }
 
 function mergeCharacterRecord(
-  fallback: CharacterRecordContent,
-  saved: CharacterRecordContent,
-): CharacterRecordContent {
+  fallback: CharacterEditorDocument,
+  saved: CharacterEditorDocument,
+): CharacterEditorDocument {
   return {
     mode: "character",
     prompt: saved.prompt,
@@ -162,7 +160,9 @@ function mergeCharacterRecord(
   };
 }
 
-function mergeSceneryRecord(saved: SceneryRecordContent): SceneryRecordContent {
+function mergeSceneryRecord(
+  saved: SceneryEditorDocument,
+): SceneryEditorDocument {
   return {
     mode: "scenery",
     prompt: saved.prompt,
@@ -171,8 +171,8 @@ function mergeSceneryRecord(saved: SceneryRecordContent): SceneryRecordContent {
 }
 
 function mergeSpriteSheetRecord(
-  saved: SpriteSheetRecordContent,
-): SpriteSheetRecordContent {
+  saved: SpriteSheetEditorDocument,
+): SpriteSheetEditorDocument {
   return {
     mode: "sprite-sheet",
     prompt: saved.prompt,

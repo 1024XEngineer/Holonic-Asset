@@ -1,7 +1,4 @@
-import type {
-  RecordContent,
-  EditorCanvasPosition,
-} from "@/features/assets/domain";
+import type { EditorCanvasPosition, EditorDocument } from "../../domain";
 
 export type AssetEditorTarget = {
   projectId: string;
@@ -31,7 +28,7 @@ export type AssetEditorSaveState =
   | { phase: "failed"; message: string };
 
 export type AssetEditorSessionSnapshot = {
-  document: RecordContent;
+  document: EditorDocument;
   dirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -51,5 +48,5 @@ export type AssetEditorSession = {
 
 export type UseAssetEditorSessionInput = {
   target: AssetEditorTarget;
-  initialDocument: RecordContent;
+  initialDocument: EditorDocument;
 };

@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { AssetRecord } from "@/features/assets/domain";
+import type { AssetRevision } from "@/features/assets/domain";
 import {
   characterNodeMeta,
   type CharacterCanvasNodeId,
@@ -15,7 +15,7 @@ type InspectorProps = {
   prompt: string;
   onPromptChange: (value: string) => void;
   onAction: (message: string) => void;
-  history: AssetRecord[];
+  history: AssetRevision[];
   selectedItems?: string[];
 };
 
@@ -169,7 +169,7 @@ function SelectionSummary({
   );
 }
 
-function SaveHistory({ entries }: { entries: AssetRecord[] }) {
+function SaveHistory({ entries }: { entries: AssetRevision[] }) {
   if (entries.length === 0) {
     return (
       <div className="py-8 text-center text-xs text-[#81786d]">

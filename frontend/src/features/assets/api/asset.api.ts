@@ -3,8 +3,16 @@ import {
   copyMockAsset,
   deleteMockAsset,
   listMockAssetGroups,
+  saveMockAssetRevision,
 } from "./mock";
 import type { AssetKind, ProjectAsset } from "@/features/assets/domain";
+
+export type SaveAssetRevisionInput<Payload> = {
+  projectId: string;
+  assetId: string;
+  description: string;
+  payload: Payload;
+};
 
 export const assetApi = {
   listGroups: (projectId: string) => listMockAssetGroups(projectId),
@@ -14,4 +22,11 @@ export const assetApi = {
     copyMockAsset(projectId, assetId),
   delete: (projectId: string, assetId: string) =>
     deleteMockAsset(projectId, assetId),
+  saveRevision: <Payload>({
+    projectId,
+    assetId,
+    description,
+    payload,
+  }: SaveAssetRevisionInput<Payload>) =>
+    saveMockAssetRevision(projectId, assetId, description, payload),
 };

@@ -1,4 +1,4 @@
-import type { SpriteSheetRecordContent } from "@/features/assets/domain";
+import type { SpriteSheetEditorDocument } from "../../domain";
 import {
   SpriteSheetCanvas,
   useSpriteSheetCanvasStateMachine,
@@ -16,7 +16,7 @@ export function SpriteSheetEditorMode({
   renderHeader,
   spriteSheet,
 }: EditorModeProps & {
-  spriteSheet: SpriteSheetRecordContent["spriteSheet"];
+  spriteSheet: SpriteSheetEditorDocument["spriteSheet"];
 }) {
   const items = spriteSheet.items;
   const stage = useSpriteSheetCanvasStateMachine(items);

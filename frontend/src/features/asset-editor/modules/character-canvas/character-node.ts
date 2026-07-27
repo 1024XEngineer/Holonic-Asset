@@ -1,4 +1,4 @@
-import type { EditorCharacterAnimation } from "@/features/assets/domain";
+import type { EditorCharacterAnimation } from "../../domain";
 
 export type CharacterCanvasNodeId =
   | "prototype"

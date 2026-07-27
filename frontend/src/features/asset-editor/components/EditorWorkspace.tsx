@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type {
-  EditorCanvasPosition,
-  RecordData,
-} from "@/features/assets/domain";
+import type { EditorCanvasPosition, EditorWorkspaceData } from "../domain";
 import { useTimeout } from "@/hooks/use-timeout";
 
 import { useAssetEditorSession } from "../state/session";
@@ -16,7 +13,7 @@ export function EditorWorkspace({
   data,
   onBack,
 }: {
-  data: RecordData;
+  data: EditorWorkspaceData;
   onBack: () => void;
 }) {
   const { asset, projectName } = data;

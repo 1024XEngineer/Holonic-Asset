@@ -1,4 +1,4 @@
-import type { EditorSceneryLayer } from "@/features/assets/domain";
+import type { EditorSceneryLayer } from "../../domain";
 
 import type { SceneryCanvasProps } from "./SceneryCanvas.interface";
 

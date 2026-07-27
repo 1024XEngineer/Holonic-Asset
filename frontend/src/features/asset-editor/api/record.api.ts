@@ -1,10 +1,14 @@
-import { getMockRecord, type GetRecordInput } from "./mock";
-import type { RecordData } from "@/features/assets/domain";
+import { getMockEditorDocument, saveMockEditorDocumentRevision } from "./mock";
+import type { EditorDocumentApi } from "./record.contract";
 
-export type RecordApi = {
-  get: (input: GetRecordInput) => Promise<RecordData>;
+export const recordApi: EditorDocumentApi = {
+  get: getMockEditorDocument,
+  saveRevision: saveMockEditorDocumentRevision,
 };
 
-export const recordApi: RecordApi = {
-  get: getMockRecord,
-};
+export type {
+  EditorDocumentApi,
+  EditorDocumentSaveResult,
+  GetEditorDocumentInput,
+  SaveEditorDocumentInput,
+} from "./record.contract";

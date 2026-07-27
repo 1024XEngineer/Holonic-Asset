@@ -1,10 +1,7 @@
 import { createStore } from "zustand";
 import { temporal } from "zundo";
 
-import type {
-  RecordContent,
-  EditorCanvasPosition,
-} from "@/features/assets/domain";
+import type { EditorCanvasPosition, EditorDocument } from "../../domain";
 
 import type {
   AssetEditorCommand,
@@ -13,8 +10,8 @@ import type {
 } from "./AssetEditorSession.interface";
 
 type AssetEditorSessionState = {
-  document: RecordContent;
-  savedDocument: RecordContent;
+  document: EditorDocument;
+  savedDocument: EditorDocument;
   setPrompt: (prompt: string) => void;
   setCharacterNodePosition: (
     nodeId: string,
@@ -22,7 +19,7 @@ type AssetEditorSessionState = {
   ) => void;
 };
 
-export function createAssetEditorSessionStore(initialDocument: RecordContent) {
+export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
   const document = structuredClone(initialDocument);
 
   return createStore<AssetEditorSessionState>()(
@@ -70,7 +67,7 @@ export type AssetEditorSessionStore = ReturnType<
 
 export function resetAssetEditorSessionStore(
   store: AssetEditorSessionStore,
-  document: RecordContent,
+  document: EditorDocument,
 ) {
   store.setState({
     document: structuredClone(document),
@@ -81,7 +78,7 @@ export function resetAssetEditorSessionStore(
 
 export function markAssetEditorSessionSaved(
   store: AssetEditorSessionStore,
-  document: RecordContent,
+  document: EditorDocument,
 ) {
   store.setState({ savedDocument: structuredClone(document) });
 }

@@ -1,9 +1,7 @@
-import {
-  isRecordContentForAssetKind,
-  type AssetGroupsByProject,
-  type AssetKind,
-  type ProjectAsset,
-  type RecordContent,
+import type {
+  AssetGroupsByProject,
+  AssetKind,
+  ProjectAsset,
 } from "../../domain";
 import { assetGroupsByProject as seededAssetGroups } from "./assets.seed";
 
@@ -89,18 +87,13 @@ export async function deleteMockAsset(projectId: string, assetId: string) {
   return structuredClone(assetGroupsByProject[projectId]);
 }
 
-export async function saveMockAssetRevision(
+export async function saveMockAssetRevision<Payload>(
   projectId: string,
   assetId: string,
-  content: RecordContent,
+  description: string,
+  payload: Payload,
 ) {
   const groups = assetGroupsByProject[projectId] ?? [];
-  const assetGroup = groups.find((group) =>
-    group.assets.some((asset) => asset.id === assetId),
-  );
-  if (assetGroup && !isRecordContentForAssetKind(assetGroup.kind, content)) {
-    throw new Error("Record content does not match the asset kind.");
-  }
   const savedAt = new Date();
 
   assetGroupsByProject = {
@@ -114,10 +107,10 @@ export async function saveMockAssetRevision(
         const record = {
           id: `record-${asset.id}-${crypto.randomUUID()}`,
           version,
-          description: content.prompt.trim() || asset.description,
+          description: description.trim() || asset.description,
           status: "ready" as const,
           isCurrent: true,
-          content: structuredClone(content),
+          content: structuredClone(payload),
           savedAt: savedAt.toISOString(),
         };
 

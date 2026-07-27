@@ -1,4 +1,4 @@
-import type { EditorCharacterAnimation } from "@/features/assets/domain";
+import type { EditorCharacterAnimation } from "../../domain";
 
 import type { CanvasPosition } from "./CharacterCanvas.constants";
 import type { CharacterCanvasNodeId } from "./character-node";

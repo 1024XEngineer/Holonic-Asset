@@ -1,4 +1,4 @@
-export { assetApi } from "./asset.api";
+export { assetApi, type SaveAssetRevisionInput } from "./asset.api";
 export { assetKeys } from "./keys";
 export { useAddAssetMutation } from "./asset-add.mutation";
 export { useCopyAssetMutation } from "./asset-copy.mutation";

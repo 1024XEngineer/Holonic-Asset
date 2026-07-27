@@ -1,1 +1,4 @@
-export { getMockRecord, type GetRecordInput } from "./record.mock";
+export {
+  getMockEditorDocument,
+  saveMockEditorDocumentRevision,
+} from "./record.mock";

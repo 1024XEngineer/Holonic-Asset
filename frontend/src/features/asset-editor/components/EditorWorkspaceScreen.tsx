@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { RecordData } from "@/features/assets/domain";
+import type { EditorWorkspaceData } from "../domain";
 
 import { EditorWorkspace } from "./EditorWorkspace";
 
@@ -10,7 +10,7 @@ export function EditorWorkspaceScreen({
   onBack,
   onRetry,
 }: {
-  data?: RecordData;
+  data?: EditorWorkspaceData;
   error: Error | null;
   isLoading: boolean;
   onBack: () => void;

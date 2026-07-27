@@ -1,6 +1,6 @@
 import type { Viewport } from "pixi-viewport";
 
-import type { EditorCharacterAnimation } from "@/features/assets/domain";
+import type { EditorCharacterAnimation } from "../../../domain";
 import type { CharacterCanvasModel } from "../CharacterCanvas.interface";
 import type { NodeId } from "../character-node";
 import type { CanvasPosition } from "../CharacterCanvas.constants";

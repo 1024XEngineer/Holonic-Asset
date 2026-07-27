@@ -3,13 +3,13 @@ import type {
   AssetGroupsByProject,
 } from "@/features/assets/domain";
 import type { ProjectAsset } from "@/features/assets/domain";
-import type { AssetRecord } from "@/features/assets/domain";
+import type { AssetRevision } from "@/features/assets/domain";
 
 function createHistory(
   assetId: string,
   currentVersion: string,
   currentDescription: string,
-): AssetRecord[] {
+): AssetRevision[] {
   const currentNumber = Number.parseInt(currentVersion.replace("v", ""), 10);
   const descriptions = [
     currentDescription,
