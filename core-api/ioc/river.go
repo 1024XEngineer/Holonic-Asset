@@ -13,7 +13,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
-	riveradapter "github.com/1024XEngineer/Holonic-Asset/internal/outbox/river"
+	riveradapter "github.com/1024XEngineer/Holonic-Asset/internal/module/task/river"
 )
 
 func InitRiver(

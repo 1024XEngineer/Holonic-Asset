@@ -1,6 +1,10 @@
 package task
 
-import "sync"
+import (
+	"context"
+	"fmt"
+	"sync"
+)
 
 // Registry maps task types to handlers and is safe for concurrent access.
 type Registry struct {
@@ -23,4 +27,18 @@ func (r *Registry) Get(taskType string) (Handler, bool) {
 	defer r.mu.RUnlock()
 	h, ok := r.handlers[taskType]
 	return h, ok
+}
+
+// Dispatch resolves the handler for a task type and executes it.
+// Business modules only register handlers; dispatching remains task infrastructure logic.
+func (r *Registry) Dispatch(ctx context.Context, message *Task) error {
+	if message == nil {
+		return fmt.Errorf("task: cannot dispatch nil task")
+	}
+
+	handler, ok := r.Get(message.Type)
+	if !ok {
+		return fmt.Errorf("task: no handler registered for type %q", message.Type)
+	}
+	return handler.Handle(ctx, message)
 }

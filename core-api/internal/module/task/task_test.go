@@ -15,16 +15,15 @@ func TestRegistryIsBusinessAgnostic(t *testing.T) {
 	registry := task.NewRegistry()
 	registry.Register("example.v1", handler{})
 
-	got, ok := registry.Get("example.v1")
-	if !ok {
-		t.Fatal("expected registered handler")
+	if err := registry.Dispatch(context.Background(), &task.Task{Type: "example.v1"}); err != nil {
+		t.Fatalf("dispatch generic task: %v", err)
 	}
-	if got == nil {
-		t.Fatal("expected non-nil handler")
-	}
+}
 
-	message := &task.Task{Type: "generation.character.v1"}
-	if err := got.Handle(context.Background(), message); err != nil {
-		t.Fatalf("handle generic task: %v", err)
+func TestRegistryDispatchReturnsErrorForUnknownType(t *testing.T) {
+	registry := task.NewRegistry()
+
+	if err := registry.Dispatch(context.Background(), &task.Task{Type: "unknown.v1"}); err == nil {
+		t.Fatal("expected unknown task type error")
 	}
 }

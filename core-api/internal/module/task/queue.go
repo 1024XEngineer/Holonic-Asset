@@ -15,3 +15,9 @@ type Consumer interface {
 	Start(ctx context.Context, fn ProcessFunc) error
 	Stop() error
 }
+
+// Queue combines task production and consumption.
+type Queue interface {
+	Producer
+	Consumer
+}
