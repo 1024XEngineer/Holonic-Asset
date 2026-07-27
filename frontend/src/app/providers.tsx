@@ -3,7 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { useState } from "react";
 
 import type { router as appRouter } from "@/app/router";
-import { createQueryClient } from "@/api";
+import { createQueryClient } from "@/app/query-client";
 
 export function AppProviders({ router }: { router: typeof appRouter }) {
   const [queryClient] = useState(createQueryClient);

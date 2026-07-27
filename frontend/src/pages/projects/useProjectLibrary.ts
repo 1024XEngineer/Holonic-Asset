@@ -1,26 +1,30 @@
 import { useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 
 import {
+  assetKeys,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
-} from "@/api/asset";
+} from "@/features/assets";
 import {
+  generationKeys,
   useEnqueueGenerationMutation,
   useGenerationRunsQuery,
-} from "@/api/generation";
+} from "@/features/generation";
 import {
   reconcileProjectSelection,
   removeProjectSelection,
   useDeleteProjectMutation,
   useProjectListQuery,
   useUpdateProjectMutation,
-} from "@/api/project";
-import type { CreationRequest } from "@/domain/generation";
-import type { ProjectSummary } from "@/domain/project";
+} from "@/features/project";
+import type { CreationRequest } from "@/features/generation";
+import type { ProjectSummary } from "@/features/project";
 
 export function useProjectLibrary() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate({ from: "/projects" });
   const search = useSearch({ from: "/projects" });
   const { data: projects = [], isSuccess: projectsLoaded } =
@@ -63,6 +67,10 @@ export function useProjectLibrary() {
   const removeProject = useCallback(
     async (projectId: string) => {
       await deleteProject(projectId);
+      queryClient.removeQueries({ queryKey: assetKeys.library(projectId) });
+      queryClient.removeQueries({
+        queryKey: generationKeys.runs(projectId),
+      });
       const fallbackProjectId = removeProjectSelection(
         projects,
         projectId,
@@ -71,7 +79,7 @@ export function useProjectLibrary() {
       if (search.project === projectId)
         await selectProject(fallbackProjectId, true);
     },
-    [deleteProject, projects, search.project, selectProject],
+    [deleteProject, projects, queryClient, search.project, selectProject],
   );
 
   const openAsset = useCallback(

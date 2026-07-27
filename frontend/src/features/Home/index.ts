@@ -1,6 +1,6 @@
-export { HomeCapabilities } from "./HomeCapabilities";
-export { HomeClosingCta } from "./HomeClosingCta";
-export { HomeFooter } from "./HomeFooter";
-export { HomeHero } from "./HomeHero";
-export { HomeProjectStory } from "./HomeProjectStory";
-export { HomeWorkflow } from "./HomeWorkflow";
+export { HomeCapabilities } from "./components/home-capabilities";
+export { HomeClosingCta } from "./components/home-closing-cta";
+export { HomeFooter } from "./components/home-footer";
+export { HomeHero } from "./components/home-hero";
+export { HomeProjectStory } from "./components/home-project-story";
+export { HomeWorkflow } from "./components/home-workflow";

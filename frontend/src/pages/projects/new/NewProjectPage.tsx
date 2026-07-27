@@ -1,8 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 
-import { NewProjectScreen } from "@/features/Project";
 import { AppHeader } from "@/components/layouts/AppHeader";
-import { useCreateProjectMutation } from "@/api/project";
+import { NewProjectScreen, useCreateProjectMutation } from "@/features/project";
 
 export function NewProjectPage() {
   const navigate = useNavigate({ from: "/projects/new" });
