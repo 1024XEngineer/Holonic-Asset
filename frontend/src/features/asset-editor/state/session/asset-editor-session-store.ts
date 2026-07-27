@@ -1,7 +1,11 @@
 import { createStore } from "zustand";
 import { temporal } from "zundo";
 
-import type { EditorCanvasPosition, EditorDocument } from "../../domain";
+import type {
+  EditorCanvasPosition,
+  EditorCharacterAnimationClip,
+  EditorDocument,
+} from "../../domain";
 
 import type {
   AssetEditorCommand,
@@ -17,6 +21,7 @@ type AssetEditorSessionState = {
     nodeId: string,
     position: EditorCanvasPosition,
   ) => void;
+  addCharacterAnimation: (label: string) => void;
 };
 
 export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
@@ -46,6 +51,33 @@ export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
                     ...state.document.character.nodePositions,
                     [nodeId]: position,
                   },
+                },
+              },
+            };
+          }),
+        addCharacterAnimation: (label) =>
+          set((state) => {
+            if (state.document.mode !== "character") {
+              throw new Error(
+                "Character animations require a character record document.",
+              );
+            }
+
+            const normalizedLabel = label.trim();
+            if (!normalizedLabel) return state;
+
+            const animations = state.document.character.animations ?? [];
+            const animation: EditorCharacterAnimationClip = {
+              id: createCharacterAnimationId(normalizedLabel, animations),
+              label: normalizedLabel,
+              frameCount: 1,
+            };
+            return {
+              document: {
+                ...state.document,
+                character: {
+                  ...state.document.character,
+                  animations: [...animations, animation],
                 },
               },
             };
@@ -96,6 +128,9 @@ export function dispatchAssetEditorCommand(
         .getState()
         .setCharacterNodePosition(command.nodeId, command.position);
       return;
+    case "character.animation.add":
+      store.getState().addCharacterAnimation(command.label);
+      return;
     case "history.undo":
       store.temporal.getState().undo();
       return;
@@ -119,4 +154,25 @@ export function getAssetEditorSessionSnapshot(
     canRedo: temporalState.futureStates.length > 0,
     saveState,
   };
+}
+
+function createCharacterAnimationId(
+  label: string,
+  animations: Array<{ id: string }>,
+) {
+  const base =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "animation";
+  const ids = new Set(animations.map((animation) => animation.id));
+  let id = base;
+  let suffix = 2;
+
+  while (ids.has(id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  return id;
 }

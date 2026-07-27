@@ -4,7 +4,7 @@ export const mockExportJobs: ExportJob[] = [
   {
     id: "export-moonlit-orchard-v4",
     projectId: "moonlit-orchard",
-    assetIds: ["forager-hero", "orchard-ground-set"],
+    assetIds: ["swordsman", "orchard-ground-set"],
     format: "zip",
     includeSourceFiles: true,
     status: "ready",

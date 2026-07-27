@@ -1,3 +1,4 @@
+import type { EditorCharacterAnimation } from "../../domain";
 import type { CharacterCanvasNodeId } from "./character-node";
 
 export type CanvasPosition = {
@@ -5,31 +6,29 @@ export type CanvasPosition = {
   y: number;
 };
 
-export const CANVAS_NODES = [
-  "prototype",
-  "idle",
-  "walk",
-  "harvest",
-  "jump",
-  "celebrate",
-] as const satisfies readonly CharacterCanvasNodeId[];
+export const PROTOTYPE_NODE_ID = "prototype";
 
-export const ANIMATION_NODES = new Set<CharacterCanvasNodeId>([
-  "idle",
-  "walk",
-  "harvest",
-  "jump",
-  "celebrate",
-]);
+export function getCanvasNodes(
+  animations: EditorCharacterAnimation[],
+): CharacterCanvasNodeId[] {
+  return [
+    PROTOTYPE_NODE_ID,
+    ...animations
+      .map((animation) => animation.id)
+      .filter((id) => id !== PROTOTYPE_NODE_ID),
+  ];
+}
 
-export const DEFAULT_CANVAS_POSITIONS: Record<
-  (typeof CANVAS_NODES)[number],
-  CanvasPosition
-> = {
-  prototype: { x: 160, y: 160 },
-  idle: { x: 490, y: 160 },
-  walk: { x: 900, y: 160 },
-  harvest: { x: 1310, y: 160 },
-  jump: { x: 520, y: 700 },
-  celebrate: { x: 1060, y: 700 },
-};
+export function createDefaultCanvasPositions(
+  animations: EditorCharacterAnimation[],
+): Record<CharacterCanvasNodeId, CanvasPosition> {
+  return Object.fromEntries(
+    getCanvasNodes(animations).map((node, index) => [
+      node,
+      {
+        x: 80 + (index % 5) * 330,
+        y: 220 + Math.floor(index / 5) * 370,
+      },
+    ]),
+  );
+}

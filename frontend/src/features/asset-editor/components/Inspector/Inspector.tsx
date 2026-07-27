@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AssetRevision } from "@/features/assets/domain";
 import {
-  characterNodeMeta,
+  getCharacterNodeLabel,
   type CharacterCanvasNodeId,
 } from "../../modules/character-canvas";
+import type { EditorCharacterAnimation } from "../../domain";
 
 type InspectorProps = {
   selectedNodes: CharacterCanvasNodeId[];
@@ -17,6 +18,7 @@ type InspectorProps = {
   onAction: (message: string) => void;
   history: AssetRevision[];
   selectedItems?: string[];
+  animations?: EditorCharacterAnimation[];
 };
 
 export function Inspector({
@@ -27,6 +29,7 @@ export function Inspector({
   onAction,
   history,
   selectedItems,
+  animations = [],
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<"ai-edit" | "history">("ai-edit");
 
@@ -62,6 +65,7 @@ export function Inspector({
                 selectedNodes={selectedNodes}
                 selectedFrames={selectedFrames}
                 selectedItems={selectedItems}
+                animations={animations}
               />
               <label className="grid gap-2 text-sm font-medium text-[#51493f]">
                 Description
@@ -124,10 +128,12 @@ function SelectionSummary({
   selectedNodes,
   selectedFrames,
   selectedItems,
+  animations,
 }: {
   selectedNodes: CharacterCanvasNodeId[];
   selectedFrames: Array<{ nodeId: CharacterCanvasNodeId; index: number }>;
   selectedItems?: string[];
+  animations: EditorCharacterAnimation[];
 }) {
   if (selectedItems) {
     return (
@@ -144,7 +150,7 @@ function SelectionSummary({
     return (
       <div className="mb-4 rounded-xl border border-black/10 bg-[#f7f5f0] p-3 text-xs text-[#51493f]">
         <span className="font-semibold text-[#2d2923]">Target:</span>{" "}
-        {node ? `${characterNodeMeta[node].label} (` : ""}
+        {node ? `${getCharacterNodeLabel(node, animations)} (` : ""}
         {selectedFrames
           .map((selectedFrame) => `Frame ${selectedFrame.index + 1}`)
           .join(", ")}
@@ -157,7 +163,9 @@ function SelectionSummary({
     return (
       <div className="mb-4 rounded-xl border border-black/10 bg-[#f7f5f0] p-3 text-xs text-[#51493f]">
         <span className="font-semibold text-[#2d2923]">Target:</span>{" "}
-        {selectedNodes.map((node) => characterNodeMeta[node].label).join(", ")}
+        {selectedNodes
+          .map((node) => getCharacterNodeLabel(node, animations))
+          .join(", ")}
       </div>
     );
   }

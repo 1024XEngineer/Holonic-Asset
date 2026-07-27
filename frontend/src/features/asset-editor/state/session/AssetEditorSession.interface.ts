@@ -16,6 +16,10 @@ export type AssetEditorCommand =
       position: EditorCanvasPosition;
     }
   | {
+      type: "character.animation.add";
+      label: string;
+    }
+  | {
       type: "history.undo";
     }
   | {

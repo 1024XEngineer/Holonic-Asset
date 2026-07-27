@@ -1,6 +1,6 @@
-import type { NodeId } from "../character-node";
+import { getCharacterDirectionId, type NodeId } from "../character-node";
 import {
-  CANVAS_NODES,
+  getCanvasNodes,
   type CanvasPosition,
 } from "../CharacterCanvas.constants";
 import {
@@ -11,7 +11,6 @@ import {
   intersects,
   normalizeBounds,
 } from "./CharacterStageGeometry";
-import { INITIAL_SCALE } from "../Runtime/CharacterStage.constants";
 import type { CharacterStageContext } from "../Runtime/CharacterCanvas.types";
 
 type DragState =
@@ -38,7 +37,6 @@ type DragState =
 
 export class CharacterStageInteraction {
   private drag: DragState | null = null;
-  private lastClick = { time: 0, x: 0, y: 0 };
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CharacterStageContext;
 
@@ -66,13 +64,20 @@ export class CharacterStageInteraction {
     const point = this.worldPoint(screen);
     if (event.button === 1) return;
     if (event.button !== 0) return;
-    if (this.handleDoubleClick(screen)) return;
 
     const hit = this.hitTest(point);
     if (hit?.kind === "play") return this.togglePlaying(hit.node);
     if (hit?.kind === "expand") return this.toggleExpanded(hit.node);
+    if (hit?.kind === "switch") return this.switchDirection(hit.node);
     if (hit?.kind === "frame")
-      return this.context.actions.onSelectFrame(hit.node, hit.index);
+      return this.context.actions.onSelectFrame(
+        getCharacterDirectionId(
+          hit.node,
+          this.context.getAnimations(),
+          this.context.getActiveDirections(),
+        ),
+        hit.index,
+      );
     if (hit?.kind === "frame-grid") {
       this.capture(event);
       this.drag = {
@@ -157,46 +162,38 @@ export class CharacterStageInteraction {
     this.context.render();
   }
 
-  private handleDoubleClick(screen: CanvasPosition) {
-    const now = performance.now();
-    const isDouble =
-      now - this.lastClick.time < 280 &&
-      Math.hypot(screen.x - this.lastClick.x, screen.y - this.lastClick.y) < 5;
-    this.lastClick = isDouble
-      ? { time: 0, x: 0, y: 0 }
-      : { time: now, x: screen.x, y: screen.y };
-    if (!isDouble) return false;
-    const focus = this.context.viewport.toWorld(screen);
-    const scale = this.context.viewport.scale.x < 1 ? 1 : INITIAL_SCALE;
-    this.context.viewport.setZoom(scale);
-    this.context.viewport.moveCenter(focus);
+  private switchDirection(node: NodeId) {
+    this.context.actions.onSelect(node);
+    this.context.switchDirection(node);
     this.context.render();
-    return true;
   }
 
   private moveNode(
     drag: Extract<DragState, { kind: "node" }>,
     point: CanvasPosition,
   ) {
+    const step = this.context.getDragStep();
     this.context.moveNode(drag.node, {
-      x: drag.position.x + point.x - drag.start.x,
-      y: drag.position.y + point.y - drag.start.y,
+      x: drag.position.x + snapToStep(point.x - drag.start.x, step),
+      y: drag.position.y + snapToStep(point.y - drag.start.y, step),
     });
   }
 
   private completeNodeSelection(start: CanvasPosition, end: CanvasPosition) {
     const bounds = normalizeBounds(start, end);
     const scene = this.context.getScene();
-    const selected = CANVAS_NODES.filter((node) =>
-      intersects(
-        bounds,
-        getNodeBounds(
-          node,
-          scene.positions[node],
-          scene.expanded.has(node),
-          this.context.getAnimations(),
+    const selected = getCanvasNodes(this.context.getAnimations()).filter(
+      (node) =>
+        intersects(
+          bounds,
+          getNodeBounds(
+            node,
+            scene.positions[node],
+            scene.expanded.has(node),
+            this.context.getAnimations(),
+            this.context.getActiveDirections(),
+          ),
         ),
-      ),
     );
     if (selected.length > 0) this.context.actions.onSelectNodes(selected);
     else this.context.actions.onClearSelection();
@@ -210,10 +207,25 @@ export class CharacterStageInteraction {
     const bounds = normalizeBounds(start, end);
     const position = this.context.getScene().positions[node];
     const indexes = Array.from(
-      { length: getFrameCount(node, this.context.getAnimations()) },
+      {
+        length: getFrameCount(
+          node,
+          this.context.getAnimations(),
+          this.context.getActiveDirections(),
+        ),
+      },
       (_, index) => index,
     ).filter((index) => intersects(bounds, getFrameBounds(position, index)));
-    if (indexes.length > 0) this.context.actions.onSelectFrames(node, indexes);
+    if (indexes.length > 0) {
+      this.context.actions.onSelectFrames(
+        getCharacterDirectionId(
+          node,
+          this.context.getAnimations(),
+          this.context.getActiveDirections(),
+        ),
+        indexes,
+      );
+    }
   }
 
   private syncMarquee() {
@@ -237,4 +249,8 @@ export class CharacterStageInteraction {
   private capture(event: PointerEvent) {
     this.canvas.setPointerCapture(event.pointerId);
   }
+}
+
+function snapToStep(value: number, step: number) {
+  return Math.round(value / step) * step;
 }

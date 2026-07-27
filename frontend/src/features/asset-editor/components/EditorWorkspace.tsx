@@ -89,6 +89,7 @@ export function EditorWorkspace({
         return (
           <CharacterEditorMode
             {...modeProps}
+            characterPrototype={snapshot.document.character.prototype}
             characterAnimations={snapshot.document.character.animations ?? []}
             characterNodePositions={snapshot.document.character.nodePositions}
             onCharacterPositionChange={(
@@ -100,6 +101,9 @@ export function EditorWorkspace({
                 nodeId,
                 position,
               })
+            }
+            onCharacterAnimationCreate={(label) =>
+              session.dispatch({ type: "character.animation.add", label })
             }
           />
         );

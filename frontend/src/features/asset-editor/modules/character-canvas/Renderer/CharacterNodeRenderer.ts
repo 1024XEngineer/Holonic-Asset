@@ -1,18 +1,26 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics, Rectangle, Sprite, Text, Texture } from "pixi.js";
 
-import type { EditorCharacterAnimation } from "../../../domain";
+import type {
+  EditorCharacterAnimation,
+  EditorCharacterSpriteSheet,
+} from "../../../domain";
 import {
-  findCharacterAnimation,
+  getCharacterCanvasAnimation,
   getCharacterNodeLabel,
+  type CharacterDirectionMap,
   type NodeId,
 } from "../character-node";
-import {
-  ANIMATION_NODES,
-  type CanvasPosition,
-} from "../CharacterCanvas.constants";
+import type { CanvasPosition } from "../CharacterCanvas.constants";
 import { getCharacterNodeLayout } from "../Interaction/CharacterStageGeometry";
-import { STAGE_ACCENT } from "../Runtime/CharacterStage.constants";
+import {
+  FRAME_SIZE,
+  getCharacterPixelScale,
+  STAGE_ACCENT,
+} from "../Runtime/CharacterStage.constants";
 import type { Bounds } from "../Runtime/CharacterCanvas.types";
+
+const COLLAPSED_PREVIEW_Y = 80;
+const PROTOTYPE_FRAME_GAP = 8;
 
 export function drawCharacterNode({
   node,
@@ -22,7 +30,9 @@ export function drawCharacterNode({
   expanded,
   playing,
   previewFrame,
+  activeDirections,
   animations,
+  prototype,
 }: {
   node: NodeId;
   position: CanvasPosition;
@@ -31,7 +41,9 @@ export function drawCharacterNode({
   expanded: boolean;
   playing: boolean;
   previewFrame: number;
+  activeDirections: CharacterDirectionMap;
   animations: EditorCharacterAnimation[];
+  prototype: EditorCharacterSpriteSheet;
 }) {
   const container = new Container({ x: position.x, y: position.y });
   const layout = getCharacterNodeLayout(
@@ -39,26 +51,67 @@ export function drawCharacterNode({
     { x: 0, y: 0 },
     expanded,
     animations,
+    activeDirections,
   );
   drawLabel(
     container,
-    getCharacterNodeLabel(node, animations),
+    getCharacterNodeLabel(node, animations, activeDirections),
     layout.bounds.width,
     selected,
   );
 
+  const animation = getCharacterCanvasAnimation(
+    node,
+    animations,
+    activeDirections,
+  );
+  const pixelScale = getCharacterPixelScale(prototype);
   if (expanded) {
     layout.frames.forEach((frame, index) => {
-      drawFrame(container, frame, index, selectedFrames.includes(index));
+      drawFrame(
+        container,
+        frame,
+        index,
+        selectedFrames.includes(index),
+        animation?.spriteSheet,
+        pixelScale,
+      );
     });
+  } else if (node === "prototype" && prototype.imageUrl) {
+    drawSpriteSheetPreview(
+      container,
+      prototype,
+      layout.bounds.width,
+      pixelScale,
+    );
+  } else if (animation?.spriteSheet?.imageUrl) {
+    drawSpriteSheetFrame(
+      container,
+      animation.spriteSheet,
+      previewFrame,
+      (layout.bounds.width - FRAME_SIZE) / 2,
+      COLLAPSED_PREVIEW_Y,
+      FRAME_SIZE,
+      FRAME_SIZE,
+      pixelScale,
+    );
   } else {
-    drawCharacter(container, 64, 48, previewFrame, 8);
+    drawCharacterPlaceholder(
+      container,
+      {
+        x: (layout.bounds.width - FRAME_SIZE) / 2,
+        y: COLLAPSED_PREVIEW_Y,
+        width: FRAME_SIZE,
+        height: FRAME_SIZE,
+      },
+      previewFrame,
+    );
   }
 
-  const audio = findCharacterAnimation(node, animations)?.audio;
+  const audio = animation?.audio;
   if (audio && !expanded) drawAudioWaveform(container, audio.label);
 
-  if (ANIMATION_NODES.has(node)) {
+  if (animation) {
     const playControl = layout.playControl!;
     const expandControl = layout.expandControl!;
     drawControl(
@@ -81,6 +134,20 @@ export function drawCharacterNode({
       expanded ? "-" : "+",
       false,
     );
+    const group = animations.find((candidate) => candidate.id === node);
+    if (group && "directions" in group && group.directions.length > 1) {
+      const switchControl = layout.switchControl!;
+      drawControl(
+        container,
+        switchControl.x,
+        switchControl.y,
+        switchControl.width,
+        switchControl.height,
+        "Switch",
+        "<>",
+        false,
+      );
+    }
   }
 
   return container;
@@ -120,6 +187,8 @@ function drawFrame(
   bounds: Bounds,
   index: number,
   selected: boolean,
+  spriteSheet?: EditorCharacterSpriteSheet,
+  pixelScale = 1,
 ) {
   if (selected) {
     container.addChild(
@@ -134,7 +203,36 @@ function drawFrame(
         .stroke({ color: STAGE_ACCENT, width: 2 }),
     );
   }
-  drawCharacter(container, bounds.x + 28, bounds.y + 8, index, 4);
+
+  if (spriteSheet?.imageUrl) {
+    drawSpriteSheetFrame(
+      container,
+      spriteSheet,
+      index,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      pixelScale,
+    );
+  } else {
+    drawCharacterPlaceholder(container, bounds, index);
+  }
+}
+
+function drawCharacterPlaceholder(
+  container: Container,
+  bounds: Bounds,
+  frame: number,
+) {
+  const size = Math.floor(Math.min(bounds.width / 12, bounds.height / 17));
+  drawCharacter(
+    container,
+    bounds.x + (bounds.width - 12 * size) / 2,
+    bounds.y + (bounds.height - 17 * size) / 2,
+    frame,
+    size,
+  );
 }
 
 function drawCharacter(
@@ -181,6 +279,104 @@ function drawCharacter(
     }
   }
   container.addChild(pixels);
+}
+
+const spriteSheetFrameTextures = new Map<string, Texture>();
+
+function drawSpriteSheetPreview(
+  container: Container,
+  spriteSheet: EditorCharacterSpriteSheet,
+  containerWidth: number,
+  pixelScale: number,
+) {
+  const frameCount = spriteSheet.columns * spriteSheet.rows;
+  const previewColumns = frameCount === 1 ? 1 : 2;
+  const previewRows = Math.ceil(frameCount / previewColumns);
+  const previewWidth =
+    previewColumns * FRAME_SIZE + (previewColumns - 1) * PROTOTYPE_FRAME_GAP;
+  const previewHeight =
+    previewRows * FRAME_SIZE + (previewRows - 1) * PROTOTYPE_FRAME_GAP;
+  const startX = (containerWidth - previewWidth) / 2;
+  const startY =
+    frameCount === 1 ? COLLAPSED_PREVIEW_Y : 48 + (200 - previewHeight) / 2;
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    drawSpriteSheetFrame(
+      container,
+      spriteSheet,
+      frame,
+      startX + (frame % previewColumns) * (FRAME_SIZE + PROTOTYPE_FRAME_GAP),
+      startY +
+        Math.floor(frame / previewColumns) * (FRAME_SIZE + PROTOTYPE_FRAME_GAP),
+      FRAME_SIZE,
+      FRAME_SIZE,
+      pixelScale,
+    );
+  }
+}
+
+function drawSpriteSheetFrame(
+  container: Container,
+  spriteSheet: EditorCharacterSpriteSheet,
+  frame: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pixelScale: number,
+) {
+  const column = frame % spriteSheet.columns;
+  const row = spriteSheet.row ?? Math.floor(frame / spriteSheet.columns);
+  const cacheKey = `${spriteSheet.imageUrl}:${column}:${row}`;
+  let texture = spriteSheetFrameTextures.get(cacheKey);
+
+  if (!texture) {
+    const source = Texture.from(spriteSheet.imageUrl).source;
+    texture = new Texture({
+      source,
+      frame: new Rectangle(
+        column * spriteSheet.frameWidth,
+        row * spriteSheet.frameHeight,
+        spriteSheet.frameWidth,
+        spriteSheet.frameHeight,
+      ),
+    });
+    spriteSheetFrameTextures.set(cacheKey, texture);
+  }
+
+  drawSprite(
+    container,
+    texture,
+    spriteSheet.frameWidth,
+    spriteSheet.frameHeight,
+    x,
+    y,
+    width,
+    height,
+    pixelScale,
+  );
+}
+
+function drawSprite(
+  container: Container,
+  texture: Texture,
+  sourceWidth: number,
+  sourceHeight: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pixelScale: number,
+) {
+  const sprite = new Sprite(texture);
+  const renderedWidth = sourceWidth * pixelScale;
+  const renderedHeight = sourceHeight * pixelScale;
+  sprite.position.set(
+    x + (width - renderedWidth) / 2,
+    y + (height - renderedHeight) / 2,
+  );
+  sprite.scale.set(pixelScale);
+  container.addChild(sprite);
 }
 
 function drawAudioWaveform(container: Container, label: string) {

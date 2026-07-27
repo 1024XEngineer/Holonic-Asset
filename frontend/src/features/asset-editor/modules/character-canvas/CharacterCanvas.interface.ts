@@ -1,4 +1,7 @@
-import type { EditorCharacterAnimation } from "../../domain";
+import type {
+  EditorCharacterAnimation,
+  EditorCharacterSpriteSheet,
+} from "../../domain";
 
 import type { CanvasPosition } from "./CharacterCanvas.constants";
 import type { CharacterCanvasNodeId } from "./character-node";
@@ -14,7 +17,9 @@ export type CharacterCanvasSelection = {
 };
 
 export type CharacterCanvasModel = {
+  prototype: EditorCharacterSpriteSheet;
   animations: EditorCharacterAnimation[];
+  activeDirections?: Readonly<Record<string, CharacterCanvasNodeId>>;
   nodePositions?: Record<string, CanvasPosition>;
   selection: CharacterCanvasSelection;
 };
@@ -28,6 +33,11 @@ export type CharacterCanvasEvent =
       type: "node-position.committed";
       nodeId: CharacterCanvasNodeId;
       position: CanvasPosition;
+    }
+  | {
+      type: "direction.changed";
+      nodeId: CharacterCanvasNodeId;
+      directionId: CharacterCanvasNodeId;
     };
 
 export type CharacterCanvasProps = {

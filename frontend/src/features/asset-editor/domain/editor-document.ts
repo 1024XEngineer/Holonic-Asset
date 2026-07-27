@@ -2,19 +2,49 @@ import type { AssetKind, AssetRevision } from "@/features/assets/domain";
 
 export type EditorCanvasPosition = { x: number; y: number };
 
-export type EditorCharacterAnimationId =
-  | "idle"
-  | "walk"
-  | "harvest"
-  | "jump"
-  | "celebrate";
+export type EditorCharacterSpriteSheet = {
+  format: "png-sprite-sheet";
+  imageUrl: string;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  rows: number;
+  row?: number;
+};
 
-export type EditorCharacterAnimation = {
-  id: EditorCharacterAnimationId;
+export type EditorCharacterAnimationClip = {
+  id: string;
   label: string;
   frameCount: number;
+  spriteSheet?: EditorCharacterSpriteSheet;
   audio?: { label: string; time: string };
 };
+
+export type EditorCharacterAnimationGroup = {
+  id: string;
+  label: string;
+  directions: EditorCharacterAnimationClip[];
+};
+
+export type EditorCharacterAnimation =
+  | EditorCharacterAnimationClip
+  | EditorCharacterAnimationGroup;
+
+export function isEditorCharacterAnimationGroup(
+  animation: EditorCharacterAnimation,
+): animation is EditorCharacterAnimationGroup {
+  return "directions" in animation;
+}
+
+export function getEditorCharacterAnimationClips(
+  animations: EditorCharacterAnimation[],
+): EditorCharacterAnimationClip[] {
+  return animations.flatMap((animation) =>
+    isEditorCharacterAnimationGroup(animation)
+      ? animation.directions
+      : [animation],
+  );
+}
 
 export type EditorSceneryLayer = {
   id: string;
@@ -48,7 +78,7 @@ export type CharacterEditorDocument = {
   mode: "character";
   prompt: string;
   character: {
-    prototypeName?: string;
+    prototype: EditorCharacterSpriteSheet;
     animations?: EditorCharacterAnimation[];
     nodePositions: Record<string, EditorCanvasPosition>;
   };
@@ -119,11 +149,10 @@ function isEditorDocument(value: unknown): value is EditorDocument {
     case "character":
       return (
         isRecord(value.character) &&
-        (value.character.prototypeName === undefined ||
-          typeof value.character.prototypeName === "string") &&
+        isEditorCharacterSpriteSheet(value.character.prototype) &&
         isNodePositions(value.character.nodePositions) &&
         (value.character.animations === undefined ||
-          isArrayOf(value.character.animations, isEditorCharacterAnimation))
+          isEditorCharacterAnimations(value.character.animations))
       );
     case "scenery":
       return (
@@ -154,34 +183,90 @@ function isEditorCanvasPosition(value: unknown): value is EditorCanvasPosition {
 function isEditorCharacterAnimation(
   value: unknown,
 ): value is EditorCharacterAnimation {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    value.id.length === 0 ||
+    typeof value.label !== "string"
+  ) {
+    return false;
+  }
+
+  if (value.directions !== undefined) {
+    return (
+      value.frameCount === undefined &&
+      value.spriteSheet === undefined &&
+      value.audio === undefined &&
+      isArrayOf(value.directions, isEditorCharacterAnimationClip) &&
+      value.directions.length > 0 &&
+      value.directions.every((direction) =>
+        direction.id.startsWith(`${value.id}/`),
+      ) &&
+      hasUniqueAnimationIds(value.directions)
+    );
+  }
+
+  return isEditorCharacterAnimationClip(value);
+}
+
+function isEditorCharacterAnimationClip(
+  value: unknown,
+): value is EditorCharacterAnimationClip {
   return (
     isRecord(value) &&
-    isEditorCharacterAnimationId(value.id) &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
     typeof value.label === "string" &&
-    isFiniteNumber(value.frameCount) &&
+    isPositiveInteger(value.frameCount) &&
+    (value.spriteSheet === undefined ||
+      isEditorCharacterSpriteSheet(value.spriteSheet)) &&
     (value.audio === undefined || isEditorCharacterAudio(value.audio))
   );
 }
 
-function isEditorCharacterAnimationId(
+function isEditorCharacterAnimations(
   value: unknown,
-): value is EditorCharacterAnimationId {
-  return (
-    value === "idle" ||
-    value === "walk" ||
-    value === "harvest" ||
-    value === "jump" ||
-    value === "celebrate"
+): value is EditorCharacterAnimation[] {
+  if (!isArrayOf(value, isEditorCharacterAnimation)) return false;
+  return hasUniqueAnimationIds(
+    value.flatMap((animation) =>
+      "directions" in animation
+        ? [animation, ...animation.directions]
+        : [animation],
+    ),
   );
+}
+
+function hasUniqueAnimationIds(value: Array<{ id: string }>) {
+  return new Set(value.map((animation) => animation.id)).size === value.length;
 }
 
 function isEditorCharacterAudio(
   value: unknown,
-): value is NonNullable<EditorCharacterAnimation["audio"]> {
+): value is NonNullable<EditorCharacterAnimationClip["audio"]> {
   return (
     isRecord(value) &&
     typeof value.label === "string" &&
     typeof value.time === "string"
+  );
+}
+
+function isEditorCharacterSpriteSheet(
+  value: unknown,
+): value is EditorCharacterSpriteSheet {
+  return (
+    isRecord(value) &&
+    value.format === "png-sprite-sheet" &&
+    typeof value.imageUrl === "string" &&
+    isPositiveInteger(value.frameWidth) &&
+    isPositiveInteger(value.frameHeight) &&
+    isPositiveInteger(value.columns) &&
+    isPositiveInteger(value.rows) &&
+    (value.row === undefined ||
+      (typeof value.row === "number" &&
+        Number.isInteger(value.row) &&
+        value.row >= 0 &&
+        value.row < value.rows))
   );
 }
 
@@ -231,6 +316,10 @@ function isArrayOf<T>(
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

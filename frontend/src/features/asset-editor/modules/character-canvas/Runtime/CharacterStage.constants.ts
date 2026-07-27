@@ -1,12 +1,30 @@
+import type { EditorCharacterSpriteSheet } from "../../../domain";
+
 export const WORLD_WIDTH = 1760;
-export const WORLD_HEIGHT = 1152;
+export const WORLD_HEIGHT = 1400;
 export const MIN_SCALE = 0.3;
-export const MAX_SCALE = 2.5;
+export const MAX_SOURCE_PIXEL_SCREEN_SIZE = 24;
 export const INITIAL_SCALE = 0.64;
 export const NODE_WIDTH = 224;
 export const COLLAPSED_HEIGHT = 300;
 export const EXPANDED_WIDTH = 448;
 export const FRAME_SIZE = 96;
 export const FRAME_GAP = 16;
+export const PIXEL_GRID_MAJOR_INTERVAL = 8;
 export const STAGE_ACCENT = 0xb86b70;
 export const STAGE_BACKGROUND = 0xeeece7;
+
+export function getCharacterPixelScale(
+  spriteSheet: Pick<EditorCharacterSpriteSheet, "frameWidth" | "frameHeight">,
+) {
+  return Math.min(
+    FRAME_SIZE / spriteSheet.frameWidth,
+    FRAME_SIZE / spriteSheet.frameHeight,
+  );
+}
+
+export function getCharacterMaxScale(
+  spriteSheet: Pick<EditorCharacterSpriteSheet, "frameWidth" | "frameHeight">,
+) {
+  return MAX_SOURCE_PIXEL_SCREEN_SIZE / getCharacterPixelScale(spriteSheet);
+}

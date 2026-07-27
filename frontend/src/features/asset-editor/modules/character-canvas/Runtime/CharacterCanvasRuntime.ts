@@ -1,14 +1,24 @@
 import { Viewport } from "pixi-viewport";
-import { Container } from "pixi.js";
+import { Assets, Container } from "pixi.js";
 
-import { type NodeId } from "../character-node";
-import { DEFAULT_CANVAS_POSITIONS } from "../CharacterCanvas.constants";
+import {
+  getEditorCharacterAnimationClips,
+  isEditorCharacterAnimationGroup,
+} from "../../../domain";
+import {
+  createDefaultCharacterDirections,
+  findCharacterAnimationGroup,
+  getPreferredCharacterDirection,
+  type NodeId,
+} from "../character-node";
+import { createDefaultCanvasPositions } from "../CharacterCanvas.constants";
 import { CharacterStageInteraction } from "../Interaction/CharacterStageInteraction";
 import { getFrameCount } from "../Interaction/CharacterStageGeometry";
 import { CharacterStageRenderer } from "../Renderer/CharacterStageRenderer";
 import {
+  getCharacterPixelScale,
+  getCharacterMaxScale,
   INITIAL_SCALE,
-  MAX_SCALE,
   MIN_SCALE,
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -29,22 +39,26 @@ export class CharacterCanvasRuntime {
   private props: CharacterCanvasRuntimeProps;
   private lastAnimationFrame = performance.now();
 
-  private readonly state: CharacterSceneState = {
-    positions: structuredClone(DEFAULT_CANVAS_POSITIONS) as Record<
-      NodeId,
-      { x: number; y: number }
-    >,
-    expanded: new Set(),
-    playing: new Set(),
-    previewFrames: new Map(),
-    marquee: null,
-  };
+  private readonly state: CharacterSceneState;
 
   constructor(props: CharacterCanvasRuntimeProps) {
     this.props = props;
+    this.state = {
+      positions: createDefaultCanvasPositions(props.model.animations),
+      expanded: new Set(),
+      playing: new Set(),
+      previewFrames: new Map(),
+      activeDirections: new Map(
+        Object.entries(
+          createDefaultCharacterDirections(props.model.animations),
+        ),
+      ),
+      marquee: null,
+    };
   }
 
   async initialize(host: HTMLElement) {
+    await this.preloadCharacterTextures();
     await this.runtime.initialize(host);
     const { app } = this.runtime;
     const viewport = new Viewport({
@@ -60,7 +74,10 @@ export class CharacterCanvasRuntime {
       .drag({ mouseButtons: "middle" })
       .wheel()
       .clamp({ direction: "all", underflow: "center" })
-      .clampZoom({ minScale: MIN_SCALE, maxScale: MAX_SCALE });
+      .clampZoom({
+        minScale: MIN_SCALE,
+        maxScale: getCharacterMaxScale(this.props.model.prototype),
+      });
     app.stage.addChild(viewport);
     this.viewport = viewport;
     const world = new Container();
@@ -79,6 +96,8 @@ export class CharacterCanvasRuntime {
         onClearSelection: () => this.props.actions.onClearSelection(),
         onNodePositionChange: (node, position) =>
           this.props.actions.onNodePositionChange(node, position),
+        onSwitchDirection: (node, direction) =>
+          this.props.actions.onSwitchDirection(node, direction),
       },
       getScene: () => this.state,
       getAnimations: () => this.props.model.animations,
@@ -88,6 +107,7 @@ export class CharacterCanvasRuntime {
       setMarquee: (marquee) => {
         this.state.marquee = marquee;
       },
+      getDragStep: () => getCharacterPixelScale(this.props.model.prototype),
       toggleExpanded: (node) => {
         this.state.playing.delete(node);
         if (this.state.expanded.has(node)) this.state.expanded.delete(node);
@@ -98,6 +118,24 @@ export class CharacterCanvasRuntime {
         if (this.state.playing.has(node)) this.state.playing.delete(node);
         else this.state.playing.add(node);
       },
+      switchDirection: (node) => {
+        const group = findCharacterAnimationGroup(
+          node,
+          this.props.model.animations,
+        );
+        if (!group || group.directions.length < 2) return;
+        const current = this.state.activeDirections.get(group.id);
+        const index = Math.max(
+          0,
+          group.directions.findIndex((direction) => direction.id === current),
+        );
+        const direction =
+          group.directions[(index + 1) % group.directions.length];
+        this.state.activeDirections.set(group.id, direction.id);
+        this.state.previewFrames.set(group.id, 0);
+        this.props.actions.onSwitchDirection(group.id, direction.id);
+      },
+      getActiveDirections: () => this.state.activeDirections,
       render: () => this.render(),
     };
     this.interaction = new CharacterStageInteraction(app.canvas, context);
@@ -113,10 +151,7 @@ export class CharacterCanvasRuntime {
 
   syncProps(props: CharacterCanvasRuntimeProps) {
     this.props = props;
-    this.state.positions = structuredClone(DEFAULT_CANVAS_POSITIONS) as Record<
-      NodeId,
-      { x: number; y: number }
-    >;
+    this.state.positions = createDefaultCanvasPositions(props.model.animations);
     for (const [node, position] of Object.entries(
       props.model.nodePositions ?? {},
     )) {
@@ -124,19 +159,55 @@ export class CharacterCanvasRuntime {
     }
     for (const frame of props.model.selection.frames)
       this.state.expanded.add(frame.nodeId);
+    for (const animation of props.model.animations) {
+      if (!isEditorCharacterAnimationGroup(animation)) continue;
+      const requested = props.model.activeDirections?.[animation.id];
+      const current = this.state.activeDirections.get(animation.id);
+      const direction = getPreferredCharacterDirection(
+        animation,
+        requested,
+        current,
+      );
+      this.state.activeDirections.set(
+        animation.id,
+        direction?.id ?? animation.directions[0].id,
+      );
+    }
     this.render();
+  }
+
+  private async preloadCharacterTextures() {
+    const urls = new Set(
+      [
+        this.props.model.prototype.imageUrl,
+        ...getEditorCharacterAnimationClips(
+          this.props.model.animations,
+        ).flatMap((animation) =>
+          animation.spriteSheet ? [animation.spriteSheet.imageUrl] : [],
+        ),
+      ].filter(Boolean),
+    );
+    const textures = await Promise.all(
+      [...urls].map((url) => Assets.load(url)),
+    );
+    textures.forEach((texture) => {
+      texture.source.scaleMode = "nearest";
+    });
   }
 
   destroy() {
     this.runtime.app.ticker.remove(this.updateAnimation);
     this.resizeObserver?.disconnect();
     this.interaction?.destroy();
+    this.viewport?.removeFromParent();
+    this.viewport?.destroy({ children: true });
+    this.viewport = undefined;
     this.runtime.destroy();
   }
 
   private centerWorld() {
     this.viewport?.setZoom(INITIAL_SCALE);
-    this.viewport?.moveCenter(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+    this.viewport?.moveCenter(650, WORLD_HEIGHT / 2);
   }
 
   private render() {
@@ -152,7 +223,11 @@ export class CharacterCanvasRuntime {
       this.state.previewFrames.set(
         node,
         ((this.state.previewFrames.get(node) ?? 0) + 1) %
-          getFrameCount(node, this.props.model.animations),
+          getFrameCount(
+            node,
+            this.props.model.animations,
+            this.state.activeDirections,
+          ),
       );
     }
     this.render();

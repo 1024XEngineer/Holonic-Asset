@@ -2,7 +2,7 @@ import type { Viewport } from "pixi-viewport";
 
 import type { EditorCharacterAnimation } from "../../../domain";
 import type { CharacterCanvasModel } from "../CharacterCanvas.interface";
-import type { NodeId } from "../character-node";
+import type { CharacterDirectionMap, NodeId } from "../character-node";
 import type { CanvasPosition } from "../CharacterCanvas.constants";
 
 export type CharacterCanvasActions = {
@@ -12,6 +12,7 @@ export type CharacterCanvasActions = {
   onSelectNodes: (nodes: NodeId[]) => void;
   onClearSelection: () => void;
   onNodePositionChange: (node: NodeId, position: CanvasPosition) => void;
+  onSwitchDirection: (node: NodeId, direction: NodeId) => void;
 };
 
 export type CharacterCanvasRuntimeProps = {
@@ -26,6 +27,7 @@ export type CharacterSceneSnapshot = {
   readonly expanded: ReadonlySet<NodeId>;
   readonly playing: ReadonlySet<NodeId>;
   readonly previewFrames: ReadonlyMap<NodeId, number>;
+  readonly activeDirections: ReadonlyMap<NodeId, NodeId>;
   readonly marquee: {
     readonly start: CanvasPosition;
     readonly end: CanvasPosition;
@@ -37,6 +39,7 @@ export type CharacterSceneState = {
   expanded: Set<NodeId>;
   playing: Set<NodeId>;
   previewFrames: Map<NodeId, number>;
+  activeDirections: Map<NodeId, NodeId>;
   marquee: { start: CanvasPosition; end: CanvasPosition } | null;
 };
 
@@ -47,7 +50,10 @@ export type CharacterStageContext = {
   getScene: () => CharacterSceneSnapshot;
   moveNode: (node: NodeId, position: CanvasPosition) => void;
   setMarquee: (marquee: CharacterSceneState["marquee"]) => void;
+  getDragStep: () => number;
   toggleExpanded: (node: NodeId) => void;
   togglePlaying: (node: NodeId) => void;
+  switchDirection: (node: NodeId) => void;
+  getActiveDirections: () => CharacterDirectionMap;
   render: () => void;
 };

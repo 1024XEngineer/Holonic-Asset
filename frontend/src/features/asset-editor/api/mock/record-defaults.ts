@@ -2,6 +2,9 @@ import type { AssetKind, ProjectAsset } from "@/features/assets/domain";
 import type {
   CharacterEditorDocument,
   EditorCharacterAnimation,
+  EditorCharacterAnimationClip,
+  EditorCharacterAnimationGroup,
+  EditorCharacterSpriteSheet,
   EditorSpriteSheetItem,
   EditorDocumentForKind,
   SceneryEditorDocument,
@@ -9,28 +12,141 @@ import type {
 } from "../../domain";
 import { isEditorDocumentForAssetKind } from "../../domain";
 
-const defaultCharacterAnimations: EditorCharacterAnimation[] = [
+const swordsmanPrototype: EditorCharacterSpriteSheet = {
+  format: "png-sprite-sheet",
+  imageUrl: "/assets/characters/swordsman/prototype.png",
+  frameWidth: 64,
+  frameHeight: 64,
+  columns: 4,
+  rows: 1,
+};
+
+const knightPrototype: EditorCharacterSpriteSheet = {
+  format: "png-sprite-sheet",
+  imageUrl: "/assets/characters/knight/prototype.png",
+  frameWidth: 128,
+  frameHeight: 128,
+  columns: 1,
+  rows: 1,
+};
+
+function createPngAnimation(
+  id: string,
+  label: string,
+  imageUrl: string,
+  frameCount: number,
+  frameWidth: number,
+  frameHeight: number,
+): EditorCharacterAnimationClip {
+  return {
+    id,
+    label,
+    frameCount,
+    spriteSheet: {
+      format: "png-sprite-sheet",
+      imageUrl,
+      frameWidth,
+      frameHeight,
+      columns: frameCount,
+      rows: 1,
+    },
+  };
+}
+
+const swordsmanDirections = [
+  { id: "front", label: "Front" },
+  { id: "back", label: "Back" },
+  { id: "left", label: "Left" },
+  { id: "right", label: "Right" },
+] as const;
+
+function createSwordsmanAnimation(
+  id: string,
+  label: string,
+  frameCounts: Record<(typeof swordsmanDirections)[number]["id"], number>,
+): EditorCharacterAnimationGroup {
+  return {
+    id,
+    label,
+    directions: swordsmanDirections.map((direction) =>
+      createPngAnimation(
+        `${id}/${direction.id}`,
+        direction.label,
+        `/assets/characters/swordsman/${id}/${direction.id}.png`,
+        frameCounts[direction.id],
+        64,
+        64,
+      ),
+    ),
+  };
+}
+
+const characterAnimationsByAssetId: Record<string, EditorCharacterAnimation[]> =
   {
-    id: "idle",
-    label: "Idle",
-    frameCount: 6,
-    audio: { label: "cloth_sway.wav", time: "0.06s" },
-  },
+    swordsman: [
+      createSwordsmanAnimation("idle", "Idle", {
+        front: 12,
+        back: 4,
+        left: 12,
+        right: 12,
+      }),
+      createSwordsmanAnimation("attack", "Attack", {
+        front: 8,
+        back: 8,
+        left: 8,
+        right: 8,
+      }),
+    ],
+    knight: [
+      createPngAnimation(
+        "idle",
+        "Idle",
+        "/assets/characters/knight/idle.png",
+        4,
+        128,
+        128,
+      ),
+      createPngAnimation(
+        "attack",
+        "Attack",
+        "/assets/characters/knight/attack-1.png",
+        5,
+        128,
+        128,
+      ),
+    ],
+  };
+
+const characterPrototypesByAssetId: Record<string, EditorCharacterSpriteSheet> =
   {
-    id: "walk",
-    label: "Walk",
-    frameCount: 8,
-    audio: { label: "footstep_grass.wav", time: "0.18s" },
-  },
-  {
-    id: "harvest",
-    label: "Harvest",
-    frameCount: 12,
-    audio: { label: "harvest_pickup.wav", time: "0.42s" },
-  },
-  { id: "jump", label: "Jump", frameCount: 10 },
-  { id: "celebrate", label: "Celebrate", frameCount: 8 },
-];
+    swordsman: swordsmanPrototype,
+    knight: knightPrototype,
+  };
+
+function getCharacterDefaultSourceId(assetId: string) {
+  return assetId.split("-copy-", 1)[0] ?? assetId;
+}
+
+function createFallbackCharacterPrototype(
+  asset: Pick<ProjectAsset, "canvasSize">,
+): EditorCharacterSpriteSheet {
+  const dimensions = asset.canvasSize.match(/(\d+)\D+(\d+)/);
+  const frameWidth = Number(dimensions?.[1]) || 64;
+  const frameHeight = Number(dimensions?.[2]) || frameWidth;
+
+  return {
+    format: "png-sprite-sheet",
+    imageUrl: "",
+    frameWidth,
+    frameHeight,
+    columns: 1,
+    rows: 1,
+  };
+}
+
+function createFallbackCharacterAnimations(): EditorCharacterAnimation[] {
+  return [{ id: "idle", label: "Idle", frameCount: 1 }];
+}
 
 const tilesetItems: EditorSpriteSheetItem[] = [
   {
@@ -83,12 +199,19 @@ export function createDefaultEditorDocument<K extends AssetKind>(
   const base = { prompt: asset.description };
 
   if (kind === "character" || kind === "object") {
+    const sourceId = getCharacterDefaultSourceId(asset.id);
     return {
       mode: "character",
       ...base,
       character: {
-        prototypeName: `${asset.id}-prototype.png`,
-        animations: structuredClone(defaultCharacterAnimations),
+        prototype: structuredClone(
+          characterPrototypesByAssetId[sourceId] ??
+            createFallbackCharacterPrototype(asset),
+        ),
+        animations: structuredClone(
+          characterAnimationsByAssetId[sourceId] ??
+            createFallbackCharacterAnimations(),
+        ),
         nodePositions: {},
       },
     } as EditorDocumentForKind<K>;
@@ -146,10 +269,7 @@ function mergeCharacterRecord(
     mode: "character",
     prompt: saved.prompt,
     character: {
-      prototypeName:
-        saved.character.prototypeName ??
-        fallback.character.prototypeName ??
-        "prototype.png",
+      prototype: saved.character.prototype ?? fallback.character.prototype,
       animations:
         saved.character.animations ?? fallback.character.animations ?? [],
       nodePositions: {
