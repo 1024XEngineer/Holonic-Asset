@@ -5,20 +5,15 @@ import {
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
-} from "@/features/assets";
-import {
   useEnqueueGenerationMutation,
   useGenerationRunsQuery,
-} from "@/features/generation";
-import {
   reconcileProjectSelection,
   removeProjectSelection,
   useDeleteProjectMutation,
   useProjectListQuery,
   useUpdateProjectMutation,
-} from "@/features/project";
-import type { CreationRequest } from "@/features/generation";
-import type { ProjectSummary } from "@/features/project";
+} from "@/api";
+import type { CreationRequest, ProjectSummary } from "@/model";
 
 export function useProjectLibrary() {
   const navigate = useNavigate({ from: "/projects" });

@@ -1,1 +1,1 @@
-export { QuickGenerateScreen } from "./components/quick-generate-screen";
+export { QuickGenerateScreen } from "./quick-generate-screen";

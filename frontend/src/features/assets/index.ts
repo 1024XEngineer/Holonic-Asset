@@ -1,8 +1,3 @@
-export {
-  assetKeys,
-  useAssetLibraryQuery,
-  useCopyAssetMutation,
-  useDeleteAssetMutation,
-} from "./api";
-export { AssetLibraryWorkspace } from "./components";
-export { creatableAssetKinds } from "./domain";
+export { AssetLibraryWorkspace } from "./asset-library-workspace";
+export { AssetTypeIcon } from "./asset-type-icon";
+export { getAssetTypeConfig } from "./asset-type-config";

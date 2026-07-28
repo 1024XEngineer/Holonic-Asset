@@ -1,4 +1,4 @@
-import type { EditorRecord } from "../../domain";
+import type { EditorRecord } from "@/model";
 
 import {
   markAssetEditorSessionSaved,

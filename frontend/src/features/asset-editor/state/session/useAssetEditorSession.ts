@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 
-import { useSaveAssetRevisionMutation } from "../../api";
+import { useSaveAssetRevisionMutation } from "@/api";
 
 import {
   createAssetEditorSessionStore,

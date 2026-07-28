@@ -1,4 +1,4 @@
-import type { EditorCanvasPosition, EditorRecord } from "../../domain";
+import type { EditorCanvasPosition, EditorRecord } from "@/model";
 
 export type AssetEditorTarget = {
   projectId: string;

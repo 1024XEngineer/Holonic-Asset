@@ -1,1 +1,1 @@
-export { AudioStudioScreen } from "./components/audio-studio-screen";
+export { AudioStudioScreen } from "./audio-studio-screen";

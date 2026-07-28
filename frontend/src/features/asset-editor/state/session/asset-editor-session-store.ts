@@ -5,7 +5,7 @@ import type {
   EditorCanvasPosition,
   EditorCharacterAnimationClip,
   EditorRecord,
-} from "../../domain";
+} from "@/model";
 
 import type {
   AssetEditorCommand,

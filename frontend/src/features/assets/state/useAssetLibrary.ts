@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { getAssetTypeConfig } from "../components/asset-type-config";
-import type { AssetGroup } from "@/features/assets/domain";
-import { assetKinds, type AssetKind } from "@/features/assets/domain";
+import { getAssetTypeConfig } from "../asset-type-config";
+import type { AssetGroup } from "@/model";
+import { assetKinds, type AssetKind } from "@/model";
 
 export function useAssetLibrary(assetGroups: AssetGroup[], query: string) {
   const [selectedKinds, setSelectedKinds] = useState<AssetKind[]>([

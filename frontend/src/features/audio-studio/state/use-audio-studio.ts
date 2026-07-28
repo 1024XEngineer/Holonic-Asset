@@ -6,7 +6,7 @@ import {
   useGenerateAudioVariationMutation,
   useAudioTracksQuery,
   useUpdateAudioTrackMutation,
-} from "../api";
+} from "@/api";
 
 export function useAudioStudio() {
   const tracksQuery = useAudioTracksQuery();

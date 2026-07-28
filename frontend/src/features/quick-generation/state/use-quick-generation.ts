@@ -4,7 +4,7 @@ import {
   useDeleteQuickAssetMutation,
   useGenerateQuickAssetMutation,
   useQuickAssetsQuery,
-} from "../api";
+} from "@/api";
 import {
   createQuickGenerationSession,
   type QuickGenerationSession,

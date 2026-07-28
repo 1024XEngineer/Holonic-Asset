@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "@tanstack/react-router";
 
-import { EditorWorkspaceScreen, useRecordQuery } from "@/features/asset-editor";
+import { useRecordQuery } from "@/api";
+import { EditorWorkspaceScreen } from "@/features/asset-editor";
 
 export function EditorPage() {
   const { assetId, projectId } = useParams({

@@ -4,7 +4,7 @@ import {
   type GenerateQuickAssetInput,
   type QuickGenerationAsset,
   type QuickGenerationDraft,
-} from "../domain";
+} from "@/model";
 import {
   browserReferencePreviewAdapter,
   createReferencePreviewLifecycle,
