@@ -1,14 +1,14 @@
-import { getMockEditorDocument, saveMockEditorDocumentRevision } from "./mock";
-import type { EditorDocumentApi } from "./record.contract";
+import { getMockEditorRecord, saveMockEditorRecordRevision } from "./mock";
+import type { EditorRecordApi } from "./record.contract";
 
-export const recordApi: EditorDocumentApi = {
-  get: getMockEditorDocument,
-  saveRevision: saveMockEditorDocumentRevision,
+export const recordApi: EditorRecordApi = {
+  get: getMockEditorRecord,
+  saveRevision: saveMockEditorRecordRevision,
 };
 
 export type {
-  EditorDocumentApi,
-  EditorDocumentSaveResult,
-  GetEditorDocumentInput,
-  SaveEditorDocumentInput,
+  EditorRecordApi,
+  EditorRecordSaveResult,
+  GetEditorRecordInput,
+  SaveEditorRecordInput,
 } from "./record.contract";

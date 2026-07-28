@@ -22,7 +22,7 @@ export function useSaveAssetRevisionMutation() {
                   version: saved.version,
                   history: structuredClone(saved.history),
                 },
-                content: structuredClone(saved.content),
+                record: structuredClone(saved.record),
               }
             : current,
       );

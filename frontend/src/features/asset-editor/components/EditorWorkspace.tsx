@@ -24,7 +24,7 @@ export function EditorWorkspace({
       projectId: asset.projectId,
       assetId: asset.id,
     },
-    initialDocument: data.content,
+    initialRecord: data.record,
   });
   const { snapshot } = session;
   const [notice, setNotice] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export function EditorWorkspace({
     />
   );
   const modeProps = {
-    prompt: snapshot.document.prompt,
+    prompt: snapshot.record.prompt,
     history: asset.history,
     onAction: reportAction,
     onPromptChange: (value: string) =>
@@ -86,14 +86,14 @@ export function EditorWorkspace({
   };
 
   const editorMode = (() => {
-    switch (snapshot.document.mode) {
+    switch (snapshot.record.mode) {
       case "character":
         return (
           <CharacterEditorMode
             {...modeProps}
-            characterPrototype={snapshot.document.character.prototype}
-            characterAnimations={snapshot.document.character.animations ?? []}
-            characterNodePositions={snapshot.document.character.nodePositions}
+            characterPrototype={snapshot.record.character.prototype}
+            characterAnimations={snapshot.record.character.animations ?? []}
+            characterNodePositions={snapshot.record.character.nodePositions}
             onCharacterPositionChange={(
               nodeId: string,
               position: EditorCanvasPosition,
@@ -113,18 +113,15 @@ export function EditorWorkspace({
         return (
           <SceneryEditorMode
             {...modeProps}
-            layers={snapshot.document.scenery.layers}
+            layers={snapshot.record.scenery.layers}
           />
         );
       case "tileset":
         return (
-          <TilesetEditorMode
-            {...modeProps}
-            tileset={snapshot.document.tileset}
-          />
+          <TilesetEditorMode {...modeProps} tileset={snapshot.record.tileset} />
         );
       case "ui":
-        return <UiEditorMode {...modeProps} ui={snapshot.document.ui} />;
+        return <UiEditorMode {...modeProps} ui={snapshot.record.ui} />;
       case "audio":
         return <AudioEditorMode {...modeProps} />;
     }

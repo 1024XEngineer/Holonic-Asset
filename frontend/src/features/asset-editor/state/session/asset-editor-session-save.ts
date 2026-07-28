@@ -1,4 +1,4 @@
-import type { EditorDocument } from "../../domain";
+import type { EditorRecord } from "../../domain";
 
 import {
   markAssetEditorSessionSaved,
@@ -10,7 +10,7 @@ type SaveAssetEditorSessionInput = {
   store: AssetEditorSessionStore;
   identity: string;
   isActive: (identity: string) => boolean;
-  saveRevision: (document: EditorDocument) => Promise<void>;
+  saveRevision: (record: EditorRecord) => Promise<void>;
 };
 
 export async function saveAssetEditorSessionRevision({
@@ -19,13 +19,13 @@ export async function saveAssetEditorSessionRevision({
   isActive,
   saveRevision,
 }: SaveAssetEditorSessionInput): Promise<AssetEditorSaveResult> {
-  const submittedDocument = structuredClone(store.getState().document);
+  const submittedRecord = structuredClone(store.getState().record);
 
   try {
-    await saveRevision(submittedDocument);
+    await saveRevision(submittedRecord);
     if (!isActive(identity)) return { status: "superseded" };
 
-    markAssetEditorSessionSaved(store, submittedDocument);
+    markAssetEditorSessionSaved(store, submittedRecord);
     return { status: "saved" };
   } catch {
     return isActive(identity) ? { status: "failed" } : { status: "superseded" };

@@ -1,18 +1,18 @@
 import type { AssetKind, ProjectAsset } from "@/features/assets/domain";
 import type {
-  CharacterEditorDocument,
+  CharacterEditorRecord,
   EditorCharacterAnimation,
   EditorCharacterAnimationClip,
   EditorCharacterAnimationGroup,
   EditorCharacterSpriteSheet,
   EditorTilesetItem,
-  EditorDocumentForKind,
-  SceneryEditorDocument,
-  TilesetEditorDocument,
-  UiEditorDocument,
-  AudioEditorDocument,
+  EditorRecordForKind,
+  SceneryEditorRecord,
+  TilesetEditorRecord,
+  UiEditorRecord,
+  AudioEditorRecord,
 } from "../../domain";
-import { isEditorDocumentForAssetKind } from "../../domain";
+import { isEditorRecordForAssetKind } from "../../domain";
 
 const swordsmanPrototype: EditorCharacterSpriteSheet = {
   format: "png-sprite-sheet",
@@ -41,6 +41,7 @@ function createPngAnimation(
   frameHeight: number,
 ): EditorCharacterAnimationClip {
   return {
+    kind: "clip",
     id,
     label,
     frameCount,
@@ -68,6 +69,7 @@ function createSwordsmanAnimation(
   frameCounts: Record<(typeof swordsmanDirections)[number]["id"], number>,
 ): EditorCharacterAnimationGroup {
   return {
+    kind: "group",
     id,
     label,
     directions: swordsmanDirections.map((direction) =>
@@ -147,7 +149,7 @@ function createFallbackCharacterPrototype(
 }
 
 function createFallbackCharacterAnimations(): EditorCharacterAnimation[] {
-  return [{ id: "idle", label: "Idle", frameCount: 1 }];
+  return [{ kind: "clip", id: "idle", label: "Idle", frameCount: 1 }];
 }
 
 const tilesetAssetBase = "/assets/split_same_32px_grid_assets";
@@ -269,10 +271,10 @@ const tilesetItems: EditorTilesetItem[] = [
   ),
 ];
 
-export function createDefaultEditorDocument<K extends AssetKind>(
+export function createDefaultEditorRecord<K extends AssetKind>(
   kind: K,
   asset: ProjectAsset,
-): EditorDocumentForKind<K> {
+): EditorRecordForKind<K> {
   const base = { prompt: asset.description };
 
   if (kind === "character" || kind === "object") {
@@ -291,7 +293,7 @@ export function createDefaultEditorDocument<K extends AssetKind>(
         ),
         nodePositions: {},
       },
-    } as EditorDocumentForKind<K>;
+    } as EditorRecordForKind<K>;
   }
 
   if (kind === "scenery") {
@@ -301,7 +303,7 @@ export function createDefaultEditorDocument<K extends AssetKind>(
       scenery: {
         layers: structuredClone(asset.scenery?.layers ?? []),
       },
-    } as EditorDocumentForKind<K>;
+    } as EditorRecordForKind<K>;
   }
 
   if (kind === "tileset") {
@@ -312,7 +314,7 @@ export function createDefaultEditorDocument<K extends AssetKind>(
         gridSize: 8,
         items: structuredClone(tilesetItems),
       },
-    } as EditorDocumentForKind<K>;
+    } as EditorRecordForKind<K>;
   }
 
   if (kind === "ui") {
@@ -341,95 +343,91 @@ export function createDefaultEditorDocument<K extends AssetKind>(
           },
         ],
       },
-    } as EditorDocumentForKind<K>;
+    } as EditorRecordForKind<K>;
   }
 
   return {
     mode: "audio",
     ...base,
     audio: {},
-  } as EditorDocumentForKind<K>;
+  } as EditorRecordForKind<K>;
 }
 
-export function mergeEditorDocument<K extends AssetKind>(
+export function mergeEditorRecord<K extends AssetKind>(
   kind: K,
-  fallback: EditorDocumentForKind<K>,
+  fallback: EditorRecordForKind<K>,
   saved: unknown,
-): EditorDocumentForKind<K> {
-  const migrated = migrateLegacyTilesetDocument(kind, saved);
-  const document = migrated ?? saved;
+): EditorRecordForKind<K> {
+  const migrated = migrateLegacyTilesetRecord(kind, saved);
+  const record = migrated ?? saved;
 
-  if (!document || !isEditorDocumentForAssetKind(kind, document)) {
+  if (!record || !isEditorRecordForAssetKind(kind, record)) {
     return fallback;
   }
 
   switch (fallback.mode) {
     case "character":
       return mergeCharacterRecord(
-        fallback as CharacterEditorDocument,
-        document as CharacterEditorDocument,
-      ) as EditorDocumentForKind<K>;
+        fallback as CharacterEditorRecord,
+        record as CharacterEditorRecord,
+      ) as EditorRecordForKind<K>;
     case "scenery":
       return mergeSceneryRecord(
-        document as SceneryEditorDocument,
-      ) as EditorDocumentForKind<K>;
+        record as SceneryEditorRecord,
+      ) as EditorRecordForKind<K>;
     case "tileset":
       return mergeTilesetRecord(
-        document as TilesetEditorDocument,
-      ) as EditorDocumentForKind<K>;
+        record as TilesetEditorRecord,
+      ) as EditorRecordForKind<K>;
     case "ui":
-      return mergeUiRecord(
-        document as UiEditorDocument,
-      ) as EditorDocumentForKind<K>;
+      return mergeUiRecord(record as UiEditorRecord) as EditorRecordForKind<K>;
     case "audio":
       return mergeAudioRecord(
-        document as AudioEditorDocument,
-      ) as EditorDocumentForKind<K>;
+        record as AudioEditorRecord,
+      ) as EditorRecordForKind<K>;
   }
 }
 
-function migrateLegacyTilesetDocument(
+function migrateLegacyTilesetRecord(
   kind: AssetKind,
   saved: unknown,
-): TilesetEditorDocument | undefined {
-  if (kind !== "tileset" || !isLegacySpriteSheetDocument(saved)) {
+): TilesetEditorRecord | undefined {
+  if (kind !== "tileset" || !isLegacySpriteSheetRecord(saved)) {
     return undefined;
   }
 
-  const migrated: TilesetEditorDocument = {
+  const migrated: TilesetEditorRecord = {
     mode: "tileset",
     prompt: saved.prompt,
     tileset: saved.spriteSheet,
   };
 
-  return isEditorDocumentForAssetKind("tileset", migrated)
-    ? migrated
-    : undefined;
+  return isEditorRecordForAssetKind("tileset", migrated) ? migrated : undefined;
 }
 
-function isLegacySpriteSheetDocument(value: unknown): value is {
+function isLegacySpriteSheetRecord(value: unknown): value is {
   mode: "sprite-sheet";
   prompt: string;
-  spriteSheet: TilesetEditorDocument["tileset"];
+  spriteSheet: TilesetEditorRecord["tileset"];
 } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
 
-  const document = value as Record<string, unknown>;
+  const record = value as Record<string, unknown>;
   return (
-    document.mode === "sprite-sheet" &&
-    typeof document.prompt === "string" &&
-    typeof document.spriteSheet === "object" &&
-    document.spriteSheet !== null &&
-    !Array.isArray(document.spriteSheet)
+    record.mode === "sprite-sheet" &&
+    typeof record.prompt === "string" &&
+    typeof record.spriteSheet === "object" &&
+    record.spriteSheet !== null &&
+    !Array.isArray(record.spriteSheet)
   );
 }
 
 function mergeCharacterRecord(
-  fallback: CharacterEditorDocument,
-  saved: CharacterEditorDocument,
-): CharacterEditorDocument {
+  fallback: CharacterEditorRecord,
+  saved: CharacterEditorRecord,
+): CharacterEditorRecord {
   return {
     mode: "character",
     prompt: saved.prompt,
@@ -445,9 +443,7 @@ function mergeCharacterRecord(
   };
 }
 
-function mergeSceneryRecord(
-  saved: SceneryEditorDocument,
-): SceneryEditorDocument {
+function mergeSceneryRecord(saved: SceneryEditorRecord): SceneryEditorRecord {
   return {
     mode: "scenery",
     prompt: saved.prompt,
@@ -455,9 +451,7 @@ function mergeSceneryRecord(
   };
 }
 
-function mergeTilesetRecord(
-  saved: TilesetEditorDocument,
-): TilesetEditorDocument {
+function mergeTilesetRecord(saved: TilesetEditorRecord): TilesetEditorRecord {
   return {
     mode: "tileset",
     prompt: saved.prompt,
@@ -468,7 +462,7 @@ function mergeTilesetRecord(
   };
 }
 
-function mergeUiRecord(saved: UiEditorDocument): UiEditorDocument {
+function mergeUiRecord(saved: UiEditorRecord): UiEditorRecord {
   return {
     mode: "ui",
     prompt: saved.prompt,
@@ -476,6 +470,6 @@ function mergeUiRecord(saved: UiEditorDocument): UiEditorDocument {
   };
 }
 
-function mergeAudioRecord(saved: AudioEditorDocument): AudioEditorDocument {
+function mergeAudioRecord(saved: AudioEditorRecord): AudioEditorRecord {
   return { mode: "audio", prompt: saved.prompt, audio: {} };
 }

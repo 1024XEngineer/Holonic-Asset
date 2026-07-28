@@ -2,21 +2,21 @@ import { assetApi } from "@/features/assets/api";
 import { listMockProjects } from "@/features/project/api/mock";
 import { DataApiError } from "@/lib/data-api-error";
 import {
-  createDefaultEditorDocument,
-  mergeEditorDocument,
+  createDefaultEditorRecord,
+  mergeEditorRecord,
 } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
 import {
-  isEditorDocumentForAssetKind,
+  isEditorRecordForAssetKind,
   type EditorWorkspaceData,
 } from "../../domain";
 import type {
-  GetEditorDocumentInput,
-  SaveEditorDocumentInput,
+  GetEditorRecordInput,
+  SaveEditorRecordInput,
 } from "../record.contract";
 
-export function getMockEditorDocument(
-  input: GetEditorDocumentInput,
+export function getMockEditorRecord(
+  input: GetEditorRecordInput,
   options?: MockRequestOptions,
 ) {
   return runMockRequest(async (): Promise<EditorWorkspaceData> => {
@@ -42,7 +42,7 @@ export function getMockEditorDocument(
     const currentRevision = asset.history.find(
       (revision) => revision.isCurrent,
     );
-    const fallback = createDefaultEditorDocument(group.kind, asset);
+    const fallback = createDefaultEditorRecord(group.kind, asset);
 
     return {
       projectName: project.name,
@@ -54,20 +54,16 @@ export function getMockEditorDocument(
         version: asset.version,
         history: structuredClone(asset.history),
       },
-      content: mergeEditorDocument(
-        group.kind,
-        fallback,
-        currentRevision?.content,
-      ),
+      record: mergeEditorRecord(group.kind, fallback, currentRevision?.content),
     } as EditorWorkspaceData;
   }, options);
 }
 
-export async function saveMockEditorDocumentRevision({
+export async function saveMockEditorRecordRevision({
   projectId,
   assetId,
-  content,
-}: SaveEditorDocumentInput) {
+  record,
+}: SaveEditorRecordInput) {
   const groups = await assetApi.listGroups(projectId);
   const assetGroup = groups.find((group) =>
     group.assets.some((asset) => asset.id === assetId),
@@ -78,20 +74,20 @@ export async function saveMockEditorDocumentRevision({
       assetId,
     });
   }
-  const documentMode = content.mode;
-  if (!isEditorDocumentForAssetKind(assetGroup.kind, content)) {
+  const recordMode = record.mode;
+  if (!isEditorRecordForAssetKind(assetGroup.kind, record)) {
     throw new DataApiError(
       "BAD_REQUEST",
-      "Editor document does not match the asset kind.",
-      { projectId, assetId, assetKind: assetGroup.kind, mode: documentMode },
+      "Editor record does not match the asset kind.",
+      { projectId, assetId, assetKind: assetGroup.kind, mode: recordMode },
     );
   }
 
   const updatedGroups = await assetApi.saveRevision({
     projectId,
     assetId,
-    description: content.prompt,
-    payload: content,
+    description: record.prompt,
+    payload: record,
   });
   const savedAsset = updatedGroups
     .flatMap((group) => group.assets)
@@ -108,6 +104,6 @@ export async function saveMockEditorDocumentRevision({
     assetId,
     version: savedAsset.version,
     history: structuredClone(savedAsset.history),
-    content: structuredClone(content),
+    record: structuredClone(record),
   };
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { UiEditorDocument } from "../../domain";
+import type { UiEditorRecord } from "../../domain";
 import { UiCanvas } from "../../modules/ui-canvas";
 
 import { UiComponentTree } from "../AssetTree/UiComponentTree";
@@ -14,7 +14,7 @@ export function UiEditorMode({
   onPromptChange,
   renderHeader,
   ui,
-}: EditorModeProps & { ui: UiEditorDocument["ui"] }) {
+}: EditorModeProps & { ui: UiEditorRecord["ui"] }) {
   const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>(
     [],
   );

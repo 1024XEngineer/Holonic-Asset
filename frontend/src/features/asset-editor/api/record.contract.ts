@@ -1,24 +1,24 @@
 import type { AssetRevision } from "@/features/assets/domain";
-import type { EditorDocument, EditorWorkspaceData } from "../domain";
+import type { EditorRecord, EditorWorkspaceData } from "../domain";
 
-export type GetEditorDocumentInput = {
+export type GetEditorRecordInput = {
   projectId: string;
   assetId: string;
 };
 
-export type SaveEditorDocumentInput = GetEditorDocumentInput & {
-  content: EditorDocument;
+export type SaveEditorRecordInput = GetEditorRecordInput & {
+  record: EditorRecord;
 };
 
-export type EditorDocumentSaveResult = GetEditorDocumentInput & {
-  content: EditorDocument;
+export type EditorRecordSaveResult = GetEditorRecordInput & {
+  record: EditorRecord;
   version: string;
   history: AssetRevision[];
 };
 
-export type EditorDocumentApi = {
-  get: (input: GetEditorDocumentInput) => Promise<EditorWorkspaceData>;
+export type EditorRecordApi = {
+  get: (input: GetEditorRecordInput) => Promise<EditorWorkspaceData>;
   saveRevision: (
-    input: SaveEditorDocumentInput,
-  ) => Promise<EditorDocumentSaveResult>;
+    input: SaveEditorRecordInput,
+  ) => Promise<EditorRecordSaveResult>;
 };

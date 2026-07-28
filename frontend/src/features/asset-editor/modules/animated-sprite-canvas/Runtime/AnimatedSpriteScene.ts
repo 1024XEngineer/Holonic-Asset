@@ -1,4 +1,3 @@
-import { isEditorCharacterAnimationGroup } from "../../../domain";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import {
   createDefaultAnimatedSpriteDirections,
@@ -63,7 +62,7 @@ export class AnimatedSpriteScene {
 
     const activeDirections = new Map<NodeId, NodeId>();
     for (const animation of model.animations) {
-      if (!isEditorCharacterAnimationGroup(animation)) continue;
+      if (animation.kind !== "group") continue;
       const requested = model.activeDirections?.[animation.id];
       const current = this.state.activeDirections.get(animation.id);
       const direction = getPreferredAnimatedSpriteDirection(

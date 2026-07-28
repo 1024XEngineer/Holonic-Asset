@@ -150,7 +150,7 @@ export function drawAnimatedSpriteNode({
       false,
     );
     const group = animations.find((candidate) => candidate.id === node);
-    if (group && "directions" in group && group.directions.length > 1) {
+    if (group?.kind === "group" && group.directions.length > 1) {
       const switchControl = layout.switchControl!;
       drawControl(
         container,

@@ -14,7 +14,6 @@ import type {
   EditorCharacterAnimation,
   EditorCharacterSpriteSheet,
 } from "../../domain";
-import { isEditorCharacterAnimationGroup } from "../../domain";
 
 import { AssetTree } from "../AssetTree/AssetTree";
 import { Inspector } from "../Inspector/Inspector";
@@ -54,7 +53,7 @@ export function CharacterEditorMode({
     const validNodeIds = new Set<string>([
       "prototype",
       ...characterAnimations.flatMap((animation) =>
-        isEditorCharacterAnimationGroup(animation)
+        animation.kind === "group"
           ? [
               animation.id,
               ...animation.directions.map((direction) => direction.id),
@@ -79,7 +78,7 @@ export function CharacterEditorMode({
     setActiveDirections((current) => {
       const next = Object.fromEntries(
         characterAnimations
-          .filter(isEditorCharacterAnimationGroup)
+          .filter((animation) => animation.kind === "group")
           .map((animation) => [
             animation.id,
             animation.directions.some(

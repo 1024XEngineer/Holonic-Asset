@@ -19,7 +19,7 @@ export function EditorWorkspaceScreen({
   if (isLoading) {
     return (
       <EditorRouteState
-        description="Loading the asset document and editor workspace."
+        description="Loading the asset editor workspace."
         title="Preparing asset studio"
       />
     );

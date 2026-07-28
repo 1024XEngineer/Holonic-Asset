@@ -4,7 +4,7 @@ import { temporal } from "zundo";
 import type {
   EditorCanvasPosition,
   EditorCharacterAnimationClip,
-  EditorDocument,
+  EditorRecord,
 } from "../../domain";
 
 import type {
@@ -14,8 +14,8 @@ import type {
 } from "./AssetEditorSession.interface";
 
 type AssetEditorSessionState = {
-  document: EditorDocument;
-  savedDocument: EditorDocument;
+  record: EditorRecord;
+  savedRecord: EditorRecord;
   setPrompt: (prompt: string) => void;
   setCharacterNodePosition: (
     nodeId: string,
@@ -24,31 +24,31 @@ type AssetEditorSessionState = {
   addCharacterAnimation: (label: string) => void;
 };
 
-export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
-  const document = structuredClone(initialDocument);
+export function createAssetEditorSessionStore(initialRecord: EditorRecord) {
+  const record = structuredClone(initialRecord);
 
   return createStore<AssetEditorSessionState>()(
     temporal(
       (set) => ({
-        document,
-        savedDocument: structuredClone(initialDocument),
+        record,
+        savedRecord: structuredClone(initialRecord),
         setPrompt: (prompt) =>
-          set((state) => ({ document: { ...state.document, prompt } })),
+          set((state) => ({ record: { ...state.record, prompt } })),
         setCharacterNodePosition: (nodeId, position) =>
           set((state) => {
-            if (state.document.mode !== "character") {
+            if (state.record.mode !== "character") {
               throw new Error(
-                "Character node positions require a character record document.",
+                "Character node positions require a character record.",
               );
             }
 
             return {
-              document: {
-                ...state.document,
+              record: {
+                ...state.record,
                 character: {
-                  ...state.document.character,
+                  ...state.record.character,
                   nodePositions: {
-                    ...state.document.character.nodePositions,
+                    ...state.record.character.nodePositions,
                     [nodeId]: position,
                   },
                 },
@@ -57,26 +57,27 @@ export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
           }),
         addCharacterAnimation: (label) =>
           set((state) => {
-            if (state.document.mode !== "character") {
+            if (state.record.mode !== "character") {
               throw new Error(
-                "Character animations require a character record document.",
+                "Character animations require a character record.",
               );
             }
 
             const normalizedLabel = label.trim();
             if (!normalizedLabel) return state;
 
-            const animations = state.document.character.animations ?? [];
+            const animations = state.record.character.animations ?? [];
             const animation: EditorCharacterAnimationClip = {
+              kind: "clip",
               id: createCharacterAnimationId(normalizedLabel, animations),
               label: normalizedLabel,
               frameCount: 1,
             };
             return {
-              document: {
-                ...state.document,
+              record: {
+                ...state.record,
                 character: {
-                  ...state.document.character,
+                  ...state.record.character,
                   animations: [...animations, animation],
                 },
               },
@@ -86,7 +87,7 @@ export function createAssetEditorSessionStore(initialDocument: EditorDocument) {
       {
         limit: 100,
         partialize: (state) => ({
-          document: state.document,
+          record: state.record,
         }),
       },
     ),
@@ -99,20 +100,20 @@ export type AssetEditorSessionStore = ReturnType<
 
 export function resetAssetEditorSessionStore(
   store: AssetEditorSessionStore,
-  document: EditorDocument,
+  record: EditorRecord,
 ) {
   store.setState({
-    document: structuredClone(document),
-    savedDocument: structuredClone(document),
+    record: structuredClone(record),
+    savedRecord: structuredClone(record),
   });
   store.temporal.getState().clear();
 }
 
 export function markAssetEditorSessionSaved(
   store: AssetEditorSessionStore,
-  document: EditorDocument,
+  record: EditorRecord,
 ) {
-  store.setState({ savedDocument: structuredClone(document) });
+  store.setState({ savedRecord: structuredClone(record) });
 }
 
 export function dispatchAssetEditorCommand(
@@ -147,9 +148,8 @@ export function getAssetEditorSessionSnapshot(
   const temporalState = store.temporal.getState();
 
   return {
-    document: state.document,
-    dirty:
-      JSON.stringify(state.document) !== JSON.stringify(state.savedDocument),
+    record: state.record,
+    dirty: JSON.stringify(state.record) !== JSON.stringify(state.savedRecord),
     canUndo: temporalState.pastStates.length > 0,
     canRedo: temporalState.futureStates.length > 0,
     saveState,
