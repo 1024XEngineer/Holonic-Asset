@@ -1,6 +1,6 @@
 import { Download, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 
-import { useQuickGeneration } from "../state/use-quick-generation";
+import { useQuickGeneration } from "../state";
 import { quickGenerationSizes } from "../domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

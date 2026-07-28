@@ -5,6 +5,11 @@ import {
   type QuickGenerationAsset,
   type QuickGenerationDraft,
 } from "../domain";
+import {
+  browserReferencePreviewAdapter,
+  createReferencePreviewLifecycle,
+  type ReferencePreviewAdapter,
+} from "./reference-preview-lifecycle";
 
 type QuickGenerationDraftPatch = Pick<
   QuickGenerationDraft<string>,
@@ -14,11 +19,6 @@ type QuickGenerationDraftPatch = Pick<
 export type QuickGenerationSessionSnapshot = {
   currentAssetId: string | null;
   draft: QuickGenerationDraft<string>;
-};
-
-export type ReferencePreviewAdapter = {
-  createPreviewUrl: (file: File) => string;
-  revokePreviewUrl: (url: string) => void;
 };
 
 export type QuickGenerationSubmission = {
@@ -48,11 +48,6 @@ export type QuickGenerationSession = {
   dispose: () => void;
 };
 
-export const browserReferencePreviewAdapter: ReferencePreviewAdapter = {
-  createPreviewUrl: (file) => URL.createObjectURL(file),
-  revokePreviewUrl: (url) => URL.revokeObjectURL(url),
-};
-
 export function createQuickGenerationSession(
   referencePreview: ReferencePreviewAdapter = browserReferencePreviewAdapter,
 ): QuickGenerationSession {
@@ -62,10 +57,7 @@ export function createQuickGenerationSession(
     draft: createQuickGenerationDraft<string>(),
   };
   const listeners = new Set<() => void>();
-  const referencePreviews = new Map<string, string>();
-  const ownedReferenceUrls = new Set<string>();
-  const retainedReferenceUrls = new Set<string>();
-  const deferredRevocations = new Set<string>();
+  const referencePreviews = createReferencePreviewLifecycle(referencePreview);
 
   function emit(nextSnapshot: QuickGenerationSessionSnapshot) {
     snapshot = nextSnapshot;
@@ -77,73 +69,16 @@ export function createQuickGenerationSession(
       currentAssetId: asset?.id ?? null,
       draft: createQuickGenerationDraft(
         asset,
-        asset ? (referencePreviews.get(asset.id) ?? "") : "",
+        asset ? (referencePreviews.previewForAsset(asset.id) ?? "") : "",
       ),
     });
   }
 
-  function forceRevokeOwnedUrl(url: string) {
-    if (!ownedReferenceUrls.has(url)) return;
-    referencePreview.revokePreviewUrl(url);
-    ownedReferenceUrls.delete(url);
-    deferredRevocations.delete(url);
-  }
-
-  function revokeOwnedUrl(url: string) {
-    if (!ownedReferenceUrls.has(url)) return;
-    if (retainedReferenceUrls.has(url)) {
-      deferredRevocations.add(url);
-      return;
-    }
-    forceRevokeOwnedUrl(url);
-  }
-
-  function committedReferenceForCurrentAsset() {
-    return snapshot.currentAssetId
-      ? referencePreviews.get(snapshot.currentAssetId)
-      : undefined;
-  }
-
   function releaseUncommittedReference() {
-    const reference = snapshot.draft.reference;
-    if (reference && reference !== committedReferenceForCurrentAsset()) {
-      revokeOwnedUrl(reference);
-    }
-  }
-
-  function commitReferencePreview(assetId: string, previewUrl: string) {
-    const previousPreview = referencePreviews.get(assetId);
-    if (previousPreview && previousPreview !== previewUrl) {
-      revokeOwnedUrl(previousPreview);
-    }
-    if (previewUrl) {
-      referencePreviews.set(assetId, previewUrl);
-    } else {
-      referencePreviews.delete(assetId);
-    }
-  }
-
-  function releaseReferencePreview(assetId: string) {
-    const previewUrl = referencePreviews.get(assetId);
-    if (!previewUrl) return;
-    revokeOwnedUrl(previewUrl);
-    referencePreviews.delete(assetId);
-  }
-
-  function releaseRetainedReference(url: string, keep: boolean) {
-    if (!url || !ownedReferenceUrls.has(url)) return;
-    retainedReferenceUrls.delete(url);
-    if (keep) {
-      deferredRevocations.delete(url);
-      return;
-    }
-    if (
-      deferredRevocations.has(url) ||
-      (snapshot.draft.reference !== url &&
-        ![...referencePreviews.values()].includes(url))
-    ) {
-      forceRevokeOwnedUrl(url);
-    }
+    referencePreviews.releaseUncommitted(
+      snapshot.draft.reference,
+      snapshot.currentAssetId,
+    );
   }
 
   return {
@@ -181,8 +116,7 @@ export function createQuickGenerationSession(
     chooseReference: (file) => {
       if (!file?.type.startsWith("image/")) return;
       releaseUncommittedReference();
-      const previewUrl = referencePreview.createPreviewUrl(file);
-      ownedReferenceUrls.add(previewUrl);
+      const previewUrl = referencePreviews.create(file);
       emit({
         ...snapshot,
         draft: {
@@ -207,9 +141,7 @@ export function createQuickGenerationSession(
       const input = toGenerateQuickAssetInput(snapshot.draft);
       if (!input) return undefined;
       const submittedReference = snapshot.draft.reference ?? "";
-      if (ownedReferenceUrls.has(submittedReference)) {
-        retainedReferenceUrls.add(submittedReference);
-      }
+      referencePreviews.retainForSubmission(submittedReference);
       let settled = false;
 
       return {
@@ -218,14 +150,22 @@ export function createQuickGenerationSession(
           if (settled) return;
           settled = true;
           releaseUncommittedReference();
-          commitReferencePreview(asset.id, submittedReference);
-          releaseRetainedReference(submittedReference, true);
+          referencePreviews.commit(asset.id, submittedReference);
+          referencePreviews.settleSubmission(
+            submittedReference,
+            true,
+            snapshot.draft.reference,
+          );
           applyAsset(asset);
         },
         fail: () => {
           if (settled) return;
           settled = true;
-          releaseRetainedReference(submittedReference, false);
+          referencePreviews.settleSubmission(
+            submittedReference,
+            false,
+            snapshot.draft.reference,
+          );
         },
       };
     },
@@ -244,22 +184,16 @@ export function createQuickGenerationSession(
           completed = true;
           if (snapshot.currentAssetId === deletedAssetId) {
             releaseUncommittedReference();
-            releaseReferencePreview(deletedAssetId);
+            referencePreviews.releaseAsset(deletedAssetId);
             applyAsset(remaining[0]);
           } else {
-            releaseReferencePreview(deletedAssetId);
+            referencePreviews.releaseAsset(deletedAssetId);
           }
         },
       };
     },
     dispose: () => {
-      for (const url of ownedReferenceUrls) {
-        referencePreview.revokePreviewUrl(url);
-      }
-      ownedReferenceUrls.clear();
-      retainedReferenceUrls.clear();
-      deferredRevocations.clear();
-      referencePreviews.clear();
+      referencePreviews.dispose();
     },
   };
 }
