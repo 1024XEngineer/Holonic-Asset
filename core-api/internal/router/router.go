@@ -7,7 +7,7 @@ func Register(
 	as AssetRouter,
 	pr ProjectRouter,
 	gr GenerationRouter,
-	mr MediaRouter,
+	ur UploadRouter,
 	tr TaxonomyRouter,
 ) *echo.Echo {
 	e := echo.New()
@@ -21,8 +21,8 @@ func Register(
 	if gr != nil {
 		RegisterGenerationRoutes(api, gr)
 	}
-	if mr != nil {
-		RegisterMediaRoutes(api, mr)
+	if ur != nil {
+		RegisterUploadRoutes(api, ur)
 	}
 	if tr != nil {
 		RegisterTaxonomyRoutes(api, tr)

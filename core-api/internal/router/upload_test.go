@@ -13,15 +13,15 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/service"
 )
 
-func TestProjectPreviewUploadTargetRouteReturnsPlaceholderResponse(t *testing.T) {
-	mediaService := service.NewMediaService()
-	mediaHandler := handler.NewMediaHandler(mediaService)
-	e := router.Register(nil, nil, nil, mediaHandler, nil)
+func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
+	uploadService := service.NewUploadService(nil)
+	uploadHandler := handler.NewUploadHandler(uploadService)
+	e := router.Register(nil, nil, nil, uploadHandler, nil)
 
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/api/v1/media/project-preview/upload-target",
-		strings.NewReader(`{"contentType":"image/png"}`),
+		"/api/v1/uploads",
+		strings.NewReader(`{"contentType":"image/png","contentLength":8}`),
 	)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	recorder := httptest.NewRecorder()
@@ -31,18 +31,21 @@ func TestProjectPreviewUploadTargetRouteReturnsPlaceholderResponse(t *testing.T)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if recorder.Body.String() != "{\"objectKey\":\"\",\"uploadURL\":\"\"}\n" {
+	if recorder.Body.String() != "{\"objectKey\":\"\",\"objectURL\":\"\",\"uploadURL\":\"\",\"uploadToken\":\"\"}\n" {
 		t.Fatalf("unexpected placeholder response: %s", recorder.Body.String())
 	}
 }
 
-func TestMediaRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
-	mediaService := service.NewMediaService()
-	mediaHandler := handler.NewMediaHandler(mediaService)
-	e := router.Register(nil, nil, nil, mediaHandler, nil)
+func TestUploadRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
+	uploadService := service.NewUploadService(nil)
+	uploadHandler := handler.NewUploadHandler(uploadService)
+	e := router.Register(nil, nil, nil, uploadHandler, nil)
 
 	routes := []string{
+		"/api/v1/upload",
+		"/api/v1/media/upload",
 		"/api/v1/media/upload-target",
+		"/api/v1/media/project-preview/upload-target",
 		"/api/v1/media/project-preview/direct-upload",
 		"/api/v1/media/generated-image/upload",
 		"/api/v1/media/upload/complete",

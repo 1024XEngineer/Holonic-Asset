@@ -1,52 +1,76 @@
-// Package storage exposes the S3-compatible object operations used by Core API modules.
-// Cloudflare R2 can be configured as the S3 endpoint without changing this package API.
+// Package storage exposes the object operations used by Core API modules.
 package storage
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
-// UploadFromURLRequest describes an object that the backend will store.
-type UploadFromURLRequest struct {
-	SourceURL   string
-	ObjectKey   string
-	ContentType string
+// QiniuConfig describes the configuration required by Qiniu Object Storage.
+type QiniuConfig struct {
+	AccessKey         string
+	SecretKey         string
+	Bucket            string
+	Domain            string
+	UploadURL         string
+	UploadTokenExpiry time.Duration
 }
 
-// StoredObject identifies an object after it has been stored.
-type StoredObject struct {
-	ObjectKey string
-	ObjectURL string
+// UploadRequest describes a direct browser upload.
+type UploadRequest struct {
+	ObjectKey     string
+	ContentType   string
+	ContentLength int64
 }
 
-// PresignedUploadRequest describes a direct browser upload.
-type PresignedUploadRequest struct {
-	ObjectKey   string
-	ContentType string
-}
-
-// UploadTarget contains an object reference and a temporary presigned upload URL.
+// UploadTarget contains the information required for a direct upload.
 type UploadTarget struct {
-	ObjectKey string
-	UploadURL string
+	ObjectKey   string
+	ObjectURL   string
+	UploadURL   string
+	UploadToken string
 }
 
 // ObjectMetadata is the subset of object metadata needed to validate an upload.
 type ObjectMetadata struct {
-	ObjectKey   string
-	ContentType string
+	ObjectKey     string
+	ObjectURL     string
+	ContentType   string
+	ContentLength int64
 }
 
-// UploadFromURL stores a backend-provided source URL as an object.
-func UploadFromURL(context.Context, UploadFromURLRequest) (*StoredObject, error) {
-	return &StoredObject{}, nil
+// Storage defines the object operations used by Core API modules.
+type Storage interface {
+	CreateUploadTarget(context.Context, UploadRequest) (*UploadTarget, error)
+	GetObjectMetadata(context.Context, string) (*ObjectMetadata, error)
+	DeleteObject(context.Context, string) error
 }
 
-// CreatePresignedUpload creates a temporary S3-compatible upload target.
-func CreatePresignedUpload(context.Context, PresignedUploadRequest) (*UploadTarget, error) {
+// QiniuStorage is the Qiniu Object Storage implementation skeleton.
+type QiniuStorage struct{}
+
+// NewQiniuStorage creates a Qiniu-backed storage service.
+// Qiniu client initialization is intentionally deferred.
+func NewQiniuStorage(QiniuConfig) (*QiniuStorage, error) {
+	return &QiniuStorage{}, nil
+}
+
+// CreateUploadTarget creates a temporary Qiniu upload target.
+// Upload token generation is intentionally deferred.
+func (*QiniuStorage) CreateUploadTarget(context.Context, UploadRequest) (*UploadTarget, error) {
 	return &UploadTarget{}, nil
 }
 
-// HeadObject verifies an object through the S3-compatible provider.
-// The R2-backed implementation is intentionally deferred.
-func HeadObject(context.Context, string) (*ObjectMetadata, error) {
+// GetObjectMetadata retrieves metadata for an object.
+// Qiniu resource access is intentionally deferred.
+func (*QiniuStorage) GetObjectMetadata(context.Context, string) (*ObjectMetadata, error) {
 	return &ObjectMetadata{}, nil
 }
+
+// DeleteObject deletes an object.
+// Qiniu resource access is intentionally deferred.
+func (*QiniuStorage) DeleteObject(context.Context, string) error {
+	return nil
+}
+
+var _ Storage = (*QiniuStorage)(nil)
