@@ -1,15 +1,18 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { ArrowRight, Layers3 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 const layers = [
-  { label: "Foreground", color: "bg-emerald-300" },
-  { label: "Atmosphere", color: "bg-amber-200" },
-  { label: "Background", color: "bg-sky-300" },
+  { id: "foreground", label: "Foreground", color: "bg-emerald-300", description: "Trees and close-range detail" },
+  { id: "atmosphere", label: "Atmosphere", color: "bg-amber-200", description: "Wind, depth and movement" },
+  { id: "background", label: "Background", color: "bg-sky-300", description: "Sky and distant worldbuilding" },
 ];
 
 export function HomeProjectStory() {
+  const [activeLayer, setActiveLayer] = useState("foreground");
+
   return (
     <section
       aria-labelledby="project-story-heading"
@@ -20,17 +23,17 @@ export function HomeProjectStory() {
           <img
             src="/assets/sky.png"
             alt=""
-            className="absolute inset-0 size-full object-cover"
+            className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${activeLayer === "background" ? "opacity-100" : "opacity-55"}`}
           />
           <img
             src="/assets/wind.png"
             alt=""
-            className="absolute inset-0 size-full object-cover mix-blend-multiply"
+            className={`absolute inset-0 size-full object-cover mix-blend-multiply transition-opacity duration-500 ${activeLayer === "atmosphere" ? "opacity-100" : "opacity-45"}`}
           />
           <img
             src="/assets/nearby-trees.png"
             alt="A multi-layer game scenery project"
-            className="absolute inset-0 size-full object-cover mix-blend-multiply"
+            className={`absolute inset-0 size-full object-cover mix-blend-multiply transition-opacity duration-500 ${activeLayer === "foreground" ? "opacity-100" : "opacity-35"}`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20" />
 
@@ -47,15 +50,19 @@ export function HomeProjectStory() {
                   SCENE LAYERS
                 </p>
               </div>
-              <div className="mt-4 grid gap-2">
-                {layers.map(({ color, label }) => (
-                  <div
+              <div className="mt-4 grid gap-1">
+                {layers.map(({ color, description, id, label }) => (
+                  <button
                     key={label}
-                    className="flex items-center gap-3 border-t border-white/10 pt-2 text-sm"
+                    type="button"
+                    onClick={() => setActiveLayer(id)}
+                    aria-pressed={activeLayer === id}
+                    className={`flex w-full items-center gap-3 border-t border-white/10 px-1 pt-2 text-left text-sm transition-colors hover:text-lime-200 focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:outline-none ${activeLayer === id ? "text-lime-200" : "text-white"}`}
                   >
                     <span className={`size-2 rounded-full ${color}`} />
                     <span>{label}</span>
-                  </div>
+                    <span className="ml-auto text-[10px] text-white/45">{description}</span>
+                  </button>
                 ))}
               </div>
             </div>

@@ -12,7 +12,7 @@ export function HomeHero() {
 
       <div className="relative mx-auto grid min-h-[calc(100vh-3.5rem)] max-w-[100rem] grid-rows-[1fr_auto] px-5 sm:px-8 lg:px-10">
         <div className="grid items-center gap-10 py-14 lg:grid-cols-[minmax(0,1.04fr)_minmax(28rem,.72fr)] lg:py-20">
-          <div>
+          <div className="home-reveal">
             <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.2em]">
               <img
                 src="/logos/logo-light-nobackground.svg"
@@ -34,9 +34,14 @@ export function HomeHero() {
                 library with a clear visual direction.
               </p>
             </div>
+            <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] font-semibold tracking-[0.13em] text-neutral-600">
+              <span className="border border-neutral-950/20 px-3 py-2">PROJECT-BASED</span>
+              <span className="border border-neutral-950/20 px-3 py-2">ENGINE-READY</span>
+              <span className="flex items-center gap-2 px-2"><i className="size-2 rounded-full bg-lime-400" />CREATIVE SYSTEM ONLINE</span>
+            </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-xl lg:mx-0 lg:justify-self-end">
+          <div className="home-reveal home-reveal-delay relative mx-auto w-full max-w-xl lg:mx-0 lg:justify-self-end">
             <div className="absolute -top-5 -left-5 z-10 hidden border border-neutral-950 bg-lime-400 px-4 py-2 font-mono text-[10px] font-semibold tracking-[0.14em] sm:block">
               ASSET COLLECTION / READY
             </div>
@@ -71,7 +76,7 @@ export function HomeHero() {
                 </div>
               </div>
             </div>
-            <div className="absolute -right-4 -bottom-4 grid size-24 place-items-center rounded-full border border-neutral-950 bg-[#f0eee7] text-center font-mono text-[10px] leading-4 font-semibold tracking-[0.12em]">
+            <div className="home-float absolute -right-4 -bottom-4 grid size-24 place-items-center rounded-full border border-neutral-950 bg-[#f0eee7] text-center font-mono text-[10px] leading-4 font-semibold tracking-[0.12em]">
               BUILT FOR
               <br />
               GAME MAKERS
