@@ -2,6 +2,7 @@ import { ChevronDown, PackageOpen } from "lucide-react";
 import { useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getGridBounds } from "@/lib/grid-bounds";
 import type { EditorSpriteSheetItem } from "../../domain";
 
 export function StaticAssetTree({
@@ -30,7 +31,7 @@ export function StaticAssetTree({
             {items.map((item) => {
               const expanded = expandedItems.includes(item.id);
               const selected = selectedItems.includes(item.id);
-              const layout = getCellLayout(item);
+              const layout = getGridBounds(item.tiles);
 
               return (
                 <div key={item.id}>
@@ -44,7 +45,9 @@ export function StaticAssetTree({
                       className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-xs font-medium"
                     >
                       <PackageOpen className="size-4 text-[#4c7e5e]" />
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {item.label}
+                      </span>
                       <span className="font-mono text-[10px] text-[#81786d]">
                         {item.tiles.length}
                       </span>
@@ -56,7 +59,9 @@ export function StaticAssetTree({
                       onClick={() =>
                         setExpandedItems((current) =>
                           current.includes(item.id)
-                            ? current.filter((candidate) => candidate !== item.id)
+                            ? current.filter(
+                                (candidate) => candidate !== item.id,
+                              )
                             : [...current, item.id],
                         )
                       }
@@ -91,8 +96,8 @@ export function StaticAssetTree({
                             aria-pressed={tileSelected}
                             onClick={() => onToggleCell(item.id, cellIndex)}
                             style={{
-                              gridColumn: x - layout.minX + 1,
-                              gridRow: y - layout.minY + 1,
+                              gridColumn: x - layout.x + 1,
+                              gridRow: y - layout.y + 1,
                             }}
                             className={`z-10 size-11 border-0 transition-colors ${tileSelected ? "bg-[#b86b70]/25" : "hover:bg-black/5"}`}
                           />
@@ -108,13 +113,4 @@ export function StaticAssetTree({
       </ScrollArea>
     </aside>
   );
-}
-
-function getCellLayout(item: EditorSpriteSheetItem) {
-  const minX = Math.min(...item.tiles.map(([x]) => x));
-  const minY = Math.min(...item.tiles.map(([, y]) => y));
-  const maxX = Math.max(...item.tiles.map(([x]) => x));
-  const maxY = Math.max(...item.tiles.map(([, y]) => y));
-
-  return { minX, minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }

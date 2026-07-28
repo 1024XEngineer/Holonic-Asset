@@ -13,6 +13,7 @@ import {
   EXPANDED_WIDTH,
   FRAME_GAP,
   FRAME_SIZE,
+  getExpandedNodeHeight,
   NODE_WIDTH,
 } from "../Runtime/CharacterStage.constants";
 import type {
@@ -63,12 +64,7 @@ function getExpandedHeight(
   animations: EditorCharacterAnimation[],
   directions?: CharacterDirectionMap,
 ) {
-  return (
-    48 +
-    Math.ceil(getFrameCount(node, animations, directions) / 4) *
-      (FRAME_SIZE + FRAME_GAP) +
-    48
-  );
+  return getExpandedNodeHeight(getFrameCount(node, animations, directions));
 }
 
 export function getNodeBounds(

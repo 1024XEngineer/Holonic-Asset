@@ -33,6 +33,7 @@ export function drawCharacterNode({
   activeDirections,
   animations,
   prototype,
+  unavailableTextureUrls,
 }: {
   node: NodeId;
   position: CanvasPosition;
@@ -44,6 +45,7 @@ export function drawCharacterNode({
   activeDirections: CharacterDirectionMap;
   animations: EditorCharacterAnimation[];
   prototype: EditorCharacterSpriteSheet;
+  unavailableTextureUrls?: ReadonlySet<string>;
 }) {
   const container = new Container({ x: position.x, y: position.y });
   const layout = getCharacterNodeLayout(
@@ -65,7 +67,9 @@ export function drawCharacterNode({
     animations,
     activeDirections,
   );
-  const pixelScale = getCharacterPixelScale(prototype);
+  const nodeSpriteSheet =
+    node === "prototype" ? prototype : animation?.spriteSheet;
+  const pixelScale = getCharacterPixelScale(nodeSpriteSheet ?? prototype);
   if (expanded) {
     layout.frames.forEach((frame, index) => {
       drawFrame(
@@ -75,16 +79,24 @@ export function drawCharacterNode({
         selectedFrames.includes(index),
         animation?.spriteSheet,
         pixelScale,
+        unavailableTextureUrls,
       );
     });
-  } else if (node === "prototype" && prototype.imageUrl) {
+  } else if (
+    node === "prototype" &&
+    prototype.imageUrl &&
+    !unavailableTextureUrls?.has(prototype.imageUrl)
+  ) {
     drawSpriteSheetPreview(
       container,
       prototype,
       layout.bounds.width,
       pixelScale,
     );
-  } else if (animation?.spriteSheet?.imageUrl) {
+  } else if (
+    animation?.spriteSheet?.imageUrl &&
+    !unavailableTextureUrls?.has(animation.spriteSheet.imageUrl)
+  ) {
     drawSpriteSheetFrame(
       container,
       animation.spriteSheet,
@@ -189,6 +201,7 @@ function drawFrame(
   selected: boolean,
   spriteSheet?: EditorCharacterSpriteSheet,
   pixelScale = 1,
+  unavailableTextureUrls?: ReadonlySet<string>,
 ) {
   if (selected) {
     container.addChild(
@@ -204,7 +217,10 @@ function drawFrame(
     );
   }
 
-  if (spriteSheet?.imageUrl) {
+  if (
+    spriteSheet?.imageUrl &&
+    !unavailableTextureUrls?.has(spriteSheet.imageUrl)
+  ) {
     drawSpriteSheetFrame(
       container,
       spriteSheet,
@@ -327,7 +343,13 @@ function drawSpriteSheetFrame(
 ) {
   const column = frame % spriteSheet.columns;
   const row = spriteSheet.row ?? Math.floor(frame / spriteSheet.columns);
-  const cacheKey = `${spriteSheet.imageUrl}:${column}:${row}`;
+  const cacheKey = [
+    spriteSheet.imageUrl,
+    column,
+    row,
+    spriteSheet.frameWidth,
+    spriteSheet.frameHeight,
+  ].join(":");
   let texture = spriteSheetFrameTextures.get(cacheKey);
 
   if (!texture) {
@@ -371,12 +393,18 @@ function drawSprite(
   const sprite = new Sprite(texture);
   const renderedWidth = sourceWidth * pixelScale;
   const renderedHeight = sourceHeight * pixelScale;
+  const centeredX = x + (width - renderedWidth) / 2;
+  const centeredY = y + (height - renderedHeight) / 2;
   sprite.position.set(
-    x + (width - renderedWidth) / 2,
-    y + (height - renderedHeight) / 2,
+    snapToPixelGrid(container.x + centeredX, pixelScale) - container.x,
+    snapToPixelGrid(container.y + centeredY, pixelScale) - container.y,
   );
   sprite.scale.set(pixelScale);
   container.addChild(sprite);
+}
+
+function snapToPixelGrid(value: number, pixelScale: number) {
+  return Math.round(value / pixelScale) * pixelScale;
 }
 
 function drawAudioWaveform(container: Container, label: string) {

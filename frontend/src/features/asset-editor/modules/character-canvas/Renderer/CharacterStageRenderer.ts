@@ -5,6 +5,7 @@ import {
   Texture,
   TilingSprite,
 } from "pixi.js";
+import type { Viewport } from "pixi-viewport";
 
 import type { CharacterCanvasModel } from "../CharacterCanvas.interface";
 import { getCanvasNodes } from "../CharacterCanvas.constants";
@@ -14,8 +15,6 @@ import {
   getCharacterPixelScale,
   PIXEL_GRID_MAJOR_INTERVAL,
   STAGE_ACCENT,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
 } from "../Runtime/CharacterStage.constants";
 import type { CharacterSceneSnapshot } from "../Runtime/CharacterCanvas.types";
 import { drawCharacterNode } from "./CharacterNodeRenderer";
@@ -23,10 +22,13 @@ import { drawCharacterNode } from "./CharacterNodeRenderer";
 export class CharacterStageRenderer {
   private readonly contentLayer = new Container();
   private readonly gridLayer = new Container();
+  private grid?: TilingSprite;
   private gridPixelScale?: number;
 
-  constructor(world: Container) {
-    world.addChild(this.gridLayer, this.contentLayer);
+  constructor(stage: Container, world: Container) {
+    this.gridLayer.eventMode = "none";
+    stage.addChildAt(this.gridLayer, 0);
+    world.addChild(this.contentLayer);
   }
 
   render(state: CharacterSceneSnapshot, model: CharacterCanvasModel) {
@@ -57,6 +59,7 @@ export class CharacterStageRenderer {
           activeDirections: state.activeDirections,
           animations: model.animations,
           prototype: model.prototype,
+          unavailableTextureUrls: model.unavailableTextureUrls,
         }),
       );
     }
@@ -64,15 +67,28 @@ export class CharacterStageRenderer {
     if (state.marquee) this.drawMarquee(state.marquee.start, state.marquee.end);
   }
 
+  syncViewport(
+    viewport: Viewport,
+    prototype: CharacterCanvasModel["prototype"],
+  ) {
+    this.drawGrid(prototype);
+    if (!this.grid) return;
+
+    this.grid.setSize(viewport.screenWidth, viewport.screenHeight);
+    this.grid.tileScale.set(
+      getCharacterPixelScale(prototype) * viewport.scale.x,
+    );
+    this.grid.tilePosition.set(viewport.x, viewport.y);
+  }
+
   private drawGrid(prototype: CharacterCanvasModel["prototype"]) {
     const pixelScale = getCharacterPixelScale(prototype);
-    if (this.gridPixelScale === pixelScale) return;
+    if (this.gridPixelScale === pixelScale && this.grid) return;
     this.gridPixelScale = pixelScale;
-    this.gridLayer
-      .removeChildren()
-      .forEach((child) => child.destroy({ children: true }));
-
-    this.gridLayer.addChild(createPixelGrid(pixelScale));
+    this.grid?.destroy({ texture: true, textureSource: true });
+    this.grid = createPixelGrid();
+    this.gridLayer.removeChildren();
+    this.gridLayer.addChild(this.grid);
   }
 
   private drawMarquee(
@@ -89,7 +105,7 @@ export class CharacterStageRenderer {
   }
 }
 
-function createPixelGrid(pixelScale: number) {
+function createPixelGrid() {
   const canvas = document.createElement("canvas");
   canvas.width = PIXEL_GRID_MAJOR_INTERVAL;
   canvas.height = PIXEL_GRID_MAJOR_INTERVAL;
@@ -109,9 +125,9 @@ function createPixelGrid(pixelScale: number) {
 
   return new TilingSprite({
     texture,
-    width: WORLD_WIDTH,
-    height: WORLD_HEIGHT,
-    tileScale: { x: pixelScale, y: pixelScale },
+    width: 1,
+    height: 1,
+    tileScale: { x: 1, y: 1 },
     roundPixels: true,
   });
 }

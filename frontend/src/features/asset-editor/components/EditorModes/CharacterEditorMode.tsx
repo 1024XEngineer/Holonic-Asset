@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   CharacterCanvas,
@@ -14,6 +14,7 @@ import type {
   EditorCharacterAnimation,
   EditorCharacterSpriteSheet,
 } from "../../domain";
+import { isEditorCharacterAnimationGroup } from "../../domain";
 
 import { AssetTree } from "../AssetTree/AssetTree";
 import { Inspector } from "../Inspector/Inspector";
@@ -48,6 +49,49 @@ export function CharacterEditorMode({
   const [activeDirections, setActiveDirections] = useState<
     Record<string, CharacterCanvasNodeId>
   >(() => createDefaultCharacterDirections(characterAnimations));
+
+  useEffect(() => {
+    const validNodeIds = new Set<string>([
+      "prototype",
+      ...characterAnimations.flatMap((animation) =>
+        isEditorCharacterAnimationGroup(animation)
+          ? [
+              animation.id,
+              ...animation.directions.map((direction) => direction.id),
+            ]
+          : [animation.id],
+      ),
+    ]);
+    setCanvasSelection((current) => {
+      const nodeIds = current.nodeIds.filter((node) => validNodeIds.has(node));
+      const frames = current.frames.filter(
+        (frame) =>
+          validNodeIds.has(frame.nodeId) && nodeIds.includes(frame.nodeId),
+      );
+      if (
+        nodeIds.length === current.nodeIds.length &&
+        frames.length === current.frames.length
+      ) {
+        return current;
+      }
+      return { nodeIds, frames };
+    });
+    setActiveDirections((current) => {
+      const next = Object.fromEntries(
+        characterAnimations
+          .filter(isEditorCharacterAnimationGroup)
+          .map((animation) => [
+            animation.id,
+            animation.directions.some(
+              (direction) => direction.id === current[animation.id],
+            )
+              ? current[animation.id]
+              : animation.directions[0].id,
+          ]),
+      );
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [characterAnimations]);
   const selection = canvasSelection.nodeIds.length
     ? canvasSelection.nodeIds
         .map((node) => getCharacterNodeLabel(node, characterAnimations))

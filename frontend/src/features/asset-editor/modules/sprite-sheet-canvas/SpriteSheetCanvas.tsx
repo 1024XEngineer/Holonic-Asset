@@ -1,4 +1,5 @@
 import type { SpriteSheetCanvasProps } from "./SpriteSheetCanvas.interface";
+import { getGridBounds } from "@/lib/grid-bounds";
 
 export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
   const highlightedCells = new Set(model.selectedCellIndexes);
@@ -20,7 +21,7 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
           >
             {model.items.flatMap((item) => {
               if (!item.imageUrl) return [];
-              const bounds = getItemBounds(item);
+              const bounds = getGridBounds(item.tiles);
 
               return (
                 <img
@@ -58,7 +59,10 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
                 />
               ),
             )}
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-30"
+            >
               {Array.from({ length: model.gridSize + 1 }, (_, index) => (
                 <span
                   key={`vertical-${index}`}
@@ -79,18 +83,4 @@ export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
       </div>
     </main>
   );
-}
-
-function getItemBounds(item: SpriteSheetCanvasProps["model"]["items"][number]) {
-  const minX = Math.min(...item.tiles.map(([x]) => x));
-  const minY = Math.min(...item.tiles.map(([, y]) => y));
-  const maxX = Math.max(...item.tiles.map(([x]) => x));
-  const maxY = Math.max(...item.tiles.map(([, y]) => y));
-
-  return {
-    x: minX,
-    y: minY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
-  };
 }

@@ -1,7 +1,5 @@
 import type { EditorCharacterSpriteSheet } from "../../../domain";
 
-export const WORLD_WIDTH = 1760;
-export const WORLD_HEIGHT = 1400;
 export const MIN_SCALE = 0.3;
 export const MAX_SOURCE_PIXEL_SCREEN_SIZE = 24;
 export const INITIAL_SCALE = 0.64;
@@ -13,6 +11,10 @@ export const FRAME_GAP = 16;
 export const PIXEL_GRID_MAJOR_INTERVAL = 8;
 export const STAGE_ACCENT = 0xb86b70;
 export const STAGE_BACKGROUND = 0xeeece7;
+
+export function getExpandedNodeHeight(frameCount: number) {
+  return 48 + Math.ceil(frameCount / 4) * (FRAME_SIZE + FRAME_GAP) + 48;
+}
 
 export function getCharacterPixelScale(
   spriteSheet: Pick<EditorCharacterSpriteSheet, "frameWidth" | "frameHeight">,

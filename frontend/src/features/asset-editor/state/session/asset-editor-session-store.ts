@@ -165,7 +165,10 @@ function createCharacterAnimationId(
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "animation";
-  const ids = new Set(animations.map((animation) => animation.id));
+  const ids = new Set([
+    "prototype",
+    ...animations.map((animation) => animation.id),
+  ]);
   let id = base;
   let suffix = 2;
 

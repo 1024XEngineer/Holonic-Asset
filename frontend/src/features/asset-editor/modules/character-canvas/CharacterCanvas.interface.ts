@@ -19,6 +19,7 @@ export type CharacterCanvasSelection = {
 export type CharacterCanvasModel = {
   prototype: EditorCharacterSpriteSheet;
   animations: EditorCharacterAnimation[];
+  unavailableTextureUrls?: ReadonlySet<string>;
   activeDirections?: Readonly<Record<string, CharacterCanvasNodeId>>;
   nodePositions?: Record<string, CanvasPosition>;
   selection: CharacterCanvasSelection;

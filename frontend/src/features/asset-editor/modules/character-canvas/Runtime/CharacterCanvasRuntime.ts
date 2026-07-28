@@ -8,10 +8,14 @@ import {
 import {
   createDefaultCharacterDirections,
   findCharacterAnimationGroup,
+  getCharacterCanvasNodeId,
   getPreferredCharacterDirection,
   type NodeId,
 } from "../character-node";
-import { createDefaultCanvasPositions } from "../CharacterCanvas.constants";
+import {
+  createDefaultCanvasPositions,
+  getCanvasNodes,
+} from "../CharacterCanvas.constants";
 import { CharacterStageInteraction } from "../Interaction/CharacterStageInteraction";
 import { getFrameCount } from "../Interaction/CharacterStageGeometry";
 import { CharacterStageRenderer } from "../Renderer/CharacterStageRenderer";
@@ -20,8 +24,6 @@ import {
   getCharacterMaxScale,
   INITIAL_SCALE,
   MIN_SCALE,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
 } from "./CharacterStage.constants";
 import type {
   CharacterCanvasRuntimeProps,
@@ -38,6 +40,7 @@ export class CharacterCanvasRuntime {
   private viewport?: Viewport;
   private props: CharacterCanvasRuntimeProps;
   private lastAnimationFrame = performance.now();
+  private readonly unavailableTextureUrls = new Set<string>();
 
   private readonly state: CharacterSceneState;
 
@@ -64,8 +67,6 @@ export class CharacterCanvasRuntime {
     const viewport = new Viewport({
       screenWidth: app.screen.width,
       screenHeight: app.screen.height,
-      worldWidth: WORLD_WIDTH,
-      worldHeight: WORLD_HEIGHT,
       events: app.renderer.events,
       ticker: app.ticker,
     });
@@ -73,7 +74,6 @@ export class CharacterCanvasRuntime {
     viewport
       .drag({ mouseButtons: "middle" })
       .wheel()
-      .clamp({ direction: "all", underflow: "center" })
       .clampZoom({
         minScale: MIN_SCALE,
         maxScale: getCharacterMaxScale(this.props.model.prototype),
@@ -82,7 +82,9 @@ export class CharacterCanvasRuntime {
     this.viewport = viewport;
     const world = new Container();
     viewport.addChild(world);
-    this.renderer = new CharacterStageRenderer(world);
+    this.renderer = new CharacterStageRenderer(app.stage, world);
+    viewport.on("moved", this.syncViewportGrid);
+    viewport.on("zoomed", this.syncViewportGrid);
 
     const context: CharacterStageContext = {
       viewport,
@@ -152,13 +154,31 @@ export class CharacterCanvasRuntime {
   syncProps(props: CharacterCanvasRuntimeProps) {
     this.props = props;
     this.state.positions = createDefaultCanvasPositions(props.model.animations);
+    const canvasNodes = new Set(getCanvasNodes(props.model.animations));
+    this.state.expanded = new Set(
+      [...this.state.expanded]
+        .map((node) => getCharacterCanvasNodeId(node, props.model.animations))
+        .filter((node) => canvasNodes.has(node)),
+    );
+    this.state.playing = new Set(
+      [...this.state.playing].filter((node) => canvasNodes.has(node)),
+    );
+    this.state.previewFrames = new Map(
+      [...this.state.previewFrames].filter(([node]) => canvasNodes.has(node)),
+    );
     for (const [node, position] of Object.entries(
       props.model.nodePositions ?? {},
     )) {
       this.state.positions[node as NodeId] = { ...position };
     }
-    for (const frame of props.model.selection.frames)
-      this.state.expanded.add(frame.nodeId);
+    for (const frame of props.model.selection.frames) {
+      const node = getCharacterCanvasNodeId(
+        frame.nodeId,
+        props.model.animations,
+      );
+      if (canvasNodes.has(node)) this.state.expanded.add(node);
+    }
+    const activeDirections = new Map<NodeId, NodeId>();
     for (const animation of props.model.animations) {
       if (!isEditorCharacterAnimationGroup(animation)) continue;
       const requested = props.model.activeDirections?.[animation.id];
@@ -168,9 +188,21 @@ export class CharacterCanvasRuntime {
         requested,
         current,
       );
-      this.state.activeDirections.set(
-        animation.id,
-        direction?.id ?? animation.directions[0].id,
+      const directionId = direction?.id ?? animation.directions[0].id;
+      activeDirections.set(animation.id, directionId);
+      if (current !== directionId)
+        this.state.previewFrames.set(animation.id, 0);
+    }
+    this.state.activeDirections = activeDirections;
+    for (const node of this.state.playing) {
+      const frameCount = getFrameCount(
+        node,
+        props.model.animations,
+        this.state.activeDirections,
+      );
+      this.state.previewFrames.set(
+        node,
+        (this.state.previewFrames.get(node) ?? 0) % frameCount,
       );
     }
     this.render();
@@ -187,18 +219,24 @@ export class CharacterCanvasRuntime {
         ),
       ].filter(Boolean),
     );
-    const textures = await Promise.all(
-      [...urls].map((url) => Assets.load(url)),
+    await Promise.all(
+      [...urls].map(async (url) => {
+        try {
+          const texture = await Assets.load(url);
+          texture.source.scaleMode = "nearest";
+        } catch {
+          this.unavailableTextureUrls.add(url);
+        }
+      }),
     );
-    textures.forEach((texture) => {
-      texture.source.scaleMode = "nearest";
-    });
   }
 
   destroy() {
     this.runtime.app.ticker.remove(this.updateAnimation);
     this.resizeObserver?.disconnect();
     this.interaction?.destroy();
+    this.viewport?.off("moved", this.syncViewportGrid);
+    this.viewport?.off("zoomed", this.syncViewportGrid);
     this.viewport?.removeFromParent();
     this.viewport?.destroy({ children: true });
     this.viewport = undefined;
@@ -207,12 +245,21 @@ export class CharacterCanvasRuntime {
 
   private centerWorld() {
     this.viewport?.setZoom(INITIAL_SCALE);
-    this.viewport?.moveCenter(650, WORLD_HEIGHT / 2);
+    this.viewport?.moveCenter(650, 700);
   }
 
   private render() {
-    this.renderer?.render(this.state, this.props.model);
+    this.renderer?.render(this.state, {
+      ...this.props.model,
+      unavailableTextureUrls: this.unavailableTextureUrls,
+    });
+    this.syncViewportGrid();
   }
+
+  private syncViewportGrid = () => {
+    if (!this.viewport || !this.renderer) return;
+    this.renderer.syncViewport(this.viewport, this.props.model.prototype);
+  };
 
   private updateAnimation = () => {
     if (this.state.playing.size === 0) return;
