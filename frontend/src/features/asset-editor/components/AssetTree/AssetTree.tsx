@@ -21,7 +21,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  isEditorCharacterAnimationGroup,
   type EditorCharacterAnimation,
   type EditorCharacterAnimationClip,
   type EditorCharacterAnimationGroup,
@@ -79,7 +78,7 @@ export function AssetTree({
             onCreateAnimation={() => setIsCreateAnimationOpen(true)}
           >
             {animations.map((animation) =>
-              isEditorCharacterAnimationGroup(animation) ? (
+              animation.kind === "group" ? (
                 <AnimationGroupTreeItem
                   key={animation.id}
                   animation={animation}

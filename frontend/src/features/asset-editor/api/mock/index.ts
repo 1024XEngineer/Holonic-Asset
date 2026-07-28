@@ -1,4 +1,4 @@
 export {
-  getMockEditorDocument,
-  saveMockEditorDocumentRevision,
+  getMockEditorRecord,
+  saveMockEditorRecordRevision,
 } from "./record.mock";

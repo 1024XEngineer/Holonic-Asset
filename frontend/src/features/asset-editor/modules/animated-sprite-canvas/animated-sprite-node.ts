@@ -1,8 +1,7 @@
-import {
-  isEditorCharacterAnimationGroup,
-  type EditorCharacterAnimation,
-  type EditorCharacterAnimationClip,
-  type EditorCharacterAnimationGroup,
+import type {
+  EditorCharacterAnimation,
+  EditorCharacterAnimationClip,
+  EditorCharacterAnimationGroup,
 } from "../../domain";
 
 export type AnimatedSpriteNodeId = string;
@@ -37,7 +36,7 @@ export function findAnimatedSpriteAnimation(
   animations: EditorCharacterAnimation[],
 ): EditorCharacterAnimationClip | undefined {
   for (const animation of animations) {
-    if (isEditorCharacterAnimationGroup(animation)) {
+    if (animation.kind === "group") {
       const direction = animation.directions.find(
         (candidate) => candidate.id === node,
       );
@@ -54,10 +53,10 @@ export function findAnimatedSpriteAnimationGroup(
   animations: EditorCharacterAnimation[],
 ): EditorCharacterAnimationGroup | undefined {
   const animation = animations.find((candidate) => candidate.id === node);
-  if (animation && isEditorCharacterAnimationGroup(animation)) return animation;
+  if (animation?.kind === "group") return animation;
   return animations.find(
     (candidate) =>
-      isEditorCharacterAnimationGroup(candidate) &&
+      candidate.kind === "group" &&
       candidate.directions.some((direction) => direction.id === node),
   ) as EditorCharacterAnimationGroup | undefined;
 }
@@ -69,7 +68,7 @@ export function getAnimatedSpriteAnimation(
 ): EditorCharacterAnimationClip | undefined {
   const animation = animations.find((candidate) => candidate.id === node);
   if (!animation) return findAnimatedSpriteAnimation(node, animations);
-  if (!isEditorCharacterAnimationGroup(animation)) return animation;
+  if (animation.kind !== "group") return animation;
 
   const activeDirectionId = getDirectionValue(directions, animation.id);
   return (
@@ -111,7 +110,7 @@ export function createDefaultAnimatedSpriteDirections(
 ) {
   return Object.fromEntries(
     animations
-      .filter(isEditorCharacterAnimationGroup)
+      .filter((animation) => animation.kind === "group")
       .map((animation) => [animation.id, animation.directions[0].id]),
   );
 }
@@ -134,7 +133,7 @@ export function getAnimatedSpriteNodeLabel(
   const topLevelAnimation = animations.find(
     (candidate) => candidate.id === node,
   );
-  if (topLevelAnimation && isEditorCharacterAnimationGroup(topLevelAnimation)) {
+  if (topLevelAnimation?.kind === "group") {
     const direction = getAnimatedSpriteAnimation(node, animations, directions);
     return directions && direction
       ? `${topLevelAnimation.label} / ${direction.label}`

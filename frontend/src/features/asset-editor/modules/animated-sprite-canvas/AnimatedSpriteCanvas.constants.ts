@@ -1,7 +1,4 @@
-import {
-  isEditorCharacterAnimationGroup,
-  type EditorCharacterAnimation,
-} from "../../domain";
+import type { EditorCharacterAnimation } from "../../domain";
 import type { AnimatedSpriteNodeId } from "./animated-sprite-node";
 import {
   COLLAPSED_HEIGHT,
@@ -69,8 +66,11 @@ function getDefaultNodeHeight(
   if (node === PROTOTYPE_NODE_ID) return COLLAPSED_HEIGHT;
   const animation = animations.find((candidate) => candidate.id === node);
   if (!animation) return COLLAPSED_HEIGHT;
-  const frameCount = isEditorCharacterAnimationGroup(animation)
-    ? Math.max(...animation.directions.map((direction) => direction.frameCount))
-    : animation.frameCount;
+  const frameCount =
+    animation.kind === "group"
+      ? Math.max(
+          ...animation.directions.map((direction) => direction.frameCount),
+        )
+      : animation.frameCount;
   return Math.max(COLLAPSED_HEIGHT, getExpandedNodeHeight(frameCount));
 }

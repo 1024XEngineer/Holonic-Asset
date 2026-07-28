@@ -20,11 +20,11 @@ import type {
 
 export function useAssetEditorSession({
   target,
-  initialDocument,
+  initialRecord,
 }: UseAssetEditorSessionInput): AssetEditorSession {
   const storeRef = useRef<AssetEditorSessionStore | null>(null);
   if (storeRef.current === null) {
-    storeRef.current = createAssetEditorSessionStore(initialDocument);
+    storeRef.current = createAssetEditorSessionStore(initialRecord);
   }
   const store = storeRef.current;
   const identity = `${target.projectId}\0${target.assetId}`;
@@ -37,14 +37,14 @@ export function useAssetEditorSession({
   const saveRevisionMutation = useSaveAssetRevisionMutation();
   // These subscriptions keep the React adapter current. Snapshot semantics stay
   // in the session store so production and its tests cross the same seam.
-  useStore(store, (state) => state.document);
-  useStore(store, (state) => state.savedDocument);
+  useStore(store, (state) => state.record);
+  useStore(store, (state) => state.savedRecord);
   useStore(store.temporal, (state) => state.pastStates.length > 0);
   useStore(store.temporal, (state) => state.futureStates.length > 0);
 
   useEffect(() => {
     // Query refreshes for the same target must not overwrite an active draft.
-    resetAssetEditorSessionStore(store, initialDocument);
+    resetAssetEditorSessionStore(store, initialRecord);
     setSaveState({ phase: "idle" });
   }, [store, target.projectId, target.assetId]);
 
@@ -68,12 +68,12 @@ export function useAssetEditorSession({
         store,
         identity: submittedIdentity,
         isActive: (candidate) => activeIdentityRef.current === candidate,
-        saveRevision: (content) =>
+        saveRevision: (record) =>
           saveRevisionMutation
             .mutateAsync({
               projectId: target.projectId,
               assetId: target.assetId,
-              content,
+              record,
             })
             .then(() => undefined),
       });

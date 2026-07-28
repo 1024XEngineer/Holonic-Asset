@@ -108,7 +108,7 @@ export function getAnimatedSpriteNodeLayout(
   const hasControls = Boolean(animation);
   const group = animations.find((candidate) => candidate.id === node);
   const hasSwitch = Boolean(
-    group && "directions" in group && group.directions.length > 1,
+    group?.kind === "group" && group.directions.length > 1,
   );
 
   return {

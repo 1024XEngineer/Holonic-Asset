@@ -1,4 +1,4 @@
-import type { TilesetEditorDocument } from "../../domain";
+import type { TilesetEditorRecord } from "../../domain";
 import {
   TilesetCanvas,
   useTilesetCanvasStateMachine,
@@ -16,7 +16,7 @@ export function TilesetEditorMode({
   renderHeader,
   tileset,
 }: EditorModeProps & {
-  tileset: TilesetEditorDocument["tileset"];
+  tileset: TilesetEditorRecord["tileset"];
 }) {
   const items = tileset.items;
   const stage = useTilesetCanvasStateMachine(items, tileset.gridSize);

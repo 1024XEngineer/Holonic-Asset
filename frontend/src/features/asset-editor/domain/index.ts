@@ -1,23 +1,26 @@
 export {
   editorModeForAssetKind,
-  getEditorCharacterAnimationClips,
-  isEditorCharacterAnimationGroup,
-  isEditorDocumentForAssetKind,
-  type CharacterEditorDocument,
-  type AudioEditorDocument,
+  type AudioEditorRecord,
+  type CharacterEditorRecord,
   type EditorCanvasPosition,
   type EditorCharacterAnimation,
   type EditorCharacterAnimationClip,
   type EditorCharacterAnimationGroup,
   type EditorCharacterSpriteSheet,
-  type EditorDocument,
-  type EditorDocumentForKind,
+  type EditorRecord,
+  type EditorRecordForKind,
   type EditorSceneryLayer,
   type EditorTilesetCell,
   type EditorTilesetItem,
   type EditorUiComponent,
-  type EditorWorkspaceData,
-  type SceneryEditorDocument,
-  type TilesetEditorDocument,
-  type UiEditorDocument,
-} from "./editor-document";
+  type SceneryEditorRecord,
+  type TilesetEditorRecord,
+  type UiEditorRecord,
+} from "./editor-record";
+export { getEditorCharacterAnimationClips } from "./editor-character-animation";
+export { isEditorRecordForAssetKind } from "./editor-record.validation";
+export type {
+  EditorWorkspaceAsset,
+  EditorWorkspaceData,
+  EditorWorkspaceDataForKind,
+} from "./editor-workspace";
