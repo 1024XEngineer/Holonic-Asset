@@ -1,23 +1,8 @@
 import { Viewport } from "pixi-viewport";
 import { Assets, Container } from "pixi.js";
 
-import {
-  getEditorCharacterAnimationClips,
-  isEditorCharacterAnimationGroup,
-} from "../../../domain";
-import {
-  createDefaultCharacterDirections,
-  findCharacterAnimationGroup,
-  getCharacterCanvasNodeId,
-  getPreferredCharacterDirection,
-  type NodeId,
-} from "../character-node";
-import {
-  createDefaultCanvasPositions,
-  getCanvasNodes,
-} from "../CharacterCanvas.constants";
+import { getEditorCharacterAnimationClips } from "../../../domain";
 import { CharacterStageInteraction } from "../Interaction/CharacterStageInteraction";
-import { getFrameCount } from "../Interaction/CharacterStageGeometry";
 import { CharacterStageRenderer } from "../Renderer/CharacterStageRenderer";
 import {
   getCharacterPixelScale,
@@ -27,9 +12,9 @@ import {
 } from "./CharacterStage.constants";
 import type {
   CharacterCanvasRuntimeProps,
-  CharacterSceneState,
   CharacterStageContext,
 } from "./CharacterCanvas.types";
+import { CharacterScene } from "./CharacterScene";
 import { StageRuntime } from "./StageRuntime";
 
 export class CharacterCanvasRuntime {
@@ -41,23 +26,11 @@ export class CharacterCanvasRuntime {
   private props: CharacterCanvasRuntimeProps;
   private lastAnimationFrame = performance.now();
   private readonly unavailableTextureUrls = new Set<string>();
-
-  private readonly state: CharacterSceneState;
+  private readonly scene: CharacterScene;
 
   constructor(props: CharacterCanvasRuntimeProps) {
     this.props = props;
-    this.state = {
-      positions: createDefaultCanvasPositions(props.model.animations),
-      expanded: new Set(),
-      playing: new Set(),
-      previewFrames: new Map(),
-      activeDirections: new Map(
-        Object.entries(
-          createDefaultCharacterDirections(props.model.animations),
-        ),
-      ),
-      marquee: null,
-    };
+    this.scene = new CharacterScene(props.model);
   }
 
   async initialize(host: HTMLElement) {
@@ -101,43 +74,22 @@ export class CharacterCanvasRuntime {
         onSwitchDirection: (node, direction) =>
           this.props.actions.onSwitchDirection(node, direction),
       },
-      getScene: () => this.state,
+      getScene: () => this.scene.getSnapshot(),
       getAnimations: () => this.props.model.animations,
-      moveNode: (node, position) => {
-        this.state.positions[node] = position;
-      },
-      setMarquee: (marquee) => {
-        this.state.marquee = marquee;
-      },
+      moveNode: (node, position) => this.scene.moveNode(node, position),
+      setMarquee: (marquee) => this.scene.setMarquee(marquee),
       getDragStep: () => getCharacterPixelScale(this.props.model.prototype),
-      toggleExpanded: (node) => {
-        this.state.playing.delete(node);
-        if (this.state.expanded.has(node)) this.state.expanded.delete(node);
-        else this.state.expanded.add(node);
-      },
-      togglePlaying: (node) => {
-        if (this.state.expanded.has(node)) return;
-        if (this.state.playing.has(node)) this.state.playing.delete(node);
-        else this.state.playing.add(node);
-      },
+      toggleExpanded: (node) => this.scene.toggleExpanded(node),
+      togglePlaying: (node) => this.scene.togglePlaying(node),
       switchDirection: (node) => {
-        const group = findCharacterAnimationGroup(
-          node,
-          this.props.model.animations,
-        );
-        if (!group || group.directions.length < 2) return;
-        const current = this.state.activeDirections.get(group.id);
-        const index = Math.max(
-          0,
-          group.directions.findIndex((direction) => direction.id === current),
-        );
-        const direction =
-          group.directions[(index + 1) % group.directions.length];
-        this.state.activeDirections.set(group.id, direction.id);
-        this.state.previewFrames.set(group.id, 0);
-        this.props.actions.onSwitchDirection(group.id, direction.id);
+        const change = this.scene.switchDirection(node, this.props.model);
+        if (change)
+          this.props.actions.onSwitchDirection(
+            change.nodeId,
+            change.directionId,
+          );
       },
-      getActiveDirections: () => this.state.activeDirections,
+      getActiveDirections: () => this.scene.getSnapshot().activeDirections,
       render: () => this.render(),
     };
     this.interaction = new CharacterStageInteraction(app.canvas, context);
@@ -153,58 +105,7 @@ export class CharacterCanvasRuntime {
 
   syncProps(props: CharacterCanvasRuntimeProps) {
     this.props = props;
-    this.state.positions = createDefaultCanvasPositions(props.model.animations);
-    const canvasNodes = new Set(getCanvasNodes(props.model.animations));
-    this.state.expanded = new Set(
-      [...this.state.expanded]
-        .map((node) => getCharacterCanvasNodeId(node, props.model.animations))
-        .filter((node) => canvasNodes.has(node)),
-    );
-    this.state.playing = new Set(
-      [...this.state.playing].filter((node) => canvasNodes.has(node)),
-    );
-    this.state.previewFrames = new Map(
-      [...this.state.previewFrames].filter(([node]) => canvasNodes.has(node)),
-    );
-    for (const [node, position] of Object.entries(
-      props.model.nodePositions ?? {},
-    )) {
-      this.state.positions[node as NodeId] = { ...position };
-    }
-    for (const frame of props.model.selection.frames) {
-      const node = getCharacterCanvasNodeId(
-        frame.nodeId,
-        props.model.animations,
-      );
-      if (canvasNodes.has(node)) this.state.expanded.add(node);
-    }
-    const activeDirections = new Map<NodeId, NodeId>();
-    for (const animation of props.model.animations) {
-      if (!isEditorCharacterAnimationGroup(animation)) continue;
-      const requested = props.model.activeDirections?.[animation.id];
-      const current = this.state.activeDirections.get(animation.id);
-      const direction = getPreferredCharacterDirection(
-        animation,
-        requested,
-        current,
-      );
-      const directionId = direction?.id ?? animation.directions[0].id;
-      activeDirections.set(animation.id, directionId);
-      if (current !== directionId)
-        this.state.previewFrames.set(animation.id, 0);
-    }
-    this.state.activeDirections = activeDirections;
-    for (const node of this.state.playing) {
-      const frameCount = getFrameCount(
-        node,
-        props.model.animations,
-        this.state.activeDirections,
-      );
-      this.state.previewFrames.set(
-        node,
-        (this.state.previewFrames.get(node) ?? 0) % frameCount,
-      );
-    }
+    this.scene.synchronize(props.model);
     this.render();
   }
 
@@ -249,7 +150,7 @@ export class CharacterCanvasRuntime {
   }
 
   private render() {
-    this.renderer?.render(this.state, {
+    this.renderer?.render(this.scene.getSnapshot(), {
       ...this.props.model,
       unavailableTextureUrls: this.unavailableTextureUrls,
     });
@@ -262,21 +163,11 @@ export class CharacterCanvasRuntime {
   };
 
   private updateAnimation = () => {
-    if (this.state.playing.size === 0) return;
+    if (this.scene.getSnapshot().playing.size === 0) return;
     const now = performance.now();
     if (now - this.lastAnimationFrame < 160) return;
     this.lastAnimationFrame = now;
-    for (const node of this.state.playing) {
-      this.state.previewFrames.set(
-        node,
-        ((this.state.previewFrames.get(node) ?? 0) + 1) %
-          getFrameCount(
-            node,
-            this.props.model.animations,
-            this.state.activeDirections,
-          ),
-      );
-    }
+    this.scene.advanceAnimation(this.props.model);
     this.render();
   };
 }
