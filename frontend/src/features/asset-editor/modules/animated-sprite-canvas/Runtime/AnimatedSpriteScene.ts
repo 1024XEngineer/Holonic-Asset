@@ -1,50 +1,50 @@
 import { isEditorCharacterAnimationGroup } from "../../../domain";
-import type { CharacterCanvasModel } from "../CharacterCanvas.interface";
+import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import {
-  createDefaultCharacterDirections,
-  findCharacterAnimationGroup,
-  getCharacterCanvasNodeId,
-  getPreferredCharacterDirection,
+  createDefaultAnimatedSpriteDirections,
+  findAnimatedSpriteAnimationGroup,
+  getAnimatedSpriteNodeId,
+  getPreferredAnimatedSpriteDirection,
   type NodeId,
-} from "../character-node";
+} from "../animated-sprite-node";
 import {
   createDefaultCanvasPositions,
   getCanvasNodes,
   type CanvasPosition,
-} from "../CharacterCanvas.constants";
-import { getFrameCount } from "../Interaction/CharacterStageGeometry";
+} from "../AnimatedSpriteCanvas.constants";
+import { getFrameCount } from "../Interaction/AnimatedSpriteStageGeometry";
 import type {
-  CharacterSceneSnapshot,
-  CharacterSceneState,
-} from "./CharacterCanvas.types";
+  AnimatedSpriteSceneSnapshot,
+  AnimatedSpriteSceneState,
+} from "./AnimatedSpriteCanvas.types";
 
-export class CharacterScene {
-  private readonly state: CharacterSceneState;
+export class AnimatedSpriteScene {
+  private readonly state: AnimatedSpriteSceneState;
 
-  constructor(model: CharacterCanvasModel) {
+  constructor(model: AnimatedSpriteCanvasModel) {
     this.state = {
       positions: createDefaultCanvasPositions(model.animations),
       expanded: new Set(),
       playing: new Set(),
       previewFrames: new Map(),
       activeDirections: new Map(
-        Object.entries(createDefaultCharacterDirections(model.animations)),
+        Object.entries(createDefaultAnimatedSpriteDirections(model.animations)),
       ),
       marquee: null,
     };
     this.synchronize(model);
   }
 
-  getSnapshot(): CharacterSceneSnapshot {
+  getSnapshot(): AnimatedSpriteSceneSnapshot {
     return this.state;
   }
 
-  synchronize(model: CharacterCanvasModel) {
+  synchronize(model: AnimatedSpriteCanvasModel) {
     this.state.positions = createDefaultCanvasPositions(model.animations);
     const canvasNodes = new Set(getCanvasNodes(model.animations));
     this.state.expanded = new Set(
       [...this.state.expanded]
-        .map((node) => getCharacterCanvasNodeId(node, model.animations))
+        .map((node) => getAnimatedSpriteNodeId(node, model.animations))
         .filter((node) => canvasNodes.has(node)),
     );
     this.state.playing = new Set(
@@ -57,7 +57,7 @@ export class CharacterScene {
       this.state.positions[node as NodeId] = { ...position };
     }
     for (const frame of model.selection.frames) {
-      const node = getCharacterCanvasNodeId(frame.nodeId, model.animations);
+      const node = getAnimatedSpriteNodeId(frame.nodeId, model.animations);
       if (canvasNodes.has(node)) this.state.expanded.add(node);
     }
 
@@ -66,7 +66,7 @@ export class CharacterScene {
       if (!isEditorCharacterAnimationGroup(animation)) continue;
       const requested = model.activeDirections?.[animation.id];
       const current = this.state.activeDirections.get(animation.id);
-      const direction = getPreferredCharacterDirection(
+      const direction = getPreferredAnimatedSpriteDirection(
         animation,
         requested,
         current,
@@ -95,7 +95,7 @@ export class CharacterScene {
     this.state.positions[node] = position;
   }
 
-  setMarquee(marquee: CharacterSceneState["marquee"]) {
+  setMarquee(marquee: AnimatedSpriteSceneState["marquee"]) {
     this.state.marquee = marquee;
   }
 
@@ -111,8 +111,8 @@ export class CharacterScene {
     else this.state.playing.add(node);
   }
 
-  switchDirection(node: NodeId, model: CharacterCanvasModel) {
-    const group = findCharacterAnimationGroup(node, model.animations);
+  switchDirection(node: NodeId, model: AnimatedSpriteCanvasModel) {
+    const group = findAnimatedSpriteAnimationGroup(node, model.animations);
     if (!group || group.directions.length < 2) return;
     const current = this.state.activeDirections.get(group.id);
     const index = Math.max(
@@ -126,7 +126,7 @@ export class CharacterScene {
     return { nodeId: group.id, directionId: direction.id };
   }
 
-  advanceAnimation(model: CharacterCanvasModel) {
+  advanceAnimation(model: AnimatedSpriteCanvasModel) {
     for (const node of this.state.playing) {
       this.state.previewFrames.set(
         node,

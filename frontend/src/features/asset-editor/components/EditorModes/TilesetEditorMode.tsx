@@ -1,25 +1,25 @@
-import type { SpriteSheetEditorDocument } from "../../domain";
+import type { TilesetEditorDocument } from "../../domain";
 import {
-  SpriteSheetCanvas,
-  useSpriteSheetCanvasStateMachine,
-} from "../../modules/sprite-sheet-canvas";
+  TilesetCanvas,
+  useTilesetCanvasStateMachine,
+} from "../../modules/tileset-canvas";
 
-import { StaticAssetTree } from "../AssetTree/StaticAssetTree";
+import { TilesetAssetTree } from "../AssetTree/TilesetAssetTree";
 import { Inspector } from "../Inspector/Inspector";
 import type { EditorModeProps } from "./types";
 
-export function SpriteSheetEditorMode({
+export function TilesetEditorMode({
   prompt,
   history,
   onAction,
   onPromptChange,
   renderHeader,
-  spriteSheet,
+  tileset,
 }: EditorModeProps & {
-  spriteSheet: SpriteSheetEditorDocument["spriteSheet"];
+  tileset: TilesetEditorDocument["tileset"];
 }) {
-  const items = spriteSheet.items;
-  const stage = useSpriteSheetCanvasStateMachine(items, spriteSheet.gridSize);
+  const items = tileset.items;
+  const stage = useTilesetCanvasStateMachine(items, tileset.gridSize);
   const selection = stage.selectedLabels.length
     ? stage.selectedLabels.join(", ")
     : "Nothing selected";
@@ -27,7 +27,7 @@ export function SpriteSheetEditorMode({
     <>
       {renderHeader(selection)}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <StaticAssetTree
+        <TilesetAssetTree
           items={items}
           selectedItems={stage.selectedItems}
           isCellSelected={stage.isCellSelected}
@@ -36,9 +36,9 @@ export function SpriteSheetEditorMode({
             stage.send({ type: "item-cell.toggle", itemId, cellIndex })
           }
         />
-        <SpriteSheetCanvas
+        <TilesetCanvas
           model={{
-            gridSize: spriteSheet.gridSize,
+            gridSize: tileset.gridSize,
             items,
             selectedCellIndexes: stage.selectedCells,
           }}

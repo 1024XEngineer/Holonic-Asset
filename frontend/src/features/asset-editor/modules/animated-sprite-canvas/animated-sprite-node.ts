@@ -5,20 +5,20 @@ import {
   type EditorCharacterAnimationGroup,
 } from "../../domain";
 
-export type CharacterCanvasNodeId = string;
+export type AnimatedSpriteNodeId = string;
 
-export type NodeId = CharacterCanvasNodeId;
+export type NodeId = AnimatedSpriteNodeId;
 
-export type CharacterDirectionMap =
-  | ReadonlyMap<CharacterCanvasNodeId, CharacterCanvasNodeId>
-  | Readonly<Record<string, CharacterCanvasNodeId>>;
+export type AnimatedSpriteDirectionMap =
+  | ReadonlyMap<AnimatedSpriteNodeId, AnimatedSpriteNodeId>
+  | Readonly<Record<string, AnimatedSpriteNodeId>>;
 
-export type CharacterCanvasNodeMeta = {
+export type AnimatedSpriteNodeMeta = {
   label: string;
   eyebrow: string;
 };
 
-export const characterFrameColors = [
+export const animatedSpriteFrameColors = [
   "#f6c66e",
   "#f09b5b",
   "#91c7a5",
@@ -27,13 +27,13 @@ export const characterFrameColors = [
   "#e68c67",
 ];
 
-export const characterNodeMeta: Record<string, CharacterCanvasNodeMeta> = {
+export const animatedSpriteNodeMeta: Record<string, AnimatedSpriteNodeMeta> = {
   prototype: { label: "Prototype", eyebrow: "Source" },
   metadata: { label: "Manifest", eyebrow: "Asset settings" },
 };
 
-export function findCharacterAnimation(
-  node: CharacterCanvasNodeId,
+export function findAnimatedSpriteAnimation(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
 ): EditorCharacterAnimationClip | undefined {
   for (const animation of animations) {
@@ -49,8 +49,8 @@ export function findCharacterAnimation(
   return undefined;
 }
 
-export function findCharacterAnimationGroup(
-  node: CharacterCanvasNodeId,
+export function findAnimatedSpriteAnimationGroup(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
 ): EditorCharacterAnimationGroup | undefined {
   const animation = animations.find((candidate) => candidate.id === node);
@@ -62,13 +62,13 @@ export function findCharacterAnimationGroup(
   ) as EditorCharacterAnimationGroup | undefined;
 }
 
-export function getCharacterCanvasAnimation(
-  node: CharacterCanvasNodeId,
+export function getAnimatedSpriteAnimation(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ): EditorCharacterAnimationClip | undefined {
   const animation = animations.find((candidate) => candidate.id === node);
-  if (!animation) return findCharacterAnimation(node, animations);
+  if (!animation) return findAnimatedSpriteAnimation(node, animations);
   if (!isEditorCharacterAnimationGroup(animation)) return animation;
 
   const activeDirectionId = getDirectionValue(directions, animation.id);
@@ -79,10 +79,10 @@ export function getCharacterCanvasAnimation(
   );
 }
 
-export function getPreferredCharacterDirection(
+export function getPreferredAnimatedSpriteDirection(
   animation: EditorCharacterAnimationGroup,
-  requested?: CharacterCanvasNodeId,
-  current?: CharacterCanvasNodeId,
+  requested?: AnimatedSpriteNodeId,
+  current?: AnimatedSpriteNodeId,
 ) {
   return (
     animation.directions.find((direction) => direction.id === requested) ??
@@ -91,22 +91,22 @@ export function getPreferredCharacterDirection(
   );
 }
 
-export function getCharacterCanvasNodeId(
-  node: CharacterCanvasNodeId,
+export function getAnimatedSpriteNodeId(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
 ) {
-  return findCharacterAnimationGroup(node, animations)?.id ?? node;
+  return findAnimatedSpriteAnimationGroup(node, animations)?.id ?? node;
 }
 
-export function getCharacterDirectionId(
-  node: CharacterCanvasNodeId,
+export function getAnimatedSpriteDirectionId(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ) {
-  return getCharacterCanvasAnimation(node, animations, directions)?.id ?? node;
+  return getAnimatedSpriteAnimation(node, animations, directions)?.id ?? node;
 }
 
-export function createDefaultCharacterDirections(
+export function createDefaultAnimatedSpriteDirections(
   animations: EditorCharacterAnimation[],
 ) {
   return Object.fromEntries(
@@ -117,35 +117,35 @@ export function createDefaultCharacterDirections(
 }
 
 function getDirectionValue(
-  directions: CharacterDirectionMap | undefined,
-  node: CharacterCanvasNodeId,
+  directions: AnimatedSpriteDirectionMap | undefined,
+  node: AnimatedSpriteNodeId,
 ) {
   if (!directions) return undefined;
   return directions instanceof Map
     ? directions.get(node)
-    : (directions as Readonly<Record<string, CharacterCanvasNodeId>>)[node];
+    : (directions as Readonly<Record<string, AnimatedSpriteNodeId>>)[node];
 }
 
-export function getCharacterNodeLabel(
-  node: CharacterCanvasNodeId,
+export function getAnimatedSpriteNodeLabel(
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ) {
   const topLevelAnimation = animations.find(
     (candidate) => candidate.id === node,
   );
   if (topLevelAnimation && isEditorCharacterAnimationGroup(topLevelAnimation)) {
-    const direction = getCharacterCanvasAnimation(node, animations, directions);
+    const direction = getAnimatedSpriteAnimation(node, animations, directions);
     return directions && direction
       ? `${topLevelAnimation.label} / ${direction.label}`
       : topLevelAnimation.label;
   }
 
-  const animation = findCharacterAnimation(node, animations);
+  const animation = findAnimatedSpriteAnimation(node, animations);
   if (animation) {
-    const parent = findCharacterAnimationGroup(node, animations);
+    const parent = findAnimatedSpriteAnimationGroup(node, animations);
     return parent ? `${parent.label} / ${animation.label}` : animation.label;
   }
 
-  return characterNodeMeta[node]?.label ?? node;
+  return animatedSpriteNodeMeta[node]?.label ?? node;
 }

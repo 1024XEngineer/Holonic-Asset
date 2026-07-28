@@ -5,10 +5,12 @@ import type {
   EditorCharacterAnimationClip,
   EditorCharacterAnimationGroup,
   EditorCharacterSpriteSheet,
-  EditorSpriteSheetItem,
+  EditorTilesetItem,
   EditorDocumentForKind,
   SceneryEditorDocument,
-  SpriteSheetEditorDocument,
+  TilesetEditorDocument,
+  UiEditorDocument,
+  AudioEditorDocument,
 } from "../../domain";
 import { isEditorDocumentForAssetKind } from "../../domain";
 
@@ -159,8 +161,8 @@ function createTilesetItem({
   id: string;
   label: string;
   imageUrl: string;
-  tiles: EditorSpriteSheetItem["tiles"];
-}): EditorSpriteSheetItem {
+  tiles: EditorTilesetItem["tiles"];
+}): EditorTilesetItem {
   return {
     id,
     label,
@@ -169,62 +171,102 @@ function createTilesetItem({
   };
 }
 
-const tilesetItems: EditorSpriteSheetItem[] = [
+const tilesetItems: EditorTilesetItem[] = [
   createTilesetItem({
     id: "sofa-01",
     label: "Sofa 01",
     imageUrl: "sofas/sofa_01_96x64.png",
-    tiles: [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]],
+    tiles: [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
+    ],
   }),
   createTilesetItem({
     id: "sofa-02",
     label: "Sofa 02",
     imageUrl: "sofas/sofa_02_96x64.png",
-    tiles: [[3, 0], [4, 0], [5, 0], [3, 1], [4, 1], [5, 1]],
+    tiles: [
+      [3, 0],
+      [4, 0],
+      [5, 0],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+    ],
   }),
   createTilesetItem({
     id: "sofa-03",
     label: "Sofa 03",
     imageUrl: "sofas/sofa_03_96x64.png",
-    tiles: [[0, 2], [1, 2], [2, 2], [0, 3], [1, 3], [2, 3]],
+    tiles: [
+      [0, 2],
+      [1, 2],
+      [2, 2],
+      [0, 3],
+      [1, 3],
+      [2, 3],
+    ],
   }),
   createTilesetItem({
     id: "sofa-04",
     label: "Sofa 04",
     imageUrl: "sofas/sofa_04_96x64.png",
-    tiles: [[3, 2], [4, 2], [5, 2], [3, 3], [4, 3], [5, 3]],
+    tiles: [
+      [3, 2],
+      [4, 2],
+      [5, 2],
+      [3, 3],
+      [4, 3],
+      [5, 3],
+    ],
   }),
   createTilesetItem({
     id: "sofa-05",
     label: "Sofa 05",
     imageUrl: "sofas/sofa_05_96x64.png",
-    tiles: [[0, 4], [1, 4], [2, 4], [0, 5], [1, 5], [2, 5]],
+    tiles: [
+      [0, 4],
+      [1, 4],
+      [2, 4],
+      [0, 5],
+      [1, 5],
+      [2, 5],
+    ],
   }),
   ...Array.from({ length: 4 }, (_, index) =>
     createTilesetItem({
       id: `bed-${index + 1}`,
       label: `Bed ${String(index + 1).padStart(2, "0")}`,
       imageUrl: `beds/bed_${String(index + 1).padStart(2, "0")}_32x64.png`,
-      tiles: [[6, index * 2], [6, index * 2 + 1]],
+      tiles: [
+        [6, index * 2],
+        [6, index * 2 + 1],
+      ],
     }),
   ),
-  ...["barrel_01", "barrel_02", "barrel_03", "barrel_04", "barrel_05", "jar_01", "jar_02", "jar_03"].map(
-    (name, index) =>
-      createTilesetItem({
-        id: name.replace("_", "-"),
-        label: name.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
-        imageUrl: `items/${name}_32x32.png`,
-        tiles: [[7, index]],
-      }),
+  ...[
+    "barrel_01",
+    "barrel_02",
+    "barrel_03",
+    "barrel_04",
+    "barrel_05",
+    "jar_01",
+    "jar_02",
+    "jar_03",
+  ].map((name, index) =>
+    createTilesetItem({
+      id: name.replace("_", "-"),
+      label: name
+        .replace("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      imageUrl: `items/${name}_32x32.png`,
+      tiles: [[7, index]],
+    }),
   ),
-];
-
-const objectItems: EditorSpriteSheetItem[] = [
-  {
-    id: "Object",
-    label: "Object",
-    tiles: [[3, 3]],
-  },
 ];
 
 export function createDefaultEditorDocument<K extends AssetKind>(
@@ -262,13 +304,50 @@ export function createDefaultEditorDocument<K extends AssetKind>(
     } as EditorDocumentForKind<K>;
   }
 
+  if (kind === "tileset") {
+    return {
+      mode: "tileset",
+      ...base,
+      tileset: {
+        gridSize: 8,
+        items: structuredClone(tilesetItems),
+      },
+    } as EditorDocumentForKind<K>;
+  }
+
+  if (kind === "ui") {
+    return {
+      mode: "ui",
+      ...base,
+      ui: {
+        components: [
+          {
+            id: "panel",
+            label: "Panel",
+            kind: "panel",
+            bounds: { x: 8, y: 12, width: 84, height: 76 },
+          },
+          {
+            id: "title",
+            label: asset.name,
+            kind: "label",
+            bounds: { x: 16, y: 23, width: 68, height: 12 },
+          },
+          {
+            id: "primary-action",
+            label: "Primary action",
+            kind: "button",
+            bounds: { x: 28, y: 63, width: 44, height: 14 },
+          },
+        ],
+      },
+    } as EditorDocumentForKind<K>;
+  }
+
   return {
-    mode: "sprite-sheet",
+    mode: "audio",
     ...base,
-    spriteSheet: {
-      gridSize: 8,
-      items: structuredClone(kind === "tileset" ? tilesetItems : objectItems),
-    },
+    audio: {},
   } as EditorDocumentForKind<K>;
 }
 
@@ -277,23 +356,74 @@ export function mergeEditorDocument<K extends AssetKind>(
   fallback: EditorDocumentForKind<K>,
   saved: unknown,
 ): EditorDocumentForKind<K> {
-  if (!saved || !isEditorDocumentForAssetKind(kind, saved)) return fallback;
+  const migrated = migrateLegacyTilesetDocument(kind, saved);
+  const document = migrated ?? saved;
+
+  if (!document || !isEditorDocumentForAssetKind(kind, document)) {
+    return fallback;
+  }
 
   switch (fallback.mode) {
     case "character":
       return mergeCharacterRecord(
         fallback as CharacterEditorDocument,
-        saved as CharacterEditorDocument,
+        document as CharacterEditorDocument,
       ) as EditorDocumentForKind<K>;
     case "scenery":
       return mergeSceneryRecord(
-        saved as SceneryEditorDocument,
+        document as SceneryEditorDocument,
       ) as EditorDocumentForKind<K>;
-    case "sprite-sheet":
-      return mergeSpriteSheetRecord(
-        saved as SpriteSheetEditorDocument,
+    case "tileset":
+      return mergeTilesetRecord(
+        document as TilesetEditorDocument,
+      ) as EditorDocumentForKind<K>;
+    case "ui":
+      return mergeUiRecord(
+        document as UiEditorDocument,
+      ) as EditorDocumentForKind<K>;
+    case "audio":
+      return mergeAudioRecord(
+        document as AudioEditorDocument,
       ) as EditorDocumentForKind<K>;
   }
+}
+
+function migrateLegacyTilesetDocument(
+  kind: AssetKind,
+  saved: unknown,
+): TilesetEditorDocument | undefined {
+  if (kind !== "tileset" || !isLegacySpriteSheetDocument(saved)) {
+    return undefined;
+  }
+
+  const migrated: TilesetEditorDocument = {
+    mode: "tileset",
+    prompt: saved.prompt,
+    tileset: saved.spriteSheet,
+  };
+
+  return isEditorDocumentForAssetKind("tileset", migrated)
+    ? migrated
+    : undefined;
+}
+
+function isLegacySpriteSheetDocument(value: unknown): value is {
+  mode: "sprite-sheet";
+  prompt: string;
+  spriteSheet: TilesetEditorDocument["tileset"];
+} {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const document = value as Record<string, unknown>;
+  return (
+    document.mode === "sprite-sheet" &&
+    typeof document.prompt === "string" &&
+    typeof document.spriteSheet === "object" &&
+    document.spriteSheet !== null &&
+    !Array.isArray(document.spriteSheet)
+  );
 }
 
 function mergeCharacterRecord(
@@ -325,15 +455,27 @@ function mergeSceneryRecord(
   };
 }
 
-function mergeSpriteSheetRecord(
-  saved: SpriteSheetEditorDocument,
-): SpriteSheetEditorDocument {
+function mergeTilesetRecord(
+  saved: TilesetEditorDocument,
+): TilesetEditorDocument {
   return {
-    mode: "sprite-sheet",
+    mode: "tileset",
     prompt: saved.prompt,
-    spriteSheet: {
-      gridSize: saved.spriteSheet.gridSize,
-      items: saved.spriteSheet.items,
+    tileset: {
+      gridSize: saved.tileset.gridSize,
+      items: saved.tileset.items,
     },
   };
+}
+
+function mergeUiRecord(saved: UiEditorDocument): UiEditorDocument {
+  return {
+    mode: "ui",
+    prompt: saved.prompt,
+    ui: { components: saved.ui.components },
+  };
+}
+
+function mergeAudioRecord(saved: AudioEditorDocument): AudioEditorDocument {
+  return { mode: "audio", prompt: saved.prompt, audio: {} };
 }

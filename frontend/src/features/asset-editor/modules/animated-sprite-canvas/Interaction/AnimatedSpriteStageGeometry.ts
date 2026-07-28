@@ -1,13 +1,13 @@
 import type { EditorCharacterAnimation } from "../../../domain";
 import {
-  getCharacterCanvasAnimation,
-  type CharacterDirectionMap,
+  getAnimatedSpriteAnimation,
+  type AnimatedSpriteDirectionMap,
   type NodeId,
-} from "../character-node";
+} from "../animated-sprite-node";
 import {
   getCanvasNodes,
   type CanvasPosition,
-} from "../CharacterCanvas.constants";
+} from "../AnimatedSpriteCanvas.constants";
 import {
   COLLAPSED_HEIGHT,
   EXPANDED_WIDTH,
@@ -15,11 +15,11 @@ import {
   FRAME_SIZE,
   getExpandedNodeHeight,
   NODE_WIDTH,
-} from "../Runtime/CharacterStage.constants";
+} from "../Runtime/AnimatedSpriteStage.constants";
 import type {
   Bounds,
-  CharacterSceneSnapshot,
-} from "../Runtime/CharacterCanvas.types";
+  AnimatedSpriteSceneSnapshot,
+} from "../Runtime/AnimatedSpriteCanvas.types";
 
 const FRAME_GRID_INSET = 8;
 const FRAME_GRID_TOP = 48;
@@ -31,7 +31,7 @@ const MULTI_PLAY_CONTROL = { x: 8, width: 64 } as const;
 const SWITCH_CONTROL = { x: 76, width: 72 } as const;
 const MULTI_EXPAND_CONTROL = { x: 156, width: 60 } as const;
 
-type CharacterHitTarget =
+type AnimatedSpriteHitTarget =
   | { kind: "node"; node: NodeId }
   | { kind: "frame"; node: NodeId; index: number }
   | { kind: "frame-grid"; node: NodeId }
@@ -39,7 +39,7 @@ type CharacterHitTarget =
   | { kind: "expand"; node: NodeId }
   | { kind: "switch"; node: NodeId };
 
-type CharacterNodeLayout = {
+type AnimatedSpriteNodeLayout = {
   bounds: Bounds;
   frames: Bounds[];
   frameGrid?: Bounds;
@@ -52,17 +52,17 @@ type CharacterNodeLayout = {
 export function getFrameCount(
   node: NodeId,
   animations: EditorCharacterAnimation[] = [],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ) {
   return (
-    getCharacterCanvasAnimation(node, animations, directions)?.frameCount ?? 1
+    getAnimatedSpriteAnimation(node, animations, directions)?.frameCount ?? 1
   );
 }
 
 function getExpandedHeight(
   node: NodeId,
   animations: EditorCharacterAnimation[],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ) {
   return getExpandedNodeHeight(getFrameCount(node, animations, directions));
 }
@@ -72,7 +72,7 @@ export function getNodeBounds(
   position: CanvasPosition,
   expanded: boolean,
   animations: EditorCharacterAnimation[] = [],
-  directions?: CharacterDirectionMap,
+  directions?: AnimatedSpriteDirectionMap,
 ): Bounds {
   return {
     ...position,
@@ -83,13 +83,13 @@ export function getNodeBounds(
   };
 }
 
-export function getCharacterNodeLayout(
+export function getAnimatedSpriteNodeLayout(
   node: NodeId,
   position: CanvasPosition,
   expanded: boolean,
   animations: EditorCharacterAnimation[] = [],
-  directions?: CharacterDirectionMap,
-): CharacterNodeLayout {
+  directions?: AnimatedSpriteDirectionMap,
+): AnimatedSpriteNodeLayout {
   const bounds = getNodeBounds(
     node,
     position,
@@ -104,7 +104,7 @@ export function getCharacterNodeLayout(
       )
     : [];
   const controlsY = bounds.y + bounds.height - CONTROL_HEIGHT - CONTROL_BOTTOM;
-  const animation = getCharacterCanvasAnimation(node, animations, directions);
+  const animation = getAnimatedSpriteAnimation(node, animations, directions);
   const hasControls = Boolean(animation);
   const group = animations.find((candidate) => candidate.id === node);
   const hasSwitch = Boolean(
@@ -168,14 +168,14 @@ export function getFrameBounds(
   };
 }
 
-export function hitTestCharacterScene(
-  scene: CharacterSceneSnapshot,
+export function hitTestAnimatedSpriteScene(
+  scene: AnimatedSpriteSceneSnapshot,
   point: CanvasPosition,
   animations: EditorCharacterAnimation[] = [],
-  directions?: CharacterDirectionMap,
-): CharacterHitTarget | null {
+  directions?: AnimatedSpriteDirectionMap,
+): AnimatedSpriteHitTarget | null {
   for (const node of getCanvasNodes(animations).reverse()) {
-    const layout = getCharacterNodeLayout(
+    const layout = getAnimatedSpriteNodeLayout(
       node,
       scene.positions[node],
       scene.expanded.has(node),

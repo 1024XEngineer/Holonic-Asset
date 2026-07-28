@@ -7,19 +7,19 @@ import {
 } from "pixi.js";
 import type { Viewport } from "pixi-viewport";
 
-import type { CharacterCanvasModel } from "../CharacterCanvas.interface";
-import { getCanvasNodes } from "../CharacterCanvas.constants";
-import { getCharacterCanvasNodeId } from "../character-node";
-import { normalizeBounds } from "../Interaction/CharacterStageGeometry";
+import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
+import { getCanvasNodes } from "../AnimatedSpriteCanvas.constants";
+import { getAnimatedSpriteNodeId } from "../animated-sprite-node";
+import { normalizeBounds } from "../Interaction/AnimatedSpriteStageGeometry";
 import {
-  getCharacterPixelScale,
+  getAnimatedSpritePixelScale,
   PIXEL_GRID_MAJOR_INTERVAL,
   STAGE_ACCENT,
-} from "../Runtime/CharacterStage.constants";
-import type { CharacterSceneSnapshot } from "../Runtime/CharacterCanvas.types";
-import { drawCharacterNode } from "./CharacterNodeRenderer";
+} from "../Runtime/AnimatedSpriteStage.constants";
+import type { AnimatedSpriteSceneSnapshot } from "../Runtime/AnimatedSpriteCanvas.types";
+import { drawAnimatedSpriteNode } from "./AnimatedSpriteNodeRenderer";
 
-export class CharacterStageRenderer {
+export class AnimatedSpriteStageRenderer {
   private readonly contentLayer = new Container();
   private readonly gridLayer = new Container();
   private grid?: TilingSprite;
@@ -31,7 +31,7 @@ export class CharacterStageRenderer {
     world.addChild(this.contentLayer);
   }
 
-  render(state: CharacterSceneSnapshot, model: CharacterCanvasModel) {
+  render(state: AnimatedSpriteSceneSnapshot, model: AnimatedSpriteCanvasModel) {
     this.contentLayer
       .removeChildren()
       .forEach((child) => child.destroy({ children: true }));
@@ -39,17 +39,17 @@ export class CharacterStageRenderer {
 
     for (const node of getCanvasNodes(model.animations)) {
       this.contentLayer.addChild(
-        drawCharacterNode({
+        drawAnimatedSpriteNode({
           node,
           position: state.positions[node],
           selected: model.selection.nodeIds.some(
             (selectedNode) =>
-              getCharacterCanvasNodeId(selectedNode, model.animations) === node,
+              getAnimatedSpriteNodeId(selectedNode, model.animations) === node,
           ),
           selectedFrames: model.selection.frames
             .filter(
               (frame) =>
-                getCharacterCanvasNodeId(frame.nodeId, model.animations) ===
+                getAnimatedSpriteNodeId(frame.nodeId, model.animations) ===
                 node,
             )
             .map((frame) => frame.index),
@@ -69,20 +69,20 @@ export class CharacterStageRenderer {
 
   syncViewport(
     viewport: Viewport,
-    prototype: CharacterCanvasModel["prototype"],
+    prototype: AnimatedSpriteCanvasModel["prototype"],
   ) {
     this.drawGrid(prototype);
     if (!this.grid) return;
 
     this.grid.setSize(viewport.screenWidth, viewport.screenHeight);
     this.grid.tileScale.set(
-      getCharacterPixelScale(prototype) * viewport.scale.x,
+      getAnimatedSpritePixelScale(prototype) * viewport.scale.x,
     );
     this.grid.tilePosition.set(viewport.x, viewport.y);
   }
 
-  private drawGrid(prototype: CharacterCanvasModel["prototype"]) {
-    const pixelScale = getCharacterPixelScale(prototype);
+  private drawGrid(prototype: AnimatedSpriteCanvasModel["prototype"]) {
+    const pixelScale = getAnimatedSpritePixelScale(prototype);
     if (this.gridPixelScale === pixelScale && this.grid) return;
     this.gridPixelScale = pixelScale;
     this.grid?.destroy({ texture: true, textureSource: true });

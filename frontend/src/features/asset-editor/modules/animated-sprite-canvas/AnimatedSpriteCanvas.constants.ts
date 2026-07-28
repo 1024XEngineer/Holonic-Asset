@@ -2,12 +2,12 @@ import {
   isEditorCharacterAnimationGroup,
   type EditorCharacterAnimation,
 } from "../../domain";
-import type { CharacterCanvasNodeId } from "./character-node";
+import type { AnimatedSpriteNodeId } from "./animated-sprite-node";
 import {
   COLLAPSED_HEIGHT,
   EXPANDED_WIDTH,
   getExpandedNodeHeight,
-} from "./Runtime/CharacterStage.constants";
+} from "./Runtime/AnimatedSpriteStage.constants";
 
 export type CanvasPosition = {
   x: number;
@@ -22,7 +22,7 @@ const DEFAULT_LAYOUT_START = { x: 80, y: 220 };
 
 export function getCanvasNodes(
   animations: EditorCharacterAnimation[],
-): CharacterCanvasNodeId[] {
+): AnimatedSpriteNodeId[] {
   return [
     PROTOTYPE_NODE_ID,
     ...animations
@@ -33,9 +33,9 @@ export function getCanvasNodes(
 
 export function createDefaultCanvasPositions(
   animations: EditorCharacterAnimation[],
-): Record<CharacterCanvasNodeId, CanvasPosition> {
+): Record<AnimatedSpriteNodeId, CanvasPosition> {
   const nodes = getCanvasNodes(animations);
-  const positions: Record<CharacterCanvasNodeId, CanvasPosition> = {};
+  const positions: Record<AnimatedSpriteNodeId, CanvasPosition> = {};
   let y = DEFAULT_LAYOUT_START.y;
 
   for (
@@ -63,7 +63,7 @@ export function createDefaultCanvasPositions(
 }
 
 function getDefaultNodeHeight(
-  node: CharacterCanvasNodeId,
+  node: AnimatedSpriteNodeId,
   animations: EditorCharacterAnimation[],
 ) {
   if (node === PROTOTYPE_NODE_ID) return COLLAPSED_HEIGHT;

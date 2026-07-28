@@ -1,24 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 
-import { createCharacterCanvasActions } from "./character-canvas-events";
-import { getCharacterNodeLabel } from "./character-node";
-import { CharacterCanvasLoading } from "./Loading/CharacterCanvasLoading";
-import { CharacterCanvasRuntime } from "./Runtime/CharacterCanvasRuntime";
-import type { CharacterCanvasProps } from "./CharacterCanvas.interface";
+import { createAnimatedSpriteCanvasActions } from "./animated-sprite-canvas-events";
+import { getAnimatedSpriteNodeLabel } from "./animated-sprite-node";
+import { AnimatedSpriteCanvasLoading } from "./Loading/AnimatedSpriteCanvasLoading";
+import { AnimatedSpriteCanvasRuntime } from "./Runtime/AnimatedSpriteCanvasRuntime";
+import type { AnimatedSpriteCanvasProps } from "./AnimatedSpriteCanvas.interface";
 
-export function CharacterCanvas({ model, onEvent }: CharacterCanvasProps) {
+export function AnimatedSpriteCanvas({
+  model,
+  onEvent,
+}: AnimatedSpriteCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const runtimeRef = useRef<CharacterCanvasRuntime>(null);
+  const runtimeRef = useRef<AnimatedSpriteCanvasRuntime>(null);
   const [loading, setLoading] = useState(true);
   const runtimeProps = {
     model,
-    actions: createCharacterCanvasActions(onEvent),
+    actions: createAnimatedSpriteCanvasActions(onEvent),
   };
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const runtime = new CharacterCanvasRuntime(runtimeProps);
+    const runtime = new AnimatedSpriteCanvasRuntime(runtimeProps);
     runtimeRef.current = runtime;
     let disposed = false;
     let initialized = false;
@@ -52,10 +55,10 @@ export function CharacterCanvas({ model, onEvent }: CharacterCanvasProps) {
         ref={hostRef}
         className="size-full cursor-default data-[panning=true]:cursor-grabbing"
       />
-      {loading ? <CharacterCanvasLoading /> : null}
+      {loading ? <AnimatedSpriteCanvasLoading /> : null}
       <p className="sr-only" aria-live="polite">
         {model.selection.nodeIds.length > 0
-          ? `${model.selection.nodeIds.map((nodeId) => getCharacterNodeLabel(nodeId, model.animations)).join(", ")} selected`
+          ? `${model.selection.nodeIds.map((nodeId) => getAnimatedSpriteNodeLabel(nodeId, model.animations)).join(", ")} selected`
           : "No canvas items selected"}
       </p>
     </main>

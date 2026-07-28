@@ -2,39 +2,39 @@ import { Viewport } from "pixi-viewport";
 import { Assets, Container } from "pixi.js";
 
 import { getEditorCharacterAnimationClips } from "../../../domain";
-import { CharacterStageInteraction } from "../Interaction/CharacterStageInteraction";
-import { CharacterStageRenderer } from "../Renderer/CharacterStageRenderer";
+import { AnimatedSpriteStageInteraction } from "../Interaction/AnimatedSpriteStageInteraction";
+import { AnimatedSpriteStageRenderer } from "../Renderer/AnimatedSpriteStageRenderer";
 import {
-  getCharacterPixelScale,
-  getCharacterMaxScale,
+  getAnimatedSpritePixelScale,
+  getAnimatedSpriteMaxScale,
   INITIAL_SCALE,
   MIN_SCALE,
-} from "./CharacterStage.constants";
+} from "./AnimatedSpriteStage.constants";
 import type {
-  CharacterCanvasRuntimeProps,
-  CharacterStageContext,
-} from "./CharacterCanvas.types";
-import { CharacterScene } from "./CharacterScene";
+  AnimatedSpriteCanvasRuntimeProps,
+  AnimatedSpriteStageContext,
+} from "./AnimatedSpriteCanvas.types";
+import { AnimatedSpriteScene } from "./AnimatedSpriteScene";
 import { StageRuntime } from "./StageRuntime";
 
-export class CharacterCanvasRuntime {
+export class AnimatedSpriteCanvasRuntime {
   private readonly runtime = new StageRuntime();
-  private interaction?: CharacterStageInteraction;
+  private interaction?: AnimatedSpriteStageInteraction;
   private resizeObserver?: ResizeObserver;
-  private renderer?: CharacterStageRenderer;
+  private renderer?: AnimatedSpriteStageRenderer;
   private viewport?: Viewport;
-  private props: CharacterCanvasRuntimeProps;
+  private props: AnimatedSpriteCanvasRuntimeProps;
   private lastAnimationFrame = performance.now();
   private readonly unavailableTextureUrls = new Set<string>();
-  private readonly scene: CharacterScene;
+  private readonly scene: AnimatedSpriteScene;
 
-  constructor(props: CharacterCanvasRuntimeProps) {
+  constructor(props: AnimatedSpriteCanvasRuntimeProps) {
     this.props = props;
-    this.scene = new CharacterScene(props.model);
+    this.scene = new AnimatedSpriteScene(props.model);
   }
 
   async initialize(host: HTMLElement) {
-    await this.preloadCharacterTextures();
+    await this.preloadAnimatedSpriteTextures();
     await this.runtime.initialize(host);
     const { app } = this.runtime;
     const viewport = new Viewport({
@@ -49,17 +49,17 @@ export class CharacterCanvasRuntime {
       .wheel()
       .clampZoom({
         minScale: MIN_SCALE,
-        maxScale: getCharacterMaxScale(this.props.model.prototype),
+        maxScale: getAnimatedSpriteMaxScale(this.props.model.prototype),
       });
     app.stage.addChild(viewport);
     this.viewport = viewport;
     const world = new Container();
     viewport.addChild(world);
-    this.renderer = new CharacterStageRenderer(app.stage, world);
+    this.renderer = new AnimatedSpriteStageRenderer(app.stage, world);
     viewport.on("moved", this.syncViewportGrid);
     viewport.on("zoomed", this.syncViewportGrid);
 
-    const context: CharacterStageContext = {
+    const context: AnimatedSpriteStageContext = {
       viewport,
       actions: {
         onSelect: (node) => this.props.actions.onSelect(node),
@@ -78,7 +78,8 @@ export class CharacterCanvasRuntime {
       getAnimations: () => this.props.model.animations,
       moveNode: (node, position) => this.scene.moveNode(node, position),
       setMarquee: (marquee) => this.scene.setMarquee(marquee),
-      getDragStep: () => getCharacterPixelScale(this.props.model.prototype),
+      getDragStep: () =>
+        getAnimatedSpritePixelScale(this.props.model.prototype),
       toggleExpanded: (node) => this.scene.toggleExpanded(node),
       togglePlaying: (node) => this.scene.togglePlaying(node),
       switchDirection: (node) => {
@@ -92,7 +93,7 @@ export class CharacterCanvasRuntime {
       getActiveDirections: () => this.scene.getSnapshot().activeDirections,
       render: () => this.render(),
     };
-    this.interaction = new CharacterStageInteraction(app.canvas, context);
+    this.interaction = new AnimatedSpriteStageInteraction(app.canvas, context);
     this.resizeObserver = new ResizeObserver(() => {
       viewport.resize(app.screen.width, app.screen.height);
       this.render();
@@ -103,13 +104,13 @@ export class CharacterCanvasRuntime {
     this.syncProps(this.props);
   }
 
-  syncProps(props: CharacterCanvasRuntimeProps) {
+  syncProps(props: AnimatedSpriteCanvasRuntimeProps) {
     this.props = props;
     this.scene.synchronize(props.model);
     this.render();
   }
 
-  private async preloadCharacterTextures() {
+  private async preloadAnimatedSpriteTextures() {
     const urls = new Set(
       [
         this.props.model.prototype.imageUrl,

@@ -4,9 +4,11 @@ import type { EditorCanvasPosition, EditorWorkspaceData } from "../domain";
 import { useTimeout } from "@/hooks/use-timeout";
 
 import { useAssetEditorSession } from "../state/session";
+import { AudioEditorMode } from "./EditorModes/AudioEditorMode";
 import { CharacterEditorMode } from "./EditorModes/CharacterEditorMode";
 import { SceneryEditorMode } from "./EditorModes/SceneryEditorMode";
-import { SpriteSheetEditorMode } from "./EditorModes/SpriteSheetEditorMode";
+import { TilesetEditorMode } from "./EditorModes/TilesetEditorMode";
+import { UiEditorMode } from "./EditorModes/UiEditorMode";
 import { EditorHeader } from "./Header/EditorHeader";
 
 export function EditorWorkspace({
@@ -114,13 +116,17 @@ export function EditorWorkspace({
             layers={snapshot.document.scenery.layers}
           />
         );
-      case "sprite-sheet":
+      case "tileset":
         return (
-          <SpriteSheetEditorMode
+          <TilesetEditorMode
             {...modeProps}
-            spriteSheet={snapshot.document.spriteSheet}
+            tileset={snapshot.document.tileset}
           />
         );
+      case "ui":
+        return <UiEditorMode {...modeProps} ui={snapshot.document.ui} />;
+      case "audio":
+        return <AudioEditorMode {...modeProps} />;
     }
   })();
 

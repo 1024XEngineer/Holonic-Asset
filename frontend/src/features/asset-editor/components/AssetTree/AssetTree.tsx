@@ -27,16 +27,16 @@ import {
   type EditorCharacterAnimationGroup,
 } from "../../domain";
 import {
-  getCharacterNodeLabel,
-  type CharacterCanvasNodeId,
-} from "../../modules/character-canvas";
+  getAnimatedSpriteNodeLabel,
+  type AnimatedSpriteNodeId,
+} from "../../modules/animated-sprite-canvas";
 
 type AssetTreeProps = {
   animations: EditorCharacterAnimation[];
-  selectedNode: CharacterCanvasNodeId | null;
-  selectedFrames: Array<{ nodeId: CharacterCanvasNodeId; index: number }>;
-  onSelect: (node: CharacterCanvasNodeId) => void;
-  onSelectFrame: (node: CharacterCanvasNodeId, index: number) => void;
+  selectedNode: AnimatedSpriteNodeId | null;
+  selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
+  onSelect: (node: AnimatedSpriteNodeId) => void;
+  onSelectFrame: (node: AnimatedSpriteNodeId, index: number) => void;
   onCreateAnimation: (label: string) => void;
 };
 
@@ -183,9 +183,9 @@ function TreeItem({
   icon,
   accent,
 }: {
-  node: CharacterCanvasNodeId;
-  selectedNode: CharacterCanvasNodeId | null;
-  onSelect: (node: CharacterCanvasNodeId) => void;
+  node: AnimatedSpriteNodeId;
+  selectedNode: AnimatedSpriteNodeId | null;
+  onSelect: (node: AnimatedSpriteNodeId) => void;
   icon: React.ReactNode;
   accent: "rose" | "blue" | "mint" | "coral" | "neutral";
 }) {
@@ -204,7 +204,7 @@ function TreeItem({
     >
       <span className={colors[accent]}>{icon}</span>
       <span className="min-w-0 flex-1 truncate text-xs font-medium">
-        {getCharacterNodeLabel(node, [])}
+        {getAnimatedSpriteNodeLabel(node, [])}
       </span>
     </button>
   );
@@ -218,12 +218,12 @@ function AnimationTreeItem({
   onSelectFrame,
 }: {
   animation: EditorCharacterAnimationClip;
-  selectedNode: CharacterCanvasNodeId | null;
-  selectedFrames: Array<{ nodeId: CharacterCanvasNodeId; index: number }>;
-  onSelect: (node: CharacterCanvasNodeId) => void;
-  onSelectFrame: (node: CharacterCanvasNodeId, index: number) => void;
+  selectedNode: AnimatedSpriteNodeId | null;
+  selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
+  onSelect: (node: AnimatedSpriteNodeId) => void;
+  onSelectFrame: (node: AnimatedSpriteNodeId, index: number) => void;
 }) {
-  const node: CharacterCanvasNodeId = animation.id;
+  const node: AnimatedSpriteNodeId = animation.id;
   const [open, setOpen] = useState(false);
   const frames = Array.from(
     { length: animation.frameCount },
@@ -302,13 +302,13 @@ function AnimationGroupTreeItem({
   onSelectFrame,
 }: {
   animation: EditorCharacterAnimationGroup;
-  selectedNode: CharacterCanvasNodeId | null;
+  selectedNode: AnimatedSpriteNodeId | null;
   selectedFrames: Array<{
-    nodeId: CharacterCanvasNodeId;
+    nodeId: AnimatedSpriteNodeId;
     index: number;
   }>;
-  onSelect: (node: CharacterCanvasNodeId) => void;
-  onSelectFrame: (node: CharacterCanvasNodeId, index: number) => void;
+  onSelect: (node: AnimatedSpriteNodeId) => void;
+  onSelectFrame: (node: AnimatedSpriteNodeId, index: number) => void;
 }) {
   const [open, setOpen] = useState(true);
 

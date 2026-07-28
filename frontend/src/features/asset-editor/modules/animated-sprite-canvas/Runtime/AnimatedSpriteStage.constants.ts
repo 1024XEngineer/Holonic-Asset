@@ -16,7 +16,7 @@ export function getExpandedNodeHeight(frameCount: number) {
   return 48 + Math.ceil(frameCount / 4) * (FRAME_SIZE + FRAME_GAP) + 48;
 }
 
-export function getCharacterPixelScale(
+export function getAnimatedSpritePixelScale(
   spriteSheet: Pick<EditorCharacterSpriteSheet, "frameWidth" | "frameHeight">,
 ) {
   return Math.min(
@@ -25,8 +25,10 @@ export function getCharacterPixelScale(
   );
 }
 
-export function getCharacterMaxScale(
+export function getAnimatedSpriteMaxScale(
   spriteSheet: Pick<EditorCharacterSpriteSheet, "frameWidth" | "frameHeight">,
 ) {
-  return MAX_SOURCE_PIXEL_SCREEN_SIZE / getCharacterPixelScale(spriteSheet);
+  return (
+    MAX_SOURCE_PIXEL_SCREEN_SIZE / getAnimatedSpritePixelScale(spriteSheet)
+  );
 }

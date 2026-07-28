@@ -3,16 +3,16 @@ import { useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getGridBounds } from "@/lib/grid-bounds";
-import type { EditorSpriteSheetItem } from "../../domain";
+import type { EditorTilesetItem } from "../../domain";
 
-export function StaticAssetTree({
+export function TilesetAssetTree({
   items,
   selectedItems,
   isCellSelected,
   onToggleItem,
   onToggleCell,
 }: {
-  items: EditorSpriteSheetItem[];
+  items: EditorTilesetItem[];
   selectedItems: string[];
   isCellSelected: (itemId: string, cellIndex: number) => boolean;
   onToggleItem: (itemId: string) => void;
@@ -25,7 +25,7 @@ export function StaticAssetTree({
       <ScrollArea className="max-h-[15rem] flex-1 lg:max-h-none">
         <div className="p-3">
           <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#81786d]">
-            Exportable objects
+            Tileset items
           </p>
           <div className="space-y-1">
             {items.map((item) => {

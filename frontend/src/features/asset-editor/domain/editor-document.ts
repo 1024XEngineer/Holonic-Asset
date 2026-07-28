@@ -55,23 +55,29 @@ export type EditorSceneryLayer = {
 };
 
 /** Global [column, row] coordinate in the tileset grid. */
-export type EditorSpriteSheetCell = [column: number, row: number];
+export type EditorTilesetCell = [column: number, row: number];
 
-export type EditorSpriteSheetItem = {
+export type EditorTilesetItem = {
   id: string;
   label: string;
   /** Complete generated item image; tiles are only a front-end interaction map. */
   imageUrl?: string;
   /** Every tileset tile occupied by this complete item, as [column, row]. */
-  tiles: EditorSpriteSheetCell[];
+  tiles: EditorTilesetCell[];
+};
+
+export type EditorUiComponent = {
+  id: string;
+  label: string;
+  kind: "panel" | "label" | "button";
+  bounds: { x: number; y: number; width: number; height: number };
 };
 
 export type CharacterAssetKind = "character" | "object";
 export type SceneryAssetKind = "scenery";
-export type SpriteSheetAssetKind = Exclude<
-  AssetKind,
-  CharacterAssetKind | SceneryAssetKind
->;
+export type TilesetAssetKind = "tileset";
+export type UiAssetKind = "ui";
+export type AudioAssetKind = "audio";
 
 export type CharacterEditorDocument = {
   mode: "character";
@@ -89,30 +95,58 @@ export type SceneryEditorDocument = {
   scenery: { layers: EditorSceneryLayer[] };
 };
 
-export type SpriteSheetEditorDocument = {
-  mode: "sprite-sheet";
+export type TilesetEditorDocument = {
+  mode: "tileset";
   prompt: string;
-  spriteSheet: { gridSize: number; items: EditorSpriteSheetItem[] };
+  tileset: { gridSize: number; items: EditorTilesetItem[] };
+};
+
+export type UiEditorDocument = {
+  mode: "ui";
+  prompt: string;
+  ui: { components: EditorUiComponent[] };
+};
+
+export type AudioEditorDocument = {
+  mode: "audio";
+  prompt: string;
+  audio: Record<string, never>;
 };
 
 export type EditorDocument =
   | CharacterEditorDocument
   | SceneryEditorDocument
-  | SpriteSheetEditorDocument;
+  | TilesetEditorDocument
+  | UiEditorDocument
+  | AudioEditorDocument;
 
 export type EditorDocumentForKind<K extends AssetKind> =
   K extends CharacterAssetKind
     ? CharacterEditorDocument
     : K extends SceneryAssetKind
       ? SceneryEditorDocument
-      : SpriteSheetEditorDocument;
+      : K extends TilesetAssetKind
+        ? TilesetEditorDocument
+        : K extends UiAssetKind
+          ? UiEditorDocument
+          : AudioEditorDocument;
 
 export function editorModeForAssetKind(
   kind: AssetKind,
 ): EditorDocument["mode"] {
-  if (kind === "character" || kind === "object") return "character";
-  if (kind === "scenery") return "scenery";
-  return "sprite-sheet";
+  switch (kind) {
+    case "character":
+    case "object":
+      return "character";
+    case "scenery":
+      return "scenery";
+    case "tileset":
+      return "tileset";
+    case "ui":
+      return "ui";
+    case "audio":
+      return "audio";
+  }
 }
 
 export function isEditorDocumentForAssetKind<K extends AssetKind>(
@@ -158,12 +192,19 @@ function isEditorDocument(value: unknown): value is EditorDocument {
         isRecord(value.scenery) &&
         isArrayOf(value.scenery.layers, isEditorSceneryLayer)
       );
-    case "sprite-sheet":
+    case "tileset":
       return (
-        isRecord(value.spriteSheet) &&
-        isFiniteNumber(value.spriteSheet.gridSize) &&
-        isArrayOf(value.spriteSheet.items, isEditorSpriteSheetItem)
+        isRecord(value.tileset) &&
+        isFiniteNumber(value.tileset.gridSize) &&
+        isArrayOf(value.tileset.items, isEditorTilesetItem)
       );
+    case "ui":
+      return (
+        isRecord(value.ui) &&
+        isArrayOf(value.ui.components, isEditorUiComponent)
+      );
+    case "audio":
+      return isRecord(value.audio);
     default:
       return false;
   }
@@ -280,26 +321,38 @@ function isEditorSceneryLayer(value: unknown): value is EditorSceneryLayer {
   );
 }
 
-function isEditorSpriteSheetItem(
-  value: unknown,
-): value is EditorSpriteSheetItem {
+function isEditorTilesetItem(value: unknown): value is EditorTilesetItem {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
-    isArrayOf(value.tiles, isEditorSpriteSheetCell)
+    isArrayOf(value.tiles, isEditorTilesetCell)
   );
 }
 
-function isEditorSpriteSheetCell(
-  value: unknown,
-): value is EditorSpriteSheetCell {
+function isEditorTilesetCell(value: unknown): value is EditorTilesetCell {
   return (
     Array.isArray(value) &&
     value.length === 2 &&
     isFiniteNumber(value[0]) &&
     isFiniteNumber(value[1])
+  );
+}
+
+function isEditorUiComponent(value: unknown): value is EditorUiComponent {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.label === "string" &&
+    (value.kind === "panel" ||
+      value.kind === "label" ||
+      value.kind === "button") &&
+    isRecord(value.bounds) &&
+    isFiniteNumber(value.bounds.x) &&
+    isFiniteNumber(value.bounds.y) &&
+    isFiniteNumber(value.bounds.width) &&
+    isFiniteNumber(value.bounds.height)
   );
 }
 

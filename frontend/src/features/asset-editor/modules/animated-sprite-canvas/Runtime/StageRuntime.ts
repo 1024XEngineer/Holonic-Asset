@@ -1,6 +1,6 @@
 import { Application, type Renderer } from "pixi.js";
 
-import { STAGE_BACKGROUND } from "./CharacterStage.constants";
+import { STAGE_BACKGROUND } from "./AnimatedSpriteStage.constants";
 
 export class StageRuntime {
   readonly app = new Application<Renderer>();

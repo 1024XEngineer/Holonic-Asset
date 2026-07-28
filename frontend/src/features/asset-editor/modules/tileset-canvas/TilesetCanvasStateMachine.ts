@@ -1,8 +1,8 @@
 import { useReducer } from "react";
 
-import type { EditorSpriteSheetItem } from "../../domain";
+import type { EditorTilesetItem } from "../../domain";
 
-import type { SpriteSheetCanvasEvent } from "./SpriteSheetCanvas.interface";
+import type { TilesetCanvasEvent } from "./TilesetCanvas.interface";
 
 type ItemCellSelection = {
   type: "item-cell";
@@ -15,29 +15,29 @@ type CanvasCellSelection = {
   cellIndex: number;
 };
 
-type SpriteSheetSelection = ItemCellSelection | CanvasCellSelection;
+type TilesetSelection = ItemCellSelection | CanvasCellSelection;
 
-export type SpriteSheetCanvasState = {
+export type TilesetCanvasState = {
   selectedItems: string[];
-  selectedTargets: SpriteSheetSelection[];
+  selectedTargets: TilesetSelection[];
 };
 
-export type SpriteSheetCanvasStateEvent =
+export type TilesetCanvasStateEvent =
   | { type: "item.toggle"; itemId: string }
   | { type: "item-cell.toggle"; itemId: string; cellIndex: number }
-  | SpriteSheetCanvasEvent;
+  | TilesetCanvasEvent;
 
-export const initialSpriteSheetCanvasState: SpriteSheetCanvasState = {
+export const initialTilesetCanvasState: TilesetCanvasState = {
   selectedItems: [],
   selectedTargets: [],
 };
 
-export function reduceSpriteSheetCanvas(
-  state: SpriteSheetCanvasState,
-  event: SpriteSheetCanvasStateEvent,
-  items: EditorSpriteSheetItem[],
+export function reduceTilesetCanvas(
+  state: TilesetCanvasState,
+  event: TilesetCanvasStateEvent,
+  items: EditorTilesetItem[],
   gridSize: number,
-): SpriteSheetCanvasState {
+): TilesetCanvasState {
   if (event.type === "item.toggle") {
     const selected = state.selectedItems.includes(event.itemId);
     return {
@@ -56,7 +56,7 @@ export function reduceSpriteSheetCanvas(
   if (event.type === "cell.selection.toggled") {
     const target = findCellTarget(event.cellIndex, items, gridSize);
     return target.type === "item-cell"
-      ? reduceSpriteSheetCanvas(
+      ? reduceTilesetCanvas(
           state,
           { ...target, type: "item-cell.toggle" },
           items,
@@ -88,9 +88,12 @@ export function reduceSpriteSheetCanvas(
       selectedTargets: [
         ...state.selectedTargets.filter(
           (selection) =>
-            selection.type !== "item-cell" || selection.itemId !== target.itemId,
+            selection.type !== "item-cell" ||
+            selection.itemId !== target.itemId,
         ),
-        ...itemTargets.filter((itemTarget) => !sameSelection(itemTarget, target)),
+        ...itemTargets.filter(
+          (itemTarget) => !sameSelection(itemTarget, target),
+        ),
       ],
     };
   }
@@ -120,14 +123,14 @@ export function reduceSpriteSheetCanvas(
   };
 }
 
-export function useSpriteSheetCanvasStateMachine(
-  items: EditorSpriteSheetItem[],
+export function useTilesetCanvasStateMachine(
+  items: EditorTilesetItem[],
   gridSize: number,
 ) {
   const [state, dispatch] = useReducer(
-    (current: SpriteSheetCanvasState, event: SpriteSheetCanvasStateEvent) =>
-      reduceSpriteSheetCanvas(current, event, items, gridSize),
-    initialSpriteSheetCanvasState,
+    (current: TilesetCanvasState, event: TilesetCanvasStateEvent) =>
+      reduceTilesetCanvas(current, event, items, gridSize),
+    initialTilesetCanvasState,
   );
 
   return {
@@ -141,32 +144,37 @@ export function useSpriteSheetCanvasStateMachine(
         itemId,
         cellIndex,
       }),
-    send: (event: SpriteSheetCanvasStateEvent) => dispatch(event),
+    send: (event: TilesetCanvasStateEvent) => dispatch(event),
   };
 }
 
 function getSelectedCells(
-  state: SpriteSheetCanvasState,
-  items: EditorSpriteSheetItem[],
+  state: TilesetCanvasState,
+  items: EditorTilesetItem[],
   gridSize: number,
 ) {
   return [
     ...state.selectedItems.flatMap((itemId) =>
-      getItemCells(items.find((item) => item.id === itemId), gridSize),
+      getItemCells(
+        items.find((item) => item.id === itemId),
+        gridSize,
+      ),
     ),
     ...state.selectedTargets.flatMap((target) => {
       if (target.type === "canvas-cell") return [target.cellIndex];
-      return getItemCells(
-        items.find((item) => item.id === target.itemId),
-        gridSize,
-      )[target.cellIndex] ?? [];
+      return (
+        getItemCells(
+          items.find((item) => item.id === target.itemId),
+          gridSize,
+        )[target.cellIndex] ?? []
+      );
     }),
   ];
 }
 
 function getSelectedLabels(
-  state: SpriteSheetCanvasState,
-  items: EditorSpriteSheetItem[],
+  state: TilesetCanvasState,
+  items: EditorTilesetItem[],
 ) {
   return [
     ...state.selectedItems.map(
@@ -182,9 +190,9 @@ function getSelectedLabels(
 
 function findCellTarget(
   cellIndex: number,
-  items: EditorSpriteSheetItem[],
+  items: EditorTilesetItem[],
   gridSize: number,
-): SpriteSheetSelection {
+): TilesetSelection {
   const item = items.find((candidate) =>
     getItemCells(candidate, gridSize).includes(cellIndex),
   );
@@ -197,13 +205,13 @@ function findCellTarget(
   };
 }
 
-function getItemCells(item: EditorSpriteSheetItem | undefined, gridSize: number) {
+function getItemCells(item: EditorTilesetItem | undefined, gridSize: number) {
   return item?.tiles.map(([x, y]) => y * gridSize + x) ?? [];
 }
 
 function toggleSelection(
-  selections: SpriteSheetSelection[],
-  target: SpriteSheetSelection,
+  selections: TilesetSelection[],
+  target: TilesetSelection,
 ) {
   return hasSelection(selections, target)
     ? selections.filter((selection) => !sameSelection(selection, target))
@@ -211,15 +219,19 @@ function toggleSelection(
 }
 
 function hasSelection(
-  selections: SpriteSheetSelection[],
-  target: SpriteSheetSelection,
+  selections: TilesetSelection[],
+  target: TilesetSelection,
 ) {
   return selections.some((selection) => sameSelection(selection, target));
 }
 
-function sameSelection(left: SpriteSheetSelection, right: SpriteSheetSelection) {
+function sameSelection(left: TilesetSelection, right: TilesetSelection) {
   if (left.type === "item-cell" && right.type === "item-cell") {
     return left.itemId === right.itemId && left.cellIndex === right.cellIndex;
   }
-  return left.type === "canvas-cell" && right.type === "canvas-cell" && left.cellIndex === right.cellIndex;
+  return (
+    left.type === "canvas-cell" &&
+    right.type === "canvas-cell" &&
+    left.cellIndex === right.cellIndex
+  );
 }

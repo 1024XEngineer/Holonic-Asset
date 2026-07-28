@@ -1,13 +1,13 @@
-import type { CharacterCanvasActions } from "./Runtime/CharacterCanvas.types";
+import type { AnimatedSpriteCanvasActions } from "./Runtime/AnimatedSpriteCanvas.types";
 import type {
-  CharacterCanvasEvent,
-  CharacterCanvasSelection,
-} from "./CharacterCanvas.interface";
+  AnimatedSpriteCanvasEvent,
+  AnimatedSpriteCanvasSelection,
+} from "./AnimatedSpriteCanvas.interface";
 
-export function createCharacterCanvasActions(
-  onEvent: (event: CharacterCanvasEvent) => void,
-): CharacterCanvasActions {
-  const changeSelection = (selection: CharacterCanvasSelection) => {
+export function createAnimatedSpriteCanvasActions(
+  onEvent: (event: AnimatedSpriteCanvasEvent) => void,
+): AnimatedSpriteCanvasActions {
+  const changeSelection = (selection: AnimatedSpriteCanvasSelection) => {
     onEvent({ type: "selection.changed", selection });
   };
 

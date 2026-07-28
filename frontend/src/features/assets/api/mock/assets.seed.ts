@@ -170,6 +170,20 @@ const moonlitOrchardAssetGroups: AssetGroup[] = [
       }),
     ],
   },
+  {
+    kind: "ui",
+    assets: [
+      createAsset({
+        id: "quest-log-ui",
+        name: "Quest Log",
+        description: "Parchment quest tracker with a primary action",
+        version: "v1",
+        canvasSize: "320 × 180 px",
+        perspective: "Screen space",
+        tags: ["interface", "quest", "parchment"],
+      }),
+    ],
+  },
 ];
 
 export const assetGroupsByProject: AssetGroupsByProject = {

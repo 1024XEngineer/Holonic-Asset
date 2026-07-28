@@ -1,7 +1,7 @@
-import type { SpriteSheetCanvasProps } from "./SpriteSheetCanvas.interface";
+import type { TilesetCanvasProps } from "./TilesetCanvas.interface";
 import { getGridBounds } from "@/lib/grid-bounds";
 
-export function SpriteSheetCanvas({ model, onEvent }: SpriteSheetCanvasProps) {
+export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
   const highlightedCells = new Set(model.selectedCellIndexes);
   const hasSelection = highlightedCells.size > 0;
 

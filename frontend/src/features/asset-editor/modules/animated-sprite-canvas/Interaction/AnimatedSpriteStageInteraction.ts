@@ -1,17 +1,20 @@
-import { getCharacterDirectionId, type NodeId } from "../character-node";
+import {
+  getAnimatedSpriteDirectionId,
+  type NodeId,
+} from "../animated-sprite-node";
 import {
   getCanvasNodes,
   type CanvasPosition,
-} from "../CharacterCanvas.constants";
+} from "../AnimatedSpriteCanvas.constants";
 import {
   getFrameBounds,
   getFrameCount,
   getNodeBounds,
-  hitTestCharacterScene,
+  hitTestAnimatedSpriteScene,
   intersects,
   normalizeBounds,
-} from "./CharacterStageGeometry";
-import type { CharacterStageContext } from "../Runtime/CharacterCanvas.types";
+} from "./AnimatedSpriteStageGeometry";
+import type { AnimatedSpriteStageContext } from "../Runtime/AnimatedSpriteCanvas.types";
 
 type DragState =
   | {
@@ -35,12 +38,12 @@ type DragState =
       node: NodeId;
     };
 
-export class CharacterStageInteraction {
+export class AnimatedSpriteStageInteraction {
   private drag: DragState | null = null;
   private readonly canvas: HTMLCanvasElement;
-  private readonly context: CharacterStageContext;
+  private readonly context: AnimatedSpriteStageContext;
 
-  constructor(canvas: HTMLCanvasElement, context: CharacterStageContext) {
+  constructor(canvas: HTMLCanvasElement, context: AnimatedSpriteStageContext) {
     this.canvas = canvas;
     this.context = context;
     canvas.addEventListener("pointerdown", this.onPointerDown);
@@ -71,7 +74,7 @@ export class CharacterStageInteraction {
     if (hit?.kind === "switch") return this.switchDirection(hit.node);
     if (hit?.kind === "frame")
       return this.context.actions.onSelectFrame(
-        getCharacterDirectionId(
+        getAnimatedSpriteDirectionId(
           hit.node,
           this.context.getAnimations(),
           this.context.getActiveDirections(),
@@ -143,7 +146,7 @@ export class CharacterStageInteraction {
   private onContextMenu = (event: MouseEvent) => event.preventDefault();
 
   private hitTest(point: CanvasPosition) {
-    return hitTestCharacterScene(
+    return hitTestAnimatedSpriteScene(
       this.context.getScene(),
       point,
       this.context.getAnimations(),
@@ -218,7 +221,7 @@ export class CharacterStageInteraction {
     ).filter((index) => intersects(bounds, getFrameBounds(position, index)));
     if (indexes.length > 0) {
       this.context.actions.onSelectFrames(
-        getCharacterDirectionId(
+        getAnimatedSpriteDirectionId(
           node,
           this.context.getAnimations(),
           this.context.getActiveDirections(),

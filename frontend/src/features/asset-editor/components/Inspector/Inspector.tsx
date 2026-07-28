@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AssetRevision } from "@/features/assets/domain";
 import {
-  getCharacterNodeLabel,
-  type CharacterCanvasNodeId,
-} from "../../modules/character-canvas";
+  getAnimatedSpriteNodeLabel,
+  type AnimatedSpriteNodeId,
+} from "../../modules/animated-sprite-canvas";
 import type { EditorCharacterAnimation } from "../../domain";
 
 type InspectorProps = {
-  selectedNodes: CharacterCanvasNodeId[];
-  selectedFrames: Array<{ nodeId: CharacterCanvasNodeId; index: number }>;
+  selectedNodes: AnimatedSpriteNodeId[];
+  selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
   prompt: string;
   onPromptChange: (value: string) => void;
   onAction: (message: string) => void;
@@ -130,8 +130,8 @@ function SelectionSummary({
   selectedItems,
   animations,
 }: {
-  selectedNodes: CharacterCanvasNodeId[];
-  selectedFrames: Array<{ nodeId: CharacterCanvasNodeId; index: number }>;
+  selectedNodes: AnimatedSpriteNodeId[];
+  selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
   selectedItems?: string[];
   animations: EditorCharacterAnimation[];
 }) {
@@ -150,7 +150,7 @@ function SelectionSummary({
     return (
       <div className="mb-4 rounded-xl border border-black/10 bg-[#f7f5f0] p-3 text-xs text-[#51493f]">
         <span className="font-semibold text-[#2d2923]">Target:</span>{" "}
-        {node ? `${getCharacterNodeLabel(node, animations)} (` : ""}
+        {node ? `${getAnimatedSpriteNodeLabel(node, animations)} (` : ""}
         {selectedFrames
           .map((selectedFrame) => `Frame ${selectedFrame.index + 1}`)
           .join(", ")}
@@ -164,7 +164,7 @@ function SelectionSummary({
       <div className="mb-4 rounded-xl border border-black/10 bg-[#f7f5f0] p-3 text-xs text-[#51493f]">
         <span className="font-semibold text-[#2d2923]">Target:</span>{" "}
         {selectedNodes
-          .map((node) => getCharacterNodeLabel(node, animations))
+          .map((node) => getAnimatedSpriteNodeLabel(node, animations))
           .join(", ")}
       </div>
     );

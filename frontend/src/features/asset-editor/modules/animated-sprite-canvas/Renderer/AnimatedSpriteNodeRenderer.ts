@@ -5,25 +5,25 @@ import type {
   EditorCharacterSpriteSheet,
 } from "../../../domain";
 import {
-  getCharacterCanvasAnimation,
-  getCharacterNodeLabel,
-  type CharacterDirectionMap,
+  getAnimatedSpriteAnimation,
+  getAnimatedSpriteNodeLabel,
+  type AnimatedSpriteDirectionMap,
   type NodeId,
-} from "../character-node";
-import type { CanvasPosition } from "../CharacterCanvas.constants";
-import { getCharacterNodeLayout } from "../Interaction/CharacterStageGeometry";
+} from "../animated-sprite-node";
+import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
+import { getAnimatedSpriteNodeLayout } from "../Interaction/AnimatedSpriteStageGeometry";
 import {
   FRAME_SIZE,
-  getCharacterPixelScale,
+  getAnimatedSpritePixelScale,
   STAGE_ACCENT,
-} from "../Runtime/CharacterStage.constants";
-import type { Bounds } from "../Runtime/CharacterCanvas.types";
+} from "../Runtime/AnimatedSpriteStage.constants";
+import type { Bounds } from "../Runtime/AnimatedSpriteCanvas.types";
 import { drawSpriteSheetFrame } from "./SpriteSheetFrameRenderer";
 
 const COLLAPSED_PREVIEW_Y = 80;
 const PROTOTYPE_FRAME_GAP = 8;
 
-export function drawCharacterNode({
+export function drawAnimatedSpriteNode({
   node,
   position,
   selected,
@@ -43,13 +43,13 @@ export function drawCharacterNode({
   expanded: boolean;
   playing: boolean;
   previewFrame: number;
-  activeDirections: CharacterDirectionMap;
+  activeDirections: AnimatedSpriteDirectionMap;
   animations: EditorCharacterAnimation[];
   prototype: EditorCharacterSpriteSheet;
   unavailableTextureUrls?: ReadonlySet<string>;
 }) {
   const container = new Container({ x: position.x, y: position.y });
-  const layout = getCharacterNodeLayout(
+  const layout = getAnimatedSpriteNodeLayout(
     node,
     { x: 0, y: 0 },
     expanded,
@@ -58,19 +58,19 @@ export function drawCharacterNode({
   );
   drawLabel(
     container,
-    getCharacterNodeLabel(node, animations, activeDirections),
+    getAnimatedSpriteNodeLabel(node, animations, activeDirections),
     layout.bounds.width,
     selected,
   );
 
-  const animation = getCharacterCanvasAnimation(
+  const animation = getAnimatedSpriteAnimation(
     node,
     animations,
     activeDirections,
   );
   const nodeSpriteSheet =
     node === "prototype" ? prototype : animation?.spriteSheet;
-  const pixelScale = getCharacterPixelScale(nodeSpriteSheet ?? prototype);
+  const pixelScale = getAnimatedSpritePixelScale(nodeSpriteSheet ?? prototype);
   if (expanded) {
     layout.frames.forEach((frame, index) => {
       drawFrame(
@@ -111,7 +111,7 @@ export function drawCharacterNode({
       pixelScale,
     });
   } else {
-    drawCharacterPlaceholder(
+    drawAnimatedSpritePlaceholder(
       container,
       {
         x: (layout.bounds.width - FRAME_SIZE) / 2,
@@ -232,17 +232,17 @@ function drawFrame(
       pixelScale,
     });
   } else {
-    drawCharacterPlaceholder(container, bounds, index);
+    drawAnimatedSpritePlaceholder(container, bounds, index);
   }
 }
 
-function drawCharacterPlaceholder(
+function drawAnimatedSpritePlaceholder(
   container: Container,
   bounds: Bounds,
   frame: number,
 ) {
   const size = Math.floor(Math.min(bounds.width / 12, bounds.height / 17));
-  drawCharacter(
+  drawAnimatedSprite(
     container,
     bounds.x + (bounds.width - 12 * size) / 2,
     bounds.y + (bounds.height - 17 * size) / 2,
@@ -251,7 +251,7 @@ function drawCharacterPlaceholder(
   );
 }
 
-function drawCharacter(
+function drawAnimatedSprite(
   container: Container,
   offsetX: number,
   offsetY: number,
