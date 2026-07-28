@@ -8,13 +8,13 @@ import (
 )
 
 type Asset struct {
-	ID          uint
+	ID          uint `gorm:"primaryKey"`
 	Name        string
-	ProjectID   uint
+	ProjectID   uint `gorm:"index"`
 	Type        string
 	Description string
-	Tags        []string        `json:"tags"`
-	Attributes  json.RawMessage `json:"attributes"`
+	Tags        []string        `json:"tags" gorm:"serializer:json"`
+	Attributes  json.RawMessage `json:"attributes" gorm:"serializer:json"`
 	Version     uint
 }
 
@@ -31,7 +31,12 @@ type AssetDaoImpl struct {
 }
 
 func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]Asset, error) {
-	return nil, nil
+	assets := make([]Asset, 0)
+	err := a.DB.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("id ASC").
+		Find(&assets).Error
+	return assets, err
 }
 
 func (a *AssetDaoImpl) CreateAsset(ctx context.Context, asset *Asset) (Asset, error) {
@@ -39,7 +44,9 @@ func (a *AssetDaoImpl) CreateAsset(ctx context.Context, asset *Asset) (Asset, er
 }
 
 func (a *AssetDaoImpl) GetAssetDetail(ctx context.Context, id uint) (Asset, error) {
-	return Asset{}, nil
+	var asset Asset
+	err := a.DB.WithContext(ctx).First(&asset, id).Error
+	return asset, err
 }
 
 func (a *AssetDaoImpl) UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error) {

@@ -42,15 +42,43 @@ type AssetRepositoryImpl struct {
 	VersionDao  dao.AssetVersionDao
 }
 
-func (r *AssetRepositoryImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]domain.Asset, error) {
-	_, err := r.AssetDao.GetAssetsByProjectID(ctx, projectID)
+func NewAssetRepository(assetDao dao.AssetDao) AssetRepository {
+	return &AssetRepositoryImpl{AssetDao: assetDao}
+}
 
-	return nil, err
+func (r *AssetRepositoryImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]domain.Asset, error) {
+	assets, err := r.AssetDao.GetAssetsByProjectID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]domain.Asset, len(assets))
+	for index := range assets {
+		result[index] = convertAssetToDomain(assets[index])
+	}
+	return result, nil
 }
 
 func (r *AssetRepositoryImpl) GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error) {
-	_, err := r.AssetDao.GetAssetDetail(ctx, id)
-	return &domain.Asset{}, err
+	asset, err := r.AssetDao.GetAssetDetail(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	result := convertAssetToDomain(asset)
+	return &result, nil
+}
+
+func convertAssetToDomain(asset dao.Asset) domain.Asset {
+	return domain.Asset{
+		ID:          asset.ID,
+		Name:        asset.Name,
+		ProjectID:   asset.ProjectID,
+		Type:        domain.AssetType(asset.Type),
+		Description: asset.Description,
+		Tags:        append([]string(nil), asset.Tags...),
+		Attributes:  append([]byte(nil), asset.Attributes...),
+		Version:     asset.Version,
+	}
 }
 
 func (r *AssetRepositoryImpl) UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error) {

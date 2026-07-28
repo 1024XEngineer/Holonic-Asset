@@ -20,5 +20,8 @@ dist/
 # Cache
 configCache/
 
+# Config
+**/config.yaml
+
 # Docker
 docker-compose.yaml

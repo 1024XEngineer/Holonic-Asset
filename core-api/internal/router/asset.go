@@ -8,20 +8,20 @@ import (
 )
 
 type AssetRouter interface {
-	GetAssets(x *echox.Context) ([]dto.GetAssetsResponse, error)
-	Detail(x *echox.Context) (dto.AssetDetailResponse, error)
-	GetProtoTypeResource(x *echox.Context) (dto.GetAssetResourcesResponse, error)
-	GetAnimations(x *echox.Context) (dto.GetAssetResourcesResponse, error)
-	GetItemResources(x *echox.Context) (dto.GetAssetResourcesResponse, error)
-	Record(x *echox.Context, req dto.RecordAssetRequest) ([]dto.RecordAssetResponse, error)
-	CreateCharacterAsset(ctx *echox.Context, req dto.CreateCharacterAssetRequest) (dto.CreateCharacterAssetResponse, error)
-	CreateObjectAsset(ctx *echox.Context, req dto.CreateObjectAssetRequest) (dto.CreateObjectAssetResponse, error)
-	CreateTileSetAsset(ctx *echox.Context, req dto.CreateTileSetAssetRequest) (dto.CreateTileSetAssetResponse, error)
-	CreateAnimation(ctx *echox.Context, req dto.CreateAnimationRequest) (dto.CreateAnimationResponse, error)
-	CopyAsset(ctx *echox.Context, req dto.CopyAssetRequest) (dto.CopyAssetResponse, error)
-	RollBackAsset(ctx *echox.Context, req dto.RollBackAssetRequest) (dto.RollBackAssetResponse, error)
+	GetAssets(x *echox.Context) (dto.Response, error)
+	Detail(x *echox.Context) (dto.Response, error)
+	GetProtoTypeResource(x *echox.Context) (dto.Response, error)
+	GetAnimations(x *echox.Context) (dto.Response, error)
+	GetItemResources(x *echox.Context) (dto.Response, error)
+	Record(x *echox.Context, req dto.RecordAssetRequest) (dto.Response, error)
+	CreateCharacterAsset(ctx *echox.Context, req dto.CreateCharacterAssetRequest) (dto.Response, error)
+	CreateObjectAsset(ctx *echox.Context, req dto.CreateObjectAssetRequest) (dto.Response, error)
+	CreateTileSetAsset(ctx *echox.Context, req dto.CreateTileSetAssetRequest) (dto.Response, error)
+	CreateAnimation(ctx *echox.Context, req dto.CreateAnimationRequest) (dto.Response, error)
+	CopyAsset(ctx *echox.Context, req dto.CopyAssetRequest) (dto.Response, error)
+	RollBackAsset(ctx *echox.Context, req dto.RollBackAssetRequest) (dto.Response, error)
 
-	Tags(ctx *echox.Context, req dto.AddTagsRequest) (dto.AddTagsResponse, error)
+	Tags(ctx *echox.Context, req dto.AddTagsRequest) (dto.Response, error)
 }
 
 // RegisterRoutes registers all HTTP routes.

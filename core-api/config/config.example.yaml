@@ -1,0 +1,18 @@
+db:
+  dsn: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
+  maxIdleConns: 5
+  maxOpenConns: 20
+  connMaxIdleTime: 15m
+  connMaxLifetime: 1h
+
+river:
+  databaseURL: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
+  maxWorkers: 10
+  clientTimeout: 5m
+
+log:
+  path: ./logs/holonic-asset.log
+  maxSize: 100
+  maxBackups: 7
+  maxAge: 14
+  compress: true

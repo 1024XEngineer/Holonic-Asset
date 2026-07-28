@@ -25,13 +25,23 @@ type AssetServiceImpl struct {
 	AssetRepository repository.AssetRepository
 }
 
+func NewAssetService(assetRepository repository.AssetRepository) AssetService {
+	return &AssetServiceImpl{AssetRepository: assetRepository}
+}
+
 func (a *AssetServiceImpl) GetAssets(ctx context.Context, projectID uint) ([]domain.Asset, error) {
 	return a.AssetRepository.GetAssetsByProjectID(ctx, projectID)
 }
 
 func (a *AssetServiceImpl) GetDetail(ctx context.Context, id uint) (domain.Asset, error) {
-	_, err := a.AssetRepository.GetAssetDetail(ctx, id)
-	return domain.Asset{}, err
+	asset, err := a.AssetRepository.GetAssetDetail(ctx, id)
+	if err != nil {
+		return domain.Asset{}, err
+	}
+	if asset == nil {
+		return domain.Asset{}, nil
+	}
+	return *asset, nil
 }
 
 func (a *AssetServiceImpl) UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error) {

@@ -1,20 +1,34 @@
 package dto
 
 import (
+	"encoding/json"
+
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
 )
 
+type AssetListItemResponse struct {
+	AssetID     uint             `json:"assetId"`
+	Name        string           `json:"name"`
+	ProjectID   uint             `json:"projectId"`
+	Type        domain.AssetType `json:"type"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Version     uint             `json:"version"`
+}
+
 type GetAssetsResponse struct {
-	AssetID     uint
-	Name        string
-	ProjectID   uint
-	Type        domain.AssetType
-	Description string
-	Tags        []string
-	Version     uint
+	Assets []AssetListItemResponse `json:"assets"`
 }
 
 type AssetDetailResponse struct {
+	AssetID     uint             `json:"assetId"`
+	Name        string           `json:"name"`
+	ProjectID   uint             `json:"projectId"`
+	Type        domain.AssetType `json:"type"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Attributes  json.RawMessage  `json:"attributes"`
+	Version     uint             `json:"version"`
 }
 
 type GetAssetResourcesRequest struct {
@@ -23,7 +37,7 @@ type GetAssetResourcesRequest struct {
 }
 
 type GetAssetResourcesResponse struct {
-	Resources []domain.AssetResource
+	Resources []domain.AssetResource `json:"resources"`
 }
 
 type CreateCharacterAssetRequest struct {
@@ -31,7 +45,7 @@ type CreateCharacterAssetRequest struct {
 }
 
 type CreateCharacterAssetResponse struct {
-	ID uint
+	ID uint `json:"id"`
 }
 
 type CreateObjectAssetRequest struct {
@@ -39,7 +53,7 @@ type CreateObjectAssetRequest struct {
 }
 
 type CreateObjectAssetResponse struct {
-	ID uint
+	ID uint `json:"id"`
 }
 
 type CreateTileSetAssetRequest struct {
@@ -47,7 +61,7 @@ type CreateTileSetAssetRequest struct {
 }
 
 type CreateTileSetAssetResponse struct {
-	ID uint
+	ID uint `json:"id"`
 }
 
 type CreateAnimationRequest struct {
@@ -57,7 +71,7 @@ type CreateAnimationRequest struct {
 }
 
 type CreateAnimationResponse struct {
-	ID uint
+	ID uint `json:"id"`
 }
 
 type RecordAssetRequest struct {
@@ -72,7 +86,7 @@ type CopyAssetRequest struct {
 }
 
 type CopyAssetResponse struct {
-	NewAssetID uint
+	NewAssetID uint `json:"newAssetId"`
 }
 
 type AddTagsRequest struct {
@@ -81,7 +95,7 @@ type AddTagsRequest struct {
 }
 
 type AddTagsResponse struct {
-	Tags []string
+	Tags []string `json:"tags"`
 }
 
 type RollBackAssetRequest struct {
@@ -90,5 +104,5 @@ type RollBackAssetRequest struct {
 }
 
 type RollBackAssetResponse struct {
-	Asset *domain.Asset
+	Asset *domain.Asset `json:"asset"`
 }
