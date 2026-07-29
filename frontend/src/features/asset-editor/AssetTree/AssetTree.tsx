@@ -28,7 +28,7 @@ import {
 import {
   getAnimatedSpriteNodeLabel,
   type AnimatedSpriteNodeId,
-} from "../canvas/animated-sprite-canvas";
+} from "../Canvas/AnimatedSpriteCanvas";
 
 type AssetTreeProps = {
   animations: EditorCharacterAnimation[];

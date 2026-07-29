@@ -2,7 +2,7 @@ import type { EditorSceneryLayer } from "@/model";
 import {
   SceneryCanvas,
   useSceneryCanvasStateMachine,
-} from "../canvas/scenery-canvas";
+} from "../Canvas/SceneryCanvas";
 
 import { SceneryLayerTree } from "../AssetTree/SceneryLayerTree";
 import { Inspector } from "../Inspector/Inspector";

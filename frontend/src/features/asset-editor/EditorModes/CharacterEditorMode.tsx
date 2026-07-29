@@ -8,7 +8,7 @@ import {
   type AnimatedSpriteCanvasEvent,
   type AnimatedSpriteNodeId,
   type AnimatedSpriteCanvasSelection,
-} from "../canvas/animated-sprite-canvas";
+} from "../Canvas/AnimatedSpriteCanvas";
 import type {
   EditorCanvasPosition,
   EditorCharacterAnimation,

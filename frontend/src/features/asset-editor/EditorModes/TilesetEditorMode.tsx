@@ -2,7 +2,7 @@ import type { TilesetEditorRecord } from "@/model";
 import {
   TilesetCanvas,
   useTilesetCanvasStateMachine,
-} from "../canvas/tileset-canvas";
+} from "../Canvas/TilesetCanvas";
 
 import { TilesetAssetTree } from "../AssetTree/TilesetAssetTree";
 import { Inspector } from "../Inspector/Inspector";

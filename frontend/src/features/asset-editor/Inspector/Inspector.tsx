@@ -7,7 +7,7 @@ import type { AssetRevision } from "@/model";
 import {
   getAnimatedSpriteNodeLabel,
   type AnimatedSpriteNodeId,
-} from "../canvas/animated-sprite-canvas";
+} from "../Canvas/AnimatedSpriteCanvas";
 import type { EditorCharacterAnimation } from "@/model";
 
 type InspectorProps = {

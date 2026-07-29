@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { UiEditorRecord } from "@/model";
-import { UiCanvas } from "../canvas/ui-canvas";
+import { UiCanvas } from "../Canvas/UiCanvas";
 
 import { UiComponentTree } from "../AssetTree/UiComponentTree";
 import { Inspector } from "../Inspector/Inspector";
