@@ -1,4 +1,8 @@
-import type { EditorCanvasPosition, EditorRecord } from "@/model";
+import type {
+  EditorCanvasPosition,
+  EditorRecord,
+  GeneratedEditorCharacterAnimation,
+} from "@/model";
 
 export type AssetEditorTarget = {
   projectId: string;
@@ -16,8 +20,17 @@ export type AssetEditorCommand =
       position: EditorCanvasPosition;
     }
   | {
-      type: "character.animation.add";
+      type: "character.animation.generated";
+      animation: GeneratedEditorCharacterAnimation;
+    }
+  | {
+      type: "character.animation.rename";
+      animationId: string;
       label: string;
+    }
+  | {
+      type: "character.animation.delete";
+      animationId: string;
     }
   | {
       type: "history.undo";

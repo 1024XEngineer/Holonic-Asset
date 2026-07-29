@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 
-import type { EditorCanvasPosition, EditorWorkspaceData } from "@/model";
+import { useGenerateAnimationMutation, useGenerationRunsQuery } from "@/api";
+import type {
+  EditorCanvasPosition,
+  EditorWorkspaceData,
+  GenerateAnimationRequest,
+} from "@/model";
 import { useTimeout } from "@/hooks/use-timeout";
 
 import { useAssetEditorSession } from "./state/session";
@@ -10,6 +15,7 @@ import { SceneryEditorMode } from "./EditorModes/SceneryEditorMode";
 import { TilesetEditorMode } from "./EditorModes/TilesetEditorMode";
 import { UiEditorMode } from "./EditorModes/UiEditorMode";
 import { EditorHeader } from "./Header/EditorHeader";
+import type { EditorGenerationTask } from "./Header/EditorHeader";
 
 export function EditorWorkspace({
   data,
@@ -27,12 +33,33 @@ export function EditorWorkspace({
     initialRecord: data.record,
   });
   const { snapshot } = session;
+  const generateAnimationMutation = useGenerateAnimationMutation();
+  const { data: generationRuns = [] } = useGenerationRunsQuery(asset.projectId);
+  const [animationGenerationTask, setAnimationGenerationTask] =
+    useState<EditorGenerationTask | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { schedule: scheduleNoticeReset } = useTimeout();
 
   useEffect(() => {
     setNotice(null);
+    setAnimationGenerationTask(null);
   }, [asset.projectId, asset.id]);
+
+  const generationTasks: EditorGenerationTask[] = [
+    ...generationRuns.flatMap((run) =>
+      run.status === "queued" || run.status === "processing"
+        ? [
+            {
+              id: run.id,
+              name: run.name,
+              prompt: run.prompt,
+              status: run.status,
+            },
+          ]
+        : [],
+    ),
+    ...(animationGenerationTask ? [animationGenerationTask] : []),
+  ];
 
   const reportAction = (message: string) => {
     setNotice(message);
@@ -41,12 +68,14 @@ export function EditorWorkspace({
   const status =
     snapshot.saveState.phase === "saving"
       ? "Saving changes"
-      : (notice ??
-        (snapshot.saveState.phase === "failed"
-          ? snapshot.saveState.message
-          : snapshot.dirty
-            ? "Unsaved changes"
-            : "All changes saved"));
+      : generateAnimationMutation.isPending
+        ? "Generating animation"
+        : (notice ??
+          (snapshot.saveState.phase === "failed"
+            ? snapshot.saveState.message
+            : snapshot.dirty
+              ? "Unsaved changes"
+              : "All changes saved"));
   const undo = () => {
     session.dispatch({ type: "history.undo" });
     reportAction("Last edit reverted");
@@ -61,6 +90,38 @@ export function EditorWorkspace({
     if (result.status === "failed") reportAction("Save failed");
   };
 
+  const generateAnimation = async (request: GenerateAnimationRequest) => {
+    if (snapshot.record.mode !== "character") return;
+
+    const taskId = `animation-${crypto.randomUUID()}`;
+    setAnimationGenerationTask({
+      id: taskId,
+      name: request.label,
+      prompt: request.prompt,
+      status: "processing",
+    });
+
+    try {
+      const result = await generateAnimationMutation.mutateAsync({
+        ...request,
+        projectId: asset.projectId,
+        assetId: asset.id,
+        prototype: snapshot.record.character.prototype,
+      });
+      session.dispatch({
+        type: "character.animation.generated",
+        animation: result.animation,
+      });
+      reportAction(`${request.label} generated. Save to keep it.`);
+    } catch {
+      reportAction("Animation generation failed");
+    } finally {
+      setAnimationGenerationTask((current) =>
+        current?.id === taskId ? null : current,
+      );
+    }
+  };
+
   const renderHeader = (_selection: string) => (
     <EditorHeader
       assetName={asset.name}
@@ -71,6 +132,7 @@ export function EditorWorkspace({
       canUndo={snapshot.canUndo}
       canRedo={snapshot.canRedo}
       isSaving={snapshot.saveState.phase === "saving"}
+      generationTasks={generationTasks}
       onUndo={undo}
       onRedo={redo}
       onSave={() => void save()}
@@ -104,9 +166,23 @@ export function EditorWorkspace({
                 position,
               })
             }
-            onCharacterAnimationCreate={(label) =>
-              session.dispatch({ type: "character.animation.add", label })
+            onCharacterAnimationGenerate={(request) =>
+              void generateAnimation(request)
             }
+            onCharacterAnimationRename={(animationId, label) =>
+              session.dispatch({
+                type: "character.animation.rename",
+                animationId,
+                label,
+              })
+            }
+            onCharacterAnimationDelete={(animationId) =>
+              session.dispatch({
+                type: "character.animation.delete",
+                animationId,
+              })
+            }
+            isGeneratingAnimation={generateAnimationMutation.isPending}
           />
         );
       case "scenery":

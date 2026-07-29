@@ -7,6 +7,7 @@ export {
   useCopyAssetMutation,
   useDeleteAssetMutation,
   useDeleteAudioTrackMutation,
+  useGenerateAnimationMutation,
   useGenerateAudioVariationMutation,
   useRecordQuery,
   useSaveAssetRevisionMutation,

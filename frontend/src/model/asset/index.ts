@@ -38,6 +38,12 @@ export type {
   UiEditorRecord,
 } from "./editor";
 export type {
+  GenerateAnimationInput,
+  GenerateAnimationRequest,
+  GenerateAnimationResult,
+  GeneratedEditorCharacterAnimation,
+} from "./editor";
+export type {
   AddAudioTrackInput,
   AudioTrack,
   AudioTrackTone,

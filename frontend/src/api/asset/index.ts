@@ -5,7 +5,11 @@ export {
   useCopyAssetMutation,
   useDeleteAssetMutation,
 } from "./library";
-export { useRecordQuery, useSaveAssetRevisionMutation } from "./editor";
+export {
+  useGenerateAnimationMutation,
+  useRecordQuery,
+  useSaveAssetRevisionMutation,
+} from "./editor";
 export {
   useAddAudioTrackMutation,
   useAudioTracksQuery,

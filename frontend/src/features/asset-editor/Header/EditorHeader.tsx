@@ -2,6 +2,12 @@ import { ArrowLeft, Redo2, Save, Undo2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  GenerationTaskDropdown,
+  type EditorGenerationTask,
+} from "./GenerationTaskDropdown";
+
+export type { EditorGenerationTask } from "./GenerationTaskDropdown";
 
 type EditorHeaderProps = {
   assetName: string;
@@ -12,6 +18,7 @@ type EditorHeaderProps = {
   canUndo: boolean;
   canRedo: boolean;
   isSaving: boolean;
+  generationTasks: EditorGenerationTask[];
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
@@ -26,6 +33,7 @@ export function EditorHeader({
   canUndo,
   canRedo,
   isSaving,
+  generationTasks,
   onUndo,
   onRedo,
   onSave,
@@ -60,7 +68,11 @@ export function EditorHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="hidden min-w-0 flex-1 justify-center px-4 lg:flex">
+        <GenerationTaskDropdown tasks={generationTasks} />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
         <span className="hidden items-center gap-2 text-xs text-[#786f64] lg:flex">
           <span className="size-1.5 rounded-full bg-[#579672] shadow-[0_0_0_3px_rgba(152,215,173,.12)]" />
           {status}

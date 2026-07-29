@@ -18,6 +18,12 @@ export {
   type UiEditorRecord,
 } from "./editor-record";
 export { getEditorCharacterAnimationClips } from "./editor-character-animation";
+export type {
+  GenerateAnimationInput,
+  GenerateAnimationRequest,
+  GenerateAnimationResult,
+  GeneratedEditorCharacterAnimation,
+} from "./editor-animation-generation";
 export { isEditorRecordForAssetKind } from "./editor-record.validation";
 export type {
   EditorWorkspaceAsset,

@@ -13,6 +13,7 @@ import type {
   EditorCanvasPosition,
   EditorCharacterAnimation,
   EditorCharacterSpriteSheet,
+  GenerateAnimationRequest,
 } from "@/model";
 
 import { AssetTree } from "../AssetTree/AssetTree";
@@ -27,7 +28,10 @@ export function CharacterEditorMode({
   characterNodePositions,
   onAction,
   onCharacterPositionChange,
-  onCharacterAnimationCreate,
+  onCharacterAnimationGenerate,
+  onCharacterAnimationRename,
+  onCharacterAnimationDelete,
+  isGeneratingAnimation,
   onPromptChange,
   renderHeader,
 }: EditorModeProps & {
@@ -38,7 +42,10 @@ export function CharacterEditorMode({
     nodeId: string,
     position: EditorCanvasPosition,
   ) => void;
-  onCharacterAnimationCreate: (label: string) => void;
+  onCharacterAnimationGenerate: (request: GenerateAnimationRequest) => void;
+  onCharacterAnimationRename: (animationId: string, label: string) => void;
+  onCharacterAnimationDelete: (animationId: string) => void;
+  isGeneratingAnimation: boolean;
 }) {
   const [canvasSelection, setCanvasSelection] =
     useState<AnimatedSpriteCanvasSelection>({
@@ -147,7 +154,10 @@ export function CharacterEditorMode({
           selectedFrames={canvasSelection.frames}
           onSelect={selectNode}
           onSelectFrame={selectFrame}
-          onCreateAnimation={onCharacterAnimationCreate}
+          onGenerateAnimation={onCharacterAnimationGenerate}
+          onRenameAnimation={onCharacterAnimationRename}
+          onDeleteAnimation={onCharacterAnimationDelete}
+          isGeneratingAnimation={isGeneratingAnimation}
         />
         <AnimatedSpriteCanvas
           model={{

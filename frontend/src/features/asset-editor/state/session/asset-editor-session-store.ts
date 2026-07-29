@@ -3,8 +3,8 @@ import { temporal } from "zundo";
 
 import type {
   EditorCanvasPosition,
-  EditorCharacterAnimationClip,
   EditorRecord,
+  GeneratedEditorCharacterAnimation,
 } from "@/model";
 
 import type {
@@ -21,7 +21,11 @@ type AssetEditorSessionState = {
     nodeId: string,
     position: EditorCanvasPosition,
   ) => void;
-  addCharacterAnimation: (label: string) => void;
+  addGeneratedCharacterAnimation: (
+    animation: GeneratedEditorCharacterAnimation,
+  ) => void;
+  renameCharacterAnimation: (animationId: string, label: string) => void;
+  deleteCharacterAnimation: (animationId: string) => void;
 };
 
 export function createAssetEditorSessionStore(initialRecord: EditorRecord) {
@@ -55,7 +59,39 @@ export function createAssetEditorSessionStore(initialRecord: EditorRecord) {
               },
             };
           }),
-        addCharacterAnimation: (label) =>
+        addGeneratedCharacterAnimation: (animation) =>
+          set((state) => {
+            if (state.record.mode !== "character") {
+              throw new Error(
+                "Character animations require a character record.",
+              );
+            }
+
+            const normalizedLabel = animation.label.trim();
+            if (!normalizedLabel) return state;
+
+            const animations = state.record.character.animations ?? [];
+            return {
+              record: {
+                ...state.record,
+                character: {
+                  ...state.record.character,
+                  animations: [
+                    ...animations,
+                    {
+                      ...animation,
+                      id: createCharacterAnimationId(
+                        normalizedLabel,
+                        animations,
+                      ),
+                      label: normalizedLabel,
+                    },
+                  ],
+                },
+              },
+            };
+          }),
+        renameCharacterAnimation: (animationId, label) =>
           set((state) => {
             if (state.record.mode !== "character") {
               throw new Error(
@@ -66,19 +102,56 @@ export function createAssetEditorSessionStore(initialRecord: EditorRecord) {
             const normalizedLabel = label.trim();
             if (!normalizedLabel) return state;
 
-            const animations = state.record.character.animations ?? [];
-            const animation: EditorCharacterAnimationClip = {
-              kind: "clip",
-              id: createCharacterAnimationId(normalizedLabel, animations),
-              label: normalizedLabel,
-              frameCount: 1,
-            };
             return {
               record: {
                 ...state.record,
                 character: {
                   ...state.record.character,
-                  animations: [...animations, animation],
+                  animations: (state.record.character.animations ?? []).map(
+                    (animation) =>
+                      animation.id === animationId
+                        ? { ...animation, label: normalizedLabel }
+                        : animation,
+                  ),
+                },
+              },
+            };
+          }),
+        deleteCharacterAnimation: (animationId) =>
+          set((state) => {
+            if (state.record.mode !== "character") {
+              throw new Error(
+                "Character animations require a character record.",
+              );
+            }
+
+            const animations = state.record.character.animations ?? [];
+            const deleted = animations.find(
+              (animation) => animation.id === animationId,
+            );
+            if (!deleted) return state;
+
+            const deletedNodeIds = new Set([
+              deleted.id,
+              ...(deleted.kind === "group"
+                ? deleted.directions.map((direction) => direction.id)
+                : []),
+            ]);
+            const nodePositions = Object.fromEntries(
+              Object.entries(state.record.character.nodePositions).filter(
+                ([nodeId]) => !deletedNodeIds.has(nodeId),
+              ),
+            );
+
+            return {
+              record: {
+                ...state.record,
+                character: {
+                  ...state.record.character,
+                  animations: animations.filter(
+                    (animation) => animation.id !== animationId,
+                  ),
+                  nodePositions,
                 },
               },
             };
@@ -129,8 +202,16 @@ export function dispatchAssetEditorCommand(
         .getState()
         .setCharacterNodePosition(command.nodeId, command.position);
       return;
-    case "character.animation.add":
-      store.getState().addCharacterAnimation(command.label);
+    case "character.animation.generated":
+      store.getState().addGeneratedCharacterAnimation(command.animation);
+      return;
+    case "character.animation.rename":
+      store
+        .getState()
+        .renameCharacterAnimation(command.animationId, command.label);
+      return;
+    case "character.animation.delete":
+      store.getState().deleteCharacterAnimation(command.animationId);
       return;
     case "history.undo":
       store.temporal.getState().undo();
