@@ -11,6 +11,12 @@ export async function listMockProjects() {
   return structuredClone(projects);
 }
 
+export async function getMockProject(projectId: string) {
+  const project = projects.find((item) => item.id === projectId);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  return structuredClone(project);
+}
+
 export async function createMockProject(project: ProjectSummary) {
   projects = [...projects, structuredClone(project)];
   return structuredClone(project);
