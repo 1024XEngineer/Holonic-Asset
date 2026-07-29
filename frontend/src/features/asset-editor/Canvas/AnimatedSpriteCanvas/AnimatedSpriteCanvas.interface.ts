@@ -23,19 +23,3 @@ export type AnimatedSpriteCanvasModel = {
   nodePositions?: Record<string, CanvasPosition>;
   selection: AnimatedSpriteCanvasSelection;
 };
-
-export type AnimatedSpriteCanvasEvent =
-  | {
-      type: "selection.changed";
-      selection: AnimatedSpriteCanvasSelection;
-    }
-  | {
-      type: "node-position.committed";
-      nodeId: AnimatedSpriteNodeId;
-      position: CanvasPosition;
-    };
-
-export type AnimatedSpriteCanvasProps = {
-  model: AnimatedSpriteCanvasModel;
-  onEvent: (event: AnimatedSpriteCanvasEvent) => void;
-};

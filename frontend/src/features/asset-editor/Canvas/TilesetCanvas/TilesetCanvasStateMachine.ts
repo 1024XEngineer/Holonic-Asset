@@ -1,5 +1,3 @@
-import { useReducer } from "react";
-
 import type { EditorTilesetItem } from "@/model";
 
 import type { TilesetCanvasEvent } from "./TilesetCanvas.interface";
@@ -123,32 +121,7 @@ export function reduceTilesetCanvas(
   };
 }
 
-export function useTilesetCanvasStateMachine(
-  items: EditorTilesetItem[],
-  gridSize: number,
-) {
-  const [state, dispatch] = useReducer(
-    (current: TilesetCanvasState, event: TilesetCanvasStateEvent) =>
-      reduceTilesetCanvas(current, event, items, gridSize),
-    initialTilesetCanvasState,
-  );
-
-  return {
-    selectedItems: state.selectedItems,
-    selectedCells: getSelectedCells(state, items, gridSize),
-    selectedLabels: getSelectedLabels(state, items),
-    isCellSelected: (itemId: string, cellIndex: number) =>
-      state.selectedItems.includes(itemId) ||
-      hasSelection(state.selectedTargets, {
-        type: "item-cell",
-        itemId,
-        cellIndex,
-      }),
-    send: (event: TilesetCanvasStateEvent) => dispatch(event),
-  };
-}
-
-function getSelectedCells(
+export function getSelectedCells(
   state: TilesetCanvasState,
   items: EditorTilesetItem[],
   gridSize: number,
@@ -172,7 +145,7 @@ function getSelectedCells(
   ];
 }
 
-function getSelectedLabels(
+export function getSelectedLabels(
   state: TilesetCanvasState,
   items: EditorTilesetItem[],
 ) {

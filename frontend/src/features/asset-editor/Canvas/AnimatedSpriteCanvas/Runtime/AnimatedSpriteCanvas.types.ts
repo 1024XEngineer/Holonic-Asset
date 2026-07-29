@@ -1,23 +1,5 @@
-import type { Viewport } from "pixi-viewport";
-
-import type { EditorCharacterAnimation } from "@/model";
-import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import type { NodeId } from "../animated-sprite-node";
 import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
-
-export type AnimatedSpriteCanvasActions = {
-  onSelect: (node: NodeId) => void;
-  onSelectFrame: (node: NodeId, index: number) => void;
-  onSelectFrames: (node: NodeId, indexes: number[]) => void;
-  onSelectNodes: (nodes: NodeId[]) => void;
-  onClearSelection: () => void;
-  onNodePositionChange: (node: NodeId, position: CanvasPosition) => void;
-};
-
-export type AnimatedSpriteCanvasRuntimeProps = {
-  model: AnimatedSpriteCanvasModel;
-  actions: AnimatedSpriteCanvasActions;
-};
 
 export type Bounds = CanvasPosition & { width: number; height: number };
 
@@ -38,17 +20,4 @@ export type AnimatedSpriteSceneState = {
   playing: Set<NodeId>;
   previewFrames: Map<NodeId, number>;
   marquee: { start: CanvasPosition; end: CanvasPosition } | null;
-};
-
-export type AnimatedSpriteStageContext = {
-  viewport: Viewport;
-  actions: AnimatedSpriteCanvasActions;
-  getAnimations: () => EditorCharacterAnimation[];
-  getScene: () => AnimatedSpriteSceneSnapshot;
-  moveNode: (node: NodeId, position: CanvasPosition) => void;
-  setMarquee: (marquee: AnimatedSpriteSceneState["marquee"]) => void;
-  getDragStep: () => number;
-  toggleExpanded: (node: NodeId) => void;
-  togglePlaying: (node: NodeId) => void;
-  render: () => void;
 };

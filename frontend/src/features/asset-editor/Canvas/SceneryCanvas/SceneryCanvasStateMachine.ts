@@ -1,5 +1,3 @@
-import { useReducer } from "react";
-
 import type { EditorSceneryLayer } from "@/model";
 
 import type { SceneryCanvasEvent } from "./SceneryCanvas.interface";
@@ -19,7 +17,7 @@ function toggle<T>(values: T[], value: T) {
     : [...values, value];
 }
 
-function reducer(
+export function reduceSceneryCanvas(
   state: SceneryCanvasState,
   event: SceneryCanvasStateEvent,
 ): SceneryCanvasState {
@@ -37,17 +35,11 @@ function reducer(
   }
 }
 
-export function useSceneryCanvasStateMachine(layers: EditorSceneryLayer[]) {
-  const [state, dispatch] = useReducer(
-    reducer,
-    layers,
-    (initialLayers): SceneryCanvasState => ({
-      selectedLayers: [],
-      visibleLayers: initialLayers.map((layer) => layer.id),
-    }),
-  );
+export function createSceneryCanvasState(
+  layers: EditorSceneryLayer[],
+): SceneryCanvasState {
   return {
-    ...state,
-    send: (event: SceneryCanvasStateEvent) => dispatch(event),
+    selectedLayers: [],
+    visibleLayers: layers.map((layer) => layer.id),
   };
 }

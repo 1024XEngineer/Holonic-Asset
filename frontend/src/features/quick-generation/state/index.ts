@@ -11,4 +11,3 @@ export {
   type ReferencePreviewAdapter,
   type ReferencePreviewLifecycle,
 } from "./reference-preview-lifecycle";
-export { useQuickGeneration } from "./use-quick-generation";
