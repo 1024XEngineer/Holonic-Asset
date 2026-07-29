@@ -9,16 +9,26 @@ import (
 
 // AssetService manages CRUD operations for assets.
 type AssetService interface {
-	GetAssets(ctx context.Context, projectID uint) ([]domain.Asset, error)
+	GetAssets(ctx context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error)
 	GetDetail(ctx context.Context, id uint) (domain.Asset, error)
-	UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error)
+	UpdateAsset(ctx context.Context, id uint, update *domain.AssetUpdate) (*domain.Asset, error)
+	UpdateContent(ctx context.Context, id uint, content domain.AssetContent) error
+	UpdateAnimationDirection(
+		ctx context.Context,
+		assetID uint,
+		animationID uint,
+		direction string,
+		frames []domain.Frame,
+	) error
+	UpdatePrototypeImages(ctx context.Context, assetID uint, images map[string]domain.ImageResource) error
 
-	// Creates a Character asset and initializes an empty prototype resource.
-	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (uint, error)
+	// Creates a Character asset and initializes prototype content.
+	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error)
 	CreateObjectAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateTileSetAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error)
+	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
 }
 
 type AssetServiceImpl struct {
@@ -29,8 +39,8 @@ func NewAssetService(assetRepository repository.AssetRepository) AssetService {
 	return &AssetServiceImpl{AssetRepository: assetRepository}
 }
 
-func (a *AssetServiceImpl) GetAssets(ctx context.Context, projectID uint) ([]domain.Asset, error) {
-	return a.AssetRepository.GetAssetsByProjectID(ctx, projectID)
+func (a *AssetServiceImpl) GetAssets(ctx context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
+	return a.AssetRepository.GetAssetsByProjectID(ctx, projectID, filter)
 }
 
 func (a *AssetServiceImpl) GetDetail(ctx context.Context, id uint) (domain.Asset, error) {
@@ -44,35 +54,70 @@ func (a *AssetServiceImpl) GetDetail(ctx context.Context, id uint) (domain.Asset
 	return *asset, nil
 }
 
-func (a *AssetServiceImpl) UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error) {
-	_, err := a.AssetRepository.UpdateTags(ctx, id, tags)
-	return []string{}, err
+func (a *AssetServiceImpl) UpdateAsset(
+	ctx context.Context,
+	id uint,
+	update *domain.AssetUpdate,
+) (*domain.Asset, error) {
+	asset, err := a.AssetRepository.UpdateAsset(ctx, id, update)
+	if err != nil {
+		return nil, err
+	}
+	return asset, nil
 }
 
-func (a *AssetServiceImpl) CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	_, err := a.AssetRepository.CreateCharacterAsset(ctx, asset)
-	// waiting for task
-	return 0, err
+func (a *AssetServiceImpl) UpdateContent(
+	ctx context.Context,
+	id uint,
+	content domain.AssetContent,
+) error {
+	return a.AssetRepository.UpdateContent(ctx, id, content)
+}
+
+func (a *AssetServiceImpl) UpdateAnimationDirection(
+	ctx context.Context,
+	assetID uint,
+	animationID uint,
+	direction string,
+	frames []domain.Frame,
+) error {
+	return a.AssetRepository.UpdateAnimationDirection(
+		ctx,
+		assetID,
+		animationID,
+		direction,
+		frames,
+	)
+}
+
+func (a *AssetServiceImpl) UpdatePrototypeImages(
+	ctx context.Context,
+	assetID uint,
+	images map[string]domain.ImageResource,
+) error {
+	return a.AssetRepository.UpdatePrototypeImages(ctx, assetID, images)
+}
+
+func (a *AssetServiceImpl) CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error) {
+	return a.AssetRepository.CreateCharacterAsset(ctx, asset)
 }
 
 func (a *AssetServiceImpl) CreateObjectAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	_, err := a.AssetRepository.CreateObjectAsset(ctx, asset)
-	// waiting for task
-	return 0, err
+	return a.AssetRepository.CreateObjectAsset(ctx, asset)
 }
 
 func (a *AssetServiceImpl) CreateTileSetAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	_, err := a.AssetRepository.CreateTileSetAsset(ctx, asset)
-	// waiting for task
-	return 0, err
+	return a.AssetRepository.CreateTileSetAsset(ctx, asset)
 }
 
 func (a *AssetServiceImpl) CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	_, err := a.AssetRepository.CreateUIAsset(ctx, asset)
-	return 0, err
+	return a.AssetRepository.CreateUIAsset(ctx, asset)
 }
 
 func (a *AssetServiceImpl) CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	_, err := a.AssetRepository.CreateSceneryAsset(ctx, asset)
-	return 0, err
+	return a.AssetRepository.CreateSceneryAsset(ctx, asset)
+}
+
+func (a *AssetServiceImpl) CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error) {
+	return a.AssetRepository.CreateAnimation(ctx, assetID, name)
 }

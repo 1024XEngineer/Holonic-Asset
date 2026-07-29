@@ -33,7 +33,7 @@ func TestProjectUpdateRoutePreservesOmittedFields(t *testing.T) {
 	}
 	projectService := service.NewProjectService(projectRepository)
 	projectHandler := handler.NewProjectHandler(projectService)
-	e := router.Register(nil, projectHandler, nil, nil, nil)
+	e := router.Register(nil, projectHandler, nil, nil)
 
 	req := httptest.NewRequest(
 		http.MethodPost,

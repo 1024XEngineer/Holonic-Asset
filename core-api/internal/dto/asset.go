@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"time"
 
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
 )
@@ -20,7 +21,62 @@ type GetAssetsResponse struct {
 	Assets []AssetListItemResponse `json:"assets"`
 }
 
+type GetAssetsRequest struct {
+	Query string             `query:"query"`
+	Tags  []string           `query:"tags"`
+	Types []domain.AssetType `query:"types"`
+}
+
 type AssetDetailResponse struct {
+	AssetID     uint             `json:"assetId"`
+	Name        string           `json:"name"`
+	ProjectID   uint             `json:"projectId"`
+	Type        domain.AssetType `json:"type"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Attributes  json.RawMessage  `json:"attributes"`
+	Content     json.RawMessage  `json:"content,omitempty"`
+	Version     uint             `json:"version"`
+}
+
+type RecordAssetRequest struct {
+	AssetID uint `json:"assetId"`
+}
+
+type RecordAssetResponse struct {
+	RecordID  uint            `json:"recordId"`
+	AssetID   uint            `json:"assetId"`
+	Version   uint            `json:"version"`
+	ContentID uint            `json:"contentId"`
+	CreatedAt time.Time       `json:"createdAt"`
+	Content   json.RawMessage `json:"content,omitempty"`
+}
+
+type AssetRecordResponse = RecordAssetResponse
+
+type GetAssetRecordsResponse struct {
+	Records []AssetRecordResponse `json:"records"`
+}
+
+type CopyAssetRequest struct {
+	AssetID uint `json:"assetId"`
+}
+
+type CopyAssetResponse struct {
+	NewAssetID uint `json:"newAssetId"`
+}
+
+type UpdateAssetRequest struct {
+	AssetID     uint              `json:"assetId"`
+	Name        *string           `json:"name,omitempty"`
+	ProjectID   *uint             `json:"projectId,omitempty"`
+	Type        *domain.AssetType `json:"type,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Tags        *[]string         `json:"tags,omitempty"`
+	Attributes  *json.RawMessage  `json:"attributes,omitempty"`
+}
+
+type UpdateAssetResponse struct {
 	AssetID     uint             `json:"assetId"`
 	Name        string           `json:"name"`
 	ProjectID   uint             `json:"projectId"`
@@ -31,78 +87,13 @@ type AssetDetailResponse struct {
 	Version     uint             `json:"version"`
 }
 
-type GetAssetResourcesRequest struct {
-	AssetID uint
-	Version uint
-}
-
-type GetAssetResourcesResponse struct {
-	Resources []domain.AssetResource `json:"resources"`
-}
-
-type CreateCharacterAssetRequest struct {
-	Asset *domain.Asset
-}
-
-type CreateCharacterAssetResponse struct {
-	ID uint `json:"id"`
-}
-
-type CreateObjectAssetRequest struct {
-	Asset *domain.Asset
-}
-
-type CreateObjectAssetResponse struct {
-	ID uint `json:"id"`
-}
-
-type CreateTileSetAssetRequest struct {
-	Asset *domain.Asset
-}
-
-type CreateTileSetAssetResponse struct {
-	ID uint `json:"id"`
-}
-
-type CreateAnimationRequest struct {
-	Name    string
-	AssetID uint
-	Type    domain.AssetType
-}
-
-type CreateAnimationResponse struct {
-	ID uint `json:"id"`
-}
-
-type RecordAssetRequest struct {
-	AssetID uint
-}
-
-type RecordAssetResponse struct {
-}
-
-type CopyAssetRequest struct {
-	AssetID uint
-}
-
-type CopyAssetResponse struct {
-	NewAssetID uint `json:"newAssetId"`
-}
-
-type AddTagsRequest struct {
-	AssetID uint
-	Tags    []string
-}
-
-type AddTagsResponse struct {
-	Tags []string `json:"tags"`
-}
-
 type RollBackAssetRequest struct {
-	AssetID uint
-	Version uint
+	AssetID uint `json:"assetId"`
+	Version uint `json:"version"`
 }
 
 type RollBackAssetResponse struct {
-	Asset *domain.Asset `json:"asset"`
+	AssetID   uint `json:"assetId"`
+	Version   uint `json:"version"`
+	ContentID uint `json:"contentId"`
 }

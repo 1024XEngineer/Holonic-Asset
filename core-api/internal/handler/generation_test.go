@@ -58,13 +58,13 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 	generationHandler := handler.NewGenerationHandler(stub)
 	parameters := json.RawMessage(`{"size":{"width":64,"height":64}}`)
 	request := dto.CreateGenerationRequest{
-		ProjectID:              2,
-		AssetID:                3,
-		Kind:                   domain.RequestKindGenerateCharacter,
-		Prompt:                 "hero",
-		ReferenceMediaIDs:      []string{"media-1"},
-		TargetAssetResourceIDs: []uint{4},
-		Parameters:             parameters,
+		ProjectID:         2,
+		AssetID:           3,
+		Kind:              domain.RequestKindGenerateCharacter,
+		Prompt:            "hero",
+		ReferenceMediaIDs: []string{"media-1"},
+		TargetAssetPaths:  []string{"animations.walk.directions.left"},
+		Parameters:        parameters,
 	}
 
 	response, err := generationHandler.Create(newGenerationHandlerContext(), request)
@@ -82,7 +82,7 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 		stub.createRequest.Kind != request.Kind ||
 		stub.createRequest.Prompt != request.Prompt ||
 		!reflect.DeepEqual(stub.createRequest.ReferenceMediaIDs, request.ReferenceMediaIDs) ||
-		!reflect.DeepEqual(stub.createRequest.TargetAssetResourceIDs, request.TargetAssetResourceIDs) ||
+		!reflect.DeepEqual(stub.createRequest.TargetAssetPaths, request.TargetAssetPaths) ||
 		!reflect.DeepEqual(stub.createRequest.Parameters, request.Parameters) {
 		t.Fatalf("unexpected generation request: %+v", stub.createRequest)
 	}

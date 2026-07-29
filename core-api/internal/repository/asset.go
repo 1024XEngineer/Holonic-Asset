@@ -2,65 +2,224 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
 
 type AssetRepository interface {
-	GetAssetsByProjectID(ctx context.Context, projectID uint) ([]domain.Asset, error)
+	GetAssetsByProjectID(ctx context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error)
 	GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error)
-	UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error)
-	// CreateCharacterAsset creates a character asset and an empty protoType resource.
-	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (uint, error)
+	UpdateAsset(ctx context.Context, id uint, update *domain.AssetUpdate) (*domain.Asset, error)
+	UpdateContent(ctx context.Context, assetID uint, content domain.AssetContent) error
+	UpdateAnimationDirection(
+		ctx context.Context,
+		assetID uint,
+		animationID uint,
+		direction string,
+		frames []domain.Frame,
+	) error
+
+	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error)
 	CreateObjectAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateTileSetAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error)
-	// CreateImageResources creates image resources bound to a specific protoType.
-	CreateImageResources(ctx context.Context, resource []domain.AssetResource) ([]domain.AssetResource, error)
-	CreateAnimationResource(ctx context.Context, resource *domain.AssetResource) (uint, error)
+	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
+	UpdatePrototypeImages(ctx context.Context, assetID uint, images map[string]domain.ImageResource) error
 
-	UpdateFrameResources(ctx context.Context, resource []domain.AssetResource) error
-	DeleteFrameResourcesByAnimationID(ctx context.Context, id uint) error
-
-	GetAnimations(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error)
-	GetProtoTypeResource(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error)
-	GetItemResources(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error)
-
-	// CreateRecord creates an AssetVersion, updates the Asset's version, and copies all resources under the asset to the new version.
-	CreateRecord(ctx context.Context, version *domain.AssetVersion) (*domain.AssetVersion, error)
-	// RollBackRecord deletes the AssetVersion, rolls back the Asset's version to the previous one, and deletes all resources of that version.
-	RollBackRecord(ctx context.Context, assetID uint, version uint) (uint, error)
-	// Copy performs a full copy of the version, asset, and all its resources to a new asset.
+	CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error)
+	GetRecordHistory(ctx context.Context, assetID uint) ([]domain.AssetRecord, error)
+	RollBackRecord(ctx context.Context, assetID uint, version uint) (*domain.AssetRecord, error)
 	Copy(ctx context.Context, assetID uint, version uint) (uint, error)
 }
 
 type AssetRepositoryImpl struct {
-	AssetDao    dao.AssetDao
-	ResourceDao dao.AssetResourceDao
-	VersionDao  dao.AssetVersionDao
+	DB         *gorm.DB
+	AssetDao   dao.AssetDao
+	ContentDao dao.AssetContentDao
+	RecordDao  dao.AssetRecordDao
 }
 
-func NewAssetRepository(assetDao dao.AssetDao) AssetRepository {
-	return &AssetRepositoryImpl{AssetDao: assetDao}
+type assetDaoWithDB interface {
+	WithDB(db *gorm.DB) dao.AssetDao
 }
 
-func (r *AssetRepositoryImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]domain.Asset, error) {
+type assetContentDaoWithDB interface {
+	WithDB(db *gorm.DB) dao.AssetContentDao
+}
+
+type assetRecordDaoWithDB interface {
+	WithDB(db *gorm.DB) dao.AssetRecordDao
+}
+
+type assetDBProvider interface {
+	DBHandle() *gorm.DB
+}
+
+func NewAssetRepository(
+	assetDao dao.AssetDao,
+	contentDao dao.AssetContentDao,
+	recordDao dao.AssetRecordDao,
+) AssetRepository {
+	return &AssetRepositoryImpl{
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
+	}
+}
+
+func NewAssetRepositoryWithDB(
+	db *gorm.DB,
+	assetDao dao.AssetDao,
+	contentDao dao.AssetContentDao,
+	recordDao dao.AssetRecordDao,
+) AssetRepository {
+	return &AssetRepositoryImpl{
+		DB:         db,
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
+	}
+}
+
+func (r *AssetRepositoryImpl) transactionDB() *gorm.DB {
+	if r.DB != nil {
+		return r.DB
+	}
+	if provider, ok := r.AssetDao.(assetDBProvider); ok {
+		return provider.DBHandle()
+	}
+	return nil
+}
+
+func (r *AssetRepositoryImpl) withDB(db *gorm.DB) (*AssetRepositoryImpl, error) {
+	assetDao, ok := r.AssetDao.(assetDaoWithDB)
+	if !ok {
+		return nil, fmt.Errorf("repository: asset DAO does not support transactions")
+	}
+	contentDao, ok := r.ContentDao.(assetContentDaoWithDB)
+	if !ok {
+		return nil, fmt.Errorf("repository: asset content DAO does not support transactions")
+	}
+	recordDao, ok := r.RecordDao.(assetRecordDaoWithDB)
+	if !ok {
+		return nil, fmt.Errorf("repository: asset record DAO does not support transactions")
+	}
+	return &AssetRepositoryImpl{
+		DB:         db,
+		AssetDao:   assetDao.WithDB(db),
+		ContentDao: contentDao.WithDB(db),
+		RecordDao:  recordDao.WithDB(db),
+	}, nil
+}
+
+func (r *AssetRepositoryImpl) inTransaction(ctx context.Context, fn func(*AssetRepositoryImpl) error) error {
+	db := r.transactionDB()
+	if db == nil {
+		return fn(r)
+	}
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepository, err := r.withDB(tx)
+		if err != nil {
+			return err
+		}
+		return fn(transactionRepository)
+	})
+}
+
+func (r *AssetRepositoryImpl) GetAssetsByProjectID(ctx context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
 	assets, err := r.AssetDao.GetAssetsByProjectID(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]domain.Asset, len(assets))
+	result := make([]domain.Asset, 0, len(assets))
 	for index := range assets {
-		result[index] = convertAssetToDomain(assets[index])
+		asset := convertAssetToDomain(assets[index])
+		if !matchesAssetFilter(asset, filter) {
+			continue
+		}
+		result = append(result, asset)
 	}
 	return result, nil
 }
 
+func matchesAssetFilter(asset domain.Asset, filter domain.AssetListFilter) bool {
+	query := strings.TrimSpace(filter.Query)
+	if query != "" &&
+		!strings.Contains(asset.Name, query) &&
+		!strings.Contains(asset.Description, query) {
+		return false
+	}
+
+	if len(filter.Types) > 0 && !containsAssetType(filter.Types, asset.Type) {
+		return false
+	}
+
+	for _, tag := range filter.Tags {
+		if !containsTag(asset.Tags, tag) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func containsAssetType(types []domain.AssetType, target domain.AssetType) bool {
+	return slices.Contains(types, target)
+}
+
+func containsTag(tags []string, target string) bool {
+	return slices.Contains(tags, target)
+}
+
 func (r *AssetRepositoryImpl) GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error) {
-	asset, err := r.AssetDao.GetAssetDetail(ctx, id)
+	asset, err := r.AssetDao.GetAsset(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	content, err := r.resolveAssetContent(ctx, asset)
+	if err != nil {
+		return nil, err
+	}
+	asset.Content = content
+	result := convertAssetToDomain(asset)
+	return &result, nil
+}
+
+func (r *AssetRepositoryImpl) UpdateAsset(
+	ctx context.Context,
+	id uint,
+	update *domain.AssetUpdate,
+) (*domain.Asset, error) {
+	if update == nil {
+		return nil, fmt.Errorf("repository: asset update is nil")
+	}
+
+	value := &dao.AssetUpdate{
+		Name:        update.Name,
+		ProjectID:   update.ProjectID,
+		Description: update.Description,
+	}
+	if update.Type != nil {
+		assetType := string(*update.Type)
+		value.Type = &assetType
+	}
+	if update.Tags != nil {
+		value.Tags = update.Tags
+	}
+	if update.Attributes != nil {
+		value.Attributes = update.Attributes
+	}
+
+	asset, err := r.AssetDao.UpdateAsset(ctx, id, value)
 	if err != nil {
 		return nil, err
 	}
@@ -77,200 +236,548 @@ func convertAssetToDomain(asset dao.Asset) domain.Asset {
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
 		Attributes:  append([]byte(nil), asset.Attributes...),
+		Content:     append([]byte(nil), asset.Content...),
 		Version:     asset.Version,
 	}
 }
 
-func (r *AssetRepositoryImpl) UpdateTags(ctx context.Context, id uint, tags []string) ([]string, error) {
-	_, err := r.AssetDao.UpdateTags(ctx, id, tags)
-	return []string{}, err
+func (r *AssetRepositoryImpl) resolveAssetContent(ctx context.Context, asset dao.Asset) ([]byte, error) {
+	if r.ContentDao != nil && asset.ContentID != nil {
+		content, err := r.ContentDao.GetAssetContent(ctx, *asset.ContentID)
+		if err != nil {
+			return nil, err
+		}
+		return append([]byte(nil), content.Content...), nil
+	}
+	return append([]byte(nil), asset.Content...), nil
 }
 
-func (r *AssetRepositoryImpl) CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	re, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{})
+func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.Asset, error) {
+	if asset == nil {
+		asset = &domain.Asset{}
+	}
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("repository: decode asset content: %w", err)
+	}
+	if (assetType == domain.AssetTypeCharacter || assetType == domain.AssetTypeObject) && content.Prototype == nil {
+		content.Prototype = &domain.Prototype{}
+	}
+	encoded, err := domain.EncodeContent(content)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dao.Asset{
+		ID:          asset.ID,
+		Name:        asset.Name,
+		ProjectID:   asset.ProjectID,
+		Type:        string(assetType),
+		Description: asset.Description,
+		Tags:        append([]string(nil), asset.Tags...),
+		Attributes:  append([]byte(nil), asset.Attributes...),
+		Content:     datatypes.JSON(encoded),
+		Version:     asset.Version,
+	}, nil
+}
+
+func (r *AssetRepositoryImpl) UpdateContent(
+	ctx context.Context,
+	assetID uint,
+	content domain.AssetContent,
+) error {
+	encoded, err := domain.EncodeContent(content)
+	if err != nil {
+		return fmt.Errorf("repository: encode asset %d content: %w", assetID, err)
+	}
+	return r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		return transactionRepository.updateContent(ctx, assetID, encoded)
+	})
+}
+
+func (r *AssetRepositoryImpl) updateContent(ctx context.Context, assetID uint, encoded []byte) error {
+	asset, err := r.AssetDao.GetAssetForUpdate(ctx, assetID)
+	if err != nil {
+		return err
+	}
+	return r.replaceAssetContent(ctx, asset, encoded)
+}
+
+func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao.Asset, encoded []byte) error {
+	if r.ContentDao == nil || r.RecordDao == nil {
+		return fmt.Errorf("repository: content storage is not configured")
+	}
+	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
+		AssetID: asset.ID,
+		Content: datatypes.JSON(encoded),
+	})
+	if err != nil {
+		return err
+	}
+	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, asset.Version, contentRecord.ID)
+}
+
+func (r *AssetRepositoryImpl) mutateAssetContent(
+	ctx context.Context,
+	assetID uint,
+	mutate func(*domain.AssetContent) error,
+) error {
+	return r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		asset, err := transactionRepository.AssetDao.GetAssetForUpdate(ctx, assetID)
+		if err != nil {
+			return err
+		}
+		encoded, err := transactionRepository.resolveAssetContent(ctx, asset)
+		if err != nil {
+			return err
+		}
+		content, err := (domain.Asset{
+			Type:    domain.AssetType(asset.Type),
+			Content: encoded,
+		}).DecodeContent()
+		if err != nil {
+			return fmt.Errorf("repository: decode asset %d content: %w", assetID, err)
+		}
+		if err := mutate(&content); err != nil {
+			return err
+		}
+		updated, err := domain.EncodeContent(content)
+		if err != nil {
+			return fmt.Errorf("repository: encode asset %d content: %w", assetID, err)
+		}
+		return transactionRepository.replaceAssetContent(ctx, asset, updated)
+	})
+}
+
+func (r *AssetRepositoryImpl) UpdateAnimationDirection(
+	ctx context.Context,
+	assetID uint,
+	animationID uint,
+	direction string,
+	frames []domain.Frame,
+) error {
+	if direction == "" {
+		return fmt.Errorf("repository: animation direction is empty")
+	}
+	return r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
+		for index := range content.Animations {
+			animation := &content.Animations[index]
+			if animation.ID != animationID {
+				continue
+			}
+			if animation.Directions == nil {
+				animation.Directions = make(map[string]domain.AnimationDirection)
+			}
+			current := animation.Directions[direction]
+			current.Frames = append([]domain.Frame(nil), frames...)
+			animation.Directions[direction] = current
+			return nil
+		}
+		return fmt.Errorf("repository: animation %d not found in asset %d", animationID, assetID)
+	})
+}
+
+func (r *AssetRepositoryImpl) createAsset(ctx context.Context, asset *domain.Asset, assetType domain.AssetType) (uint, error) {
+	created, err := r.createAssetResult(ctx, asset, assetType)
 	if err != nil {
 		return 0, err
 	}
+	return created.ID, nil
+}
 
-	_, err = r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{AssetID: re.ID, Version: re.Version})
+func (r *AssetRepositoryImpl) createAssetResult(ctx context.Context, asset *domain.Asset, assetType domain.AssetType) (*domain.Asset, error) {
+	value, err := convertAssetToDAO(asset, assetType)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
+	if r.ContentDao == nil || r.RecordDao == nil {
+		return nil, fmt.Errorf("repository: content storage is not configured")
+	}
+	var result *domain.Asset
+	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		var err error
+		result, err = transactionRepository.createAssetResultInTransaction(ctx, value)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
 
-	_, err = r.ResourceDao.CreateAssetResources(ctx, []dao.AssetResource{{AssetID: re.ID, AssetVersion: re.Version, Type: string(domain.AssetResourceTypeProtoType)}})
-	return 0, err
+func (r *AssetRepositoryImpl) createAssetResultInTransaction(ctx context.Context, value *dao.Asset) (*domain.Asset, error) {
+	created, err := r.AssetDao.CreateAsset(ctx, value)
+	if err != nil {
+		return nil, err
+	}
+	currentVersion := created.Version
+	if currentVersion == 0 {
+		currentVersion = 1
+		created.Version = currentVersion
+	}
+	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
+		AssetID: created.ID,
+		Content: datatypes.JSON(value.Content),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := r.RecordDao.CreateAssetRecord(ctx, &dao.AssetRecord{
+		AssetID:   created.ID,
+		Version:   currentVersion,
+		ContentID: contentRecord.ID,
+	}); err != nil {
+		return nil, err
+	}
+	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, created.ID, currentVersion, contentRecord.ID); err != nil {
+		return nil, err
+	}
+	created.ContentID = &contentRecord.ID
+	created.Content = append([]byte(nil), value.Content...)
+	result := convertAssetToDomain(created)
+	return &result, nil
+}
+
+func (r *AssetRepositoryImpl) CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error) {
+	return r.createAssetResult(ctx, asset, domain.AssetTypeCharacter)
 }
 
 func (r *AssetRepositoryImpl) CreateObjectAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	re, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{})
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{AssetID: re.ID, Version: re.Version})
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.ResourceDao.CreateAssetResources(ctx, []dao.AssetResource{{AssetID: re.ID, AssetVersion: re.Version, Type: string(domain.AssetResourceTypeProtoType)}})
-	return 0, err
+	return r.createAsset(ctx, asset, domain.AssetTypeObject)
 }
 
 func (r *AssetRepositoryImpl) CreateTileSetAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	// This should run inside a transaction.
-	re, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{})
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{AssetID: re.ID, Version: re.Version})
-	if err != nil {
-		return 0, err
-	}
-
-	// The count is determined by the length of the items array in asset.Attributes; using a default of one for now.
-	_, err = r.ResourceDao.CreateAssetResources(ctx, []dao.AssetResource{{AssetID: re.ID, AssetVersion: re.Version, Type: string(domain.AssetResourceTypeItem)}})
-	return 0, err
+	return r.createAsset(ctx, asset, domain.AssetTypeTileSet)
 }
 
 func (r *AssetRepositoryImpl) CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	// This should run inside a transaction.
-	re, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{})
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{AssetID: re.ID, Version: re.Version})
-	return 0, err
+	return r.createAsset(ctx, asset, domain.AssetTypeUI)
 }
 
 func (r *AssetRepositoryImpl) CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	// This should run inside a transaction.
-	re, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{})
-	if err != nil {
+	return r.createAsset(ctx, asset, domain.AssetTypeScenery)
+}
+
+func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error) {
+	if name == "" {
+		return 0, fmt.Errorf("repository: animation name is empty")
+	}
+	var animationID uint
+	if err := r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
+		animationID = nextAnimationID(content.Animations)
+		content.Animations = append(content.Animations, domain.Animation{
+			ID:         animationID,
+			Name:       name,
+			Directions: make(map[string]domain.AnimationDirection),
+		})
+		return nil
+	}); err != nil {
 		return 0, err
 	}
+	return animationID, nil
+}
 
-	_, err = r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{AssetID: re.ID, Version: re.Version})
-	if err != nil {
-		return 0, err
+func (r *AssetRepositoryImpl) UpdatePrototypeImages(
+	ctx context.Context,
+	assetID uint,
+	images map[string]domain.ImageResource,
+) error {
+	return r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
+		if content.Prototype == nil {
+			content.Prototype = &domain.Prototype{}
+		}
+		if content.Prototype.Directions == nil {
+			content.Prototype.Directions = make(map[string]domain.PrototypeDirection)
+		}
+		directions := domain.DirectionsForCount(content.DirectionCount)
+		for _, direction := range directions {
+			if _, ok := content.Prototype.Directions[direction]; !ok {
+				content.Prototype.Directions[direction] = domain.PrototypeDirection{}
+			}
+		}
+		for direction, image := range images {
+			if direction == "" {
+				return fmt.Errorf("repository: prototype direction is empty")
+			}
+			if len(directions) > 0 && !slices.Contains(directions, direction) {
+				return fmt.Errorf("repository: prototype direction %q is not supported by asset %d", direction, assetID)
+			}
+			current := content.Prototype.Directions[direction]
+			current.Image = &image
+			content.Prototype.Directions[direction] = current
+		}
+		return nil
+	})
+}
+
+func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+	if record == nil {
+		return nil, fmt.Errorf("repository: asset record is nil")
 	}
-	return 0, err
-}
-
-func (r *AssetRepositoryImpl) GetProtoTypeResource(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error) {
-	// This should run inside a transaction.
-	p, err := r.ResourceDao.GetProtoTypeResource(ctx, assetID, version)
-	if err != nil {
-		return []domain.AssetResource{}, err
+	recordCopy := *record
+	var snapshot *domain.AssetRecord
+	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		var err error
+		snapshot, err = transactionRepository.createRecord(ctx, &recordCopy)
+		return err
+	}); err != nil {
+		return nil, err
 	}
-	_, err = r.ResourceDao.GetImageResources(ctx, p.ID)
-
-	return []domain.AssetResource{}, err
+	return snapshot, nil
 }
 
-func (r *AssetRepositoryImpl) GetAnimations(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error) {
-	_, err := r.ResourceDao.GetAnimations(ctx, assetID, version)
-	return []domain.AssetResource{}, err
-}
-
-func (r *AssetRepositoryImpl) GetItemResources(ctx context.Context, assetID uint, version uint) ([]domain.AssetResource, error) {
-	_, err := r.ResourceDao.GetItemResources(ctx, assetID, version)
-	return []domain.AssetResource{}, err
-}
-
-func (r *AssetRepositoryImpl) CreateImageResources(ctx context.Context, resource []domain.AssetResource) ([]domain.AssetResource, error) {
-	_, err := r.ResourceDao.CreateAssetResources(ctx, []dao.AssetResource{})
-	return []domain.AssetResource{}, err
-}
-
-func (r *AssetRepositoryImpl) CreateAnimationResource(ctx context.Context, resource *domain.AssetResource) (uint, error) {
-	_, err := r.ResourceDao.CreateAssetResources(ctx, []dao.AssetResource{})
-	return 0, err
-}
-
-func (r *AssetRepositoryImpl) UpdateFrameResources(ctx context.Context, resource []domain.AssetResource) error {
-	return r.ResourceDao.UpdateFrameResources(ctx, []dao.AssetResource{})
-}
-
-func (r *AssetRepositoryImpl) DeleteFrameResourcesByAnimationID(ctx context.Context, id uint) error {
-	return r.ResourceDao.DeleteFrameResourcesByAnimationID(ctx, id)
-}
-
-func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, version *domain.AssetVersion) (*domain.AssetVersion, error) {
-	// This should run inside a transaction.
-	_, err := r.VersionDao.CreateAssetVersion(ctx, &dao.AssetVersion{})
+func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+	asset, err := r.AssetDao.GetAssetForUpdate(ctx, record.AssetID)
 	if err != nil {
-		return &domain.AssetVersion{}, err
+		return nil, err
 	}
-
-	resources, err := r.ResourceDao.GetResourcesByAssetVersion(ctx, version.AssetID, version.Version)
+	content, err := r.resolveAssetContent(ctx, asset)
 	if err != nil {
-		return &domain.AssetVersion{}, err
+		return nil, err
 	}
-
-	err = r.AssetDao.UpdateAssetVersion(ctx, version.AssetID, version.Version)
+	if r.ContentDao == nil || r.RecordDao == nil {
+		return nil, fmt.Errorf("repository: content storage is not configured")
+	}
+	history, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, asset.ID)
 	if err != nil {
-		return &domain.AssetVersion{}, err
+		return nil, err
 	}
-
-	err = r.ResourceDao.CopyResourcesToVersion(ctx, resources, version.Version)
-
-	return &domain.AssetVersion{}, err
-}
-
-func (r *AssetRepositoryImpl) RollBackRecord(ctx context.Context, assetID uint, version uint) (uint, error) {
-	err := r.AssetDao.UpdateAssetVersion(ctx, assetID, version)
-	return 0, err
-}
-
-func (r *AssetRepositoryImpl) Copy(ctx context.Context, assetID uint, version uint) (uint, error) {
-	// This should run inside a transaction.
-	original, err := r.AssetDao.GetAssetDetail(ctx, assetID)
-	if err != nil {
-		return 0, err
+	version := record.Version
+	if version == 0 {
+		version = asset.Version + 1
+		for _, candidate := range history {
+			if candidate.Version >= version {
+				version = candidate.Version + 1
+			}
+		}
 	}
-
-	newAsset, err := r.AssetDao.CreateAsset(ctx, &dao.Asset{
-		Name:        original.Name,
-		ProjectID:   original.ProjectID,
-		Type:        original.Type,
-		Description: original.Description,
-		Tags:        original.Tags,
-		Attributes:  original.Attributes,
-		Version:     version,
+	snapshot := &domain.AssetRecord{
+		AssetID: record.AssetID,
+		Version: version,
+		Content: append([]byte(nil), content...),
+	}
+	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
+		AssetID: asset.ID,
+		Content: datatypes.JSON(snapshot.Content),
 	})
 	if err != nil {
+		return nil, err
+	}
+	daoRecord := &dao.AssetRecord{
+		AssetID:   snapshot.AssetID,
+		Version:   snapshot.Version,
+		ContentID: contentRecord.ID,
+	}
+	recordID, err := r.RecordDao.CreateAssetRecord(ctx, daoRecord)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.ID = recordID
+	snapshot.ContentID = contentRecord.ID
+	snapshot.CreatedAt = daoRecord.CreatedAt
+	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, snapshot.Version, contentRecord.ID); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+func (r *AssetRepositoryImpl) GetRecordHistory(ctx context.Context, assetID uint) ([]domain.AssetRecord, error) {
+	if r.RecordDao == nil {
+		return nil, fmt.Errorf("repository: record storage is not configured")
+	}
+	records, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, assetID)
+	if err != nil {
+		return nil, err
+	}
+	if r.ContentDao == nil {
+		return nil, fmt.Errorf("repository: content storage is not configured")
+	}
+	result := make([]domain.AssetRecord, 0, len(records))
+	for _, record := range records {
+		content, err := r.ContentDao.GetAssetContent(ctx, record.ContentID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, domain.AssetRecord{
+			ID:        record.ID,
+			AssetID:   record.AssetID,
+			Version:   record.Version,
+			ContentID: record.ContentID,
+			CreatedAt: record.CreatedAt,
+			Content:   append([]byte(nil), content.Content...),
+		})
+	}
+	return result, nil
+}
+
+func (r *AssetRepositoryImpl) RollBackRecord(ctx context.Context, assetID uint, version uint) (*domain.AssetRecord, error) {
+	if r.RecordDao == nil {
+		return nil, fmt.Errorf("repository: record storage is not configured")
+	}
+	if r.ContentDao == nil {
+		return nil, fmt.Errorf("repository: content storage is not configured")
+	}
+	var result *domain.AssetRecord
+	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		var err error
+		result, err = transactionRepository.rollbackRecord(ctx, assetID, version)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, version uint) (*domain.AssetRecord, error) {
+	asset, err := r.AssetDao.GetAssetForUpdate(ctx, assetID)
+	if err != nil {
+		return nil, err
+	}
+	candidate, err := r.RecordDao.GetAssetRecord(ctx, assetID, version)
+	if err != nil {
+		return nil, err
+	}
+	content, err := r.ContentDao.GetAssetContent(ctx, candidate.ContentID)
+	if err != nil {
+		return nil, err
+	}
+	history, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, assetID)
+	if err != nil {
+		return nil, err
+	}
+	retainedContentIDs := make(map[uint]struct{}, len(history))
+	contentIDsToDelete := make([]uint, 0)
+	for _, record := range history {
+		if record.Version <= version {
+			retainedContentIDs[record.ContentID] = struct{}{}
+			continue
+		}
+		contentIDsToDelete = appendUniqueUint(contentIDsToDelete, record.ContentID)
+	}
+	if asset.ContentID != nil {
+		if _, retained := retainedContentIDs[*asset.ContentID]; !retained && *asset.ContentID != candidate.ContentID {
+			contentIDsToDelete = appendUniqueUint(contentIDsToDelete, *asset.ContentID)
+		}
+	}
+	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, assetID, version, candidate.ContentID); err != nil {
+		return nil, err
+	}
+	if err := r.RecordDao.DeleteAssetRecordsAfterVersion(ctx, assetID, version); err != nil {
+		return nil, err
+	}
+	if err := r.ContentDao.DeleteAssetContents(ctx, contentIDsToDelete); err != nil {
+		return nil, err
+	}
+	return &domain.AssetRecord{
+		ID:        candidate.ID,
+		AssetID:   candidate.AssetID,
+		Version:   candidate.Version,
+		ContentID: candidate.ContentID,
+		CreatedAt: candidate.CreatedAt,
+		Content:   append([]byte(nil), content.Content...),
+	}, nil
+}
+
+func (r *AssetRepositoryImpl) Copy(ctx context.Context, assetID uint, _ uint) (uint, error) {
+	if r.ContentDao == nil || r.RecordDao == nil {
+		return 0, fmt.Errorf("repository: content storage is not configured")
+	}
+	var newAssetID uint
+	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		var err error
+		newAssetID, err = transactionRepository.copyAssetInTransaction(ctx, assetID)
+		return err
+	}); err != nil {
 		return 0, err
 	}
+	return newAssetID, nil
+}
 
-	resources, err := r.ResourceDao.GetResourcesByAssetVersion(ctx, assetID, version)
+func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetID uint) (uint, error) {
+	asset, err := r.AssetDao.GetAssetForUpdate(ctx, assetID)
+	if err != nil {
+		return 0, err
+	}
+	records, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, assetID)
+	if err != nil {
+		return 0, err
+	}
+	contents, err := r.ContentDao.GetAssetContentsByAssetID(ctx, assetID)
 	if err != nil {
 		return 0, err
 	}
 
-	versions, err := r.VersionDao.GetAssetVersionsByAssetID(ctx, assetID)
+	copyAsset := &dao.Asset{
+		Name:        asset.Name,
+		ProjectID:   asset.ProjectID,
+		Type:        asset.Type,
+		Description: asset.Description,
+		Tags:        append([]string(nil), asset.Tags...),
+		Attributes:  append([]byte(nil), asset.Attributes...),
+		Version:     asset.Version,
+	}
+	created, err := r.AssetDao.CreateAsset(ctx, copyAsset)
 	if err != nil {
 		return 0, err
 	}
 
-	if len(resources) > 0 {
-		for i := range resources {
-			resources[i].AssetID = newAsset.ID
+	contentCopies := make([]dao.AssetContent, len(contents))
+	for index, content := range contents {
+		contentCopies[index] = dao.AssetContent{
+			AssetID: created.ID,
+			Content: append(datatypes.JSON(nil), content.Content...),
 		}
-		if _, err := r.ResourceDao.CreateAssetResources(ctx, resources); err != nil {
+	}
+	if err := r.ContentDao.CreateAssetContents(ctx, contentCopies); err != nil {
+		return 0, err
+	}
+
+	contentIDs := make(map[uint]uint, len(contents))
+	for index, content := range contents {
+		contentIDs[content.ID] = contentCopies[index].ID
+	}
+
+	recordCopies := make([]dao.AssetRecord, 0, len(records))
+	for _, record := range records {
+		contentID, ok := contentIDs[record.ContentID]
+		if !ok {
+			return 0, fmt.Errorf("repository: content %d for asset record %d/%d not found", record.ContentID, record.AssetID, record.Version)
+		}
+		recordCopies = append(recordCopies, dao.AssetRecord{
+			AssetID:   created.ID,
+			Version:   record.Version,
+			ContentID: contentID,
+			CreatedAt: record.CreatedAt,
+		})
+	}
+	if err := r.RecordDao.CreateAssetRecords(ctx, recordCopies); err != nil {
+		return 0, err
+	}
+
+	if asset.ContentID != nil {
+		contentID, ok := contentIDs[*asset.ContentID]
+		if !ok {
+			return 0, fmt.Errorf("repository: current content %d for asset %d not found", *asset.ContentID, assetID)
+		}
+		if err := r.AssetDao.UpdateAssetCurrentContent(ctx, created.ID, asset.Version, contentID); err != nil {
 			return 0, err
 		}
 	}
+	return created.ID, nil
+}
 
-	if len(versions) > 0 {
-		for i := range versions {
-			versions[i].AssetID = newAsset.ID
-		}
-		if err := r.VersionDao.CreateAssetVersions(ctx, versions); err != nil {
-			return 0, err
+func nextAnimationID(animations []domain.Animation) uint {
+	var id uint
+	for _, animation := range animations {
+		if animation.ID > id {
+			id = animation.ID
 		}
 	}
+	return id + 1
+}
 
-	return newAsset.ID, nil
+func appendUniqueUint(values []uint, value uint) []uint {
+	if slices.Contains(values, value) {
+		return values
+	}
+	return append(values, value)
 }

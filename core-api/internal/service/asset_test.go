@@ -19,10 +19,12 @@ type assetRepositoryStub struct {
 	getDetailErr error
 	projectID    uint
 	assetID      uint
+	filter       domain.AssetListFilter
 }
 
-func (s *assetRepositoryStub) GetAssetsByProjectID(_ context.Context, projectID uint) ([]domain.Asset, error) {
+func (s *assetRepositoryStub) GetAssetsByProjectID(_ context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
 	s.projectID = projectID
+	s.filter = filter
 	return s.assets, s.getAssetsErr
 }
 
@@ -36,7 +38,7 @@ func TestAssetServiceGetAssetsForwardsProjectIDAndResult(t *testing.T) {
 	repositoryStub := &assetRepositoryStub{assets: want}
 	assetService := service.NewAssetService(repositoryStub)
 
-	got, err := assetService.GetAssets(context.Background(), 42)
+	got, err := assetService.GetAssets(context.Background(), 42, domain.AssetListFilter{})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}

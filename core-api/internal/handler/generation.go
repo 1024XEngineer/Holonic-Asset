@@ -20,13 +20,13 @@ func (h *GenerationHandler) Create(
 	request dto.CreateGenerationRequest,
 ) (dto.CreateGenerationResponse, error) {
 	runID, err := h.service.Create(ctx, &domain.GenerationRequest{
-		ProjectID:              request.ProjectID,
-		AssetID:                request.AssetID,
-		Kind:                   request.Kind,
-		Prompt:                 request.Prompt,
-		ReferenceMediaIDs:      request.ReferenceMediaIDs,
-		TargetAssetResourceIDs: request.TargetAssetResourceIDs,
-		Parameters:             request.Parameters,
+		ProjectID:         request.ProjectID,
+		AssetID:           request.AssetID,
+		Kind:              request.Kind,
+		Prompt:            request.Prompt,
+		ReferenceMediaIDs: request.ReferenceMediaIDs,
+		TargetAssetPaths:  request.TargetAssetPaths,
+		Parameters:        request.Parameters,
 	})
 	return dto.CreateGenerationResponse{GenerationRunID: runID}, err
 }

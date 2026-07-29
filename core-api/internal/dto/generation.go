@@ -8,13 +8,13 @@ import (
 )
 
 type CreateGenerationRequest struct {
-	ProjectID              uint               `param:"project_id" json:"-"`
-	AssetID                uint               `json:"assetId,omitempty"`
-	Kind                   domain.RequestKind `json:"kind"`
-	Prompt                 string             `json:"prompt"`
-	ReferenceMediaIDs      []string           `json:"referenceMediaIds,omitempty"`
-	TargetAssetResourceIDs []uint             `json:"targetAssetResourceIds,omitempty"`
-	Parameters             json.RawMessage    `json:"parameters,omitempty"`
+	ProjectID         uint               `param:"project_id" json:"-"`
+	AssetID           uint               `json:"assetId,omitempty"`
+	Kind              domain.RequestKind `json:"kind"`
+	Prompt            string             `json:"prompt"`
+	ReferenceMediaIDs []string           `json:"referenceMediaIds,omitempty"`
+	TargetAssetPaths  []string           `json:"targetAssetPaths,omitempty"`
+	Parameters        json.RawMessage    `json:"parameters,omitempty"`
 }
 
 type CreateGenerationResponse struct {

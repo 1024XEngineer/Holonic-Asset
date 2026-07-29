@@ -14,13 +14,13 @@ type CandidateID uint
 // GenerationRequest captures the business intent accepted by generation.
 // Kind-specific parameters remain bounded data interpreted by generation.
 type GenerationRequest struct {
-	ProjectID              uint
-	AssetID                uint
-	Kind                   RequestKind
-	Prompt                 string
-	ReferenceMediaIDs      []string
-	TargetAssetResourceIDs []uint
-	Parameters             json.RawMessage
+	ProjectID         uint
+	AssetID           uint
+	Kind              RequestKind
+	Prompt            string
+	ReferenceMediaIDs []string
+	TargetAssetPaths  []string
+	Parameters        json.RawMessage
 }
 
 type Failure struct {
@@ -85,11 +85,11 @@ type Candidate struct {
 // ConfirmCandidateCommand contains the asset target required to apply an
 // accepted candidate without making the asset module query generation state.
 type ConfirmCandidateCommand struct {
-	RunID                  RunID
-	CandidateID            CandidateID
-	ProjectID              uint
-	AssetID                uint
-	Kind                   RequestKind
-	TargetAssetResourceIDs []uint
-	MediaIDs               []string
+	RunID            RunID
+	CandidateID      CandidateID
+	ProjectID        uint
+	AssetID          uint
+	Kind             RequestKind
+	TargetAssetPaths []string
+	MediaIDs         []string
 }

@@ -12,26 +12,28 @@ import (
 )
 
 type Handler struct {
-	AssetService         service.AssetService
-	AssetResourceService service.AssetResourceService
-	AssetVerionService   service.AssetVersionService
+	AssetService       service.AssetService
+	AssetRecordService service.AssetRecordService
 }
 
-func NewHandler(as service.AssetService, rs service.AssetResourceService, vs service.AssetVersionService) *Handler {
+func NewHandler(as service.AssetService, rs service.AssetRecordService) *Handler {
 	return &Handler{
-		AssetService:         as,
-		AssetResourceService: rs,
-		AssetVerionService:   vs,
+		AssetService:       as,
+		AssetRecordService: rs,
 	}
 }
 
-func (h *Handler) GetAssets(x *echox.Context) (dto.Response, error) {
+func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto.Response, error) {
 	projectID, err := parseAssetPathID(x, "project_id")
 	if err != nil {
 		return dto.Response{}, err
 	}
 
-	assets, err := h.AssetService.GetAssets(x, projectID)
+	assets, err := h.AssetService.GetAssets(x, projectID, domain.AssetListFilter{
+		Query: request.Query,
+		Tags:  request.Tags,
+		Types: request.Types,
+	})
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -71,6 +73,7 @@ func (h *Handler) Detail(x *echox.Context) (dto.Response, error) {
 		Description: asset.Description,
 		Tags:        asset.Tags,
 		Attributes:  asset.Attributes,
+		Content:     asset.Content,
 		Version:     asset.Version,
 	}), nil
 }
@@ -83,64 +86,51 @@ func parseAssetPathID(x *echox.Context, name string) (uint, error) {
 	return uint(value), nil
 }
 
-func (h *Handler) GetProtoTypeResource(x *echox.Context) (dto.Response, error) {
-	resources, err := h.AssetResourceService.GetProtoTypeResource(x, 0, 0)
-	if err != nil {
-		return dto.Response{}, err
-	}
-	return dto.NewSuccessResponse(dto.GetAssetResourcesResponse{Resources: resources}), nil
-}
-
-func (h *Handler) GetAnimations(x *echox.Context) (dto.Response, error) {
-	resources, err := h.AssetResourceService.GetAnimations(x, 0, 0)
-	if err != nil {
-		return dto.Response{}, err
-	}
-	return dto.NewSuccessResponse(dto.GetAssetResourcesResponse{Resources: resources}), nil
-}
-
-func (h *Handler) GetItemResources(x *echox.Context) (dto.Response, error) {
-	resources, err := h.AssetResourceService.GetItemResources(x, 0, 0)
-	if err != nil {
-		return dto.Response{}, err
-	}
-	return dto.NewSuccessResponse(dto.GetAssetResourcesResponse{Resources: resources}), nil
-}
-
 func (h *Handler) Record(x *echox.Context, asset dto.RecordAssetRequest) (dto.Response, error) {
-	_, err := h.AssetVerionService.CreateRecord(x, &domain.AssetVersion{AssetID: asset.AssetID})
+	if asset.AssetID == 0 {
+		return dto.Response{}, echo.ErrBadRequest
+	}
+	record, err := h.AssetRecordService.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID})
 	if err != nil {
 		return dto.Response{}, err
 	}
-	return dto.NewSuccessResponse([]dto.RecordAssetResponse{}), nil
+	return dto.NewSuccessResponse(dto.RecordAssetResponse{
+		RecordID:  record.ID,
+		AssetID:   record.AssetID,
+		Version:   record.Version,
+		ContentID: record.ContentID,
+		CreatedAt: record.CreatedAt,
+	}), nil
 }
 
-func (h *Handler) CreateCharacterAsset(ctx *echox.Context, asset dto.CreateCharacterAssetRequest) (dto.Response, error) {
-	id, err := h.AssetService.CreateCharacterAsset(ctx, asset.Asset)
+func (h *Handler) Records(x *echox.Context) (dto.Response, error) {
+	assetID, err := parseAssetPathID(x, "asset_id")
 	if err != nil {
 		return dto.Response{}, err
 	}
-	return dto.NewSuccessResponse(dto.CreateCharacterAssetResponse{ID: id}), nil
-}
-
-func (h *Handler) CreateObjectAsset(ctx *echox.Context, asset dto.CreateObjectAssetRequest) (dto.Response, error) {
-	id, err := h.AssetService.CreateObjectAsset(ctx, asset.Asset)
+	records, err := h.AssetRecordService.GetRecordHistory(x, assetID)
 	if err != nil {
 		return dto.Response{}, err
 	}
-	return dto.NewSuccessResponse(dto.CreateObjectAssetResponse{ID: id}), nil
-}
-
-func (h *Handler) CreateTileSetAsset(ctx *echox.Context, asset dto.CreateTileSetAssetRequest) (dto.Response, error) {
-	id, err := h.AssetService.CreateTileSetAsset(ctx, asset.Asset)
-	if err != nil {
-		return dto.Response{}, err
+	items := make([]dto.AssetRecordResponse, len(records))
+	for index, record := range records {
+		items[index] = dto.AssetRecordResponse{
+			RecordID:  record.ID,
+			AssetID:   record.AssetID,
+			Version:   record.Version,
+			ContentID: record.ContentID,
+			CreatedAt: record.CreatedAt,
+			Content:   record.Content,
+		}
 	}
-	return dto.NewSuccessResponse(dto.CreateTileSetAssetResponse{ID: id}), nil
+	return dto.NewSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
 }
 
 func (h *Handler) CopyAsset(ctx *echox.Context, asset dto.CopyAssetRequest) (dto.Response, error) {
-	newAssetID, err := h.AssetVerionService.Copy(ctx, asset.AssetID, 0)
+	if asset.AssetID == 0 {
+		return dto.Response{}, echo.ErrBadRequest
+	}
+	newAssetID, err := h.AssetRecordService.Copy(ctx, asset.AssetID, 0)
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -148,25 +138,40 @@ func (h *Handler) CopyAsset(ctx *echox.Context, asset dto.CopyAssetRequest) (dto
 }
 
 func (h *Handler) RollBackAsset(ctx *echox.Context, asset dto.RollBackAssetRequest) (dto.Response, error) {
-	_, err := h.AssetVerionService.RollBackVersion(ctx, asset.AssetID, 0)
+	if asset.AssetID == 0 || asset.Version == 0 {
+		return dto.Response{}, echo.ErrBadRequest
+	}
+	record, err := h.AssetRecordService.RollBackRecord(ctx, asset.AssetID, asset.Version)
 	if err != nil {
 		return dto.Response{}, err
 	}
-	return dto.NewSuccessResponse(dto.RollBackAssetResponse{}), nil
+	return dto.NewSuccessResponse(dto.RollBackAssetResponse{
+		AssetID:   record.AssetID,
+		Version:   record.Version,
+		ContentID: record.ContentID,
+	}), nil
 }
 
-func (h *Handler) Tags(ctx *echox.Context, req dto.AddTagsRequest) (dto.Response, error) {
-	tags, err := h.AssetService.UpdateTags(ctx, req.AssetID, req.Tags)
+func (h *Handler) UpdateAsset(ctx *echox.Context, req dto.UpdateAssetRequest) (dto.Response, error) {
+	asset, err := h.AssetService.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
+		Name:        req.Name,
+		ProjectID:   req.ProjectID,
+		Type:        req.Type,
+		Description: req.Description,
+		Tags:        req.Tags,
+		Attributes:  req.Attributes,
+	})
 	if err != nil {
 		return dto.Response{}, err
 	}
-	return dto.NewSuccessResponse(dto.AddTagsResponse{Tags: tags}), nil
-}
-
-func (h *Handler) CreateAnimation(ctx *echox.Context, req dto.CreateAnimationRequest) (dto.Response, error) {
-	id, err := h.AssetResourceService.CreateAnimationResource(ctx, &domain.AssetResource{AssetID: req.AssetID, Name: req.Name, Type: domain.AssetResourceType(req.Type)})
-	if err != nil {
-		return dto.Response{}, err
-	}
-	return dto.NewSuccessResponse(dto.CreateAnimationResponse{ID: id}), nil
+	return dto.NewSuccessResponse(dto.UpdateAssetResponse{
+		AssetID:     asset.ID,
+		Name:        asset.Name,
+		ProjectID:   asset.ProjectID,
+		Type:        asset.Type,
+		Description: asset.Description,
+		Tags:        asset.Tags,
+		Attributes:  asset.Attributes,
+		Version:     asset.Version,
+	}), nil
 }

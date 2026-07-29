@@ -45,7 +45,7 @@ func (*generationRouterStub) ConfirmCandidate(
 }
 
 func TestGenerationRoutesAreRegistered(t *testing.T) {
-	e := router.Register(nil, nil, &generationRouterStub{}, nil, nil)
+	e := router.Register(nil, nil, &generationRouterStub{}, nil)
 
 	tests := []struct {
 		method string
@@ -89,7 +89,7 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 }
 
 func TestAIRoutesAreNotExposed(t *testing.T) {
-	e := router.Register(nil, nil, &generationRouterStub{}, nil, nil)
+	e := router.Register(nil, nil, &generationRouterStub{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/tile-set/item/edit", strings.NewReader(`{}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)

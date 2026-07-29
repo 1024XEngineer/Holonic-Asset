@@ -26,11 +26,8 @@ func InitServer() *App {
 	uploadService := appservice.NewUploadService(nil)
 	uploadHandler := handler.NewUploadHandler(uploadService)
 
-	taxonomyService := appservice.NewAssetDiscoveryService()
-	taxonomyHandler := handler.NewTaxonomyHandler(taxonomyService)
-
 	return &App{
-		engine: router.Register(nil, projectHandler, generationHandler, uploadHandler, taxonomyHandler),
+		engine: router.Register(nil, projectHandler, generationHandler, uploadHandler),
 	}
 }
 

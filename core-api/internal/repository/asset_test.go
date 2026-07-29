@@ -17,8 +17,12 @@ type assetDaoStub struct {
 	asset        dao.Asset
 	getAssetsErr error
 	getDetailErr error
+	updatedAsset dao.Asset
+	updateErr    error
 	projectID    uint
 	assetID      uint
+	updateID     uint
+	update       *dao.AssetUpdate
 }
 
 func (s *assetDaoStub) GetAssetsByProjectID(_ context.Context, projectID uint) ([]dao.Asset, error) {
@@ -29,6 +33,22 @@ func (s *assetDaoStub) GetAssetsByProjectID(_ context.Context, projectID uint) (
 func (s *assetDaoStub) GetAssetDetail(_ context.Context, assetID uint) (dao.Asset, error) {
 	s.assetID = assetID
 	return s.asset, s.getDetailErr
+}
+
+func (s *assetDaoStub) GetAsset(_ context.Context, assetID uint) (dao.Asset, error) {
+	s.assetID = assetID
+	return s.asset, s.getDetailErr
+}
+
+func (s *assetDaoStub) GetAssetForUpdate(_ context.Context, assetID uint) (dao.Asset, error) {
+	s.assetID = assetID
+	return s.asset, s.getDetailErr
+}
+
+func (s *assetDaoStub) UpdateAsset(_ context.Context, assetID uint, update *dao.AssetUpdate) (dao.Asset, error) {
+	s.updateID = assetID
+	s.update = update
+	return s.updatedAsset, s.updateErr
 }
 
 func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
@@ -45,7 +65,7 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 	}}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
 
-	got, err := repo.GetAssetsByProjectID(context.Background(), 42)
+	got, err := repo.GetAssetsByProjectID(context.Background(), 42, domain.AssetListFilter{})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}
@@ -60,6 +80,83 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 	}
 	if string(got[0].Attributes) != string(attributes) || len(got[0].Tags) != 2 {
 		t.Fatalf("asset data was not mapped: %+v", got[0])
+	}
+}
+
+func TestAssetRepositoryFiltersAssetsByAllTagsAndTypes(t *testing.T) {
+	daoStub := &assetDaoStub{assets: []dao.Asset{
+		{ID: 1, ProjectID: 42, Name: "hero", Type: "character", Tags: []string{"hero", "player"}},
+		{ID: 2, ProjectID: 42, Type: "object", Tags: []string{"hero", "prop"}},
+		{ID: 3, ProjectID: 42, Type: "character", Tags: []string{"npc"}},
+	}}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	got, err := repo.GetAssetsByProjectID(context.Background(), 42, domain.AssetListFilter{
+		Query: "hero",
+		Tags:  []string{"hero", "player"},
+		Types: []domain.AssetType{domain.AssetTypeCharacter},
+	})
+	if err != nil {
+		t.Fatalf("filter assets: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != 1 {
+		t.Fatalf("unexpected filtered assets: %+v", got)
+	}
+}
+
+func TestAssetRepositoryMatchesAssetQueryByNameOrDescription(t *testing.T) {
+	daoStub := &assetDaoStub{assets: []dao.Asset{
+		{ID: 1, ProjectID: 42, Name: "Hero Knight"},
+		{ID: 2, ProjectID: 42, Description: "A forest prop"},
+		{ID: 3, ProjectID: 42, Name: "Enemy"},
+	}}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	got, err := repo.GetAssetsByProjectID(context.Background(), 42, domain.AssetListFilter{Query: "forest"})
+	if err != nil {
+		t.Fatalf("filter assets by query: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != 2 {
+		t.Fatalf("unexpected query results: %+v", got)
+	}
+}
+
+func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
+	name := "updated hero"
+	projectID := uint(99)
+	typeValue := domain.AssetTypeObject
+	description := "updated description"
+	tags := []string{"prop"}
+	attributes := json.RawMessage(`{"scale":2}`)
+	version := uint(4)
+	daoStub := &assetDaoStub{updatedAsset: dao.Asset{
+		ID:          7,
+		Name:        name,
+		ProjectID:   projectID,
+		Type:        string(typeValue),
+		Description: description,
+		Tags:        tags,
+		Attributes:  attributes,
+		Version:     version,
+	}}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	got, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{
+		Name:        &name,
+		ProjectID:   &projectID,
+		Type:        &typeValue,
+		Description: &description,
+		Tags:        &tags,
+		Attributes:  &attributes,
+	})
+	if err != nil {
+		t.Fatalf("update asset basics: %v", err)
+	}
+	if daoStub.updateID != 7 || daoStub.update == nil || daoStub.update.Type == nil || *daoStub.update.Type != string(typeValue) {
+		t.Fatalf("unexpected DAO update: %+v", daoStub.update)
+	}
+	if got == nil || got.Name != name || got.ProjectID != projectID || got.Type != typeValue {
+		t.Fatalf("unexpected updated asset: %+v", got)
 	}
 }
 
