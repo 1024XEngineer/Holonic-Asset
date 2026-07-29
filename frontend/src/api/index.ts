@@ -12,6 +12,12 @@ export {
   useSaveAssetRevisionMutation,
   useUpdateAudioTrackMutation,
 } from "./asset";
+export { coreAssetApi } from "./asset/library/asset.api";
+export type {
+  AssetDetailResponse,
+  AssetListItemResponse,
+  AssetRequest,
+} from "./asset/library/asset.api";
 export {
   generationKeys,
   useDeleteQuickAssetMutation,
@@ -20,6 +26,13 @@ export {
   useGenerationRunsQuery,
   useQuickAssetsQuery,
 } from "./generation";
+export { coreGenerationApi } from "./generation/run/generation.api";
+export type {
+  CreateGenerationRequest,
+  GenerationRunResponse,
+  GenerationTaskStatus,
+  GenerationTaskType,
+} from "./generation/run/generation.api";
 export {
   reconcileProjectSelection,
   removeProjectSelection,
@@ -28,3 +41,11 @@ export {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";
+export { coreProjectApi } from "./project/project.api";
+export type {
+  CreateProjectRequest,
+  ProjectResponse,
+  UpdateProjectRequest,
+} from "./project/project.api";
+export { uploadApi } from "./upload";
+export type { CreateUploadTargetRequest, UploadTarget } from "./upload";
