@@ -1,7 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/api";
-import { AppHeader } from "@/components/layouts/AppHeader";
 import { NewProjectScreen } from "@/features/project";
 
 export function NewProjectPage() {
@@ -10,7 +9,6 @@ export function NewProjectPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <AppHeader />
       <NewProjectScreen
         onCancel={() =>
           void navigate({
