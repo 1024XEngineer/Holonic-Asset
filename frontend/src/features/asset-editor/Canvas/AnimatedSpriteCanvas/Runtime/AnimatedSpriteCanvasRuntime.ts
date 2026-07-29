@@ -1,7 +1,6 @@
 import { Viewport } from "pixi-viewport";
 import { Assets, Container } from "pixi.js";
 
-import { getEditorCharacterAnimationClips } from "@/model";
 import { AnimatedSpriteStageInteraction } from "../Interaction/AnimatedSpriteStageInteraction";
 import { AnimatedSpriteStageRenderer } from "../Renderer/AnimatedSpriteStageRenderer";
 import {
@@ -71,8 +70,6 @@ export class AnimatedSpriteCanvasRuntime {
         onClearSelection: () => this.props.actions.onClearSelection(),
         onNodePositionChange: (node, position) =>
           this.props.actions.onNodePositionChange(node, position),
-        onSwitchDirection: (node, direction) =>
-          this.props.actions.onSwitchDirection(node, direction),
       },
       getScene: () => this.scene.getSnapshot(),
       getAnimations: () => this.props.model.animations,
@@ -82,15 +79,6 @@ export class AnimatedSpriteCanvasRuntime {
         getAnimatedSpritePixelScale(this.props.model.prototype),
       toggleExpanded: (node) => this.scene.toggleExpanded(node),
       togglePlaying: (node) => this.scene.togglePlaying(node),
-      switchDirection: (node) => {
-        const change = this.scene.switchDirection(node, this.props.model);
-        if (change)
-          this.props.actions.onSwitchDirection(
-            change.nodeId,
-            change.directionId,
-          );
-      },
-      getActiveDirections: () => this.scene.getSnapshot().activeDirections,
       render: () => this.render(),
     };
     this.interaction = new AnimatedSpriteStageInteraction(app.canvas, context);
@@ -114,9 +102,7 @@ export class AnimatedSpriteCanvasRuntime {
     const urls = new Set(
       [
         this.props.model.prototype.imageUrl,
-        ...getEditorCharacterAnimationClips(
-          this.props.model.animations,
-        ).flatMap((animation) =>
+        ...this.props.model.animations.flatMap((animation) =>
           animation.spriteSheet ? [animation.spriteSheet.imageUrl] : [],
         ),
       ].filter(Boolean),

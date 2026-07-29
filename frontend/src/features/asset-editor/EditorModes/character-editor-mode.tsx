@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 
 import {
   AnimatedSpriteCanvas,
-  createDefaultAnimatedSpriteDirections,
-  findAnimatedSpriteAnimationGroup,
   getAnimatedSpriteNodeLabel,
   type AnimatedSpriteCanvasEvent,
   type AnimatedSpriteNodeId,
@@ -52,21 +50,10 @@ export function CharacterEditorMode({
       nodeIds: [],
       frames: [],
     });
-  const [activeDirections, setActiveDirections] = useState<
-    Record<string, AnimatedSpriteNodeId>
-  >(() => createDefaultAnimatedSpriteDirections(characterAnimations));
-
   useEffect(() => {
     const validNodeIds = new Set<string>([
       "prototype",
-      ...characterAnimations.flatMap((animation) =>
-        animation.kind === "group"
-          ? [
-              animation.id,
-              ...animation.directions.map((direction) => direction.id),
-            ]
-          : [animation.id],
-      ),
+      ...characterAnimations.map((animation) => animation.id),
     ]);
     setCanvasSelection((current) => {
       const nodeIds = current.nodeIds.filter((node) => validNodeIds.has(node));
@@ -82,21 +69,6 @@ export function CharacterEditorMode({
       }
       return { nodeIds, frames };
     });
-    setActiveDirections((current) => {
-      const next = Object.fromEntries(
-        characterAnimations
-          .filter((animation) => animation.kind === "group")
-          .map((animation) => [
-            animation.id,
-            animation.directions.some(
-              (direction) => direction.id === current[animation.id],
-            )
-              ? current[animation.id]
-              : animation.directions[0].id,
-          ]),
-      );
-      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
-    });
   }, [characterAnimations]);
   const selection = canvasSelection.nodeIds.length
     ? canvasSelection.nodeIds
@@ -104,23 +76,9 @@ export function CharacterEditorMode({
         .join(", ")
     : "Nothing selected";
   const selectNode = (nodeId: AnimatedSpriteNodeId) => {
-    const group = findAnimatedSpriteAnimationGroup(nodeId, characterAnimations);
-    if (group) {
-      setActiveDirections((current) => ({
-        ...current,
-        [group.id]: nodeId,
-      }));
-    }
     setCanvasSelection({ nodeIds: [nodeId], frames: [] });
   };
   const selectFrame = (nodeId: AnimatedSpriteNodeId, index: number) => {
-    const group = findAnimatedSpriteAnimationGroup(nodeId, characterAnimations);
-    if (group) {
-      setActiveDirections((current) => ({
-        ...current,
-        [group.id]: nodeId,
-      }));
-    }
     setCanvasSelection({
       nodeIds: [nodeId],
       frames: [{ nodeId, index }],
@@ -129,15 +87,6 @@ export function CharacterEditorMode({
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
     if (event.type === "selection.changed") {
       setCanvasSelection(event.selection);
-      return;
-    }
-
-    if (event.type === "direction.changed") {
-      setActiveDirections((current) => ({
-        ...current,
-        [event.nodeId]: event.directionId,
-      }));
-      setCanvasSelection({ nodeIds: [event.directionId], frames: [] });
       return;
     }
 
@@ -163,7 +112,6 @@ export function CharacterEditorMode({
           model={{
             prototype: characterPrototype,
             animations: characterAnimations,
-            activeDirections,
             nodePositions: characterNodePositions,
             selection: canvasSelection,
           }}

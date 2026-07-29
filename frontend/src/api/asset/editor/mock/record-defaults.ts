@@ -3,7 +3,6 @@ import type {
   CharacterEditorRecord,
   EditorCharacterAnimation,
   EditorCharacterAnimationClip,
-  EditorCharacterAnimationGroup,
   EditorCharacterSpriteSheet,
   EditorTilesetItem,
   EditorRecordForKind,
@@ -63,38 +62,33 @@ const swordsmanDirections = [
   { id: "right", label: "Right" },
 ] as const;
 
-function createSwordsmanAnimation(
+function createSwordsmanAnimations(
   id: string,
   label: string,
   frameCounts: Record<(typeof swordsmanDirections)[number]["id"], number>,
-): EditorCharacterAnimationGroup {
-  return {
-    kind: "group",
-    id,
-    label,
-    directions: swordsmanDirections.map((direction) =>
-      createPngAnimation(
-        `${id}/${direction.id}`,
-        direction.label,
-        `/assets/characters/swordsman/${id}/${direction.id}.png`,
-        frameCounts[direction.id],
-        64,
-        64,
-      ),
+): EditorCharacterAnimation[] {
+  return swordsmanDirections.map((direction) =>
+    createPngAnimation(
+      `${id}-${direction.id}`,
+      `${label} ${direction.label}`,
+      `/assets/characters/swordsman/${id}-${direction.id}.png`,
+      frameCounts[direction.id],
+      64,
+      64,
     ),
-  };
+  );
 }
 
 const characterAnimationsByAssetId: Record<string, EditorCharacterAnimation[]> =
   {
     swordsman: [
-      createSwordsmanAnimation("idle", "Idle", {
+      ...createSwordsmanAnimations("idle", "Idle", {
         front: 12,
         back: 4,
         left: 12,
         right: 12,
       }),
-      createSwordsmanAnimation("attack", "Attack", {
+      ...createSwordsmanAnimations("attack", "Attack", {
         front: 8,
         back: 8,
         left: 8,

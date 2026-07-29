@@ -131,15 +131,9 @@ export function createAssetEditorSessionStore(initialRecord: EditorRecord) {
             );
             if (!deleted) return state;
 
-            const deletedNodeIds = new Set([
-              deleted.id,
-              ...(deleted.kind === "group"
-                ? deleted.directions.map((direction) => direction.id)
-                : []),
-            ]);
             const nodePositions = Object.fromEntries(
               Object.entries(state.record.character.nodePositions).filter(
-                ([nodeId]) => !deletedNodeIds.has(nodeId),
+                ([nodeId]) => nodeId !== deleted.id,
               ),
             );
 

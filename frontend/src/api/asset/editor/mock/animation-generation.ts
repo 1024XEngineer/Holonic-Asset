@@ -19,7 +19,7 @@ export function generateMockAnimation(
             ...input.prototype,
             imageUrl: isLargeCharacter
               ? "/assets/characters/knight/attack-1.png"
-              : "/assets/characters/swordsman/attack/front.png",
+              : "/assets/characters/swordsman/attack-front.png",
             columns: frameCount,
             rows: 1,
             row: undefined,

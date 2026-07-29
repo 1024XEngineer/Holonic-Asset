@@ -8,10 +8,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import {
-  type EditorCharacterAnimation,
-  type EditorCharacterAnimationClip,
-  type EditorCharacterAnimationGroup,
+import type {
+  EditorCharacterAnimation,
+  EditorCharacterAnimationClip,
 } from "@/model";
 import {
   getAnimatedSpriteNodeLabel,
@@ -55,29 +54,17 @@ export function AnimationTreeItems({
         onOpenGeneration={onOpenGeneration}
         isGenerating={isGenerating}
       >
-        {animations.map((animation) =>
-          animation.kind === "group" ? (
-            <AnimationGroupTreeItem
-              key={animation.id}
-              animation={animation}
-              selectedNode={selectedNode}
-              selectedFrames={selectedFrames}
-              onSelect={onSelect}
-              onSelectFrame={onSelectFrame}
-              onOpenContextMenu={onOpenContextMenu}
-            />
-          ) : (
-            <AnimationTreeItem
-              key={animation.id}
-              animation={animation}
-              selectedNode={selectedNode}
-              selectedFrames={selectedFrames}
-              onSelect={onSelect}
-              onSelectFrame={onSelectFrame}
-              onOpenContextMenu={onOpenContextMenu}
-            />
-          ),
-        )}
+        {animations.map((animation) => (
+          <AnimationTreeItem
+            key={animation.id}
+            animation={animation}
+            selectedNode={selectedNode}
+            selectedFrames={selectedFrames}
+            onSelect={onSelect}
+            onSelectFrame={onSelectFrame}
+            onOpenContextMenu={onOpenContextMenu}
+          />
+        ))}
       </AnimationFolder>
     </>
   );
@@ -225,64 +212,6 @@ function AnimationTreeItem({
               </button>
             );
           })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function AnimationGroupTreeItem({
-  animation,
-  selectedNode,
-  selectedFrames,
-  onSelect,
-  onSelectFrame,
-  onOpenContextMenu,
-}: {
-  animation: EditorCharacterAnimationGroup;
-  selectedNode: AnimatedSpriteNodeId | null;
-  selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
-  onSelect: (node: AnimatedSpriteNodeId) => void;
-  onSelectFrame: (node: AnimatedSpriteNodeId, index: number) => void;
-  onOpenContextMenu: (
-    event: React.MouseEvent<HTMLElement>,
-    animation: EditorCharacterAnimationGroup,
-  ) => void;
-}) {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        onContextMenu={(event) => onOpenContextMenu(event, animation)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[#71685d] transition-colors hover:bg-black/[.04] hover:text-[#2d2923]"
-      >
-        <Folder className="size-3.5 text-[#b86b70]" />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium">
-          {animation.label}
-        </span>
-        <span className="font-mono text-[10px] text-[#81786d]">
-          {animation.directions.length}
-        </span>
-        <ChevronDown
-          className={`size-3.5 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
-        />
-      </button>
-      {open ? (
-        <div className="ml-4 mt-1 space-y-0.5 border-l border-black/10 pl-2">
-          {animation.directions.map((direction) => (
-            <AnimationTreeItem
-              key={direction.id}
-              animation={direction}
-              selectedNode={selectedNode}
-              selectedFrames={selectedFrames}
-              onSelect={onSelect}
-              onSelectFrame={onSelectFrame}
-            />
-          ))}
         </div>
       ) : null}
     </div>

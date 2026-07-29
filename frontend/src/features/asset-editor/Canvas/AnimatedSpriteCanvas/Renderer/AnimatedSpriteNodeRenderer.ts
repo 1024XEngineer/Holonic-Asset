@@ -7,7 +7,6 @@ import type {
 import {
   getAnimatedSpriteAnimation,
   getAnimatedSpriteNodeLabel,
-  type AnimatedSpriteDirectionMap,
   type NodeId,
 } from "../animated-sprite-node";
 import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
@@ -31,7 +30,6 @@ export function drawAnimatedSpriteNode({
   expanded,
   playing,
   previewFrame,
-  activeDirections,
   animations,
   prototype,
   unavailableTextureUrls,
@@ -43,7 +41,6 @@ export function drawAnimatedSpriteNode({
   expanded: boolean;
   playing: boolean;
   previewFrame: number;
-  activeDirections: AnimatedSpriteDirectionMap;
   animations: EditorCharacterAnimation[];
   prototype: EditorCharacterSpriteSheet;
   unavailableTextureUrls?: ReadonlySet<string>;
@@ -54,20 +51,15 @@ export function drawAnimatedSpriteNode({
     { x: 0, y: 0 },
     expanded,
     animations,
-    activeDirections,
   );
   drawLabel(
     container,
-    getAnimatedSpriteNodeLabel(node, animations, activeDirections),
+    getAnimatedSpriteNodeLabel(node, animations),
     layout.bounds.width,
     selected,
   );
 
-  const animation = getAnimatedSpriteAnimation(
-    node,
-    animations,
-    activeDirections,
-  );
+  const animation = getAnimatedSpriteAnimation(node, animations);
   const nodeSpriteSheet =
     node === "prototype" ? prototype : animation?.spriteSheet;
   const pixelScale = getAnimatedSpritePixelScale(nodeSpriteSheet ?? prototype);
@@ -149,20 +141,6 @@ export function drawAnimatedSpriteNode({
       expanded ? "-" : "+",
       false,
     );
-    const group = animations.find((candidate) => candidate.id === node);
-    if (group?.kind === "group" && group.directions.length > 1) {
-      const switchControl = layout.switchControl!;
-      drawControl(
-        container,
-        switchControl.x,
-        switchControl.y,
-        switchControl.width,
-        switchControl.height,
-        "Switch",
-        "<>",
-        false,
-      );
-    }
   }
 
   return container;

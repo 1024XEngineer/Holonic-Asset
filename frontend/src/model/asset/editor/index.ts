@@ -5,7 +5,6 @@ export {
   type EditorCanvasPosition,
   type EditorCharacterAnimation,
   type EditorCharacterAnimationClip,
-  type EditorCharacterAnimationGroup,
   type EditorCharacterSpriteSheet,
   type EditorRecord,
   type EditorRecordForKind,
@@ -17,7 +16,6 @@ export {
   type TilesetEditorRecord,
   type UiEditorRecord,
 } from "./editor-record";
-export { getEditorCharacterAnimationClips } from "./editor-character-animation";
 export type {
   GenerateAnimationInput,
   GenerateAnimationRequest,

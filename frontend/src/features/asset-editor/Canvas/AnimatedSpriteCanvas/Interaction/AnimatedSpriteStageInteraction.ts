@@ -1,7 +1,4 @@
-import {
-  getAnimatedSpriteDirectionId,
-  type NodeId,
-} from "../animated-sprite-node";
+import type { NodeId } from "../animated-sprite-node";
 import {
   getCanvasNodes,
   type CanvasPosition,
@@ -71,16 +68,8 @@ export class AnimatedSpriteStageInteraction {
     const hit = this.hitTest(point);
     if (hit?.kind === "play") return this.togglePlaying(hit.node);
     if (hit?.kind === "expand") return this.toggleExpanded(hit.node);
-    if (hit?.kind === "switch") return this.switchDirection(hit.node);
     if (hit?.kind === "frame")
-      return this.context.actions.onSelectFrame(
-        getAnimatedSpriteDirectionId(
-          hit.node,
-          this.context.getAnimations(),
-          this.context.getActiveDirections(),
-        ),
-        hit.index,
-      );
+      return this.context.actions.onSelectFrame(hit.node, hit.index);
     if (hit?.kind === "frame-grid") {
       this.capture(event);
       this.drag = {
@@ -165,12 +154,6 @@ export class AnimatedSpriteStageInteraction {
     this.context.render();
   }
 
-  private switchDirection(node: NodeId) {
-    this.context.actions.onSelect(node);
-    this.context.switchDirection(node);
-    this.context.render();
-  }
-
   private moveNode(
     drag: Extract<DragState, { kind: "node" }>,
     point: CanvasPosition,
@@ -194,7 +177,6 @@ export class AnimatedSpriteStageInteraction {
             scene.positions[node],
             scene.expanded.has(node),
             this.context.getAnimations(),
-            this.context.getActiveDirections(),
           ),
         ),
     );
@@ -211,23 +193,12 @@ export class AnimatedSpriteStageInteraction {
     const position = this.context.getScene().positions[node];
     const indexes = Array.from(
       {
-        length: getFrameCount(
-          node,
-          this.context.getAnimations(),
-          this.context.getActiveDirections(),
-        ),
+        length: getFrameCount(node, this.context.getAnimations()),
       },
       (_, index) => index,
     ).filter((index) => intersects(bounds, getFrameBounds(position, index)));
     if (indexes.length > 0) {
-      this.context.actions.onSelectFrames(
-        getAnimatedSpriteDirectionId(
-          node,
-          this.context.getAnimations(),
-          this.context.getActiveDirections(),
-        ),
-        indexes,
-      );
+      this.context.actions.onSelectFrames(node, indexes);
     }
   }
 

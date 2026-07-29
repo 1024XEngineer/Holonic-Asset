@@ -21,16 +21,7 @@ export type EditorCharacterAnimationClip = {
   audio?: { label: string; time: string };
 };
 
-export type EditorCharacterAnimationGroup = {
-  kind: "group";
-  id: string;
-  label: string;
-  directions: EditorCharacterAnimationClip[];
-};
-
-export type EditorCharacterAnimation =
-  | EditorCharacterAnimationClip
-  | EditorCharacterAnimationGroup;
+export type EditorCharacterAnimation = EditorCharacterAnimationClip;
 
 export type EditorSceneryLayer = {
   id: string;

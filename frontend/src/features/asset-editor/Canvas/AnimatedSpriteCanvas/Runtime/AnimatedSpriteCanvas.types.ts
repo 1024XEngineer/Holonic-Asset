@@ -2,10 +2,7 @@ import type { Viewport } from "pixi-viewport";
 
 import type { EditorCharacterAnimation } from "@/model";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
-import type {
-  AnimatedSpriteDirectionMap,
-  NodeId,
-} from "../animated-sprite-node";
+import type { NodeId } from "../animated-sprite-node";
 import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
 
 export type AnimatedSpriteCanvasActions = {
@@ -15,7 +12,6 @@ export type AnimatedSpriteCanvasActions = {
   onSelectNodes: (nodes: NodeId[]) => void;
   onClearSelection: () => void;
   onNodePositionChange: (node: NodeId, position: CanvasPosition) => void;
-  onSwitchDirection: (node: NodeId, direction: NodeId) => void;
 };
 
 export type AnimatedSpriteCanvasRuntimeProps = {
@@ -30,7 +26,6 @@ export type AnimatedSpriteSceneSnapshot = {
   readonly expanded: ReadonlySet<NodeId>;
   readonly playing: ReadonlySet<NodeId>;
   readonly previewFrames: ReadonlyMap<NodeId, number>;
-  readonly activeDirections: ReadonlyMap<NodeId, NodeId>;
   readonly marquee: {
     readonly start: CanvasPosition;
     readonly end: CanvasPosition;
@@ -42,7 +37,6 @@ export type AnimatedSpriteSceneState = {
   expanded: Set<NodeId>;
   playing: Set<NodeId>;
   previewFrames: Map<NodeId, number>;
-  activeDirections: Map<NodeId, NodeId>;
   marquee: { start: CanvasPosition; end: CanvasPosition } | null;
 };
 
@@ -56,7 +50,5 @@ export type AnimatedSpriteStageContext = {
   getDragStep: () => number;
   toggleExpanded: (node: NodeId) => void;
   togglePlaying: (node: NodeId) => void;
-  switchDirection: (node: NodeId) => void;
-  getActiveDirections: () => AnimatedSpriteDirectionMap;
   render: () => void;
 };

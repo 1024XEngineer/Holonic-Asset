@@ -11,18 +11,13 @@ export type {
   AssetRevision,
   ProjectAsset,
 } from "./library";
-export {
-  editorModeForAssetKind,
-  getEditorCharacterAnimationClips,
-  isEditorRecordForAssetKind,
-} from "./editor";
+export { editorModeForAssetKind, isEditorRecordForAssetKind } from "./editor";
 export type {
   AudioEditorRecord,
   CharacterEditorRecord,
   EditorCanvasPosition,
   EditorCharacterAnimation,
   EditorCharacterAnimationClip,
-  EditorCharacterAnimationGroup,
   EditorCharacterSpriteSheet,
   EditorRecord,
   EditorRecordForKind,

@@ -1,11 +1,5 @@
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
-import {
-  createDefaultAnimatedSpriteDirections,
-  findAnimatedSpriteAnimationGroup,
-  getAnimatedSpriteNodeId,
-  getPreferredAnimatedSpriteDirection,
-  type NodeId,
-} from "../animated-sprite-node";
+import type { NodeId } from "../animated-sprite-node";
 import {
   createDefaultCanvasPositions,
   getCanvasNodes,
@@ -26,9 +20,6 @@ export class AnimatedSpriteScene {
       expanded: new Set(),
       playing: new Set(),
       previewFrames: new Map(),
-      activeDirections: new Map(
-        Object.entries(createDefaultAnimatedSpriteDirections(model.animations)),
-      ),
       marquee: null,
     };
     this.synchronize(model);
@@ -42,9 +33,7 @@ export class AnimatedSpriteScene {
     this.state.positions = createDefaultCanvasPositions(model.animations);
     const canvasNodes = new Set(getCanvasNodes(model.animations));
     this.state.expanded = new Set(
-      [...this.state.expanded]
-        .map((node) => getAnimatedSpriteNodeId(node, model.animations))
-        .filter((node) => canvasNodes.has(node)),
+      [...this.state.expanded].filter((node) => canvasNodes.has(node)),
     );
     this.state.playing = new Set(
       [...this.state.playing].filter((node) => canvasNodes.has(node)),
@@ -56,33 +45,12 @@ export class AnimatedSpriteScene {
       this.state.positions[node as NodeId] = { ...position };
     }
     for (const frame of model.selection.frames) {
-      const node = getAnimatedSpriteNodeId(frame.nodeId, model.animations);
+      const node = frame.nodeId;
       if (canvasNodes.has(node)) this.state.expanded.add(node);
     }
 
-    const activeDirections = new Map<NodeId, NodeId>();
-    for (const animation of model.animations) {
-      if (animation.kind !== "group") continue;
-      const requested = model.activeDirections?.[animation.id];
-      const current = this.state.activeDirections.get(animation.id);
-      const direction = getPreferredAnimatedSpriteDirection(
-        animation,
-        requested,
-        current,
-      );
-      const directionId = direction?.id ?? animation.directions[0].id;
-      activeDirections.set(animation.id, directionId);
-      if (current !== directionId)
-        this.state.previewFrames.set(animation.id, 0);
-    }
-    this.state.activeDirections = activeDirections;
-
     for (const node of this.state.playing) {
-      const frameCount = getFrameCount(
-        node,
-        model.animations,
-        this.state.activeDirections,
-      );
+      const frameCount = getFrameCount(node, model.animations);
       this.state.previewFrames.set(
         node,
         (this.state.previewFrames.get(node) ?? 0) % frameCount,
@@ -110,27 +78,12 @@ export class AnimatedSpriteScene {
     else this.state.playing.add(node);
   }
 
-  switchDirection(node: NodeId, model: AnimatedSpriteCanvasModel) {
-    const group = findAnimatedSpriteAnimationGroup(node, model.animations);
-    if (!group || group.directions.length < 2) return;
-    const current = this.state.activeDirections.get(group.id);
-    const index = Math.max(
-      0,
-      group.directions.findIndex((direction) => direction.id === current),
-    );
-    const direction = group.directions[(index + 1) % group.directions.length];
-    this.state.activeDirections.set(group.id, direction.id);
-    this.state.previewFrames.set(group.id, 0);
-
-    return { nodeId: group.id, directionId: direction.id };
-  }
-
   advanceAnimation(model: AnimatedSpriteCanvasModel) {
     for (const node of this.state.playing) {
       this.state.previewFrames.set(
         node,
         ((this.state.previewFrames.get(node) ?? 0) + 1) %
-          getFrameCount(node, model.animations, this.state.activeDirections),
+          getFrameCount(node, model.animations),
       );
     }
   }

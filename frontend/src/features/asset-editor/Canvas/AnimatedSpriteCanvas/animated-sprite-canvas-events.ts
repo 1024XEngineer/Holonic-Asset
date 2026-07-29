@@ -28,8 +28,5 @@ export function createAnimatedSpriteCanvasActions(
     onNodePositionChange: (nodeId, position) => {
       onEvent({ type: "node-position.committed", nodeId, position });
     },
-    onSwitchDirection: (nodeId, directionId) => {
-      onEvent({ type: "direction.changed", nodeId, directionId });
-    },
   };
 }

@@ -9,7 +9,6 @@ import type { Viewport } from "pixi-viewport";
 
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import { getCanvasNodes } from "../AnimatedSpriteCanvas.constants";
-import { getAnimatedSpriteNodeId } from "../animated-sprite-node";
 import { normalizeBounds } from "../Interaction/AnimatedSpriteStageGeometry";
 import {
   getAnimatedSpritePixelScale,
@@ -43,20 +42,14 @@ export class AnimatedSpriteStageRenderer {
           node,
           position: state.positions[node],
           selected: model.selection.nodeIds.some(
-            (selectedNode) =>
-              getAnimatedSpriteNodeId(selectedNode, model.animations) === node,
+            (selectedNode) => selectedNode === node,
           ),
           selectedFrames: model.selection.frames
-            .filter(
-              (frame) =>
-                getAnimatedSpriteNodeId(frame.nodeId, model.animations) ===
-                node,
-            )
+            .filter((frame) => frame.nodeId === node)
             .map((frame) => frame.index),
           expanded: state.expanded.has(node),
           playing: state.playing.has(node),
           previewFrame: state.previewFrames.get(node) ?? 0,
-          activeDirections: state.activeDirections,
           animations: model.animations,
           prototype: model.prototype,
           unavailableTextureUrls: model.unavailableTextureUrls,

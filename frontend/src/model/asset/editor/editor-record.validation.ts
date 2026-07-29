@@ -72,33 +72,7 @@ function isEditorCanvasPosition(value: unknown): value is EditorCanvasPosition {
 function isEditorCharacterAnimation(
   value: unknown,
 ): value is EditorCharacterAnimation {
-  if (
-    !isPlainObject(value) ||
-    typeof value.id !== "string" ||
-    value.id.length === 0 ||
-    typeof value.label !== "string"
-  ) {
-    return false;
-  }
-
-  switch (value.kind) {
-    case "group":
-      return (
-        value.frameCount === undefined &&
-        value.spriteSheet === undefined &&
-        value.audio === undefined &&
-        isArrayOf(value.directions, isEditorCharacterAnimationClip) &&
-        value.directions.length > 0 &&
-        value.directions.every((direction) =>
-          direction.id.startsWith(`${value.id}/`),
-        ) &&
-        hasUniqueAnimationIds(value.directions)
-      );
-    case "clip":
-      return isEditorCharacterAnimationClip(value);
-    default:
-      return false;
-  }
+  return isEditorCharacterAnimationClip(value);
 }
 
 function isEditorCharacterAnimationClip(
@@ -121,13 +95,7 @@ function isEditorCharacterAnimations(
   value: unknown,
 ): value is EditorCharacterAnimation[] {
   if (!isArrayOf(value, isEditorCharacterAnimation)) return false;
-  return hasUniqueAnimationIds(
-    value.flatMap((animation) =>
-      animation.kind === "group"
-        ? [animation, ...animation.directions]
-        : [animation],
-    ),
-  );
+  return hasUniqueAnimationIds(value);
 }
 
 function hasUniqueAnimationIds(value: Array<{ id: string }>) {

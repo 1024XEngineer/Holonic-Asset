@@ -66,11 +66,8 @@ function getDefaultNodeHeight(
   if (node === PROTOTYPE_NODE_ID) return COLLAPSED_HEIGHT;
   const animation = animations.find((candidate) => candidate.id === node);
   if (!animation) return COLLAPSED_HEIGHT;
-  const frameCount =
-    animation.kind === "group"
-      ? Math.max(
-          ...animation.directions.map((direction) => direction.frameCount),
-        )
-      : animation.frameCount;
-  return Math.max(COLLAPSED_HEIGHT, getExpandedNodeHeight(frameCount));
+  return Math.max(
+    COLLAPSED_HEIGHT,
+    getExpandedNodeHeight(animation.frameCount),
+  );
 }

@@ -20,7 +20,6 @@ export type AnimatedSpriteCanvasModel = {
   prototype: EditorCharacterSpriteSheet;
   animations: EditorCharacterAnimation[];
   unavailableTextureUrls?: ReadonlySet<string>;
-  activeDirections?: Readonly<Record<string, AnimatedSpriteNodeId>>;
   nodePositions?: Record<string, CanvasPosition>;
   selection: AnimatedSpriteCanvasSelection;
 };
@@ -34,11 +33,6 @@ export type AnimatedSpriteCanvasEvent =
       type: "node-position.committed";
       nodeId: AnimatedSpriteNodeId;
       position: CanvasPosition;
-    }
-  | {
-      type: "direction.changed";
-      nodeId: AnimatedSpriteNodeId;
-      directionId: AnimatedSpriteNodeId;
     };
 
 export type AnimatedSpriteCanvasProps = {
