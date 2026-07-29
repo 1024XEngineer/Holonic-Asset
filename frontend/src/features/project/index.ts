@@ -1,2 +1,2 @@
-export { NewProjectScreen } from "./NewProjectScreen";
-export { ProjectSidebar } from "./ProjectSidebar";
+export { NewProjectScreen } from "./new-project-screen";
+export { ProjectSidebar } from "./project-sidebar";

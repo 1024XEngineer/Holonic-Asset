@@ -1,1 +1,1 @@
-export { UiCanvas } from "./UiCanvas";
+export { UiCanvas } from "./ui-canvas";

@@ -1,5 +1,5 @@
 import { SettingsScreen } from "@/features/settings";
-import { AppHeader } from "@/components/layouts/AppHeader";
+import { AppHeader } from "@/components/layouts/app-header";
 
 export function SettingsPage() {
   return (

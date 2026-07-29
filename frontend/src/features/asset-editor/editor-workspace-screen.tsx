@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import type { EditorWorkspaceData } from "@/model";
 
-import { EditorWorkspace } from "./EditorWorkspace";
+import { EditorWorkspace } from "./editor-workspace";
 
 export function EditorWorkspaceScreen({
   data,

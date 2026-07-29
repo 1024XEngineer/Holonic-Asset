@@ -4,8 +4,8 @@ import {
   useSceneryCanvasStateMachine,
 } from "../Canvas/SceneryCanvas";
 
-import { SceneryLayerTree } from "../AssetTree/SceneryLayerTree";
-import { Inspector } from "../Inspector/Inspector";
+import { SceneryLayerTree } from "../AssetTree/scenery-layer-tree";
+import { Inspector } from "../Inspector/inspector";
 import type { EditorModeProps } from "./types";
 
 export function SceneryEditorMode({

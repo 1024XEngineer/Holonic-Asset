@@ -6,7 +6,7 @@ import {
   HomeProjectStory,
   HomeWorkflow,
 } from "@/features/home";
-import { AppHeader } from "@/components/layouts/AppHeader";
+import { AppHeader } from "@/components/layouts/app-header";
 
 export function HomePage() {
   return (

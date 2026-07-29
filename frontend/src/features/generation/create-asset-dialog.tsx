@@ -28,9 +28,9 @@ import {
 import {
   SceneryAssetFields,
   TilesetAssetFields,
-} from "./CreateAsset/BackgroundAssetFields";
-import { UiAssetFields } from "./CreateAsset/UiAssetFields";
-import { VisualAssetFields } from "./CreateAsset/VisualAssetFields";
+} from "./CreateAsset/background-asset-fields";
+import { UiAssetFields } from "./CreateAsset/ui-asset-fields";
+import { VisualAssetFields } from "./CreateAsset/visual-asset-fields";
 
 export function CreateAssetDialog({
   children,

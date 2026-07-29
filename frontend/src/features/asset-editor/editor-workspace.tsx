@@ -9,13 +9,13 @@ import type {
 import { useTimeout } from "@/hooks/use-timeout";
 
 import { useAssetEditorSession } from "./state/session";
-import { AudioEditorMode } from "./EditorModes/AudioEditorMode";
-import { CharacterEditorMode } from "./EditorModes/CharacterEditorMode";
-import { SceneryEditorMode } from "./EditorModes/SceneryEditorMode";
-import { TilesetEditorMode } from "./EditorModes/TilesetEditorMode";
-import { UiEditorMode } from "./EditorModes/UiEditorMode";
-import { EditorHeader } from "./Header/EditorHeader";
-import type { EditorGenerationTask } from "./Header/EditorHeader";
+import { AudioEditorMode } from "./EditorModes/audio-editor-mode";
+import { CharacterEditorMode } from "./EditorModes/character-editor-mode";
+import { SceneryEditorMode } from "./EditorModes/scenery-editor-mode";
+import { TilesetEditorMode } from "./EditorModes/tileset-editor-mode";
+import { UiEditorMode } from "./EditorModes/ui-editor-mode";
+import { EditorHeader } from "./Header/editor-header";
+import type { EditorGenerationTask } from "./Header/editor-header";
 
 export function EditorWorkspace({
   data,

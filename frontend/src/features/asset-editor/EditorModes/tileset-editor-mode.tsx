@@ -4,8 +4,8 @@ import {
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
 
-import { TilesetAssetTree } from "../AssetTree/TilesetAssetTree";
-import { Inspector } from "../Inspector/Inspector";
+import { TilesetAssetTree } from "../AssetTree/tileset-asset-tree";
+import { Inspector } from "../Inspector/inspector";
 import type { EditorModeProps } from "./types";
 
 export function TilesetEditorMode({

@@ -5,8 +5,8 @@ import type {
   GenerateAnimationRequest,
 } from "@/model";
 import { type AnimatedSpriteNodeId } from "../Canvas/AnimatedSpriteCanvas";
-import { useAnimationActions } from "./AnimationActions";
-import { AnimationTreeItems } from "./AnimationTreeItems";
+import { useAnimationActions } from "./animation-actions";
+import { AnimationTreeItems } from "./animation-tree-items";
 
 type AssetTreeProps = {
   animations: EditorCharacterAnimation[];

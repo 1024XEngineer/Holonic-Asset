@@ -1,1 +1,1 @@
-export { EditorWorkspaceScreen } from "./EditorWorkspaceScreen";
+export { EditorWorkspaceScreen } from "./editor-workspace-screen";

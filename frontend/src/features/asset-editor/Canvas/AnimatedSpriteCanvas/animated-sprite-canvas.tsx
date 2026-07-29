@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { createAnimatedSpriteCanvasActions } from "./animated-sprite-canvas-events";
 import { getAnimatedSpriteNodeLabel } from "./animated-sprite-node";
-import { AnimatedSpriteCanvasLoading } from "./Loading/AnimatedSpriteCanvasLoading";
+import { AnimatedSpriteCanvasLoading } from "./Loading/animated-sprite-canvas-loading";
 import { AnimatedSpriteCanvasRuntime } from "./Runtime/AnimatedSpriteCanvasRuntime";
 import type { AnimatedSpriteCanvasProps } from "./AnimatedSpriteCanvas.interface";
 

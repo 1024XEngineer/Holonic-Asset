@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { ProjectSummary } from "@/model";
-import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
+import { ProjectSettingsDialog } from "./project-settings-dialog";
 
 type ProjectSidebarProps = {
   isProjectRoute: boolean;

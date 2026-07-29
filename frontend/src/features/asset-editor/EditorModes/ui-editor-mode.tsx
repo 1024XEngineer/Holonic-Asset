@@ -3,8 +3,8 @@ import { useState } from "react";
 import type { UiEditorRecord } from "@/model";
 import { UiCanvas } from "../Canvas/UiCanvas";
 
-import { UiComponentTree } from "../AssetTree/UiComponentTree";
-import { Inspector } from "../Inspector/Inspector";
+import { UiComponentTree } from "../AssetTree/ui-component-tree";
+import { Inspector } from "../Inspector/inspector";
 import type { EditorModeProps } from "./types";
 
 export function UiEditorMode({

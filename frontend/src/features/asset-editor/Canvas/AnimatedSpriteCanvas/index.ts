@@ -1,4 +1,4 @@
-export { AnimatedSpriteCanvas } from "./AnimatedSpriteCanvas";
+export { AnimatedSpriteCanvas } from "./animated-sprite-canvas";
 export {
   createDefaultAnimatedSpriteDirections,
   findAnimatedSpriteAnimationGroup,

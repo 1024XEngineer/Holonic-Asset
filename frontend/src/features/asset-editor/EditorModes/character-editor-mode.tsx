@@ -16,8 +16,8 @@ import type {
   GenerateAnimationRequest,
 } from "@/model";
 
-import { AssetTree } from "../AssetTree/AssetTree";
-import { Inspector } from "../Inspector/Inspector";
+import { AssetTree } from "../AssetTree/asset-tree";
+import { Inspector } from "../Inspector/inspector";
 import type { EditorModeProps } from "./types";
 
 export function CharacterEditorMode({

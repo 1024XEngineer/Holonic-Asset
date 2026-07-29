@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import {
   GenerationTaskDropdown,
   type EditorGenerationTask,
-} from "./GenerationTaskDropdown";
+} from "./generation-task-dropdown";
 
-export type { EditorGenerationTask } from "./GenerationTaskDropdown";
+export type { EditorGenerationTask } from "./generation-task-dropdown";
 
 type EditorHeaderProps = {
   assetName: string;
