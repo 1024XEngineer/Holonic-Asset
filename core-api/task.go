@@ -1,6 +1,6 @@
-// Package ioc is the composition root — it wires business handlers to
+// Package main is the composition root — it wires business handlers to
 // infrastructure modules.
-package ioc
+package main
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func InitTask(
 ) (task.Queue, error) {
 	queue, err := task.NewQueue(ctx, cfg, repo)
 	if err != nil {
-		return nil, fmt.Errorf("ioc: initialize task queue: %w", err)
+		return nil, fmt.Errorf("app: initialize task queue: %w", err)
 	}
 	return queue, nil
 }

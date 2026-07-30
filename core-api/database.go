@@ -1,4 +1,4 @@
-package ioc
+package main
 
 import (
 	"context"
@@ -17,10 +17,10 @@ import (
 
 func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.DB, error) {
 	if cfg == nil {
-		return nil, errors.New("ioc: database config is nil")
+		return nil, errors.New("app: database config is nil")
 	}
 	if strings.TrimSpace(cfg.DSN) == "" {
-		return nil, errors.New("ioc: database DSN is required")
+		return nil, errors.New("app: database DSN is required")
 	}
 	if l == nil {
 		l = logger.NewDefaultLogger()
@@ -33,12 +33,12 @@ func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.D
 		}),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("ioc: open PostgreSQL database: %w", err)
+		return nil, fmt.Errorf("app: open PostgreSQL database: %w", err)
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("ioc: get PostgreSQL connection pool: %w", err)
+		return nil, fmt.Errorf("app: get PostgreSQL connection pool: %w", err)
 	}
 	if cfg.MaxIdleConns > 0 {
 		sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
@@ -55,11 +55,11 @@ func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.D
 
 	if err := sqlDB.PingContext(ctx); err != nil {
 		_ = sqlDB.Close()
-		return nil, fmt.Errorf("ioc: ping PostgreSQL database: %w", err)
+		return nil, fmt.Errorf("app: ping PostgreSQL database: %w", err)
 	}
 	if err := dao.InitTables(db.WithContext(ctx)); err != nil {
 		_ = sqlDB.Close()
-		return nil, fmt.Errorf("ioc: initialize database tables: %w", err)
+		return nil, fmt.Errorf("app: initialize database tables: %w", err)
 	}
 
 	return db, nil

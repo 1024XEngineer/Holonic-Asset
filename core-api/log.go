@@ -1,4 +1,4 @@
-package ioc
+package main
 
 import (
 	"encoding/json"
