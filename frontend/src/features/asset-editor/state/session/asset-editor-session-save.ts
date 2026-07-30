@@ -1,4 +1,4 @@
-import type { EditorRecord } from "@/model";
+import type { EditorRecord } from "@/features/asset-editor/types";
 
 import {
   markAssetEditorSessionSaved,

@@ -2,7 +2,7 @@ import type {
   EditorCanvasPosition,
   EditorRecord,
   GeneratedEditorCharacterAnimation,
-} from "@/model";
+} from "@/features/asset-editor/types";
 
 export type AssetEditorTarget = {
   projectId: string;

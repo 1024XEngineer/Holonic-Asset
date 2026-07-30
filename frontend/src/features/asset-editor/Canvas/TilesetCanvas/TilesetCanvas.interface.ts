@@ -1,4 +1,4 @@
-import type { EditorTilesetItem } from "@/model";
+import type { EditorTilesetItem } from "@/features/asset-editor/types";
 
 export type TilesetCanvasModel = {
   gridSize: number;

@@ -1,47 +1,19 @@
 export {
-  assetKinds,
-  creatableAssetKinds,
-  getDefaultAssetCanvasSize,
-  type AssetKind,
-  type CreatableAssetKind,
+  assetApi,
+  assetKeys,
+  useAssetLibraryQuery,
+  useCopyAssetMutation,
+  useDeleteAssetMutation,
 } from "./library";
-export type {
-  AssetGroup,
-  AssetGroupsByProject,
-  AssetRevision,
-  ProjectAsset,
-} from "./library";
-export { editorModeForAssetKind, isEditorRecordForAssetKind } from "./editor";
-export type {
-  AudioEditorRecord,
-  CharacterEditorRecord,
-  EditorCanvasPosition,
-  EditorCharacterAnimation,
-  EditorCharacterAnimationClip,
-  EditorCharacterSpriteSheet,
-  EditorRecord,
-  EditorRecordForKind,
-  EditorSceneryLayer,
-  EditorTilesetCell,
-  EditorTilesetItem,
-  EditorUiComponent,
-  EditorWorkspaceAsset,
-  EditorWorkspaceData,
-  EditorWorkspaceDataForKind,
-  SceneryEditorRecord,
-  TilesetEditorRecord,
-  UiEditorRecord,
+export {
+  useGenerateAnimationMutation,
+  useRecordQuery,
+  useSaveAssetRevisionMutation,
 } from "./editor";
-export type {
-  GenerateAnimationInput,
-  GenerateAnimationRequest,
-  GenerateAnimationResult,
-  GeneratedEditorCharacterAnimation,
-} from "./editor";
-export type {
-  AddAudioTrackInput,
-  AudioTrack,
-  AudioTrackTone,
-  GenerateAudioVariationInput,
-  UpdateAudioTrackInput,
+export {
+  useAddAudioTrackMutation,
+  useAudioTracksQuery,
+  useDeleteAudioTrackMutation,
+  useGenerateAudioVariationMutation,
+  useUpdateAudioTrackMutation,
 } from "./audio";

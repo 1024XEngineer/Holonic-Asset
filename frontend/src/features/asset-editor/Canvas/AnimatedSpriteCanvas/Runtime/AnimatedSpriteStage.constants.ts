@@ -1,4 +1,4 @@
-import type { EditorCharacterSpriteSheet } from "@/model";
+import type { EditorCharacterSpriteSheet } from "@/features/asset-editor/types";
 
 export const MIN_SCALE = 0.3;
 export const MAX_SOURCE_PIXEL_SCREEN_SIZE = 24;

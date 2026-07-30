@@ -1,4 +1,4 @@
-import type { EditorCharacterAnimation } from "@/model";
+import type { EditorCharacterAnimation } from "@/features/asset-editor/types";
 import type { AnimatedSpriteNodeId } from "./animated-sprite-node";
 import {
   COLLAPSED_HEIGHT,

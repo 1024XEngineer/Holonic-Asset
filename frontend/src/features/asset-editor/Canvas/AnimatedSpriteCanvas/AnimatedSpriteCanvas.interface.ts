@@ -1,7 +1,7 @@
 import type {
   EditorCharacterAnimation,
   EditorCharacterSpriteSheet,
-} from "@/model";
+} from "@/features/asset-editor/types";
 
 import type { CanvasPosition } from "./AnimatedSpriteCanvas.constants";
 import type { AnimatedSpriteNodeId } from "./animated-sprite-node";

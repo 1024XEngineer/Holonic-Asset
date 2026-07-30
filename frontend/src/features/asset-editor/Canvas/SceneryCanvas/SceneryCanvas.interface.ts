@@ -1,4 +1,4 @@
-import type { EditorSceneryLayer } from "@/model";
+import type { EditorSceneryLayer } from "@/features/asset-editor/types";
 
 export type SceneryCanvasModel = {
   layers: EditorSceneryLayer[];

@@ -1,4 +1,4 @@
-import type { EditorCharacterAnimation } from "@/model";
+import type { EditorCharacterAnimation } from "@/features/asset-editor/types";
 import {
   getAnimatedSpriteAnimation,
   type NodeId,
