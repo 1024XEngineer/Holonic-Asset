@@ -12,27 +12,139 @@ import {
 } from "@/model";
 import { getEnvelope, postEnvelope } from "@/api/fetchers";
 
+export type AssetType =
+  | "character"
+  | "object"
+  | "tileSet"
+  | "audio"
+  | "ui"
+  | "scenery";
+
+export type AssetAttributes = Record<string, unknown>;
+export type AssetContentMetadata = Record<string, unknown>;
+
+export type AssetImageResourceResponse = {
+  id: number;
+  url: string;
+};
+
+export type AssetAnimationFrameResponse = AssetImageResourceResponse & {
+  duration: number;
+};
+
+export type AssetAnimationResponse = {
+  id: number;
+  name: string;
+  frames: AssetAnimationFrameResponse[];
+};
+
+type DirectionalAssetContent = {
+  viewMode: "side_on" | "top_down";
+  directionCount: 1 | 2 | 4 | 8;
+  prototype: AssetImageResourceResponse[];
+  metadata?: AssetContentMetadata;
+};
+
+export type CharacterAssetContent = DirectionalAssetContent & {
+  animations: AssetAnimationResponse[];
+};
+
+export type ObjectAssetContent = DirectionalAssetContent & {
+  animations?: AssetAnimationResponse[];
+};
+
+export type TileSetTileResponse = {
+  url: string;
+  position: { x: number; y: number };
+};
+
+export type TileSetItemResponse = {
+  name: string;
+  tiles: TileSetTileResponse[];
+};
+
+export type TileSetAssetContent = {
+  tileSize: { width: number; height: number };
+  items: TileSetItemResponse[];
+  metadata?: AssetContentMetadata;
+};
+
+/** Content contracts for these asset types have not been specified yet. */
+export type UnspecifiedAssetContent = {
+  metadata?: AssetContentMetadata;
+  [key: string]: unknown;
+};
+
+export type AssetContentByType = {
+  character: CharacterAssetContent;
+  object: ObjectAssetContent;
+  tileSet: TileSetAssetContent;
+  audio: UnspecifiedAssetContent;
+  ui: UnspecifiedAssetContent;
+  scenery: UnspecifiedAssetContent;
+};
+
+export type AssetContent = AssetContentByType[AssetType];
+
 /** Matches core-api/internal/dto.AssetListItemResponse. */
-export type AssetListItemResponse = {
+export type AssetListItemResponse<Type extends AssetType = AssetType> = {
   assetId: number;
   name: string;
   projectId: number;
-  type: "character" | "tileSet" | "audio" | "ui" | "object" | "scenery";
+  type: Type;
   description: string;
   tags: string[];
   version: number;
 };
 
-export type AssetAttributes = Record<string, unknown>;
-export type AssetDetailResponse = AssetListItemResponse & {
-  attributes: AssetAttributes;
+export type AssetMetadataResponse<Type extends AssetType = AssetType> =
+  AssetListItemResponse<Type> & {
+    attributes: AssetAttributes;
+  };
+
+type AssetDetailResponseByType = {
+  [Type in AssetType]: AssetMetadataResponse<Type> & {
+    content: AssetContentByType[Type];
+  };
 };
+
+export type AssetDetailResponse<Type extends AssetType = AssetType> =
+  AssetDetailResponseByType[Type];
+
+export type ListAssetsQuery = {
+  query?: string;
+  tags?: string[];
+  types?: AssetType[];
+};
+
+export type UpdateAssetRequest = {
+  assetId: number;
+  name?: string;
+  projectId?: number;
+  type?: AssetType;
+  description?: string;
+  tags?: string[];
+  attributes?: AssetAttributes;
+  version?: number;
+};
+
+export type UpdateAssetResponse = AssetMetadataResponse;
+
+export type AssetRecordResponse<Content extends AssetContent = AssetContent> = {
+  recordId: number;
+  assetId: number;
+  version: number;
+  contentId: number;
+  createdAt: string;
+  content: Content;
+};
+
 export type GetAssetsResponse = { assets: AssetListItemResponse[] };
 export type AssetRequest = {
   ID?: number;
   Name: string;
   ProjectID: number;
-  Type: AssetListItemResponse["type"];
+  Type: AssetType;
   Description: string;
   tags?: string[];
   attributes?: AssetAttributes;
@@ -42,7 +154,7 @@ export type CreateAssetResponse = { id: number };
 export type CreateAnimationRequest = {
   Name: string;
   AssetID: number;
-  Type: AssetListItemResponse["type"];
+  Type: AssetType;
 };
 export type CreateAnimationResponse = { id: number };
 export type RecordAssetRequest = { AssetID: number };

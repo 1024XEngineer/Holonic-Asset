@@ -15,9 +15,28 @@ export {
 } from "./asset";
 export { coreAssetApi } from "./asset/library/asset.api";
 export type {
+  AssetAnimationFrameResponse,
+  AssetAnimationResponse,
+  AssetAttributes,
+  AssetContent,
+  AssetContentByType,
+  AssetContentMetadata,
   AssetDetailResponse,
+  AssetImageResourceResponse,
   AssetListItemResponse,
+  AssetMetadataResponse,
+  AssetRecordResponse,
   AssetRequest,
+  AssetType,
+  CharacterAssetContent,
+  ListAssetsQuery,
+  ObjectAssetContent,
+  TileSetAssetContent,
+  TileSetItemResponse,
+  TileSetTileResponse,
+  UnspecifiedAssetContent,
+  UpdateAssetRequest,
+  UpdateAssetResponse,
 } from "./asset/library/asset.api";
 export {
   generationKeys,
