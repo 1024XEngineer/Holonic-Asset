@@ -10,3 +10,14 @@ pre-commit:
       root: "core-api/"
       glob: "*.go"
       run: golangci-lint run
+
+    frontend-format:
+      root: "frontend/"
+      glob: "*.{js,jsx,ts,tsx}"
+      run: pnpm format {staged_files}
+      stage_fixed: true
+
+    frontend-lint:
+      root: "frontend/"
+      glob: "*.{js,jsx,ts,tsx}"
+      run: pnpm lint
