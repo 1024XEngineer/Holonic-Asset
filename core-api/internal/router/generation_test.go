@@ -14,13 +14,23 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
-type generationRouterStub struct{}
+type generationRouterStub struct {
+	listRequest *dto.ListGenerationRunsRequest
+}
 
 func (*generationRouterStub) Create(
 	*echox.Context,
 	dto.CreateGenerationRequest,
 ) (dto.CreateGenerationResponse, error) {
 	return dto.CreateGenerationResponse{}, nil
+}
+
+func (s *generationRouterStub) List(
+	_ *echox.Context,
+	request dto.ListGenerationRunsRequest,
+) (dto.ListGenerationRunsResponse, error) {
+	s.listRequest = &request
+	return dto.ListGenerationRunsResponse{}, nil
 }
 
 func (*generationRouterStub) Get(
@@ -37,15 +47,9 @@ func (*generationRouterStub) Cancel(
 	return dto.CancelGenerationResponse{}, nil
 }
 
-func (*generationRouterStub) ConfirmCandidate(
-	*echox.Context,
-	dto.ConfirmCandidateRequest,
-) (dto.ConfirmCandidateResponse, error) {
-	return dto.ConfirmCandidateResponse{}, nil
-}
-
 func TestGenerationRoutesAreRegistered(t *testing.T) {
-	e := router.Register(nil, nil, &generationRouterStub{}, nil)
+	stub := &generationRouterStub{}
+	e := router.Register(nil, nil, stub, nil)
 
 	tests := []struct {
 		method string
@@ -62,13 +66,12 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 			path:   "/api/v1/generation-runs/7",
 		},
 		{
-			method: http.MethodPost,
-			path:   "/api/v1/generation-runs/7/cancel",
-			body:   `{}`,
+			method: http.MethodGet,
+			path:   "/api/v1/projects/42/generation-runs?assetId=9&status=active&limit=10&cursor=next",
 		},
 		{
 			method: http.MethodPost,
-			path:   "/api/v1/generation-runs/7/candidates/9/confirm",
+			path:   "/api/v1/generation-runs/7/cancel",
 			body:   `{}`,
 		},
 	}
@@ -86,12 +89,37 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 			}
 		})
 	}
+
+	if stub.listRequest == nil || stub.listRequest.ProjectID != 42 ||
+		stub.listRequest.AssetID == nil || *stub.listRequest.AssetID != 9 ||
+		stub.listRequest.Status != "active" || stub.listRequest.Limit != 10 ||
+		stub.listRequest.Cursor != "next" {
+		t.Fatalf("unexpected list request: %+v", stub.listRequest)
+	}
 }
 
 func TestAIRoutesAreNotExposed(t *testing.T) {
 	e := router.Register(nil, nil, &generationRouterStub{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/tile-set/item/edit", strings.NewReader(`{}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recorder := httptest.NewRecorder()
+
+	e.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCandidateConfirmationRouteIsNotExposed(t *testing.T) {
+	e := router.Register(nil, nil, &generationRouterStub{}, nil)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/generation-runs/7/candidates/9/confirm",
+		strings.NewReader(`{}`),
+	)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	recorder := httptest.NewRecorder()
 

@@ -7,89 +7,62 @@ import (
 )
 
 type RunID uint
-type PlanID uint
-type StepID uint
-type CandidateID uint
+type RunListStatus string
+
+const RunListStatusActive RunListStatus = "active"
 
 // GenerationRequest captures the business intent accepted by generation.
 // Kind-specific parameters remain bounded data interpreted by generation.
 type GenerationRequest struct {
 	ProjectID         uint
-	AssetID           uint
-	Kind              RequestKind
+	AssetID           *uint
+	Kind              TaskType
 	Prompt            string
 	ReferenceMediaIDs []string
 	TargetAssetPaths  []string
 	Parameters        json.RawMessage
 }
 
-type Failure struct {
-	Code    string
-	Message string
-}
-
+// GenerationRun is a task-backed projection. ID and Status come directly from
+// the task record; generation does not persist a separate run state.
 type GenerationRun struct {
-	ID                   RunID
-	PlanningTaskID       *uint
-	ProjectID            uint
-	Request              GenerationRequest
-	PlanID               PlanID
-	Lifecycle            RunLifecycle
-	ConfirmedCandidateID *CandidateID
-	Failure              *Failure
+	ID        RunID
+	ProjectID uint
+	AssetID   *uint
+	Kind      TaskType
+	Status    taskdomain.Status
+	Result    json.RawMessage
+	Error     string
 }
 
-// GenerationDetail is assembled from generation records and task state.
-type GenerationDetail struct {
-	Run        GenerationRun
-	Steps      []StepDetail
-	Candidates []Candidate
+// RunListQuery contains the client-facing list semantics. The service expands
+// status and asset scope into repository filters.
+type RunListQuery struct {
+	ProjectID uint
+	AssetID   *uint
+	Status    RunListStatus
+	Limit     int
+	Cursor    string
 }
 
-// StepDetail carries task-owned execution state without persisting a duplicate
-// status in the generation module.
-type StepDetail struct {
-	Step       Step
-	TaskStatus *taskdomain.Status
-}
-
-type Plan struct {
-	ID    PlanID
-	RunID RunID
-	Steps []Step
-}
-
-type Step struct {
-	ID           StepID
-	TaskID       *uint
-	RunID        RunID
-	PlanID       PlanID
-	Key          string
-	Type         string
-	Executor     StepExecutor
-	Dependencies []StepID
-	Parameters   json.RawMessage
-}
-
-type StepResult struct {
-	MediaIDs []string
-	Metadata json.RawMessage
-}
-
-type Candidate struct {
-	ID       CandidateID
-	RunID    RunID
-	MediaIDs []string
-}
-
-// ConfirmCandidateCommand contains the asset target required to apply an
-// accepted candidate without making the asset module query generation state.
-type ConfirmCandidateCommand struct {
-	RunID            RunID
-	CandidateID      CandidateID
+type RunListFilter struct {
 	ProjectID        uint
-	AssetID          uint
-	Kind             RequestKind
-	TargetAssetPaths []string
-	MediaIDs         []string
+	AssetID          *uint
+	Statuses         []taskdomain.Status
+	IncludeTaskTypes []TaskType
+	ExcludeTaskTypes []TaskType
+	Limit            int
+	Cursor           string
+}
+
+type RunListPage struct {
+	Runs       []GenerationRun
+	NextCursor string
+}
+
+func ActiveTaskStatuses() []taskdomain.Status {
+	return []taskdomain.Status{
+		taskdomain.StatusPending,
+		taskdomain.StatusProcessing,
+	}
 }

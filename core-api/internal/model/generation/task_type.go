@@ -19,3 +19,29 @@ const (
 	RegenerateItem  TaskType = "regenerate_item"
 	RegenerateTiles TaskType = "regenerate_tiles"
 )
+
+func ProjectLevelTaskTypes() []TaskType {
+	return []TaskType{
+		GenerateCharacterProtoType,
+		GenerateObjectProtoType,
+		GenerateTileSet,
+	}
+}
+
+func TaskTypes() []TaskType {
+	return []TaskType{
+		GenerateCharacterProtoType,
+		GenerateCharacterAnimation,
+		RegenerateCharacterProtoType,
+		RegenerateCharacterAnimation,
+		RegenerateCharacterFrames,
+		GenerateObjectProtoType,
+		GenerateObjectAnimation,
+		RegenerateObjectProtoType,
+		RegenerateObjectAnimation,
+		RegenerateObjectFrames,
+		GenerateTileSet,
+		RegenerateItem,
+		RegenerateTiles,
+	}
+}

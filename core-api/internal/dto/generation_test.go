@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/generation"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 )
 
@@ -21,17 +19,8 @@ func TestCreateGenerationRequestUsesPromptField(t *testing.T) {
 	}
 }
 
-func TestGenerationResponseSeparatesLifecycleFromTaskStatus(t *testing.T) {
-	taskStatus := taskdomain.StatusProcessing
-	response := dto.GetGenerationResponse{
-		Lifecycle: domain.RunLifecycleGenerating,
-		Steps: []dto.StepResponse{{
-			TaskStatus: &taskStatus,
-		}},
-		Candidates: []dto.CandidateResponse{{
-			ID: 9,
-		}},
-	}
+func TestGenerationResponseUsesTaskStatus(t *testing.T) {
+	response := dto.GetGenerationResponse{Status: taskdomain.StatusProcessing}
 
 	payload, err := json.Marshal(response)
 	if err != nil {
@@ -42,25 +31,10 @@ func TestGenerationResponseSeparatesLifecycleFromTaskStatus(t *testing.T) {
 	if err := json.Unmarshal(payload, &body); err != nil {
 		t.Fatalf("unmarshal generation response: %v", err)
 	}
-	if body["lifecycle"] != string(domain.RunLifecycleGenerating) {
-		t.Fatalf("unexpected lifecycle: %v", body["lifecycle"])
+	if body["status"] != float64(taskdomain.StatusProcessing) {
+		t.Fatalf("unexpected task status: %v", body["status"])
 	}
-	if _, exists := body["status"]; exists {
-		t.Fatalf("generation response must not expose task status: %s", payload)
-	}
-
-	steps := body["steps"].([]any)
-	step := steps[0].(map[string]any)
-	if step["taskStatus"] != float64(taskdomain.StatusProcessing) {
-		t.Fatalf("unexpected step task status: %v", step["taskStatus"])
-	}
-	if _, exists := step["status"]; exists {
-		t.Fatalf("step must label execution state as taskStatus: %s", payload)
-	}
-
-	candidates := body["candidates"].([]any)
-	candidate := candidates[0].(map[string]any)
-	if _, exists := candidate["status"]; exists {
-		t.Fatalf("candidate must not expose task status: %s", payload)
+	if _, exists := body["lifecycle"]; exists {
+		t.Fatalf("generation response must not expose lifecycle: %s", payload)
 	}
 }
