@@ -1,7 +1,5 @@
-import {
-  getDefaultAssetCanvasSize,
-  type CreatableAssetKind,
-} from "@/features/assets/types";
+import type { CreatableAssetKind } from "@/features/assets";
+import { getDefaultAssetCanvasSize } from "@/model";
 import type { CreationRequest } from "../generation";
 
 import type { AssetCreationDraft } from "./AssetCreation.interface";

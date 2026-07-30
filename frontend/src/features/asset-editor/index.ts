@@ -1,4 +1,4 @@
-export { editorModeForAssetKind } from "./editor-mode";
+export { AssetEditor } from "./asset-editor";
 export type {
   AudioEditorRecord,
   CharacterEditorRecord,
@@ -12,8 +12,8 @@ export type {
   EditorTilesetCell,
   EditorTilesetItem,
   EditorUiComponent,
+  EditorWorkspaceData,
   SceneryEditorRecord,
   TilesetEditorRecord,
   UiEditorRecord,
-} from "./editor-record";
-export type { EditorWorkspaceData } from "./editor-workspace";
+} from "./types";

@@ -1,4 +1,4 @@
-import type { CreatableAssetKind } from "@/features/assets/types";
+import type { CreatableAssetKind } from "@/features/assets";
 import type { CreationRequest } from "../generation";
 
 type CommonAssetCreationDraft<K extends CreatableAssetKind> = {

@@ -2,7 +2,6 @@ export type { ProjectAsset } from "./asset";
 export {
   assetKinds,
   creatableAssetKinds,
-  getDefaultAssetCanvasSize,
   type AssetKind,
   type CreatableAssetKind,
 } from "./asset-kind";

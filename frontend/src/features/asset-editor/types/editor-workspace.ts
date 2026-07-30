@@ -1,4 +1,4 @@
-import type { AssetKind, AssetRevision } from "@/features/assets/types";
+import type { AssetKind, AssetRevision } from "@/features/assets";
 import type { EditorRecordForKind } from "./editor-record";
 
 export type EditorWorkspaceAsset<K extends AssetKind = AssetKind> = {

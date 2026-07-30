@@ -1,4 +1,4 @@
-import type { AssetKind } from "@/features/assets/types";
+import type { AssetKind } from "@/features/assets";
 
 export type EditorCanvasPosition = { x: number; y: number };
 
@@ -107,19 +107,3 @@ export type EditorRecordForKind<K extends AssetKind> =
         : K extends UiAssetKind
           ? UiEditorRecord
           : AudioEditorRecord;
-
-export function editorModeForAssetKind(kind: AssetKind): EditorRecord["mode"] {
-  switch (kind) {
-    case "character":
-    case "object":
-      return "character";
-    case "scenery":
-      return "scenery";
-    case "tileset":
-      return "tileset";
-    case "ui":
-      return "ui";
-    case "audio":
-      return "audio";
-  }
-}
