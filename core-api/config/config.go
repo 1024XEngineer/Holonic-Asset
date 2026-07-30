@@ -24,8 +24,15 @@ type LogConfig struct {
 	Compress   bool   `mapstructure:"compress" yaml:"compress"`
 }
 
+type QNAConfig struct {
+	BaseURL      string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey       string `mapstructure:"apiKey" yaml:"apiKey"`
+	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
+}
+
 type Config struct {
 	DB    DBConfig    `mapstructure:"db" yaml:"db"`
 	Queue QueueConfig `mapstructure:"queue" yaml:"queue"`
 	Log   LogConfig   `mapstructure:"log" yaml:"log"`
+	QNA   QNAConfig   `mapstructure:"qna" yaml:"qna"`
 }
