@@ -4,7 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 )
 
 type UploadRouter interface {

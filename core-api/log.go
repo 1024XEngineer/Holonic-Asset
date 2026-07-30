@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/1024XEngineer/Holonic-Asset/config"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/logger"
+	"github.com/1024XEngineer/Holonic-Asset/internal/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
 func InitLogger(logConfig *config.LogConfig) logger.Logger {

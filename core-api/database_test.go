@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/1024XEngineer/Holonic-Asset/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 )
 
 func TestInitDBRejectsEmptyDSN(t *testing.T) {

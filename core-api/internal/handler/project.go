@@ -2,8 +2,8 @@ package handler
 
 import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type ProjectHandler struct {

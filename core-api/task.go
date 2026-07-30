@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/1024XEngineer/Holonic-Asset/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 )
 

@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/1024XEngineer/Holonic-Asset/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/logger"
 )
 
 func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.DB, error) {

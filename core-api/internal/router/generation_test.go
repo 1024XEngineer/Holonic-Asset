@@ -10,8 +10,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type generationRouterStub struct {

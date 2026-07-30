@@ -21,3 +21,11 @@ qna:
   baseURL: "https://example.com"
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
+
+  qiniu:
+    accessKey: ""
+    secretKey: ""
+    bucket: ""
+    domain: ""
+    uploadURL: ""
+    uploadTokenExpiry: 1h

@@ -2,8 +2,8 @@ package handler
 
 import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type UploadHandler struct {

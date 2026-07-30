@@ -12,8 +12,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
-	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type projectManagerStub struct {

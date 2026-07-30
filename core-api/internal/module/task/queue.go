@@ -10,7 +10,7 @@ import (
 	riverqueue "github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
-	"github.com/1024XEngineer/Holonic-Asset/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 )
 
 const queueTaskKind = "holonic_task"

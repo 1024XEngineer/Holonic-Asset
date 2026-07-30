@@ -30,9 +30,19 @@ type QNAConfig struct {
 	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
 }
 
+type QiniuConfig struct {
+	AccessKey         string
+	SecretKey         string
+	Bucket            string
+	Domain            string
+	UploadURL         string
+	UploadTokenExpiry time.Duration
+}
+
 type Config struct {
 	DB    DBConfig    `mapstructure:"db" yaml:"db"`
 	Queue QueueConfig `mapstructure:"queue" yaml:"queue"`
 	Log   LogConfig   `mapstructure:"log" yaml:"log"`
 	QNA   QNAConfig   `mapstructure:"qna" yaml:"qna"`
+	QiNiu QiniuConfig `mapstructure:"qiniu" yaml:"qiniu"`
 }
