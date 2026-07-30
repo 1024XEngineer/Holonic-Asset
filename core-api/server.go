@@ -22,7 +22,7 @@ func InitServer() *App {
 	workspaceModule := workspace.New(projectRepository, nil)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
 
-	generatorEngine := generator.NewEngine(nil, nil, nil, nil)
+	generatorEngine := generator.NewEngine(nil, nil, nil)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
 
 	uploader := upload.NewUploader(nil)

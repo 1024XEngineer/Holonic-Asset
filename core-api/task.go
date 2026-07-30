@@ -13,11 +13,11 @@ import (
 func InitTask(
 	ctx context.Context,
 	cfg config.QueueConfig,
-	repo task.TaskResultStore,
-) (task.Queue, error) {
-	queue, err := task.NewQueue(ctx, cfg, repo)
+	repo task.TaskStore,
+) (task.Manager, error) {
+	manager, err := task.NewManager(ctx, cfg, repo)
 	if err != nil {
-		return nil, fmt.Errorf("app: initialize task queue: %w", err)
+		return nil, fmt.Errorf("app: initialize task manager: %w", err)
 	}
-	return queue, nil
+	return manager, nil
 }

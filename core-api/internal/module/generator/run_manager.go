@@ -36,7 +36,7 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 		return 0, err
 	}
 
-	taskID, err := e.tasks.Create(ctx, &taskdomain.Task{
+	taskID, err := e.tasks.Publish(ctx, &taskdomain.Task{
 		Type:    string(request.Kind),
 		Status:  taskdomain.StatusPending,
 		Payload: payload,
@@ -213,5 +213,5 @@ func (e *Engine) Cancel(ctx context.Context, runID RunID) error {
 	if e.tasks == nil {
 		return ErrTaskManagerRequired
 	}
-	return e.tasks.UpdateStatus(ctx, uint(runID), taskdomain.StatusCancelled)
+	return e.tasks.Cancel(ctx, uint(runID))
 }

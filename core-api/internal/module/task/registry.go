@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// registry maps task types to handlers for TaskQueue and is safe for concurrent access.
+// registry maps task types to handlers and is safe for concurrent access.
 type registry struct {
 	mu       sync.RWMutex
 	handlers map[string]Handler

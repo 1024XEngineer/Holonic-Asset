@@ -84,12 +84,12 @@ func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 	return nil
 }
 
-func (e *Engine) registerTaskHandlers(queue taskdomain.Queue) {
-	queue.Register(string(GenerateCharacterProtoType), taskdomain.HandlerFunc(e.handleCharacterPrototype))
-	queue.Register(string(GenerateCharacterAnimation), taskdomain.HandlerFunc(e.handleCharacterAnimation))
-	queue.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
-	queue.Register(string(GenerateObjectAnimation), taskdomain.HandlerFunc(e.handleObjectAnimation))
-	queue.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
+func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
+	manager.Register(string(GenerateCharacterProtoType), taskdomain.HandlerFunc(e.handleCharacterPrototype))
+	manager.Register(string(GenerateCharacterAnimation), taskdomain.HandlerFunc(e.handleCharacterAnimation))
+	manager.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
+	manager.Register(string(GenerateObjectAnimation), taskdomain.HandlerFunc(e.handleObjectAnimation))
+	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
 
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{
@@ -102,6 +102,6 @@ func (e *Engine) registerTaskHandlers(queue taskdomain.Queue) {
 		RegenerateItem,
 		RegenerateTiles,
 	} {
-		queue.Register(string(taskType), emptyHandler)
+		manager.Register(string(taskType), emptyHandler)
 	}
 }

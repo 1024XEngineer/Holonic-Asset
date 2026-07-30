@@ -23,30 +23,21 @@ func (queueTaskArgs) Kind() string { return queueTaskKind }
 
 type queueWorker struct {
 	riverqueue.WorkerDefaults[queueTaskArgs]
-	queue *TaskQueue
+	queue *queue
 }
 
 func (w *queueWorker) Work(ctx context.Context, job *riverqueue.Job[queueTaskArgs]) error {
 	return w.queue.dispatch(ctx, &job.Args.Task)
 }
 
-// Queue combines task registration, production, and consumption.
-type Queue interface {
-	Register(taskType string, h Handler)
-	Producer
-	Consumer
-}
-
-// TaskQueue is the ready-to-use task queue implementation.
-type TaskQueue struct {
+type queue struct {
 	client   *riverqueue.Client[pgx.Tx]
 	dbPool   *pgxpool.Pool
 	registry *registry
 	repo     TaskResultStore
 }
 
-// NewQueue creates a ready-to-use task queue using the module's configuration.
-func NewQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore) (Queue, error) {
+func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore) (*queue, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("task: database URL is required")
 	}
@@ -62,7 +53,7 @@ func NewQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore)
 		return nil, fmt.Errorf("task: create database pool: %w", err)
 	}
 
-	queue := &TaskQueue{dbPool: dbPool, registry: newRegistry(), repo: repo}
+	queue := &queue{dbPool: dbPool, registry: newRegistry(), repo: repo}
 	workers := riverqueue.NewWorkers()
 	riverqueue.AddWorker(workers, &queueWorker{queue: queue})
 
@@ -87,22 +78,11 @@ func NewQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore)
 	return queue, nil
 }
 
-// Producer publishes tasks to the configured queue.
-type Producer interface {
-	Publish(ctx context.Context, task *Task) error
-}
-
-// Consumer receives tasks and delegates processing to registered handlers.
-type Consumer interface {
-	Start(ctx context.Context) error
-	Stop() error
-}
-
-func (q *TaskQueue) Register(taskType string, h Handler) {
+func (q *queue) Register(taskType string, h Handler) {
 	q.registry.register(taskType, h)
 }
 
-func (q *TaskQueue) Publish(ctx context.Context, message *Task) error {
+func (q *queue) publish(ctx context.Context, message *Task) error {
 	if message == nil {
 		return fmt.Errorf("task: cannot publish nil task")
 	}
@@ -119,20 +99,20 @@ func (q *TaskQueue) Publish(ctx context.Context, message *Task) error {
 	return nil
 }
 
-func (q *TaskQueue) Start(ctx context.Context) error {
+func (q *queue) start(ctx context.Context) error {
 	if err := q.client.Start(ctx); err != nil {
 		return fmt.Errorf("task: start queue: %w", err)
 	}
 	return nil
 }
 
-func (q *TaskQueue) Stop() error {
+func (q *queue) stop() error {
 	err := q.client.Stop(context.Background())
 	q.dbPool.Close()
 	return err
 }
 
-func (q *TaskQueue) dispatch(ctx context.Context, message *Task) error {
+func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	if message == nil {
 		return fmt.Errorf("task: cannot dispatch nil task")
 	}
@@ -154,7 +134,3 @@ func (q *TaskQueue) dispatch(ctx context.Context, message *Task) error {
 	message.Status = StatusCompleted
 	return nil
 }
-
-var (
-	_ Queue = (*TaskQueue)(nil)
-)

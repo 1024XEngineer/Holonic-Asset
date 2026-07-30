@@ -1,10 +1,10 @@
 # Task Module
 
-The Task module owns task contracts, task management, queue execution, and transactional outbox dispatch. It exposes one `task.Queue` entry point for handler registration, publishing, and consumption. Business code can still depend on the narrower `task.Producer` or `task.Consumer` interfaces when needed.
+The Task module exposes one application-facing concept: `task.Manager`. It owns task creation, handler registration, queue consumption, transactional outbox dispatch, and task queries. Queue and outbox implementations remain internal details.
 
-Before starting the queue, configure PostgreSQL and ensure the task queue database schema has been migrated.
+Before starting the manager, configure PostgreSQL and ensure the task and outbox tables have been migrated.
 
-## 1. Define the Business Payload and Handler
+## Define a Business Handler
 
 Task types, payloads, and handlers belong to the business module that owns them.
 
@@ -15,12 +15,12 @@ type examplePayload struct {
 	Message string `json:"message"`
 }
 
-func registerExampleHandler(queue task.Queue) {
-	queue.Register(exampleTaskType, task.HandlerFunc(
+func registerExampleHandler(manager task.Manager) {
+	manager.Register(exampleTaskType, task.HandlerFunc(
 		func(_ context.Context, message *task.Task) (any, error) {
 			var payload examplePayload
 			if err := json.Unmarshal(message.Payload, &payload); err != nil {
-				return fmt.Errorf("decode example payload: %w", err)
+				return nil, fmt.Errorf("decode example payload: %w", err)
 			}
 
 			fmt.Printf("handled task %d: %s\n", message.ID, payload.Message)
@@ -30,97 +30,66 @@ func registerExampleHandler(queue task.Queue) {
 }
 ```
 
-The business handler does not read from the queue directly and does not perform task-type routing. `task.TaskQueue` owns handler lookup and invocation.
-
-## 2. Create and Start the Task Queue
-
-Application code can depend on the generic `task.Consumer` interface:
+## Create and Start the Manager
 
 ```go
-func startConsumer(ctx context.Context, consumer task.Consumer) error {
-	return consumer.Start(ctx)
-}
-```
-
-Create the queue through the task module. No queue vendor configuration or type is exposed to callers:
-
-```go
-queue, err := task.NewQueue(ctx, config.QueueConfig{
+manager, err := task.NewManager(ctx, config.QueueConfig{
 	DatabaseURL: databaseURL,
 	MaxWorkers:  4,
 	JobTimeout:  5 * time.Minute,
-}, taskRepo)
+}, taskStore)
 if err != nil {
 	return err
 }
 
-registerExampleHandler(queue)
+registerExampleHandler(manager)
 
-defer queue.Stop()
-if err := startConsumer(ctx, queue); err != nil {
+if err := manager.Start(ctx); err != nil {
 	return err
 }
+defer manager.Stop()
 ```
 
-`Start` launches the queue's fetching and worker loops in the background. `MaxWorkers` controls how many task handlers can execute concurrently in one application instance.
+`Start` starts both the queue consumer and the transactional outbox poller. The outbox poller continuously forwards persisted task records to the queue, so callers do not need to construct or run a dispatcher separately.
 
-## 3. Publish Through the Producer Interface
+## Publish and Query Tasks
 
-Producers should also depend on the generic interface:
-
-```go
-func publishExample(ctx context.Context, producer task.Producer) error {
-	payload, err := json.Marshal(examplePayload{Message: "hello from the task queue"})
-	if err != nil {
-		return fmt.Errorf("encode example payload: %w", err)
-	}
-
-	return producer.Publish(ctx, &task.Task{
-		Type:    exampleTaskType,
-		Status:  task.StatusPending,
-		Payload: payload,
-	})
-}
-```
-
-Pass the same task queue as the implementation:
+`Publish` creates the task and its transactional outbox record, returning the task ID. Handler execution remains asynchronous.
 
 ```go
-if err := publishExample(ctx, queue); err != nil {
+payload, err := json.Marshal(examplePayload{Message: "hello from the task manager"})
+if err != nil {
 	return err
 }
-```
 
-`Publish` waits for the task to be inserted into the queue, but handler execution is asynchronous. Production workflows that must atomically persist business state and enqueue a task should publish through the transactional Outbox flow instead of calling the queue directly.
+taskID, err := manager.Publish(ctx, &task.Task{
+	Type:    exampleTaskType,
+	Status:  task.StatusPending,
+	Payload: payload,
+})
+if err != nil {
+	return err
+}
 
-## Responsibility Boundaries
+detail, err := manager.GetDetail(ctx, taskID)
+if err != nil {
+	return err
+}
 
-- Business modules define task type strings, payloads, and handlers.
-- `task.Queue` combines handler registration, publishing, and consumption.
-- `task.TaskQueue` is the queue implementation and owns the handler registry.
-- `task.Consumer` controls receiving messages and handler execution.
-- `task.Producer` provides the queue-neutral publishing contract.
-- `task.TaskManager` owns task lifecycle operations backed by `task.TaskStore`.
-- `task.Dispatcher` publishes pending records from `task.OutboxStore`.
-- The composition root creates the queue from `config.QueueConfig` and injects it into business modules, which register their handlers during construction.
-
-## Task Management and Outbox
-
-Task lifecycle operations and outbox dispatch belong to this module as well:
-
-```go
-manager := task.NewTaskManager(taskStore)
 pending, err := manager.ListByStatus(ctx, task.StatusPending)
 if err != nil {
 	return err
 }
-_ = pending
 
-queue, err := task.NewQueue(ctx, cfg.Queue, taskResultStore)
-if err != nil {
-	return err
-}
-dispatcher := task.NewDispatcher(taskStore, queue)
+_ = detail
+_ = pending
 ```
 
-The repository package implements `task.TaskStore`, `task.TaskResultStore`, and `task.OutboxStore`; the queue only depends on the narrow `task.TaskResultStore` port needed for automatic completion updates.
+Production workflows that must atomically persist business state and enqueue a task should use the repository's `TaskStore` transaction boundary. The manager's `Publish` method already uses `CreateWithOutbox`, so callers never need to handle outbox records directly.
+
+## Responsibility Boundaries
+
+- Business modules define task type strings, payloads, and handlers.
+- `task.Manager` is the only task lifecycle and execution entry point exposed to application code.
+- `task.Task` and `task.Handler` define the queue-neutral task contract.
+- `task.TaskStore` is the persistence port implemented by the repository adapter.

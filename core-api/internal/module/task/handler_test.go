@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-func TestTaskQueuePersistsSuccessfulHandlerResult(t *testing.T) {
+func TestManagerExecutionPersistsSuccessfulHandlerResult(t *testing.T) {
 	store := &taskStoreStub{}
-	queue := &TaskQueue{
+	queue := &queue{
 		registry: newRegistry(),
 		repo:     store,
 	}

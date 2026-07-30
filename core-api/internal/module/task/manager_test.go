@@ -43,12 +43,12 @@ func (*taskStoreStub) MarkOutboxPublished(context.Context, uint, int64) error {
 	return nil
 }
 
-func TestTaskManagerDelegatesLifecycleOperations(t *testing.T) {
+func TestManagerDelegatesTaskOperations(t *testing.T) {
 	store := &taskStoreStub{}
-	manager := NewTaskManager(store)
+	manager := &manager{store: store}
 	message := &Task{Type: "example.v1"}
 
-	id, err := manager.Create(context.Background(), message)
+	id, err := manager.Publish(context.Background(), message)
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -72,11 +72,18 @@ func TestTaskManagerDelegatesLifecycleOperations(t *testing.T) {
 		t.Fatalf("unexpected task list: %+v", tasks)
 	}
 
-	if err := manager.UpdateStatus(context.Background(), id, StatusProcessing); err != nil {
-		t.Fatalf("update task status: %v", err)
+	if err := manager.Cancel(context.Background(), id); err != nil {
+		t.Fatalf("cancel task: %v", err)
 	}
-	if store.status != StatusProcessing {
-		t.Fatalf("unexpected status: %v", store.status)
+	if store.status != StatusCancelled {
+		t.Fatalf("unexpected task status: %s", store.status)
 	}
+}
 
+func TestManagerRejectsNilPublish(t *testing.T) {
+	manager := &manager{store: &taskStoreStub{}}
+
+	if _, err := manager.Publish(context.Background(), nil); err == nil {
+		t.Fatal("expected nil publish error")
+	}
 }

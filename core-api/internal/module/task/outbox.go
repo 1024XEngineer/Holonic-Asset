@@ -6,17 +6,20 @@ import (
 	"log"
 )
 
-// Dispatcher publishes task messages stored in the transactional outbox.
-type Dispatcher struct {
+type queuePublisher interface {
+	publish(ctx context.Context, task *Task) error
+}
+
+type dispatcher struct {
 	store    OutboxStore
-	producer Producer
+	producer queuePublisher
 }
 
-func NewDispatcher(store OutboxStore, producer Producer) *Dispatcher {
-	return &Dispatcher{store: store, producer: producer}
+func newDispatcher(store OutboxStore, producer queuePublisher) *dispatcher {
+	return &dispatcher{store: store, producer: producer}
 }
 
-func (d *Dispatcher) Run(ctx context.Context, batchSize int) (int, error) {
+func (d *dispatcher) run(ctx context.Context, batchSize int) (int, error) {
 	records, err := d.store.FetchPendingOutbox(ctx, batchSize)
 	if err != nil {
 		return 0, err
@@ -30,7 +33,7 @@ func (d *Dispatcher) Run(ctx context.Context, batchSize int) (int, error) {
 			continue
 		}
 
-		if err := d.producer.Publish(ctx, &message); err != nil {
+		if err := d.producer.publish(ctx, &message); err != nil {
 			log.Printf("task dispatcher: publish outbox %d (%s): %v", record.ID, message.Type, err)
 			continue
 		}

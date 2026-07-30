@@ -24,7 +24,7 @@ type producerStub struct {
 	messages []*Task
 }
 
-func (p *producerStub) Publish(_ context.Context, message *Task) error {
+func (p *producerStub) publish(_ context.Context, message *Task) error {
 	p.messages = append(p.messages, message)
 	return nil
 }
@@ -37,9 +37,9 @@ func TestDispatcherPublishesAndMarksOutboxRecords(t *testing.T) {
 
 	store := &outboxStoreStub{records: []OutboxRecord{{ID: 11, Payload: payload}}}
 	producer := &producerStub{}
-	dispatcher := NewDispatcher(store, producer)
+	dispatcher := newDispatcher(store, producer)
 
-	published, err := dispatcher.Run(context.Background(), 10)
+	published, err := dispatcher.run(context.Background(), 10)
 	if err != nil {
 		t.Fatalf("run dispatcher: %v", err)
 	}

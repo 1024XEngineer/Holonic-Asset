@@ -31,6 +31,7 @@ type taskManagerStub struct {
 	createID      uint
 	detail        *taskdomain.Task
 	statusUpdates []taskStatusUpdate
+	handlers      map[string]taskdomain.Handler
 }
 
 type taskStatusUpdate struct {
@@ -38,7 +39,18 @@ type taskStatusUpdate struct {
 	status taskdomain.Status
 }
 
-func (s *taskManagerStub) Create(_ context.Context, message *taskdomain.Task) (uint, error) {
+func (s *taskManagerStub) Register(taskType string, handler taskdomain.Handler) {
+	if s.handlers == nil {
+		s.handlers = make(map[string]taskdomain.Handler)
+	}
+	s.handlers[taskType] = handler
+}
+
+func (s *taskManagerStub) Start(context.Context) error { return nil }
+
+func (s *taskManagerStub) Stop() error { return nil }
+
+func (s *taskManagerStub) Publish(_ context.Context, message *taskdomain.Task) (uint, error) {
 	s.createdTask = message
 	return s.createID, nil
 }
@@ -54,33 +66,18 @@ func (*taskManagerStub) ListByStatus(
 	return nil, nil
 }
 
-func (s *taskManagerStub) UpdateStatus(_ context.Context, taskID uint, status taskdomain.Status) error {
-	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: status})
+func (s *taskManagerStub) Cancel(_ context.Context, taskID uint) error {
+	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: taskdomain.StatusCancelled})
 	return nil
 }
 
-var _ taskdomain.TaskManager = (*taskManagerStub)(nil)
-
-type taskQueueStub struct {
-	handlers map[string]taskdomain.Handler
-}
-
-func newTaskQueueStub() *taskQueueStub {
-	return &taskQueueStub{handlers: make(map[string]taskdomain.Handler)}
-}
-
-func (s *taskQueueStub) Register(taskType string, handler taskdomain.Handler) {
-	s.handlers[taskType] = handler
-}
-
-func (*taskQueueStub) Publish(context.Context, *taskdomain.Task) error { return nil }
-func (*taskQueueStub) Start(context.Context) error                     { return nil }
-func (*taskQueueStub) Stop() error                                     { return nil }
-
-func (s *taskQueueStub) dispatch(
+func (s *taskManagerStub) dispatch(
 	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
+	if s.handlers == nil {
+		return nil, errors.New("task handler is not registered")
+	}
 	handler, ok := s.handlers[message.Type]
 	if !ok {
 		return nil, errors.New("task handler is not registered")
@@ -88,12 +85,12 @@ func (s *taskQueueStub) dispatch(
 	return handler.Handle(ctx, message)
 }
 
-var _ taskdomain.Queue = (*taskQueueStub)(nil)
+var _ taskdomain.Manager = (*taskManagerStub)(nil)
 
 func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	assetID := uint(9)
 	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(nil, tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil, nil)
 	request := &generator.Request{
 		ProjectID:         42,
 		AssetID:           &assetID,
@@ -127,7 +124,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 
 func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(nil, tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil, nil)
 
 	_, err := engine.Create(context.Background(), &generator.Request{
 		ProjectID:         42,
@@ -170,7 +167,7 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 		Payload: payload,
 		Result:  json.RawMessage(`{"asset_id":9}`),
 	}}
-	engine := generator.NewEngine(nil, tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil, nil)
 
 	run, err := engine.Get(context.Background(), 17)
 	if err != nil {
@@ -184,7 +181,7 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 
 func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 	reader := &generationReaderStub{page: &generator.RunListPage{}}
-	engine := generator.NewEngine(nil, &taskManagerStub{}, reader, nil)
+	engine := generator.NewEngine(&taskManagerStub{}, reader, nil)
 
 	_, err := engine.List(context.Background(), &generator.RunListQuery{
 		ProjectID: 42,
@@ -210,7 +207,7 @@ func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 func TestListBuildsAssetScopeTaskFilter(t *testing.T) {
 	assetID := uint(9)
 	reader := &generationReaderStub{page: &generator.RunListPage{}}
-	engine := generator.NewEngine(nil, &taskManagerStub{}, reader, nil)
+	engine := generator.NewEngine(&taskManagerStub{}, reader, nil)
 
 	_, err := engine.List(context.Background(), &generator.RunListQuery{
 		ProjectID: 42,
@@ -232,7 +229,7 @@ func TestListBuildsAssetScopeTaskFilter(t *testing.T) {
 }
 
 func TestListRejectsUnsupportedStatus(t *testing.T) {
-	engine := generator.NewEngine(nil, &taskManagerStub{}, &generationReaderStub{}, nil)
+	engine := generator.NewEngine(&taskManagerStub{}, &generationReaderStub{}, nil)
 	_, err := engine.List(context.Background(), &generator.RunListQuery{Status: "completed"})
 	if !errors.Is(err, generator.ErrInvalidRunListStatus) {
 		t.Fatalf("expected invalid status error, got %v", err)
@@ -241,7 +238,7 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 
 func TestCancelUpdatesTaskStatus(t *testing.T) {
 	tasks := &taskManagerStub{}
-	engine := generator.NewEngine(nil, tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil, nil)
 
 	if err := engine.Cancel(context.Background(), 17); err != nil {
 		t.Fatalf("cancel generation: %v", err)
@@ -300,11 +297,10 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		t.Run(string(tt.taskType), func(t *testing.T) {
 			tasks := &taskManagerStub{}
 			executor := &executorStub{}
-			queue := newTaskQueueStub()
-			generator.NewEngine(queue, tasks, nil, executor)
+			generator.NewEngine(tasks, nil, executor)
 
 			message := &taskdomain.Task{ID: 17, Type: string(tt.taskType), Payload: tt.payload}
-			if _, err := queue.dispatch(context.Background(), message); err != nil {
+			if _, err := tasks.dispatch(context.Background(), message); err != nil {
 				t.Fatalf("dispatch generation task: %v", err)
 			}
 			if executor.payload != nil || len(tasks.statusUpdates) != 0 {
@@ -318,10 +314,9 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
-	queue := newTaskQueueStub()
-	generator.NewEngine(queue, tasks, nil, executor)
+	generator.NewEngine(tasks, nil, executor)
 
-	_, err := queue.dispatch(context.Background(), &taskdomain.Task{
+	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
 		Type:    string(generator.GenerateCharacterProtoType),
 		Payload: json.RawMessage(`{"project_id":"not-a-number"}`),
@@ -338,8 +333,7 @@ func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
-	queue := newTaskQueueStub()
-	generator.NewEngine(queue, tasks, nil, executor)
+	generator.NewEngine(tasks, nil, executor)
 
 	for _, taskType := range generator.TaskTypes() {
 		message := &taskdomain.Task{
@@ -347,7 +341,7 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			Type:    string(taskType),
 			Payload: json.RawMessage(`{}`),
 		}
-		if _, err := queue.dispatch(context.Background(), message); err != nil {
+		if _, err := tasks.dispatch(context.Background(), message); err != nil {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
@@ -361,10 +355,9 @@ func TestHandleCharacterPrototypeOnlyDecodesPayload(t *testing.T) {
 	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top-down","direction_count":"4","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
-	queue := newTaskQueueStub()
-	generator.NewEngine(queue, tasks, nil, executor)
+	generator.NewEngine(tasks, nil, executor)
 
-	got, err := queue.dispatch(context.Background(), &taskdomain.Task{
+	got, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
 		Type:    string(generator.GenerateCharacterProtoType),
 		Payload: payload,
