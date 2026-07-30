@@ -9,47 +9,47 @@ import (
 )
 
 func (e *Engine) handleCharacterPrototype(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateCharacterPrototypePayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	return e.execute(ctx, GenerateCharacterProtoType, message.Payload)
 }
 
 func (e *Engine) handleCharacterAnimation(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateCharacterAnimationPayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	return e.execute(ctx, GenerateCharacterAnimation, message.Payload)
 }
 
 func (e *Engine) handleObjectPrototype(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateObjectPrototypePayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	return e.execute(ctx, GenerateObjectProtoType, message.Payload)
 }
 
 func (e *Engine) handleObjectAnimation(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateObjectAnimationPayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	return e.execute(ctx, GenerateObjectAnimation, message.Payload)
 }
 
 func (e *Engine) handleTileSet(
@@ -82,6 +82,17 @@ func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 		return fmt.Errorf("generator: decode %s task %d payload: %w", message.Type, message.ID, err)
 	}
 	return nil
+}
+
+func (e *Engine) execute(
+	ctx context.Context,
+	taskType TaskType,
+	payload json.RawMessage,
+) (any, error) {
+	if e.executor == nil {
+		return nil, ErrExecutorRequired
+	}
+	return e.executor.Generate(ctx, taskType, append(json.RawMessage(nil), payload...))
 }
 
 func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
