@@ -12,17 +12,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
 
-type TaskRepository interface {
-	CreateWithOutbox(ctx context.Context, task *domain.Task) (uint, error)
-
-	GetTaskByID(ctx context.Context, taskID uint) (*domain.Task, error)
-
-	UpdateTaskStatus(ctx context.Context, taskID uint, status domain.Status) error
-	UpdateTaskResult(ctx context.Context, taskID uint, result json.RawMessage) error
-
-	FetchPendingOutbox(ctx context.Context, limit int) ([]*dao.Outbox, error)
-	MarkOutboxPublished(ctx context.Context, outboxID uint, queueID int64) error
-}
+type TaskRepository = domain.TaskStore
 
 type TaskRepositoryImpl struct {
 	DB        *gorm.DB
@@ -37,6 +27,8 @@ func NewTaskRepository(db *gorm.DB) *TaskRepositoryImpl {
 		OutboxDao: dao.NewOutboxDao(db),
 	}
 }
+
+var _ domain.TaskStore = (*TaskRepositoryImpl)(nil)
 
 func (r *TaskRepositoryImpl) CreateWithOutbox(ctx context.Context, task *domain.Task) (uint, error) {
 	task.Status = domain.StatusPending
@@ -104,8 +96,42 @@ func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID uint) (*dom
 	}, nil
 }
 
-func (r *TaskRepositoryImpl) FetchPendingOutbox(ctx context.Context, limit int) ([]*dao.Outbox, error) {
-	return r.OutboxDao.FetchPending(ctx, limit)
+func (r *TaskRepositoryImpl) ListTasksByStatus(ctx context.Context, status domain.Status) ([]*domain.Task, error) {
+	items, err := r.TaskDao.ListByStatus(ctx, uint(status))
+	if err != nil {
+		return nil, fmt.Errorf("repo: list tasks by status %s: %w", status, err)
+	}
+
+	tasks := make([]*domain.Task, 0, len(items))
+	for _, item := range items {
+		tasks = append(tasks, &domain.Task{
+			ID:        item.ID,
+			Type:      item.Type,
+			Status:    domain.Status(item.Status),
+			Payload:   json.RawMessage(item.Payload),
+			Result:    json.RawMessage(item.Result),
+			Error:     item.Error,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
+		})
+	}
+	return tasks, nil
+}
+
+func (r *TaskRepositoryImpl) FetchPendingOutbox(ctx context.Context, limit int) ([]domain.OutboxRecord, error) {
+	records, err := r.OutboxDao.FetchPending(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	outbox := make([]domain.OutboxRecord, 0, len(records))
+	for _, record := range records {
+		outbox = append(outbox, domain.OutboxRecord{
+			ID:      record.ID,
+			Payload: json.RawMessage(record.Payload),
+		})
+	}
+	return outbox, nil
 }
 
 func (r *TaskRepositoryImpl) MarkOutboxPublished(ctx context.Context, outboxID uint, queueID int64) error {

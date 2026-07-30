@@ -26,6 +26,7 @@ type TaskDao interface {
 	UpdateStatus(ctx context.Context, taskID uint, status uint) error
 	UpdateResult(ctx context.Context, taskID uint, status uint, result datatypes.JSON) error
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
+	ListByStatus(ctx context.Context, status uint) ([]*Task, error)
 }
 
 type TaskDaoImpl struct {
@@ -72,4 +73,16 @@ func (d *TaskDaoImpl) GetDetail(ctx context.Context, taskID uint) (*Task, error)
 		return nil, fmt.Errorf("dao: get task %d: %w", taskID, err)
 	}
 	return &task, nil
+}
+
+func (d *TaskDaoImpl) ListByStatus(ctx context.Context, status uint) ([]*Task, error) {
+	var tasks []*Task
+	err := d.DB.WithContext(ctx).
+		Where("status = ?", status).
+		Order("created_at ASC, id ASC").
+		Find(&tasks).Error
+	if err != nil {
+		return nil, fmt.Errorf("dao: list tasks by status %d: %w", status, err)
+	}
+	return tasks, nil
 }

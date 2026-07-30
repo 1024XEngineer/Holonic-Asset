@@ -5,10 +5,10 @@ db:
   connMaxIdleTime: 15m
   connMaxLifetime: 1h
 
-river:
+queue:
   databaseURL: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
   maxWorkers: 10
-  clientTimeout: 5m
+  jobTimeout: 5m
 
 log:
   path: ./logs/holonic-asset.log

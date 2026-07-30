@@ -10,10 +10,10 @@ type DBConfig struct {
 	ConnMaxLifetime time.Duration `mapstructure:"connMaxLifetime" yaml:"connMaxLifetime"`
 }
 
-type RiverConfig struct {
-	DatabaseURL   string        `mapstructure:"databaseURL" yaml:"databaseURL"`
-	MaxWorkers    int           `mapstructure:"maxWorkers" yaml:"maxWorkers"`
-	ClientTimeout time.Duration `mapstructure:"clientTimeout" yaml:"clientTimeout"`
+type QueueConfig struct {
+	DatabaseURL string        `mapstructure:"databaseURL" yaml:"databaseURL"`
+	MaxWorkers  int           `mapstructure:"maxWorkers" yaml:"maxWorkers"`
+	JobTimeout  time.Duration `mapstructure:"jobTimeout" yaml:"jobTimeout"`
 }
 
 type LogConfig struct {
@@ -26,6 +26,6 @@ type LogConfig struct {
 
 type Config struct {
 	DB    DBConfig    `mapstructure:"db" yaml:"db"`
-	River RiverConfig `mapstructure:"river" yaml:"river"`
+	Queue QueueConfig `mapstructure:"queue" yaml:"queue"`
 	Log   LogConfig   `mapstructure:"log" yaml:"log"`
 }

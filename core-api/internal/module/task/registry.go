@@ -6,39 +6,37 @@ import (
 	"sync"
 )
 
-// Registry maps task types to handlers and is safe for concurrent access.
-type Registry struct {
+// registry maps task types to handlers for TaskQueue and is safe for concurrent access.
+type registry struct {
 	mu       sync.RWMutex
 	handlers map[string]Handler
 }
 
-func NewRegistry() *Registry {
-	return &Registry{handlers: make(map[string]Handler)}
+func newRegistry() *registry {
+	return &registry{handlers: make(map[string]Handler)}
 }
 
-func (r *Registry) Register(taskType string, h Handler) {
+func (r *registry) register(taskType string, h Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handlers[taskType] = h
 }
 
-func (r *Registry) Get(taskType string) (Handler, bool) {
+func (r *registry) get(taskType string) (Handler, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	h, ok := r.handlers[taskType]
 	return h, ok
 }
 
-// Dispatch resolves the handler for a task type and executes it.
-// Business modules only register handlers; dispatching remains task infrastructure logic.
-func (r *Registry) Dispatch(ctx context.Context, message *Task) error {
+func (r *registry) dispatch(ctx context.Context, message *Task) (any, error) {
 	if message == nil {
-		return fmt.Errorf("task: cannot dispatch nil task")
+		return nil, fmt.Errorf("task: cannot dispatch nil task")
 	}
 
-	handler, ok := r.Get(message.Type)
+	handler, ok := r.get(message.Type)
 	if !ok {
-		return fmt.Errorf("task: no handler registered for type %q", message.Type)
+		return nil, fmt.Errorf("task: no handler registered for type %q", message.Type)
 	}
 	return handler.Handle(ctx, message)
 }

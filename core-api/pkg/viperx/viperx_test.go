@@ -19,10 +19,10 @@ db:
   maxOpenConns: 20
   connMaxIdleTime: 15m
   connMaxLifetime: 1h
-river:
+queue:
   databaseURL: postgres://localhost/holonic
   maxWorkers: 3
-  clientTimeout: 30s
+  jobTimeout: 30s
 log:
   path: ./logs/app.log
   maxSize: 100
@@ -42,8 +42,8 @@ log:
 	if loaded.DB.DSN != "postgres://localhost/holonic" || loaded.DB.MaxOpenConns != 20 {
 		t.Fatalf("unexpected database config: %+v", loaded.DB)
 	}
-	if loaded.DB.ConnMaxIdleTime != 15*time.Minute || loaded.River.ClientTimeout != 30*time.Second {
-		t.Fatalf("unexpected duration config: db=%s river=%s", loaded.DB.ConnMaxIdleTime, loaded.River.ClientTimeout)
+	if loaded.DB.ConnMaxIdleTime != 15*time.Minute || loaded.Queue.JobTimeout != 30*time.Second {
+		t.Fatalf("unexpected duration config: db=%s queue=%s", loaded.DB.ConnMaxIdleTime, loaded.Queue.JobTimeout)
 	}
 	if loaded.Log.Path != "./logs/app.log" || !loaded.Log.Compress {
 		t.Fatalf("unexpected log config: %+v", loaded.Log)
