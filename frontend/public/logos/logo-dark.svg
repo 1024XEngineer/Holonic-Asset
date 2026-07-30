@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Five-segment orbit symbol</title>
+  <desc id="description">A white center circle surrounded by five identical rounded arcs on a black background.</desc>
+
+  <rect width="1024" height="1024" fill="#000"/>
+
+  <defs>
+    <path
+      id="orbit-segment"
+      d="M 391.13 252.80 A 286 286 0 0 1 632.87 252.80"
+      fill="none"
+      stroke="#fff"
+      stroke-width="52"
+      stroke-linecap="round"
+    />
+  </defs>
+
+  <g>
+    <use href="#orbit-segment"/>
+    <use href="#orbit-segment" transform="rotate(72 512 512)"/>
+    <use href="#orbit-segment" transform="rotate(144 512 512)"/>
+    <use href="#orbit-segment" transform="rotate(216 512 512)"/>
+    <use href="#orbit-segment" transform="rotate(288 512 512)"/>
+  </g>
+
+  <circle cx="512" cy="512" r="112" fill="#fff"/>
+</svg>
