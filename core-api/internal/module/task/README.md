@@ -102,7 +102,7 @@ if err := publishExample(ctx, queue); err != nil {
 - `task.Producer` provides the queue-neutral publishing contract.
 - `task.TaskManager` owns task lifecycle operations backed by `task.TaskStore`.
 - `task.Dispatcher` publishes pending records from `task.OutboxStore`.
-- The composition root creates the queue from `config.QueueConfig` and registers business handlers.
+- The composition root creates the queue from `config.QueueConfig` and injects it into business modules, which register their handlers during construction.
 
 ## Task Management and Outbox
 

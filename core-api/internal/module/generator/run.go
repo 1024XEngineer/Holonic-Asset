@@ -1,4 +1,4 @@
-package generation
+package generator
 
 import (
 	"encoding/json"
@@ -11,21 +11,9 @@ type RunListStatus string
 
 const RunListStatusActive RunListStatus = "active"
 
-// GenerationRequest captures the business intent accepted by generation.
-// Kind-specific parameters remain bounded data interpreted by generation.
-type GenerationRequest struct {
-	ProjectID         uint
-	AssetID           *uint
-	Kind              TaskType
-	Prompt            string
-	ReferenceMediaIDs []string
-	TargetAssetPaths  []string
-	Parameters        json.RawMessage
-}
-
-// GenerationRun is a task-backed projection. ID and Status come directly from
-// the task record; generation does not persist a separate run state.
-type GenerationRun struct {
+// Run is a task-backed projection. ID and Status come directly from
+// the task record; Generator does not persist a separate run state.
+type Run struct {
 	ID        RunID
 	ProjectID uint
 	AssetID   *uint
@@ -35,7 +23,7 @@ type GenerationRun struct {
 	Error     string
 }
 
-// RunListQuery contains the client-facing list semantics. The service expands
+// RunListQuery contains the client-facing list semantics. Engine expands
 // status and asset scope into repository filters.
 type RunListQuery struct {
 	ProjectID uint
@@ -56,7 +44,7 @@ type RunListFilter struct {
 }
 
 type RunListPage struct {
-	Runs       []GenerationRun
+	Runs       []Run
 	NextCursor string
 }
 

@@ -6,24 +6,23 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/generation"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type GenerationHandler struct {
-	service service.RequestService
+	runs generator.RunManager
 }
 
-func NewGenerationHandler(generationService service.RequestService) *GenerationHandler {
-	return &GenerationHandler{service: generationService}
+func NewGenerationHandler(runs generator.RunManager) *GenerationHandler {
+	return &GenerationHandler{runs: runs}
 }
 
 func (h *GenerationHandler) Create(
 	ctx *echox.Context,
 	request dto.CreateGenerationRequest,
 ) (dto.CreateGenerationResponse, error) {
-	runID, err := h.service.Create(ctx, &domain.GenerationRequest{
+	runID, err := h.runs.Create(ctx, &generator.Request{
 		ProjectID:         request.ProjectID,
 		AssetID:           request.AssetID,
 		Kind:              request.Kind,
@@ -39,14 +38,14 @@ func (h *GenerationHandler) List(
 	ctx *echox.Context,
 	request dto.ListGenerationRunsRequest,
 ) (dto.ListGenerationRunsResponse, error) {
-	page, err := h.service.List(ctx, &domain.RunListQuery{
+	page, err := h.runs.List(ctx, &generator.RunListQuery{
 		ProjectID: request.ProjectID,
 		AssetID:   request.AssetID,
 		Status:    request.Status,
 		Limit:     request.Limit,
 		Cursor:    request.Cursor,
 	})
-	if errors.Is(err, service.ErrInvalidRunListStatus) {
+	if errors.Is(err, generator.ErrInvalidRunListStatus) {
 		return dto.ListGenerationRunsResponse{}, echo.ErrBadRequest
 	}
 	if err != nil {
@@ -78,7 +77,7 @@ func (h *GenerationHandler) Get(
 	ctx *echox.Context,
 	request dto.GetGenerationRequest,
 ) (dto.GetGenerationResponse, error) {
-	run, err := h.service.Get(ctx, request.GenerationRunID)
+	run, err := h.runs.Get(ctx, request.GenerationRunID)
 	if err != nil {
 		return dto.GetGenerationResponse{}, err
 	}
@@ -98,6 +97,6 @@ func (h *GenerationHandler) Cancel(
 	ctx *echox.Context,
 	request dto.CancelGenerationRequest,
 ) (dto.CancelGenerationResponse, error) {
-	err := h.service.Cancel(ctx, request.GenerationRunID)
+	err := h.runs.Cancel(ctx, request.GenerationRunID)
 	return dto.CancelGenerationResponse{Cancelled: err == nil}, err
 }

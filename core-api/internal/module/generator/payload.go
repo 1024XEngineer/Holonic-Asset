@@ -1,4 +1,4 @@
-package generation
+package generator
 
 // CreateCharacterPrototypePayload is the complete input consumed by the
 // character prototype task handler.

@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
@@ -20,8 +21,8 @@ func InitServer() *App {
 	projectService := appservice.NewProjectService(projectRepository)
 	projectHandler := handler.NewProjectHandler(projectService)
 
-	generationService := appservice.NewGenerationService(nil, nil, nil)
-	generationHandler := handler.NewGenerationHandler(generationService)
+	generatorEngine := generator.NewEngine(nil, nil, nil, nil)
+	generationHandler := handler.NewGenerationHandler(generatorEngine)
 
 	uploadService := appservice.NewUploadService(nil)
 	uploadHandler := handler.NewUploadHandler(uploadService)

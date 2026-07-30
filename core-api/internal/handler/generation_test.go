@@ -13,59 +13,58 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/generation"
+	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
-type requestServiceStub struct {
-	createRequest *domain.GenerationRequest
-	listQuery     *domain.RunListQuery
-	listPage      *domain.RunListPage
+type runManagerStub struct {
+	createRequest *generator.Request
+	listQuery     *generator.RunListQuery
+	listPage      *generator.RunListPage
 	listErr       error
-	run           *domain.GenerationRun
-	cancelID      domain.RunID
+	run           *generator.Run
+	cancelID      generator.RunID
 	cancelErr     error
 }
 
-func (s *requestServiceStub) Create(
+func (s *runManagerStub) Create(
 	_ context.Context,
-	request *domain.GenerationRequest,
-) (domain.RunID, error) {
+	request *generator.Request,
+) (generator.RunID, error) {
 	s.createRequest = request
 	return 17, nil
 }
 
-func (s *requestServiceStub) List(
+func (s *runManagerStub) List(
 	_ context.Context,
-	query *domain.RunListQuery,
-) (*domain.RunListPage, error) {
+	query *generator.RunListQuery,
+) (*generator.RunListPage, error) {
 	s.listQuery = query
 	if s.listPage == nil {
-		return &domain.RunListPage{}, s.listErr
+		return &generator.RunListPage{}, s.listErr
 	}
 	return s.listPage, s.listErr
 }
 
-func (s *requestServiceStub) Get(context.Context, domain.RunID) (*domain.GenerationRun, error) {
+func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, error) {
 	return s.run, nil
 }
 
-func (s *requestServiceStub) Cancel(_ context.Context, runID domain.RunID) error {
+func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
 	s.cancelID = runID
 	return s.cancelErr
 }
 
 func TestCreateMapsTransportRequest(t *testing.T) {
 	assetID := uint(3)
-	stub := &requestServiceStub{}
+	stub := &runManagerStub{}
 	generationHandler := handler.NewGenerationHandler(stub)
 	parameters := json.RawMessage(`{"size":{"width":64,"height":64}}`)
 	request := dto.CreateGenerationRequest{
 		ProjectID:         2,
 		AssetID:           &assetID,
-		Kind:              domain.GenerateCharacterAnimation,
+		Kind:              generator.GenerateCharacterAnimation,
 		Prompt:            "hero",
 		ReferenceMediaIDs: []string{"media-1"},
 		TargetAssetPaths:  []string{"animations.walk.frames"},
@@ -92,11 +91,11 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 
 func TestGetMapsTaskBackedGeneration(t *testing.T) {
 	assetID := uint(3)
-	stub := &requestServiceStub{run: &domain.GenerationRun{
+	stub := &runManagerStub{run: &generator.Run{
 		ID:        7,
 		ProjectID: 2,
 		AssetID:   &assetID,
-		Kind:      domain.GenerateCharacterAnimation,
+		Kind:      generator.GenerateCharacterAnimation,
 		Status:    taskdomain.StatusProcessing,
 		Result:    json.RawMessage(`{"media_ids":["media-1"]}`),
 	}}
@@ -109,7 +108,7 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		t.Fatalf("get generation: %v", err)
 	}
 	if response.ID != 7 || response.ProjectID != 2 || response.AssetID == nil ||
-		*response.AssetID != assetID || response.Kind != domain.GenerateCharacterAnimation ||
+		*response.AssetID != assetID || response.Kind != generator.GenerateCharacterAnimation ||
 		response.Status != taskdomain.StatusProcessing {
 		t.Fatalf("unexpected run response: %+v", response)
 	}
@@ -117,10 +116,10 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 
 func TestListMapsTaskBackedRuns(t *testing.T) {
 	assetID := uint(3)
-	stub := &requestServiceStub{listPage: &domain.RunListPage{
-		Runs: []domain.GenerationRun{
-			{ID: 7, ProjectID: 2, AssetID: &assetID, Kind: domain.GenerateCharacterAnimation, Status: taskdomain.StatusProcessing},
-			{ID: 8, ProjectID: 2, AssetID: &assetID, Kind: domain.RegenerateCharacterFrames, Status: taskdomain.StatusPending},
+	stub := &runManagerStub{listPage: &generator.RunListPage{
+		Runs: []generator.Run{
+			{ID: 7, ProjectID: 2, AssetID: &assetID, Kind: generator.GenerateCharacterAnimation, Status: taskdomain.StatusProcessing},
+			{ID: 8, ProjectID: 2, AssetID: &assetID, Kind: generator.RegenerateCharacterFrames, Status: taskdomain.StatusPending},
 		},
 		NextCursor: "next",
 	}}
@@ -128,7 +127,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 	query := dto.ListGenerationRunsRequest{
 		ProjectID: 42,
 		AssetID:   &assetID,
-		Status:    domain.RunListStatusActive,
+		Status:    generator.RunListStatusActive,
 		Limit:     10,
 		Cursor:    "cursor",
 	}
@@ -148,7 +147,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 }
 
 func TestListRejectsUnsupportedStatus(t *testing.T) {
-	stub := &requestServiceStub{listErr: service.ErrInvalidRunListStatus}
+	stub := &runManagerStub{listErr: generator.ErrInvalidRunListStatus}
 	_, err := handler.NewGenerationHandler(stub).List(
 		newGenerationHandlerContext(),
 		dto.ListGenerationRunsRequest{Status: "completed"},
@@ -159,7 +158,7 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 }
 
 func TestCancelForwardsTaskBackedRunID(t *testing.T) {
-	stub := &requestServiceStub{}
+	stub := &runManagerStub{}
 	response, err := handler.NewGenerationHandler(stub).Cancel(
 		newGenerationHandlerContext(),
 		dto.CancelGenerationRequest{GenerationRunID: 7},

@@ -1,4 +1,4 @@
-package generation
+package generator
 
 type TaskType string
 
