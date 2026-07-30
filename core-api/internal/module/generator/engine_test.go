@@ -254,6 +254,7 @@ type executorStub struct {
 	payload  json.RawMessage
 	result   json.RawMessage
 	err      error
+	calls    int
 }
 
 func (s *executorStub) Generate(
@@ -261,8 +262,9 @@ func (s *executorStub) Generate(
 	taskType generator.TaskType,
 	payload json.RawMessage,
 ) (json.RawMessage, error) {
+	s.calls++
 	s.taskType = taskType
-	s.payload = payload
+	s.payload = append(json.RawMessage(nil), payload...)
 	return s.result, s.err
 }
 
@@ -296,16 +298,27 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.taskType), func(t *testing.T) {
 			tasks := &taskManagerStub{}
-			executor := &executorStub{}
+			executor := &executorStub{result: json.RawMessage(`{"asset_id":7}`)}
 			generator.NewEngine(tasks, nil, executor)
 
 			message := &taskdomain.Task{ID: 17, Type: string(tt.taskType), Payload: tt.payload}
-			if _, err := tasks.dispatch(context.Background(), message); err != nil {
+			result, err := tasks.dispatch(context.Background(), message)
+			if err != nil {
 				t.Fatalf("dispatch generation task: %v", err)
 			}
-			if executor.payload != nil || len(tasks.statusUpdates) != 0 {
-				t.Fatalf("handler skeleton must not execute business logic: payload=%s statuses=%+v",
-					executor.payload, tasks.statusUpdates)
+			shouldExecute := tt.taskType != generator.GenerateTileSet
+			if shouldExecute {
+				if executor.calls != 1 || executor.taskType != tt.taskType ||
+					!reflect.DeepEqual(executor.payload, tt.payload) ||
+					!reflect.DeepEqual(result, executor.result) {
+					t.Fatalf("unexpected executor call: calls=%d type=%s payload=%s result=%s",
+						executor.calls, executor.taskType, executor.payload, result)
+				}
+			} else if executor.calls != 0 || result != nil {
+				t.Fatalf("tileset handler must remain deferred: calls=%d result=%v", executor.calls, result)
+			}
+			if len(tasks.statusUpdates) != 0 {
+				t.Fatalf("task queue owns status updates, got %+v", tasks.statusUpdates)
 			}
 		})
 	}
@@ -324,7 +337,7 @@ func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected payload decode error")
 	}
-	if executor.payload != nil || len(tasks.statusUpdates) != 0 {
+	if executor.calls != 0 || len(tasks.statusUpdates) != 0 {
 		t.Fatalf("malformed task must not be processed: payload=%s statuses=%+v",
 			executor.payload, tasks.statusUpdates)
 	}
@@ -345,16 +358,16 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.payload != nil || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("handler skeleton must not execute business logic: payload=%s statuses=%+v",
-			executor.payload, tasks.statusUpdates)
+	if executor.calls != 4 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected four implemented handler calls: calls=%d statuses=%+v",
+			executor.calls, tasks.statusUpdates)
 	}
 }
 
-func TestHandleCharacterPrototypeOnlyDecodesPayload(t *testing.T) {
+func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
 	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top-down","direction_count":"4","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
-	executor := &executorStub{}
+	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
 	generator.NewEngine(tasks, nil, executor)
 
 	got, err := tasks.dispatch(context.Background(), &taskdomain.Task{
@@ -365,11 +378,26 @@ func TestHandleCharacterPrototypeOnlyDecodesPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handle generation task: %v", err)
 	}
-	if got != nil {
-		t.Fatalf("handler skeleton must return a nil result, got %v", got)
+	if !reflect.DeepEqual(got, executor.result) {
+		t.Fatalf("unexpected handler result: %s", got)
 	}
-	if executor.payload != nil || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("handler skeleton must not execute business logic: payload=%s statuses=%+v",
-			executor.payload, tasks.statusUpdates)
+	if executor.calls != 1 || executor.taskType != generator.GenerateCharacterProtoType ||
+		!reflect.DeepEqual(executor.payload, payload) || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("unexpected handler execution: calls=%d type=%s payload=%s statuses=%+v",
+			executor.calls, executor.taskType, executor.payload, tasks.statusUpdates)
+	}
+}
+
+func TestImplementedHandlerRequiresExecutor(t *testing.T) {
+	tasks := &taskManagerStub{}
+	generator.NewEngine(tasks, nil, nil)
+
+	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
+		ID:      17,
+		Type:    string(generator.GenerateObjectAnimation),
+		Payload: json.RawMessage(`{"asset_name":"open","parent_id":8}`),
+	})
+	if !errors.Is(err, generator.ErrExecutorRequired) {
+		t.Fatalf("expected executor required error, got %v", err)
 	}
 }
