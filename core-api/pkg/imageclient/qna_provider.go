@@ -133,7 +133,9 @@ func (p *QNAProvider) call(
 	if err != nil {
 		return nil, classifyQNARequestError(ctx, err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return nil, qnaStatusError(response)
@@ -176,7 +178,6 @@ func (p *QNAProvider) call(
 	return &ProviderResult{
 		Images:       images,
 		OutputFormat: decoded.OutputFormat,
-		Model:        model,
 		Size:         decoded.Size,
 		CreatedAt:    decoded.Created,
 		Usage: Usage{

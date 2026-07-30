@@ -2,23 +2,23 @@ package handler
 
 import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type UploadHandler struct {
-	service service.UploadService
+	uploader upload.Uploader
 }
 
-func NewUploadHandler(uploadService service.UploadService) *UploadHandler {
-	return &UploadHandler{service: uploadService}
+func NewUploadHandler(uploader upload.Uploader) *UploadHandler {
+	return &UploadHandler{uploader: uploader}
 }
 
 func (h *UploadHandler) CreateUploadTarget(
 	c *echox.Context,
 	request dto.CreateUploadTargetRequest,
 ) (*dto.UploadTarget, error) {
-	target, err := h.service.CreateUploadTarget(c, &service.CreateUploadTargetRequest{
+	target, err := h.uploader.CreateUploadTarget(c, &upload.CreateUploadTargetRequest{
 		ContentType:   request.ContentType,
 		ContentLength: request.ContentLength,
 	})

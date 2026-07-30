@@ -1,5 +1,4 @@
-// Package storage exposes the object operations used by Core API modules.
-package storage
+package upload
 
 import (
 	"context"

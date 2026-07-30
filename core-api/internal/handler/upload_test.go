@@ -12,36 +12,36 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
-type uploadServiceStub struct {
-	target  *service.UploadTarget
+type uploaderStub struct {
+	target  *upload.UploadTarget
 	err     error
 	ctx     context.Context
-	request *service.CreateUploadTargetRequest
+	request *upload.CreateUploadTargetRequest
 	calls   int
 }
 
-func (s *uploadServiceStub) CreateUploadTarget(
+func (s *uploaderStub) CreateUploadTarget(
 	ctx context.Context,
-	request *service.CreateUploadTargetRequest,
-) (*service.UploadTarget, error) {
+	request *upload.CreateUploadTargetRequest,
+) (*upload.UploadTarget, error) {
 	s.calls++
 	s.ctx = ctx
 	s.request = request
 	return s.target, s.err
 }
 
-func TestCreateUploadTargetForwardsRequestToService(t *testing.T) {
-	wantTarget := &service.UploadTarget{
+func TestCreateUploadTargetForwardsRequestToUploader(t *testing.T) {
+	wantTarget := &upload.UploadTarget{
 		ObjectKey:   "users/7/uploads/uuid",
 		ObjectURL:   "https://files.example.com/users/7/uploads/uuid",
 		UploadURL:   "https://upload.qiniup.com",
 		UploadToken: "access-key:signature:policy",
 	}
-	stub := &uploadServiceStub{target: wantTarget}
+	stub := &uploaderStub{target: wantTarget}
 	uploadHandler := handler.NewUploadHandler(stub)
 	request := dto.CreateUploadTargetRequest{
 		ContentType:   "image/png",
@@ -67,9 +67,9 @@ func TestCreateUploadTargetForwardsRequestToService(t *testing.T) {
 	}
 }
 
-func TestCreateUploadTargetPropagatesServiceError(t *testing.T) {
+func TestCreateUploadTargetPropagatesUploaderError(t *testing.T) {
 	wantErr := errors.New("create upload target failed")
-	stub := &uploadServiceStub{err: wantErr}
+	stub := &uploaderStub{err: wantErr}
 	uploadHandler := handler.NewUploadHandler(stub)
 
 	target, err := uploadHandler.CreateUploadTarget(

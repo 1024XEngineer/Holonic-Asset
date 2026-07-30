@@ -2,6 +2,7 @@ package imageclient
 
 import (
 	"context"
+	"maps"
 	"strings"
 )
 
@@ -70,7 +71,7 @@ func (s *imageGenerationService) Generate(
 
 	return &GenerateResult{
 		Images:    images,
-		Model:     providerResult.Model,
+		Model:     request.Model,
 		Size:      providerResult.Size,
 		CreatedAt: providerResult.CreatedAt,
 		Usage:     providerResult.Usage,
@@ -82,9 +83,7 @@ func copyParams(params Params) Params {
 		return nil
 	}
 	copied := make(Params, len(params))
-	for key, value := range params {
-		copied[key] = value
-	}
+	maps.Copy(copied, params)
 	return copied
 }
 

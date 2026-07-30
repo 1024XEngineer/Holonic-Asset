@@ -9,13 +9,13 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
 )
 
 func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
-	uploadService := service.NewUploadService(nil)
-	uploadHandler := handler.NewUploadHandler(uploadService)
+	uploader := upload.NewUploader(nil)
+	uploadHandler := handler.NewUploadHandler(uploader)
 	e := router.Register(nil, nil, nil, uploadHandler)
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -36,8 +36,8 @@ func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
 }
 
 func TestUploadRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
-	uploadService := service.NewUploadService(nil)
-	uploadHandler := handler.NewUploadHandler(uploadService)
+	uploader := upload.NewUploader(nil)
+	uploadHandler := handler.NewUploadHandler(uploader)
 	e := router.Register(nil, nil, nil, uploadHandler)
 
 	routes := []string{

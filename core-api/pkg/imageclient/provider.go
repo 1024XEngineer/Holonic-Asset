@@ -16,6 +16,7 @@ type ProviderResult struct {
 	Images       []string
 	OutputFormat string
 	Size         string
+	CreatedAt    int64
 	Usage        Usage
 }
 
