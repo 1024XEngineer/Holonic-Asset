@@ -2,4 +2,7 @@ export {
   deleteMockProjectGenerationRuns,
   listMockGenerationRuns,
 } from "./generation-runs.mock";
-export { mockGenerationLifecycle } from "./lifecycle.mock";
+export {
+  enqueueMockGeneration,
+  mockGenerationLifecycle,
+} from "./lifecycle.mock";

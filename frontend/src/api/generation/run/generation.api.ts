@@ -1,5 +1,5 @@
-import { listMockGenerationRuns, mockGenerationLifecycle } from "./mock";
-import type { GenerationInput, GenerationLifecycleUpdate } from "@/model";
+import { enqueueMockGeneration, listMockGenerationRuns } from "./mock";
+import type { GenerationInput, GenerationRun } from "@/model";
 import { getJson, postJson } from "@/api/fetchers";
 
 export type GenerationTaskType =
@@ -50,12 +50,14 @@ export type GenerationRunResponse = GenerationRunListItemResponse & {
 };
 export type CancelGenerationResponse = { cancelled: boolean };
 
-export const generationApi = {
+export type GenerationApi = {
+  listRuns: (projectId: string) => Promise<GenerationRun[]>;
+  enqueue: (input: GenerationInput) => Promise<GenerationRun>;
+};
+
+export const generationApi: GenerationApi = {
   listRuns: (projectId: string) => listMockGenerationRuns(projectId),
-  enqueue: (
-    input: GenerationInput,
-    onUpdate: (update: GenerationLifecycleUpdate) => void,
-  ) => mockGenerationLifecycle.enqueue(input, onUpdate),
+  enqueue: enqueueMockGeneration,
 };
 
 /** HTTP client for task-backed generation routes. */
