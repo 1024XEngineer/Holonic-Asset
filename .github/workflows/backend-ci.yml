@@ -1,0 +1,48 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "core-api/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    paths:
+      - "core-api/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, vet, and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core-api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: core-api/go.mod
+          cache-dependency-path: core-api/go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa # v7.0.1
+        with:
+          working-directory: core-api
+          version: v2.11.2
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
