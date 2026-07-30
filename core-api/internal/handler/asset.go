@@ -6,21 +6,16 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
 type Handler struct {
-	AssetService       service.AssetService
-	AssetRecordService service.AssetRecordService
+	AssetManager domain.Manager
 }
 
-func NewHandler(as service.AssetService, rs service.AssetRecordService) *Handler {
-	return &Handler{
-		AssetService:       as,
-		AssetRecordService: rs,
-	}
+func NewHandler(manager domain.Manager) *Handler {
+	return &Handler{AssetManager: manager}
 }
 
 func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto.Response, error) {
@@ -29,7 +24,7 @@ func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto
 		return dto.Response{}, err
 	}
 
-	assets, err := h.AssetService.GetAssets(x, projectID, domain.AssetListFilter{
+	assets, err := h.AssetManager.GetAssets(x, projectID, domain.AssetListFilter{
 		Query: request.Query,
 		Tags:  request.Tags,
 		Types: request.Types,
@@ -60,7 +55,7 @@ func (h *Handler) Detail(x *echox.Context) (dto.Response, error) {
 		return dto.Response{}, err
 	}
 
-	asset, err := h.AssetService.GetDetail(x, assetID)
+	asset, err := h.AssetManager.GetDetail(x, assetID)
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -90,7 +85,7 @@ func (h *Handler) Record(x *echox.Context, asset dto.RecordAssetRequest) (dto.Re
 	if asset.AssetID == 0 {
 		return dto.Response{}, echo.ErrBadRequest
 	}
-	record, err := h.AssetRecordService.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID})
+	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID})
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -108,7 +103,7 @@ func (h *Handler) Records(x *echox.Context) (dto.Response, error) {
 	if err != nil {
 		return dto.Response{}, err
 	}
-	records, err := h.AssetRecordService.GetRecordHistory(x, assetID)
+	records, err := h.AssetManager.GetRecordHistory(x, assetID)
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -130,7 +125,7 @@ func (h *Handler) CopyAsset(ctx *echox.Context, asset dto.CopyAssetRequest) (dto
 	if asset.AssetID == 0 {
 		return dto.Response{}, echo.ErrBadRequest
 	}
-	newAssetID, err := h.AssetRecordService.Copy(ctx, asset.AssetID, 0)
+	newAssetID, err := h.AssetManager.Copy(ctx, asset.AssetID, 0)
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -141,7 +136,7 @@ func (h *Handler) RollBackAsset(ctx *echox.Context, asset dto.RollBackAssetReque
 	if asset.AssetID == 0 || asset.Version == 0 {
 		return dto.Response{}, echo.ErrBadRequest
 	}
-	record, err := h.AssetRecordService.RollBackRecord(ctx, asset.AssetID, asset.Version)
+	record, err := h.AssetManager.RollBackRecord(ctx, asset.AssetID, asset.Version)
 	if err != nil {
 		return dto.Response{}, err
 	}
@@ -153,7 +148,7 @@ func (h *Handler) RollBackAsset(ctx *echox.Context, asset dto.RollBackAssetReque
 }
 
 func (h *Handler) UpdateAsset(ctx *echox.Context, req dto.UpdateAssetRequest) (dto.Response, error) {
-	asset, err := h.AssetService.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
+	asset, err := h.AssetManager.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
 		Name:        req.Name,
 		ProjectID:   req.ProjectID,
 		Type:        req.Type,

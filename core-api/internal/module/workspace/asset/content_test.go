@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) {

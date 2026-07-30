@@ -1,4 +1,4 @@
-# Asset API Response Contract
+# Asset Module and API Contract
 
 This document defines the data structures returned by the Asset detail endpoint to the frontend.
 

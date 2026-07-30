@@ -12,28 +12,23 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
-type assetServiceStub struct {
-	service.AssetService
-	assets       []domain.Asset
-	asset        domain.Asset
-	updatedAsset *domain.Asset
-	getAssetsErr error
-	getDetailErr error
-	updateErr    error
-	projectID    uint
-	assetID      uint
-	filter       domain.AssetListFilter
-	updateID     uint
-	update       *domain.AssetUpdate
-}
-
-type assetRecordServiceStub struct {
-	service.AssetRecordService
+type assetManagerStub struct {
+	domain.Manager
+	assets          []domain.Asset
+	asset           domain.Asset
+	updatedAsset    *domain.Asset
+	getAssetsErr    error
+	getDetailErr    error
+	updateErr       error
+	projectID       uint
+	assetID         uint
+	filter          domain.AssetListFilter
+	updateID        uint
+	update          *domain.AssetUpdate
 	record          *domain.AssetRecord
 	recordRequest   *domain.AssetRecord
 	records         []domain.AssetRecord
@@ -42,33 +37,33 @@ type assetRecordServiceStub struct {
 	rollbackResult  *domain.AssetRecord
 }
 
-func (s *assetRecordServiceStub) CreateRecord(_ context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
 	s.recordRequest = record
 	return s.record, nil
 }
 
-func (s *assetRecordServiceStub) GetRecordHistory(_ context.Context, _ uint) ([]domain.AssetRecord, error) {
+func (s *assetManagerStub) GetRecordHistory(_ context.Context, _ uint) ([]domain.AssetRecord, error) {
 	return s.records, nil
 }
 
-func (s *assetRecordServiceStub) RollBackRecord(_ context.Context, assetID uint, version uint) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) RollBackRecord(_ context.Context, assetID uint, version uint) (*domain.AssetRecord, error) {
 	s.rollbackAsset = assetID
 	s.rollbackVersion = version
 	return s.rollbackResult, nil
 }
 
-func (s *assetServiceStub) GetAssets(_ context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
+func (s *assetManagerStub) GetAssets(_ context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
 	s.projectID = projectID
 	s.filter = filter
 	return s.assets, s.getAssetsErr
 }
 
-func (s *assetServiceStub) GetDetail(_ context.Context, assetID uint) (domain.Asset, error) {
+func (s *assetManagerStub) GetDetail(_ context.Context, assetID uint) (domain.Asset, error) {
 	s.assetID = assetID
 	return s.asset, s.getDetailErr
 }
 
-func (s *assetServiceStub) UpdateAsset(_ context.Context, assetID uint, update *domain.AssetUpdate) (*domain.Asset, error) {
+func (s *assetManagerStub) UpdateAsset(_ context.Context, assetID uint, update *domain.AssetUpdate) (*domain.Asset, error) {
 	s.updateID = assetID
 	s.update = update
 	if s.updatedAsset != nil {
@@ -78,7 +73,7 @@ func (s *assetServiceStub) UpdateAsset(_ context.Context, assetID uint, update *
 }
 
 func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
-	serviceStub := &assetServiceStub{assets: []domain.Asset{{
+	managerStub := &assetManagerStub{assets: []domain.Asset{{
 		ID:          7,
 		Name:        "hero",
 		ProjectID:   42,
@@ -87,14 +82,14 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 		Tags:        []string{"player"},
 		Version:     3,
 	}}}
-	h := handler.NewHandler(serviceStub, nil)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}
-	if serviceStub.projectID != 42 {
-		t.Fatalf("expected project ID 42, got %d", serviceStub.projectID)
+	if managerStub.projectID != 42 {
+		t.Fatalf("expected project ID 42, got %d", managerStub.projectID)
 	}
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response: %+v", response)
@@ -117,8 +112,8 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 }
 
 func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
-	serviceStub := &assetServiceStub{}
-	h := handler.NewHandler(serviceStub, nil)
+	managerStub := &assetManagerStub{}
+	h := handler.NewHandler(managerStub)
 
 	_, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{
 		Query: "hero",
@@ -128,8 +123,8 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}
-	if serviceStub.filter.Query != "hero" || len(serviceStub.filter.Tags) != 1 || len(serviceStub.filter.Types) != 1 {
-		t.Fatalf("unexpected asset filter: %+v", serviceStub.filter)
+	if managerStub.filter.Query != "hero" || len(managerStub.filter.Tags) != 1 || len(managerStub.filter.Types) != 1 {
+		t.Fatalf("unexpected asset filter: %+v", managerStub.filter)
 	}
 }
 
@@ -141,7 +136,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	tags := []string{"prop"}
 	attributes := json.RawMessage(`{"scale":2}`)
 	version := uint(4)
-	serviceStub := &assetServiceStub{updatedAsset: &domain.Asset{
+	managerStub := &assetManagerStub{updatedAsset: &domain.Asset{
 		ID:          7,
 		Name:        name,
 		ProjectID:   projectID,
@@ -151,7 +146,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 		Attributes:  attributes,
 		Version:     version,
 	}}
-	h := handler.NewHandler(serviceStub, nil)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.UpdateAsset(newAssetHandlerContext("asset_id", "7"), dto.UpdateAssetRequest{
 		AssetID:     7,
@@ -165,8 +160,8 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update asset basics: %v", err)
 	}
-	if serviceStub.updateID != 7 || serviceStub.update == nil || serviceStub.update.Name == nil || *serviceStub.update.Name != name {
-		t.Fatalf("unexpected update request: %+v", serviceStub.update)
+	if managerStub.updateID != 7 || managerStub.update == nil || managerStub.update.Name == nil || *managerStub.update.Name != name {
+		t.Fatalf("unexpected update request: %+v", managerStub.update)
 	}
 	data, ok := response.Data.(dto.UpdateAssetResponse)
 	if !ok || data.AssetID != 7 || data.Name != name || string(data.Attributes) != string(attributes) {
@@ -175,20 +170,20 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 }
 
 func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
-	recordService := &assetRecordServiceStub{record: &domain.AssetRecord{
+	managerStub := &assetManagerStub{record: &domain.AssetRecord{
 		ID:        15,
 		AssetID:   7,
 		Version:   3,
 		ContentID: 21,
 	}}
-	h := handler.NewHandler(&assetServiceStub{}, recordService)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.Record(newAssetHandlerContext("asset_id", "7"), dto.RecordAssetRequest{AssetID: 7})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
-	if recordService.recordRequest == nil || recordService.recordRequest.AssetID != 7 {
-		t.Fatalf("unexpected record request: %+v", recordService.recordRequest)
+	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 {
+		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
 	data, ok := response.Data.(dto.RecordAssetResponse)
 	if !ok || data.RecordID != 15 || data.AssetID != 7 || data.Version != 3 || data.ContentID != 21 {
@@ -197,19 +192,19 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 }
 
 func TestAssetHandlerRollbackUsesRequestedVersion(t *testing.T) {
-	recordService := &assetRecordServiceStub{rollbackResult: &domain.AssetRecord{
+	managerStub := &assetManagerStub{rollbackResult: &domain.AssetRecord{
 		AssetID:   7,
 		Version:   2,
 		ContentID: 9,
 	}}
-	h := handler.NewHandler(&assetServiceStub{}, recordService)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.RollBackAsset(newAssetHandlerContext("asset_id", "7"), dto.RollBackAssetRequest{AssetID: 7, Version: 2})
 	if err != nil {
 		t.Fatalf("rollback asset: %v", err)
 	}
-	if recordService.rollbackAsset != 7 || recordService.rollbackVersion != 2 {
-		t.Fatalf("unexpected rollback request: asset=%d version=%d", recordService.rollbackAsset, recordService.rollbackVersion)
+	if managerStub.rollbackAsset != 7 || managerStub.rollbackVersion != 2 {
+		t.Fatalf("unexpected rollback request: asset=%d version=%d", managerStub.rollbackAsset, managerStub.rollbackVersion)
 	}
 	data, ok := response.Data.(dto.RollBackAssetResponse)
 	if !ok || data.AssetID != 7 || data.Version != 2 || data.ContentID != 9 {
@@ -218,11 +213,11 @@ func TestAssetHandlerRollbackUsesRequestedVersion(t *testing.T) {
 }
 
 func TestAssetHandlerRecordsReturnsHistory(t *testing.T) {
-	recordService := &assetRecordServiceStub{records: []domain.AssetRecord{
+	managerStub := &assetManagerStub{records: []domain.AssetRecord{
 		{ID: 15, AssetID: 7, Version: 1, ContentID: 21},
 		{ID: 16, AssetID: 7, Version: 2, ContentID: 22},
 	}}
-	h := handler.NewHandler(&assetServiceStub{}, recordService)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.Records(newAssetHandlerContext("asset_id", "7"))
 	if err != nil {
@@ -235,7 +230,7 @@ func TestAssetHandlerRecordsReturnsHistory(t *testing.T) {
 }
 
 func TestAssetHandlerDetailMapsResponse(t *testing.T) {
-	serviceStub := &assetServiceStub{asset: domain.Asset{
+	managerStub := &assetManagerStub{asset: domain.Asset{
 		ID:          7,
 		Name:        "hero",
 		ProjectID:   42,
@@ -245,14 +240,14 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 		Attributes:  json.RawMessage(`{"mesh":"hero.glb"}`),
 		Version:     2,
 	}}
-	h := handler.NewHandler(serviceStub, nil)
+	h := handler.NewHandler(managerStub)
 
 	response, err := h.Detail(newAssetHandlerContext("asset_id", "7"))
 	if err != nil {
 		t.Fatalf("get asset detail: %v", err)
 	}
-	if serviceStub.assetID != 7 {
-		t.Fatalf("expected asset ID 7, got %d", serviceStub.assetID)
+	if managerStub.assetID != 7 {
+		t.Fatalf("expected asset ID 7, got %d", managerStub.assetID)
 	}
 	data, ok := response.Data.(dto.AssetDetailResponse)
 	if !ok {
@@ -264,7 +259,7 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 }
 
 func TestAssetHandlerRejectsZeroIDs(t *testing.T) {
-	h := handler.NewHandler(&assetServiceStub{}, nil)
+	h := handler.NewHandler(&assetManagerStub{})
 	if _, err := h.GetAssets(newAssetHandlerContext("project_id", "0"), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero project ID, got %v", err)
 	}
@@ -273,9 +268,9 @@ func TestAssetHandlerRejectsZeroIDs(t *testing.T) {
 	}
 }
 
-func TestAssetHandlerPropagatesServiceErrors(t *testing.T) {
-	wantErr := errors.New("asset service failed")
-	h := handler.NewHandler(&assetServiceStub{getDetailErr: wantErr}, nil)
+func TestAssetHandlerPropagatesManagerErrors(t *testing.T) {
+	wantErr := errors.New("asset manager failed")
+	h := handler.NewHandler(&assetManagerStub{getDetailErr: wantErr})
 
 	_, err := h.Detail(newAssetHandlerContext("asset_id", "7"))
 	if !errors.Is(err, wantErr) {

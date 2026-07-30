@@ -1,36 +1,6 @@
 package asset
 
-import (
-	"encoding/json"
-	"time"
-)
-
-type Asset struct {
-	ID          uint
-	Name        string
-	ProjectID   uint
-	Type        AssetType
-	Description string
-	Tags        []string        `json:"tags"`
-	Attributes  json.RawMessage `json:"attributes,omitempty"`
-	Content     json.RawMessage `json:"content,omitempty"`
-	Version     uint
-}
-
-type AssetListFilter struct {
-	Query string
-	Tags  []string
-	Types []AssetType
-}
-
-type AssetUpdate struct {
-	Name        *string
-	ProjectID   *uint
-	Type        *AssetType
-	Description *string
-	Tags        *[]string
-	Attributes  *json.RawMessage
-}
+import "encoding/json"
 
 type ViewMode string
 
@@ -117,13 +87,4 @@ func EncodeContent(content AssetContent) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(value), nil
-}
-
-type AssetRecord struct {
-	ID        uint
-	AssetID   uint
-	Version   uint
-	ContentID uint
-	CreatedAt time.Time
-	Content   json.RawMessage
 }

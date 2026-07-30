@@ -2,18 +2,16 @@ package handler
 
 import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
-
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/project"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
 )
 
 type ProjectHandler struct {
-	service service.ProjectService
+	manager domain.Manager
 }
 
-func NewProjectHandler(projectService service.ProjectService) *ProjectHandler {
-	return &ProjectHandler{service: projectService}
+func NewProjectHandler(manager domain.Manager) *ProjectHandler {
+	return &ProjectHandler{manager: manager}
 }
 
 func (h *ProjectHandler) Create(c *echox.Context, request dto.CreateProjectRequest) (dto.CreateProjectResponse, error) {
@@ -27,17 +25,17 @@ func (h *ProjectHandler) Create(c *echox.Context, request dto.CreateProjectReque
 		Reference:      request.Reference,
 		Style:          request.Style,
 	}
-	err := h.service.Create(c, project)
+	err := h.manager.Create(c, project)
 	return dto.CreateProjectResponse{}, err
 }
 
 func (h *ProjectHandler) ListByUID(c *echox.Context, request dto.ListProjectsRequest) (dto.ListProjectsResponse, error) {
-	_, err := h.service.ListByUID(c, request.UserID)
+	_, err := h.manager.ListByUID(c, request.UserID)
 	return dto.ListProjectsResponse{}, err
 }
 
 func (h *ProjectHandler) GetDetail(c *echox.Context, request dto.ProjectDetailRequest) (dto.ProjectDetailResponse, error) {
-	_, err := h.service.GetDetail(c, request.ProjectID)
+	_, err := h.manager.GetDetail(c, request.ProjectID)
 	return dto.ProjectDetailResponse{}, err
 }
 
@@ -52,11 +50,11 @@ func (h *ProjectHandler) Update(c *echox.Context, request dto.UpdateProjectReque
 		Reference:      request.Reference,
 		Style:          request.Style,
 	}
-	err := h.service.Update(c, update)
+	err := h.manager.Update(c, update)
 	return dto.UpdateProjectResponse{Success: err == nil}, err
 }
 
 func (h *ProjectHandler) Delete(c *echox.Context, request dto.DeleteProjectRequest) (dto.DeleteProjectResponse, error) {
-	err := h.service.Delete(c, request.ProjectID)
+	err := h.manager.Delete(c, request.ProjectID)
 	return dto.DeleteProjectResponse{}, err
 }

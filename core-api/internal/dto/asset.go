@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 type AssetListItemResponse struct {

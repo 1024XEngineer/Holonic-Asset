@@ -9,35 +9,9 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
-
-type AssetRepository interface {
-	GetAssetsByProjectID(ctx context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error)
-	GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error)
-	UpdateAsset(ctx context.Context, id uint, update *domain.AssetUpdate) (*domain.Asset, error)
-	UpdateContent(ctx context.Context, assetID uint, content domain.AssetContent) error
-	UpdateAnimationFrames(
-		ctx context.Context,
-		assetID uint,
-		animationID uint,
-		frames []domain.Frame,
-	) error
-
-	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error)
-	CreateObjectAsset(ctx context.Context, asset *domain.Asset) (uint, error)
-	CreateTileSetAsset(ctx context.Context, asset *domain.Asset) (uint, error)
-	CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error)
-	CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error)
-	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
-	UpdatePrototypeImages(ctx context.Context, assetID uint, images []domain.ImageResource) error
-
-	CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error)
-	GetRecordHistory(ctx context.Context, assetID uint) ([]domain.AssetRecord, error)
-	RollBackRecord(ctx context.Context, assetID uint, version uint) (*domain.AssetRecord, error)
-	Copy(ctx context.Context, assetID uint, version uint) (uint, error)
-}
 
 type AssetRepositoryImpl struct {
 	DB         *gorm.DB
@@ -66,7 +40,7 @@ func NewAssetRepository(
 	assetDao dao.AssetDao,
 	contentDao dao.AssetContentDao,
 	recordDao dao.AssetRecordDao,
-) AssetRepository {
+) domain.Store {
 	return &AssetRepositoryImpl{
 		AssetDao:   assetDao,
 		ContentDao: contentDao,
@@ -79,7 +53,7 @@ func NewAssetRepositoryWithDB(
 	assetDao dao.AssetDao,
 	contentDao dao.AssetContentDao,
 	recordDao dao.AssetRecordDao,
-) AssetRepository {
+) domain.Store {
 	return &AssetRepositoryImpl{
 		DB:         db,
 		AssetDao:   assetDao,
@@ -87,6 +61,8 @@ func NewAssetRepositoryWithDB(
 		RecordDao:  recordDao,
 	}
 }
+
+var _ domain.Store = (*AssetRepositoryImpl)(nil)
 
 func (r *AssetRepositoryImpl) transactionDB() *gorm.DB {
 	if r.DB != nil {

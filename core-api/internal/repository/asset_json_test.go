@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/datatypes"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )

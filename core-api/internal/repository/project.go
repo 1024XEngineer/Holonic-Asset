@@ -3,25 +3,19 @@ package repository
 import (
 	"context"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/project"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
-
-type ProjectRepository interface {
-	Insert(ctx context.Context, project *domain.Project) error
-	FindByID(ctx context.Context, projectID uint) (*domain.Project, error)
-	FindByUserID(ctx context.Context, userID uint) ([]*domain.Project, error)
-	Update(ctx context.Context, update *domain.ProjectUpdate) error
-	Remove(ctx context.Context, projectID uint) error
-}
 
 type projectRepository struct {
 	projectDao dao.ProjectDao
 }
 
-func NewProjectRepository(projectDao dao.ProjectDao) ProjectRepository {
+func NewProjectRepository(projectDao dao.ProjectDao) domain.Store {
 	return &projectRepository{projectDao: projectDao}
 }
+
+var _ domain.Store = (*projectRepository)(nil)
 
 func (r *projectRepository) Insert(ctx context.Context, project *domain.Project) error {
 	id, err := r.projectDao.CreateProject(ctx, convertProjectToDao(project))

@@ -11,11 +11,10 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/project"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
-	"github.com/1024XEngineer/Holonic-Asset/internal/service"
 )
 
 func TestProjectUpdateRoutePreservesOmittedFields(t *testing.T) {
@@ -31,8 +30,8 @@ func TestProjectUpdateRoutePreservesOmittedFields(t *testing.T) {
 	if err := projectRepository.Insert(context.Background(), project); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	projectService := service.NewProjectService(projectRepository)
-	projectHandler := handler.NewProjectHandler(projectService)
+	projectManager := domain.NewManager(projectRepository)
+	projectHandler := handler.NewProjectHandler(projectManager)
 	e := router.Register(nil, projectHandler, nil, nil)
 
 	req := httptest.NewRequest(

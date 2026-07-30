@@ -12,35 +12,35 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/project"
+	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/pkg/echox"
 )
 
-type projectServiceStub struct {
+type projectManagerStub struct {
 	updateErr     error
 	updateContext context.Context
 	update        *domain.ProjectUpdate
 	updateCalls   int
 }
 
-func (*projectServiceStub) Create(context.Context, *domain.Project) error { return nil }
+func (*projectManagerStub) Create(context.Context, *domain.Project) error { return nil }
 
-func (*projectServiceStub) ListByUID(context.Context, uint) ([]*domain.Project, error) {
+func (*projectManagerStub) ListByUID(context.Context, uint) ([]*domain.Project, error) {
 	return []*domain.Project{}, nil
 }
 
-func (*projectServiceStub) GetDetail(context.Context, uint) (*domain.Project, error) {
+func (*projectManagerStub) GetDetail(context.Context, uint) (*domain.Project, error) {
 	return &domain.Project{}, nil
 }
 
-func (s *projectServiceStub) Update(ctx context.Context, update *domain.ProjectUpdate) error {
+func (s *projectManagerStub) Update(ctx context.Context, update *domain.ProjectUpdate) error {
 	s.updateCalls++
 	s.updateContext = ctx
 	s.update = update
 	return s.updateErr
 }
 
-func (*projectServiceStub) Delete(context.Context, uint) error { return nil }
+func (*projectManagerStub) Delete(context.Context, uint) error { return nil }
 
 func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	reference := "https://media.example/project-previews/new.png"
@@ -50,7 +50,7 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 		Description: &description,
 		Reference:   &reference,
 	}
-	stub := &projectServiceStub{}
+	stub := &projectManagerStub{}
 	projectHandler := handler.NewProjectHandler(stub)
 	handlerContext := newProjectHandlerContext()
 
@@ -59,10 +59,10 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 		t.Fatalf("update project: %v", err)
 	}
 	if stub.updateCalls != 1 {
-		t.Fatalf("expected one service call, got %d", stub.updateCalls)
+		t.Fatalf("expected one manager call, got %d", stub.updateCalls)
 	}
 	if stub.updateContext != handlerContext {
-		t.Fatal("expected handler context to be forwarded to the service")
+		t.Fatal("expected handler context to be forwarded to the manager")
 	}
 	if stub.update == nil || stub.update.ID != request.ProjectID {
 		t.Fatalf("expected project ID %d, got %+v", request.ProjectID, stub.update)
@@ -81,9 +81,9 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	}
 }
 
-func TestUpdatePropagatesServiceError(t *testing.T) {
+func TestUpdatePropagatesManagerError(t *testing.T) {
 	wantErr := errors.New("update project failed")
-	projectHandler := handler.NewProjectHandler(&projectServiceStub{updateErr: wantErr})
+	projectHandler := handler.NewProjectHandler(&projectManagerStub{updateErr: wantErr})
 
 	response, err := projectHandler.Update(newProjectHandlerContext(), dto.UpdateProjectRequest{ProjectID: 42})
 	if !errors.Is(err, wantErr) {
