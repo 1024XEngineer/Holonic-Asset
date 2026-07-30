@@ -145,7 +145,7 @@ func (s *recordContentDaoStub) DeleteAssetContents(_ context.Context, ids []uint
 
 func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.T) {
 	currentContentID := uint(4)
-	currentContent := datatypes.JSON(`{"prototype":{"directions":{"up":{"image":{"url":"https://cdn.example/up.png"}}}}}`)
+	currentContent := datatypes.JSON(`{"prototype":[{"id":1,"url":"https://cdn.example/up.png"}]}`)
 	assetDao := &recordAssetDaoStub{asset: dao.Asset{
 		ID:        7,
 		Version:   2,
@@ -202,10 +202,10 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 		targetContentID: {
 			ID:      targetContentID,
 			AssetID: 7,
-			Content: datatypes.JSON(`{"prototype":{"directions":{"up":{"image":{"url":"https://cdn.example/up.png"}}}}}`),
+			Content: datatypes.JSON(`{"prototype":[{"id":1,"url":"https://cdn.example/up.png"}]}`),
 		},
-		5: {ID: 5, AssetID: 7, Content: datatypes.JSON(`{"prototype":{"directions":{"up":{"image":{"url":"https://cdn.example/new.png"}}}}}`)},
-		6: {ID: 6, AssetID: 7, Content: datatypes.JSON(`{"prototype":{"directions":{"up":{"image":{"url":"https://cdn.example/current.png"}}}}}`)},
+		5: {ID: 5, AssetID: 7, Content: datatypes.JSON(`{"prototype":[{"id":2,"url":"https://cdn.example/new.png"}]}`)},
+		6: {ID: 6, AssetID: 7, Content: datatypes.JSON(`{"prototype":[{"id":3,"url":"https://cdn.example/current.png"}]}`)},
 	}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
 

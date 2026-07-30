@@ -88,79 +88,69 @@ The asset's own metadata goes in `data.attributes`. Extended metadata within the
 
 ## Character
 
-Character contains `prototype` and `animations`. Directions under an animation use dynamic keys; the number of directions is not fixed.
+Character contains `prototype` and `animations`. Direction resources are represented as simple arrays for now; direction names are not modeled in Asset content.
 
 ```json
 {
   "viewMode": "top_down",
   "directionCount": 4,
-  "prototype": {
-    "directions": {
-      "up": {
-        "image": {
-          "url": "https://cdn.example.com/hero/prototype-up.png"
-        }
-      },
-      "down": {
-        "image": {
-          "url": "https://cdn.example.com/hero/prototype-down.png"
-        }
-      },
-      "left": {
-        "image": {
-          "url": "https://cdn.example.com/hero/prototype-left.png"
-        }
-      },
-      "right": {
-        "image": {
-          "url": "https://cdn.example.com/hero/prototype-right.png"
-        }
-      }
+  "prototype": [
+    {
+      "id": 2101,
+      "url": "https://cdn.example.com/hero/prototype-01.png"
+    },
+    {
+      "id": 2102,
+      "url": "https://cdn.example.com/hero/prototype-02.png"
+    },
+    {
+      "id": 2103,
+      "url": "https://cdn.example.com/hero/prototype-03.png"
+    },
+    {
+      "id": 2104,
+      "url": "https://cdn.example.com/hero/prototype-04.png"
     }
-  },
+  ],
   "animations": [
     {
       "id": 3001,
       "name": "walk",
-      "directions": {
-        "left": {
-          "frames": [
-            {
-              "url": "https://cdn.example.com/hero/walk/left/001.png",
-              "duration": 100
-            }
-          ]
+      "frames": [
+        {
+          "id": 2201,
+          "url": "https://cdn.example.com/hero/walk/001.png",
+          "duration": 100
+        },
+        {
+          "id": 2202,
+          "url": "https://cdn.example.com/hero/walk/002.png",
+          "duration": 100
         }
-      }
+      ]
     }
   ]
 }
 ```
 
-The four directions above are only an example for `top_down`. The direction set is specified by `directionCount`; the actual direction names are determined by the keys of `prototype.directions` and `animations[].directions`.
+`directionCount` retains the expected number of directional resources. The arrays do not currently expose names such as `up`, `down`, `left`, or `right`.
 
-For example, `side_on` may only contain left and right directions:
+For example, a two-direction asset is represented by two prototype elements:
 
 ```json
 {
   "viewMode": "side_on",
   "directionCount": 2,
-  "prototype": {
-    "directions": {
-      "left": {
-        "image": {
-          "id": 2101,
-          "url": "https://cdn.example.com/hero/prototype-left.png"
-        }
-      },
-      "right": {
-        "image": {
-          "id": 2102,
-          "url": "https://cdn.example.com/hero/prototype-right.png"
-        }
-      }
+  "prototype": [
+    {
+      "id": 2101,
+      "url": "https://cdn.example.com/hero/prototype-01.png"
+    },
+    {
+      "id": 2102,
+      "url": "https://cdn.example.com/hero/prototype-02.png"
     }
-  }
+  ]
 }
 ```
 
@@ -168,16 +158,10 @@ Character conventions:
 
 - `viewMode` represents the asset's perspective mode. Currently includes `side_on` and `top_down`.
 - `directionCount` is the number of directions to generate for the current asset. Only `1`, `2`, `4`, or `8` are used.
-- `directionCount: 1` corresponds to `front`.
-- `directionCount: 2` corresponds to `left`, `right`.
-- `directionCount: 4` corresponds to `up`, `down`, `left`, `right`.
-- `directionCount: 8` corresponds to the four cardinal directions plus `up_left`, `up_right`, `down_left`, `down_right`.
-- Keys of `prototype.directions` must use the direction names listed above and match `directionCount`.
-- Each prototype direction must contain exactly one `image` when complete.
-- `side_on` may have `left` and `right` (two directions), corresponding to two images.
-- `top_down` may have `up`, `down`, `left`, `right` (four directions), corresponding to four images.
-- The keys in `directions` indicate which directions are actually selected for generation this time.
-- `frames` may be absent when the direction is not yet complete.
+- `prototype` is a plain array of image resources.
+- `animations[].frames` is a plain array of animation frames.
+- Direction names and direction-to-array-index mappings are intentionally not defined at this stage.
+- Array elements may be absent while generation is incomplete.
 - Whether a resource has been generated is determined by the corresponding Task status; Asset content itself does not carry generation state.
 
 ## Object
@@ -188,14 +172,12 @@ Object uses the same content structure as Character. It may have only a prototyp
 {
   "viewMode": "side_on",
   "directionCount": 2,
-  "prototype": {
-    "directions": {}
-  },
+  "prototype": [],
   "animations": [
     {
       "id": 3101,
       "name": "open",
-      "directions": {}
+      "frames": []
     }
   ]
 }
@@ -218,25 +200,17 @@ TileSet does not contain prototype or animations. Instead, it consists of an ite
       "name": "grass",
       "tiles": [
         {
-          "name": "grass-center",
           "url": "https://cdn.example.com/tileset/grass/center.png",
           "position": {
             "x": 0,
             "y": 1
-          },
-          "metadata": {
-            "tileType": "center"
           }
         },
         {
-          "name": "grass-top-left",
           "url": "https://cdn.example.com/tileset/grass/top-left.png",
           "position": {
             "x": 1,
             "y": 1
-          },
-          "metadata": {
-            "tileType": "top-left"
           }
         }
       ]
@@ -251,9 +225,9 @@ TileSet conventions:
 - `tileSize` defines the fixed tile dimensions for the entire TileSet. All tiles share the same width and height.
 - `items` is the top-level business content of the TileSet.
 - `items[].tiles` is the list of tiles generated for that item.
+- `items[].name` identifies the tile group; individual tiles do not repeat a name.
 - `tiles[].position` is the tile's position on the grid. `x` is the column, `y` is the row, both zero-indexed. For example, `{ "x": 0, "y": 1 }` means column 0, row 1.
 - Whether an item has been generated is determined by the corresponding Task status; Asset content itself does not carry state.
-- Extended tile properties go in `metadata`, e.g. tile type. Fixed dimensions and grid position use `tileSize` and `position` respectively.
 
 ## Task Polling
 
@@ -261,6 +235,6 @@ Asset content does not provide a `status` field. The frontend should save the Ta
 
 1. While the Task is incomplete, keep polling the Task.
 2. After the Task completes, re-fetch the Asset detail.
-3. For Character/Object, read `prototype.directions[*].image` or `animations[*].directions[*].frames`.
+3. For Character/Object, read `prototype[*]` or `animations[*].frames`.
 4. For TileSet, read `items[*].tiles`.
 5. If the Task fails or is cancelled, stop polling and display the failure reason based on the error information returned by the Task.

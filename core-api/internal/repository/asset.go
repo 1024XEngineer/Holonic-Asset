@@ -18,11 +18,10 @@ type AssetRepository interface {
 	GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error)
 	UpdateAsset(ctx context.Context, id uint, update *domain.AssetUpdate) (*domain.Asset, error)
 	UpdateContent(ctx context.Context, assetID uint, content domain.AssetContent) error
-	UpdateAnimationDirection(
+	UpdateAnimationFrames(
 		ctx context.Context,
 		assetID uint,
 		animationID uint,
-		direction string,
 		frames []domain.Frame,
 	) error
 
@@ -32,7 +31,7 @@ type AssetRepository interface {
 	CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error)
 	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
-	UpdatePrototypeImages(ctx context.Context, assetID uint, images map[string]domain.ImageResource) error
+	UpdatePrototypeImages(ctx context.Context, assetID uint, images []domain.ImageResource) error
 
 	CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error)
 	GetRecordHistory(ctx context.Context, assetID uint) ([]domain.AssetRecord, error)
@@ -349,28 +348,19 @@ func (r *AssetRepositoryImpl) mutateAssetContent(
 	})
 }
 
-func (r *AssetRepositoryImpl) UpdateAnimationDirection(
+func (r *AssetRepositoryImpl) UpdateAnimationFrames(
 	ctx context.Context,
 	assetID uint,
 	animationID uint,
-	direction string,
 	frames []domain.Frame,
 ) error {
-	if direction == "" {
-		return fmt.Errorf("repository: animation direction is empty")
-	}
 	return r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
 		for index := range content.Animations {
 			animation := &content.Animations[index]
 			if animation.ID != animationID {
 				continue
 			}
-			if animation.Directions == nil {
-				animation.Directions = make(map[string]domain.AnimationDirection)
-			}
-			current := animation.Directions[direction]
-			current.Frames = append([]domain.Frame(nil), frames...)
-			animation.Directions[direction] = current
+			animation.Frames = append([]domain.Frame(nil), frames...)
 			return nil
 		}
 		return fmt.Errorf("repository: animation %d not found in asset %d", animationID, assetID)
@@ -465,9 +455,9 @@ func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint,
 	if err := r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
 		animationID = nextAnimationID(content.Animations)
 		content.Animations = append(content.Animations, domain.Animation{
-			ID:         animationID,
-			Name:       name,
-			Directions: make(map[string]domain.AnimationDirection),
+			ID:     animationID,
+			Name:   name,
+			Frames: make([]domain.Frame, 0),
 		})
 		return nil
 	}); err != nil {
@@ -479,32 +469,11 @@ func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint,
 func (r *AssetRepositoryImpl) UpdatePrototypeImages(
 	ctx context.Context,
 	assetID uint,
-	images map[string]domain.ImageResource,
+	images []domain.ImageResource,
 ) error {
 	return r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
-		if content.Prototype == nil {
-			content.Prototype = &domain.Prototype{}
-		}
-		if content.Prototype.Directions == nil {
-			content.Prototype.Directions = make(map[string]domain.PrototypeDirection)
-		}
-		directions := domain.DirectionsForCount(content.DirectionCount)
-		for _, direction := range directions {
-			if _, ok := content.Prototype.Directions[direction]; !ok {
-				content.Prototype.Directions[direction] = domain.PrototypeDirection{}
-			}
-		}
-		for direction, image := range images {
-			if direction == "" {
-				return fmt.Errorf("repository: prototype direction is empty")
-			}
-			if len(directions) > 0 && !slices.Contains(directions, direction) {
-				return fmt.Errorf("repository: prototype direction %q is not supported by asset %d", direction, assetID)
-			}
-			current := content.Prototype.Directions[direction]
-			current.Image = &image
-			content.Prototype.Directions[direction] = current
-		}
+		prototype := domain.Prototype(append([]domain.ImageResource(nil), images...))
+		content.Prototype = &prototype
 		return nil
 	})
 }

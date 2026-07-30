@@ -13,14 +13,13 @@ type AssetService interface {
 	GetDetail(ctx context.Context, id uint) (domain.Asset, error)
 	UpdateAsset(ctx context.Context, id uint, update *domain.AssetUpdate) (*domain.Asset, error)
 	UpdateContent(ctx context.Context, id uint, content domain.AssetContent) error
-	UpdateAnimationDirection(
+	UpdateAnimationFrames(
 		ctx context.Context,
 		assetID uint,
 		animationID uint,
-		direction string,
 		frames []domain.Frame,
 	) error
-	UpdatePrototypeImages(ctx context.Context, assetID uint, images map[string]domain.ImageResource) error
+	UpdatePrototypeImages(ctx context.Context, assetID uint, images []domain.ImageResource) error
 
 	// Creates a Character asset and initializes prototype content.
 	CreateCharacterAsset(ctx context.Context, asset *domain.Asset) (*domain.Asset, error)
@@ -74,18 +73,16 @@ func (a *AssetServiceImpl) UpdateContent(
 	return a.AssetRepository.UpdateContent(ctx, id, content)
 }
 
-func (a *AssetServiceImpl) UpdateAnimationDirection(
+func (a *AssetServiceImpl) UpdateAnimationFrames(
 	ctx context.Context,
 	assetID uint,
 	animationID uint,
-	direction string,
 	frames []domain.Frame,
 ) error {
-	return a.AssetRepository.UpdateAnimationDirection(
+	return a.AssetRepository.UpdateAnimationFrames(
 		ctx,
 		assetID,
 		animationID,
-		direction,
 		frames,
 	)
 }
@@ -93,7 +90,7 @@ func (a *AssetServiceImpl) UpdateAnimationDirection(
 func (a *AssetServiceImpl) UpdatePrototypeImages(
 	ctx context.Context,
 	assetID uint,
-	images map[string]domain.ImageResource,
+	images []domain.ImageResource,
 ) error {
 	return a.AssetRepository.UpdatePrototypeImages(ctx, assetID, images)
 }

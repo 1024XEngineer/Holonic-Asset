@@ -49,30 +49,22 @@ type AssetContent struct {
 	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
-type Prototype struct {
-	Directions map[string]PrototypeDirection `json:"directions,omitempty"`
-}
-
-type PrototypeDirection struct {
-	Image *ImageResource `json:"image,omitempty"`
-}
+type Prototype []ImageResource
 
 type Animation struct {
-	ID         uint                          `json:"id"`
-	Name       string                        `json:"name"`
-	Directions map[string]AnimationDirection `json:"directions,omitempty"`
-}
-
-type AnimationDirection struct {
-	Frames []Frame `json:"frames,omitempty"`
+	ID     uint    `json:"id"`
+	Name   string  `json:"name"`
+	Frames []Frame `json:"frames"`
 }
 
 type ImageResource struct {
+	ID       uint            `json:"id"`
 	URL      *string         `json:"url,omitempty"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 type Frame struct {
+	ID       uint            `json:"id"`
 	URL      *string         `json:"url,omitempty"`
 	Duration uint            `json:"duration,omitempty"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
@@ -89,10 +81,8 @@ type TileSetItem struct {
 }
 
 type Tile struct {
-	Name     string          `json:"name"`
-	URL      *string         `json:"url,omitempty"`
-	Position TilePosition    `json:"position"`
-	Metadata json.RawMessage `json:"metadata,omitempty"`
+	URL      *string      `json:"url,omitempty"`
+	Position TilePosition `json:"position"`
 }
 
 type TilePosition struct {
@@ -103,7 +93,8 @@ type TilePosition struct {
 func NewAssetContent(assetType AssetType) AssetContent {
 	content := AssetContent{}
 	if assetType == AssetTypeCharacter || assetType == AssetTypeObject {
-		content.Prototype = &Prototype{}
+		prototype := Prototype{}
+		content.Prototype = &prototype
 	}
 	return content
 }
@@ -121,58 +112,11 @@ func (a Asset) DecodeContent() (AssetContent, error) {
 }
 
 func EncodeContent(content AssetContent) (json.RawMessage, error) {
-	content.normalizePrototypeDirections()
 	value, err := json.Marshal(content)
 	if err != nil {
 		return nil, err
 	}
 	return json.RawMessage(value), nil
-}
-
-func DirectionsForCount(count uint) []string {
-	switch count {
-	case 1:
-		return []string{"front"}
-	case 2:
-		return []string{"left", "right"}
-	case 4:
-		return []string{"up", "down", "left", "right"}
-	case 8:
-		return []string{
-			"up",
-			"down",
-			"left",
-			"right",
-			"up_left",
-			"up_right",
-			"down_left",
-			"down_right",
-		}
-	default:
-		return nil
-	}
-}
-
-func (content *AssetContent) normalizePrototypeDirections() {
-	directions := DirectionsForCount(content.DirectionCount)
-	if content.Prototype == nil || len(directions) == 0 {
-		return
-	}
-	if content.Prototype.Directions == nil {
-		content.Prototype.Directions = make(map[string]PrototypeDirection, len(directions))
-	}
-	supported := make(map[string]struct{}, len(directions))
-	for _, direction := range directions {
-		supported[direction] = struct{}{}
-		if _, ok := content.Prototype.Directions[direction]; !ok {
-			content.Prototype.Directions[direction] = PrototypeDirection{}
-		}
-	}
-	for direction := range content.Prototype.Directions {
-		if _, ok := supported[direction]; !ok {
-			delete(content.Prototype.Directions, direction)
-		}
-	}
 }
 
 type AssetRecord struct {

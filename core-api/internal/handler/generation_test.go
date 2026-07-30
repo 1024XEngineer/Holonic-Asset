@@ -68,7 +68,7 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 		Kind:              domain.GenerateCharacterAnimation,
 		Prompt:            "hero",
 		ReferenceMediaIDs: []string{"media-1"},
-		TargetAssetPaths:  []string{"animations.walk.directions.left"},
+		TargetAssetPaths:  []string{"animations.walk.frames"},
 		Parameters:        parameters,
 	}
 

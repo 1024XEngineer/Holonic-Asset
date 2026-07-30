@@ -88,26 +88,15 @@ func (s *jsonAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID 
 }
 
 func TestAssetRepositoryReadsAssetContent(t *testing.T) {
-	upURL := "https://cdn.example/prototype-up.png"
-	downURL := "https://cdn.example/prototype-down.png"
-	leftURL := "https://cdn.example/prototype-left.png"
-	rightURL := "https://cdn.example/prototype-right.png"
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
 	content.DirectionCount = 4
-	content.Prototype.Directions = map[string]domain.PrototypeDirection{
-		"up": {
-			Image: &domain.ImageResource{URL: &upURL},
-		},
-		"down": {
-			Image: &domain.ImageResource{URL: &downURL},
-		},
-		"left": {
-			Image: &domain.ImageResource{URL: &leftURL},
-		},
-		"right": {
-			Image: &domain.ImageResource{URL: &rightURL},
-		},
+	prototype := domain.Prototype{
+		{ID: 2101, URL: new("https://cdn.example/prototype-01.png")},
+		{ID: 2102, URL: new("https://cdn.example/prototype-02.png")},
+		{ID: 2103, URL: new("https://cdn.example/prototype-03.png")},
+		{ID: 2104, URL: new("https://cdn.example/prototype-04.png")},
 	}
+	content.Prototype = &prototype
 	payload, err := domain.EncodeContent(content)
 	if err != nil {
 		t.Fatalf("encode content: %v", err)
@@ -133,7 +122,7 @@ func TestAssetRepositoryReadsAssetContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode asset: %v", err)
 	}
-	if decoded.Prototype == nil || len(decoded.Prototype.Directions) != 4 || decoded.Prototype.Directions["up"].Image == nil || decoded.Prototype.Directions["up"].Image.URL == nil || *decoded.Prototype.Directions["up"].Image.URL != "https://cdn.example/prototype-up.png" {
+	if decoded.Prototype == nil || len(*decoded.Prototype) != 4 || (*decoded.Prototype)[0].ID != 2101 || (*decoded.Prototype)[0].URL == nil || *(*decoded.Prototype)[0].URL != "https://cdn.example/prototype-01.png" {
 		t.Fatalf("unexpected asset content: %+v", decoded)
 	}
 }
@@ -189,12 +178,12 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 	}
 }
 
-func TestAssetRepositoryUpdatesDynamicAnimationDirection(t *testing.T) {
+func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
 	content.Animations = []domain.Animation{{
-		ID:         9,
-		Name:       "walk",
-		Directions: map[string]domain.AnimationDirection{"left": {}},
+		ID:     9,
+		Name:   "walk",
+		Frames: []domain.Frame{},
 	}}
 	payload, err := domain.EncodeContent(content)
 	if err != nil {
@@ -216,15 +205,14 @@ func TestAssetRepositoryUpdatesDynamicAnimationDirection(t *testing.T) {
 		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
 	}
 
-	err = repo.UpdateAnimationDirection(
+	err = repo.UpdateAnimationFrames(
 		context.Background(),
 		7,
 		9,
-		"right",
-		[]domain.Frame{{URL: new("https://cdn.example/walk-right-1.png")}},
+		[]domain.Frame{{ID: 2201, URL: new("https://cdn.example/walk-01.png")}},
 	)
 	if err != nil {
-		t.Fatalf("update animation direction: %v", err)
+		t.Fatalf("update animation frames: %v", err)
 	}
 	if daoStub.updatedAsset != 7 || daoStub.updatedContent == contentID {
 		t.Fatalf("unexpected content pointer update: %+v", daoStub)
@@ -234,7 +222,7 @@ func TestAssetRepositoryUpdatesDynamicAnimationDirection(t *testing.T) {
 		t.Fatalf("decode updated content: %v", err)
 	}
 	animation := updated.Animations[0]
-	if len(animation.Directions["right"].Frames) != 1 || animation.Directions["right"].Frames[0].URL == nil {
+	if len(animation.Frames) != 1 || animation.Frames[0].ID != 2201 || animation.Frames[0].URL == nil {
 		t.Fatalf("unexpected animation content: %+v", animation)
 	}
 }
@@ -277,7 +265,7 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	}
 }
 
-func TestAssetRepositoryUpdatesOnePrototypeImagePerDirection(t *testing.T) {
+func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
 	content.DirectionCount = 4
 	payload, err := domain.EncodeContent(content)
@@ -300,11 +288,11 @@ func TestAssetRepositoryUpdatesOnePrototypeImagePerDirection(t *testing.T) {
 		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
 	}
 
-	err = repo.UpdatePrototypeImages(context.Background(), 7, map[string]domain.ImageResource{
-		"up":    {URL: new("https://cdn.example/prototype-up.png")},
-		"down":  {URL: new("https://cdn.example/prototype-down.png")},
-		"left":  {URL: new("https://cdn.example/prototype-left.png")},
-		"right": {URL: new("https://cdn.example/prototype-right.png")},
+	err = repo.UpdatePrototypeImages(context.Background(), 7, []domain.ImageResource{
+		{ID: 2101, URL: new("https://cdn.example/prototype-01.png")},
+		{ID: 2102, URL: new("https://cdn.example/prototype-02.png")},
+		{ID: 2103, URL: new("https://cdn.example/prototype-03.png")},
+		{ID: 2104, URL: new("https://cdn.example/prototype-04.png")},
 	})
 	if err != nil {
 		t.Fatalf("update prototype images: %v", err)
@@ -314,12 +302,12 @@ func TestAssetRepositoryUpdatesOnePrototypeImagePerDirection(t *testing.T) {
 		t.Fatalf("decode updated content: %v", err)
 	}
 	prototype := updated.Prototype
-	if prototype == nil || len(prototype.Directions) != 4 {
+	if prototype == nil || len(*prototype) != 4 {
 		t.Fatalf("unexpected prototype content: %+v", prototype)
 	}
-	for _, direction := range domain.DirectionsForCount(content.DirectionCount) {
-		if prototype.Directions[direction].Image == nil {
-			t.Fatalf("expected prototype image for direction %q", direction)
+	for index, image := range *prototype {
+		if image.ID != uint(2101+index) || image.URL == nil {
+			t.Fatalf("unexpected prototype image at index %d: %+v", index, image)
 		}
 	}
 }

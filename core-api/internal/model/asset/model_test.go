@@ -7,18 +7,22 @@ import (
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/model/asset"
 )
 
-func TestAssetContentSupportsDynamicAnimationDirections(t *testing.T) {
+func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
-	content.DirectionCount = 2
+	content.DirectionCount = 4
+	prototype := domain.Prototype{
+		{ID: 2101, URL: new("https://cdn.example/prototype-01.png")},
+		{ID: 2102, URL: new("https://cdn.example/prototype-02.png")},
+	}
+	content.Prototype = &prototype
 	content.Animations = []domain.Animation{{
-		ID:   7,
+		ID:   3001,
 		Name: "walk",
-		Directions: map[string]domain.AnimationDirection{
-			"left": {
-				Frames: []domain.Frame{{}},
-			},
-			"right": {},
-		},
+		Frames: []domain.Frame{{
+			ID:       2201,
+			URL:      new("https://cdn.example/walk-01.png"),
+			Duration: 100,
+		}},
 	}}
 
 	payload, err := domain.EncodeContent(content)
@@ -33,8 +37,21 @@ func TestAssetContentSupportsDynamicAnimationDirections(t *testing.T) {
 	if decoded.Prototype == nil {
 		t.Fatalf("expected prototype: %+v", decoded.Prototype)
 	}
-	if len(decoded.Animations) != 1 || len(decoded.Animations[0].Directions) != 2 {
-		t.Fatalf("dynamic direction data was not preserved: %+v", decoded.Animations)
+	if len(*decoded.Prototype) != 2 || (*decoded.Prototype)[0].ID != 2101 {
+		t.Fatalf("prototype resources were not preserved: %+v", decoded.Prototype)
+	}
+	if len(decoded.Animations) != 1 || len(decoded.Animations[0].Frames) != 1 || decoded.Animations[0].Frames[0].ID != 2201 {
+		t.Fatalf("animation frames were not preserved: %+v", decoded.Animations)
+	}
+	if string(payload) == "" || json.Valid(payload) == false {
+		t.Fatalf("invalid encoded content: %s", payload)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatalf("decode raw asset content: %v", err)
+	}
+	if _, exists := raw["directions"]; exists {
+		t.Fatalf("directions must not be encoded: %s", payload)
 	}
 }
 
@@ -48,14 +65,12 @@ func TestAssetDecodeContentInitializesMissingContent(t *testing.T) {
 	}
 }
 
-func TestAssetContentMatchesPrototypeDirectionsToDirectionCount(t *testing.T) {
+func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
 	content.ViewMode = domain.ViewModeSideOn
 	content.DirectionCount = 2
-	content.Prototype.Directions = map[string]domain.PrototypeDirection{
-		"left":   {Image: &domain.ImageResource{}},
-		"unused": {Image: &domain.ImageResource{}},
-	}
+	prototype := domain.Prototype{{ID: 1}, {ID: 2}, {ID: 3}}
+	content.Prototype = &prototype
 
 	payload, err := domain.EncodeContent(content)
 	if err != nil {
@@ -65,14 +80,11 @@ func TestAssetContentMatchesPrototypeDirectionsToDirectionCount(t *testing.T) {
 	if err := json.Unmarshal(payload, &decoded); err != nil {
 		t.Fatalf("decode asset content: %v", err)
 	}
-	if len(decoded.Prototype.Directions) != 2 {
-		t.Fatalf("expected two side-on directions: %+v", decoded.Prototype.Directions)
+	if decoded.DirectionCount != 2 {
+		t.Fatalf("unexpected direction count: %d", decoded.DirectionCount)
 	}
-	if _, ok := decoded.Prototype.Directions["unused"]; ok {
-		t.Fatal("unsupported prototype direction should be removed")
-	}
-	if _, ok := decoded.Prototype.Directions["right"]; !ok {
-		t.Fatalf("missing direction should be initialized")
+	if decoded.Prototype == nil || len(*decoded.Prototype) != 3 {
+		t.Fatalf("prototype images should be preserved independently: %+v", decoded.Prototype)
 	}
 }
 
@@ -82,7 +94,7 @@ func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
 	content.Items = []domain.TileSetItem{{
 		Name: "grass",
 		Tiles: []domain.Tile{{
-			Name:     "grass-center",
+			URL:      new("https://cdn.example.com/tileset/grass/center.png"),
 			Position: domain.TilePosition{X: 0, Y: 1},
 		}},
 	}}
@@ -104,5 +116,8 @@ func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
 	}
 	if position := decoded.Items[0].Tiles[0].Position; position.X != 0 || position.Y != 1 {
 		t.Fatalf("unexpected tile position: %+v", position)
+	}
+	if decoded.Items[0].Tiles[0].URL == nil || *decoded.Items[0].Tiles[0].URL != "https://cdn.example.com/tileset/grass/center.png" {
+		t.Fatalf("unexpected tile URL: %+v", decoded.Items[0].Tiles[0].URL)
 	}
 }
