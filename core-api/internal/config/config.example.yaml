@@ -1,0 +1,31 @@
+db:
+  dsn: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
+  maxIdleConns: 5
+  maxOpenConns: 20
+  connMaxIdleTime: 15m
+  connMaxLifetime: 1h
+
+queue:
+  databaseURL: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
+  maxWorkers: 10
+  jobTimeout: 5m
+
+log:
+  path: ./logs/holonic-asset.log
+  maxSize: 100
+  maxBackups: 7
+  maxAge: 14
+  compress: true
+
+qna:
+  baseURL: "https://example.com"
+  apiKey: ""
+  defaultModel: "openai/gpt-image-2"
+
+  qiniu:
+    accessKey: ""
+    secretKey: ""
+    bucket: ""
+    domain: ""
+    uploadURL: ""
+    uploadTokenExpiry: 1h

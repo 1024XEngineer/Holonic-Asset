@@ -1,0 +1,27 @@
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+
+# Go
+bin/
+dist/
+
+# Logs
+**/*.log
+**/*.out
+
+# Environment
+**/.env
+
+# Cache
+configCache/
+
+# Config
+**/config.yaml
+
+# Docker
+docker-compose.yaml

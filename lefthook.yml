@@ -1,0 +1,12 @@
+pre-commit:
+  commands:
+    backend-format:
+      root: "core-api/"
+      glob: "*.go"
+      run: golangci-lint fmt {staged_files}
+      stage_fixed: true
+
+    backend-lint:
+      root: "core-api/"
+      glob: "*.go"
+      run: golangci-lint run
