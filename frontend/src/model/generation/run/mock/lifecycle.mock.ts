@@ -10,21 +10,21 @@ import type { GenerationInput } from "./generation-input";
 
 const MOCK_QUEUE_DELAY_MS = 650;
 
-/** Starts background work and returns immediately, matching a queued HTTP job. */
+/** Starts background work and returns immediately, matching a pending HTTP job. */
 export async function enqueueMockGeneration({
   projectId,
   request,
 }: GenerationInput) {
-  const queuedRun = createMockGenerationRun({ ...request, projectId });
+  const pendingRun = createMockGenerationRun({ ...request, projectId });
 
   globalThis.setTimeout(() => {
     if (!hasMockProject(projectId)) {
-      removeMockGenerationRun(queuedRun.id);
+      removeMockGenerationRun(pendingRun.id);
       return;
     }
 
     const processingRun = updateMockGenerationRun({
-      ...queuedRun,
+      ...pendingRun,
       status: "processing",
     });
 
@@ -40,5 +40,5 @@ export async function enqueueMockGeneration({
       });
   }, MOCK_QUEUE_DELAY_MS);
 
-  return structuredClone(queuedRun);
+  return structuredClone(pendingRun);
 }

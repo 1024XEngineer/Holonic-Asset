@@ -106,7 +106,7 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 	}
 	if response.Data.ID != 7 || response.Data.ProjectID != 2 || response.Data.AssetID == nil ||
 		*response.Data.AssetID != assetID || response.Data.Kind != generator.GenerateCharacterAnimation ||
-		response.Data.Status != taskdomain.StatusProcessing {
+		response.Data.Status != "processing" {
 		t.Fatalf("unexpected run response: %+v", response)
 	}
 }
@@ -137,8 +137,8 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 		t.Fatalf("unexpected list query: %+v", stub.listQuery)
 	}
 	if len(response.Data.Items) != 2 || response.Data.Items[0].ID != 7 || response.Data.Items[1].ID != 8 ||
-		response.Data.Items[0].Status != taskdomain.StatusProcessing ||
-		response.Data.Items[1].Status != taskdomain.StatusPending || response.Data.NextCursor != "next" {
+		response.Data.Items[0].Status != "processing" ||
+		response.Data.Items[1].Status != "pending" || response.Data.NextCursor != "next" {
 		t.Fatalf("unexpected list response: %+v", response)
 	}
 }

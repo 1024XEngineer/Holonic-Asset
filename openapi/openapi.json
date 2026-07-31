@@ -451,15 +451,13 @@
           },
           "status": {
             "enum": [
-              0,
-              1,
-              2,
-              3,
-              4
+              "pending",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
             ],
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [
@@ -542,15 +540,13 @@
           "result": {},
           "status": {
             "enum": [
-              0,
-              1,
-              2,
-              3,
-              4
+              "pending",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
             ],
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [

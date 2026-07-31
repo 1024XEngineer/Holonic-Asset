@@ -66,7 +66,7 @@ func (h *GenerationHandler) List(
 			ProjectID: run.ProjectID,
 			AssetID:   run.AssetID,
 			Kind:      run.Kind,
-			Status:    run.Status,
+			Status:    dto.GenerationStatus(run.Status.String()),
 		}
 	}
 
@@ -90,7 +90,7 @@ func (h *GenerationHandler) Get(
 		ProjectID: run.ProjectID,
 		AssetID:   run.AssetID,
 		Kind:      run.Kind,
-		Status:    run.Status,
+		Status:    dto.GenerationStatus(run.Status.String()),
 		Result:    run.Result,
 		Error:     run.Error,
 	}), nil

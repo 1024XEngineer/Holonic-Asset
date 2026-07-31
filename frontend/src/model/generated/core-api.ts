@@ -414,11 +414,8 @@ export interface components {
             kind: "generate_character_prototype" | "generate_character_animation" | "regenerate_character_prototype" | "regenerate_character_animation" | "regenerate_character_frames" | "generate_object_prototype" | "generate_object_animation" | "regenerate_object_prototype" | "regenerate_object_animation" | "regenerate_object_frames" | "generate_tileset" | "regenerate_item" | "regenerate_tiles";
             /** Format: int64 */
             projectId: number;
-            /**
-             * Format: int64
-             * @enum {integer}
-             */
-            status: 0 | 1 | 2 | 3 | 4;
+            /** @enum {string} */
+            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
         };
         GetAssetRecordsResponse: {
             records: components["schemas"]["RecordAssetResponse"][];
@@ -437,11 +434,8 @@ export interface components {
             /** Format: int64 */
             projectId: number;
             result?: unknown;
-            /**
-             * Format: int64
-             * @enum {integer}
-             */
-            status: 0 | 1 | 2 | 3 | 4;
+            /** @enum {string} */
+            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
         };
         ListGenerationRunsResponse: {
             items: components["schemas"]["GenerationRunListItemResponse"][];

@@ -14,7 +14,7 @@ export function createMockGenerationRun(
   const createdRun: GenerationRun = {
     ...structuredClone(run),
     id: crypto.randomUUID(),
-    status: "queued",
+    status: "pending",
   };
   generationRuns = [...generationRuns, createdRun];
   return structuredClone(createdRun);
