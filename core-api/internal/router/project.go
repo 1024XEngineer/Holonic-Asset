@@ -8,11 +8,11 @@ import (
 )
 
 type ProjectRouter interface {
-	Create(c *echox.Context, request dto.CreateProjectRequest) (dto.CreateProjectResponse, error)
-	ListByUID(c *echox.Context, request dto.ListProjectsRequest) (dto.ListProjectsResponse, error)
-	GetDetail(c *echox.Context, request dto.ProjectDetailRequest) (dto.ProjectDetailResponse, error)
-	Update(c *echox.Context, request dto.UpdateProjectRequest) (dto.UpdateProjectResponse, error)
-	Delete(c *echox.Context, request dto.DeleteProjectRequest) (dto.DeleteProjectResponse, error)
+	Create(c *echox.Context, request dto.CreateProjectRequest) (dto.Response, error)
+	ListByUID(c *echox.Context, request dto.ListProjectsRequest) (dto.Response, error)
+	GetDetail(c *echox.Context, request dto.ProjectDetailRequest) (dto.Response, error)
+	Update(c *echox.Context, request dto.UpdateProjectRequest) (dto.Response, error)
+	Delete(c *echox.Context, request dto.DeleteProjectRequest) (dto.Response, error)
 }
 
 // RegisterRoutes registers all project HTTP routes.

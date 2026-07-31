@@ -1,6 +1,7 @@
 package echox
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -12,25 +13,45 @@ const UserClaimsKey = "user_claims"
 
 type Context struct {
 	echo.Context
+	requestContext context.Context
 }
 
 func newContext(c echo.Context) *Context {
-	return &Context{Context: c}
+	reqCtx := context.Background()
+	if req := c.Request(); req != nil && req.Context() != nil {
+		reqCtx = req.Context()
+	}
+	return &Context{
+		Context:        c,
+		requestContext: reqCtx,
+	}
 }
 
 func (c *Context) Deadline() (deadline time.Time, ok bool) {
+	if c.requestContext != nil {
+		return c.requestContext.Deadline()
+	}
 	return c.Request().Context().Deadline()
 }
 
 func (c *Context) Done() <-chan struct{} {
+	if c.requestContext != nil {
+		return c.requestContext.Done()
+	}
 	return c.Request().Context().Done()
 }
 
 func (c *Context) Err() error {
+	if c.requestContext != nil {
+		return c.requestContext.Err()
+	}
 	return c.Request().Context().Err()
 }
 
 func (c *Context) Value(key any) any {
+	if c.requestContext != nil {
+		return c.requestContext.Value(key)
+	}
 	return c.Request().Context().Value(key)
 }
 

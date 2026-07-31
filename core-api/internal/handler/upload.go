@@ -7,18 +7,18 @@ import (
 )
 
 type UploadHandler struct {
-	uploader upload.Uploader
+	manager upload.Manager
 }
 
-func NewUploadHandler(uploader upload.Uploader) *UploadHandler {
-	return &UploadHandler{uploader: uploader}
+func NewUploadHandler(manager upload.Manager) *UploadHandler {
+	return &UploadHandler{manager: manager}
 }
 
 func (h *UploadHandler) CreateUploadTarget(
 	c *echox.Context,
 	request dto.CreateUploadTargetRequest,
 ) (*dto.UploadTarget, error) {
-	target, err := h.uploader.CreateUploadTarget(c, &upload.CreateUploadTargetRequest{
+	target, err := h.manager.CreateUploadTarget(c, &upload.CreateUploadTargetRequest{
 		ContentType:   request.ContentType,
 		ContentLength: request.ContentLength,
 	})

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
@@ -29,7 +30,7 @@ func (r *projectRepository) Insert(ctx context.Context, project *domain.Project)
 func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*domain.Project, error) {
 	project, err := r.projectDao.FindByID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, normalizeProjectError(err)
 	}
 	return convertProjectToDomain(project), nil
 }
@@ -48,11 +49,18 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*d
 }
 
 func (r *projectRepository) Update(ctx context.Context, update *domain.ProjectUpdate) error {
-	return r.projectDao.Update(ctx, convertProjectUpdateToDao(update))
+	return normalizeProjectError(r.projectDao.Update(ctx, convertProjectUpdateToDao(update)))
 }
 
 func (r *projectRepository) Remove(ctx context.Context, projectID uint) error {
-	return r.projectDao.Delete(ctx, projectID)
+	return normalizeProjectError(r.projectDao.Delete(ctx, projectID))
+}
+
+func normalizeProjectError(err error) error {
+	if errors.Is(err, dao.ErrProjectNotFound) {
+		return domain.ErrProjectNotFound
+	}
+	return err
 }
 
 func convertProjectToDao(project *domain.Project) *dao.Project {

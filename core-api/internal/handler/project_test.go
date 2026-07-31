@@ -76,12 +76,19 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	if stub.update.Name != nil || stub.update.GameType != nil || stub.update.ViewType != nil || stub.update.Style != nil {
 		t.Fatalf("expected omitted fields to remain nil, got %+v", stub.update)
 	}
-	if !response.Success {
+	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
+		t.Fatalf("unexpected response envelope: %+v", response)
+	}
+	data, ok := response.Data.(dto.UpdateProjectResponse)
+	if !ok {
+		t.Fatalf("expected UpdateProjectResponse data, got %T", response.Data)
+	}
+	if !data.Success {
 		t.Fatal("expected successful update response")
 	}
 }
 
-func TestUpdatePropagatesManagerError(t *testing.T) {
+func TestUpdatePropagatesServiceError(t *testing.T) {
 	wantErr := errors.New("update project failed")
 	projectHandler := handler.NewProjectHandler(&projectManagerStub{updateErr: wantErr})
 
@@ -89,8 +96,8 @@ func TestUpdatePropagatesManagerError(t *testing.T) {
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if response.Success {
-		t.Fatal("expected unsuccessful update response")
+	if response != (dto.Response{}) {
+		t.Fatalf("expected an empty response on error, got %+v", response)
 	}
 }
 
