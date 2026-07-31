@@ -16,7 +16,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 )
 
-type uploaderStub struct {
+type uploadManagerStub struct {
 	target  *upload.UploadTarget
 	err     error
 	ctx     context.Context
@@ -24,7 +24,7 @@ type uploaderStub struct {
 	calls   int
 }
 
-func (s *uploaderStub) CreateUploadTarget(
+func (s *uploadManagerStub) CreateUploadTarget(
 	ctx context.Context,
 	request *upload.CreateUploadTargetRequest,
 ) (*upload.UploadTarget, error) {
@@ -34,14 +34,14 @@ func (s *uploaderStub) CreateUploadTarget(
 	return s.target, s.err
 }
 
-func TestCreateUploadTargetForwardsRequestToUploader(t *testing.T) {
+func TestCreateUploadTargetForwardsRequestToManager(t *testing.T) {
 	wantTarget := &upload.UploadTarget{
 		ObjectKey:   "users/7/uploads/uuid",
 		ObjectURL:   "https://files.example.com/users/7/uploads/uuid",
 		UploadURL:   "https://upload.qiniup.com",
 		UploadToken: "access-key:signature:policy",
 	}
-	stub := &uploaderStub{target: wantTarget}
+	stub := &uploadManagerStub{target: wantTarget}
 	uploadHandler := handler.NewUploadHandler(stub)
 	request := dto.CreateUploadTargetRequest{
 		ContentType:   "image/png",
@@ -67,9 +67,9 @@ func TestCreateUploadTargetForwardsRequestToUploader(t *testing.T) {
 	}
 }
 
-func TestCreateUploadTargetPropagatesUploaderError(t *testing.T) {
+func TestCreateUploadTargetPropagatesManagerError(t *testing.T) {
 	wantErr := errors.New("create upload target failed")
-	stub := &uploaderStub{err: wantErr}
+	stub := &uploadManagerStub{err: wantErr}
 	uploadHandler := handler.NewUploadHandler(stub)
 
 	target, err := uploadHandler.CreateUploadTarget(

@@ -1,7 +1,11 @@
 package main
 
 func main() {
-	if err := InitServer().Start(":8080"); err != nil {
+	app, err := InitServer()
+	if err != nil {
+		panic(err)
+	}
+	if err := app.Start(":8080"); err != nil {
 		panic(err)
 	}
 }
