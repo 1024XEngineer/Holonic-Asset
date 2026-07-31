@@ -27,6 +27,15 @@ func newContext(c echo.Context) *Context {
 	}
 }
 
+// FromContext adapts a standard request context for handlers registered through
+// OpenAPI-aware transports that do not expose an Echo context directly.
+func FromContext(ctx context.Context) *Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &Context{requestContext: ctx}
+}
+
 func (c *Context) Deadline() (deadline time.Time, ok bool) {
 	if c.requestContext != nil {
 		return c.requestContext.Deadline()

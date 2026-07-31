@@ -79,11 +79,7 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response envelope: %+v", response)
 	}
-	data, ok := response.Data.(dto.UpdateProjectResponse)
-	if !ok {
-		t.Fatalf("expected UpdateProjectResponse data, got %T", response.Data)
-	}
-	if !data.Success {
+	if !response.Data.Success {
 		t.Fatal("expected successful update response")
 	}
 }
@@ -96,7 +92,7 @@ func TestUpdatePropagatesServiceError(t *testing.T) {
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if response != (dto.Response{}) {
+	if response != (dto.SuccessResponse[dto.UpdateProjectResponse]{}) {
 		t.Fatalf("expected an empty response on error, got %+v", response)
 	}
 }

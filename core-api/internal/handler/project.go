@@ -19,7 +19,10 @@ func NewProjectHandler(manager domain.Manager) *ProjectHandler {
 	return &ProjectHandler{manager: manager}
 }
 
-func (h *ProjectHandler) Create(c *echox.Context, request dto.CreateProjectRequest) (dto.Response, error) {
+func (h *ProjectHandler) Create(
+	c *echox.Context,
+	request dto.CreateProjectRequest,
+) (dto.SuccessResponse[dto.CreateProjectResponse], error) {
 	project := &domain.Project{
 		UserID:         request.UserID,
 		Name:           request.Name,
@@ -31,33 +34,42 @@ func (h *ProjectHandler) Create(c *echox.Context, request dto.CreateProjectReque
 		Style:          request.Style,
 	}
 	if err := h.manager.Create(c, project); err != nil {
-		return dto.Response{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.CreateProjectResponse]{}, projectHandlerError(err)
 	}
-	return dto.NewSuccessResponse(dto.CreateProjectResponse{ID: project.ID}), nil
+	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: project.ID}), nil
 }
 
-func (h *ProjectHandler) ListByUID(c *echox.Context, request dto.ListProjectsRequest) (dto.Response, error) {
+func (h *ProjectHandler) ListByUID(
+	c *echox.Context,
+	request dto.ListProjectsRequest,
+) (dto.SuccessResponse[dto.ListProjectsResponse], error) {
 	projects, err := h.manager.ListByUID(c, request.UserID)
 	if err != nil {
-		return dto.Response{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.ListProjectsResponse]{}, projectHandlerError(err)
 	}
 
 	response := make([]*dto.ProjectResponse, len(projects))
 	for i, project := range projects {
 		response[i] = projectResponse(project)
 	}
-	return dto.NewSuccessResponse(dto.ListProjectsResponse{Projects: response}), nil
+	return dto.NewTypedSuccessResponse(dto.ListProjectsResponse{Projects: response}), nil
 }
 
-func (h *ProjectHandler) GetDetail(c *echox.Context, request dto.ProjectDetailRequest) (dto.Response, error) {
+func (h *ProjectHandler) GetDetail(
+	c *echox.Context,
+	request dto.ProjectDetailRequest,
+) (dto.SuccessResponse[dto.ProjectDetailResponse], error) {
 	project, err := h.manager.GetDetail(c, request.ProjectID)
 	if err != nil {
-		return dto.Response{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.ProjectDetailResponse]{}, projectHandlerError(err)
 	}
-	return dto.NewSuccessResponse(dto.ProjectDetailResponse{Project: projectResponse(project)}), nil
+	return dto.NewTypedSuccessResponse(dto.ProjectDetailResponse{Project: projectResponse(project)}), nil
 }
 
-func (h *ProjectHandler) Update(c *echox.Context, request dto.UpdateProjectRequest) (dto.Response, error) {
+func (h *ProjectHandler) Update(
+	c *echox.Context,
+	request dto.UpdateProjectRequest,
+) (dto.SuccessResponse[dto.UpdateProjectResponse], error) {
 	update := &domain.ProjectUpdate{
 		ID:             request.ProjectID,
 		Name:           request.Name,
@@ -69,16 +81,19 @@ func (h *ProjectHandler) Update(c *echox.Context, request dto.UpdateProjectReque
 		Style:          request.Style,
 	}
 	if err := h.manager.Update(c, update); err != nil {
-		return dto.Response{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.UpdateProjectResponse]{}, projectHandlerError(err)
 	}
-	return dto.NewSuccessResponse(dto.UpdateProjectResponse{Success: true}), nil
+	return dto.NewTypedSuccessResponse(dto.UpdateProjectResponse{Success: true}), nil
 }
 
-func (h *ProjectHandler) Delete(c *echox.Context, request dto.DeleteProjectRequest) (dto.Response, error) {
+func (h *ProjectHandler) Delete(
+	c *echox.Context,
+	request dto.DeleteProjectRequest,
+) (dto.SuccessResponse[dto.DeleteProjectResponse], error) {
 	if err := h.manager.Delete(c, request.ProjectID); err != nil {
-		return dto.Response{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.DeleteProjectResponse]{}, projectHandlerError(err)
 	}
-	return dto.NewSuccessResponse(dto.DeleteProjectResponse{Success: true}), nil
+	return dto.NewTypedSuccessResponse(dto.DeleteProjectResponse{Success: true}), nil
 }
 
 func projectResponse(project *domain.Project) *dto.ProjectResponse {

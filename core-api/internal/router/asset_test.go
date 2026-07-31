@@ -15,8 +15,8 @@ import (
 
 type assetRouterStub struct {
 	router.AssetRouter
-	projectID string
-	assetID   string
+	projectID uint
+	assetID   uint
 	request   dto.GetAssetsRequest
 	update    dto.UpdateAssetRequest
 	record    dto.RecordAssetRequest
@@ -24,35 +24,54 @@ type assetRouterStub struct {
 	rollback  dto.RollBackAssetRequest
 }
 
-func (s *assetRouterStub) GetAssets(context *echox.Context, request dto.GetAssetsRequest) (dto.Response, error) {
-	s.projectID = context.Param("project_id")
+func (s *assetRouterStub) GetAssets(
+	_ *echox.Context,
+	request dto.GetAssetsRequest,
+) (dto.SuccessResponse[dto.GetAssetsResponse], error) {
+	s.projectID = request.ProjectID
 	s.request = request
-	return dto.NewSuccessResponse(dto.GetAssetsResponse{Assets: []dto.AssetListItemResponse{{AssetID: 7, ProjectID: 42}}}), nil
+	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: []dto.AssetListItemResponse{{AssetID: 7, ProjectID: 42}}}), nil
 }
 
-func (s *assetRouterStub) Detail(context *echox.Context) (dto.Response, error) {
-	s.assetID = context.Param("asset_id")
-	return dto.NewSuccessResponse(dto.AssetDetailResponse{AssetID: 7}), nil
+func (s *assetRouterStub) Detail(
+	_ *echox.Context,
+	request dto.AssetDetailRequest,
+) (dto.SuccessResponse[dto.AssetDetailResponse], error) {
+	s.assetID = request.AssetID
+	return dto.NewTypedSuccessResponse(dto.AssetDetailResponse{AssetID: 7}), nil
 }
 
-func (s *assetRouterStub) UpdateAsset(_ *echox.Context, request dto.UpdateAssetRequest) (dto.Response, error) {
+func (s *assetRouterStub) UpdateAsset(
+	_ *echox.Context,
+	request dto.UpdateAssetRequest,
+) (dto.SuccessResponse[dto.UpdateAssetResponse], error) {
 	s.update = request
-	return dto.NewSuccessResponse(dto.UpdateAssetResponse{AssetID: request.AssetID}), nil
+	return dto.NewTypedSuccessResponse(dto.UpdateAssetResponse{AssetID: request.AssetID}), nil
 }
 
-func (s *assetRouterStub) Record(_ *echox.Context, request dto.RecordAssetRequest) (dto.Response, error) {
+func (s *assetRouterStub) Record(
+	_ *echox.Context,
+	request dto.RecordAssetRequest,
+) (dto.SuccessResponse[dto.RecordAssetResponse], error) {
 	s.record = request
-	return dto.NewSuccessResponse(dto.RecordAssetResponse{AssetID: request.AssetID, Version: 2}), nil
+	return dto.NewTypedSuccessResponse(dto.RecordAssetResponse{AssetID: request.AssetID, Version: 2}), nil
 }
 
-func (s *assetRouterStub) Records(_ *echox.Context) (dto.Response, error) {
+func (s *assetRouterStub) Records(
+	_ *echox.Context,
+	request dto.GetAssetRecordsRequest,
+) (dto.SuccessResponse[dto.GetAssetRecordsResponse], error) {
+	s.assetID = request.AssetID
 	s.records = true
-	return dto.NewSuccessResponse(dto.GetAssetRecordsResponse{Records: []dto.AssetRecordResponse{}}), nil
+	return dto.NewTypedSuccessResponse(dto.GetAssetRecordsResponse{Records: []dto.AssetRecordResponse{}}), nil
 }
 
-func (s *assetRouterStub) RollBackAsset(_ *echox.Context, request dto.RollBackAssetRequest) (dto.Response, error) {
+func (s *assetRouterStub) RollBackAsset(
+	_ *echox.Context,
+	request dto.RollBackAssetRequest,
+) (dto.SuccessResponse[dto.RollBackAssetResponse], error) {
 	s.rollback = request
-	return dto.NewSuccessResponse(dto.RollBackAssetResponse{AssetID: request.AssetID, Version: request.Version}), nil
+	return dto.NewTypedSuccessResponse(dto.RollBackAssetResponse{AssetID: request.AssetID, Version: request.Version}), nil
 }
 
 func TestAssetRoutesBindPathParameters(t *testing.T) {
@@ -68,8 +87,8 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 		}
-		if assetStub.projectID != "42" {
-			t.Fatalf("expected project ID 42, got %q", assetStub.projectID)
+		if assetStub.projectID != 42 {
+			t.Fatalf("expected project ID 42, got %d", assetStub.projectID)
 		}
 		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"","projectId":42,"type":"","description":"","tags":null,"version":0}]}}`+"\n" {
 			t.Fatalf("unexpected response: %s", recorder.Body.String())
@@ -172,11 +191,32 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 		}
-		if assetStub.assetID != "7" {
-			t.Fatalf("expected asset ID 7, got %q", assetStub.assetID)
+		if assetStub.assetID != 7 {
+			t.Fatalf("expected asset ID 7, got %d", assetStub.assetID)
 		}
 		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assetId":7,"name":"","projectId":0,"type":"","description":"","tags":null,"attributes":null,"version":0}}`+"\n" {
 			t.Fatalf("unexpected response: %s", recorder.Body.String())
 		}
 	})
+}
+
+func TestAssetRoutesRejectZeroPathIDs(t *testing.T) {
+	e := router.Register(&assetRouterStub{}, nil, nil, nil)
+
+	for _, path := range []string{
+		"/api/v1/projects/0/assets",
+		"/api/v1/asset/0",
+		"/api/v1/asset/0/records",
+	} {
+		t.Run(path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			recorder := httptest.NewRecorder()
+
+			e.ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+			}
+		})
+	}
 }

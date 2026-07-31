@@ -5,20 +5,8 @@ import {
   updateMockGenerationRun,
 } from "./generation-runs.mock";
 import { addMockAsset } from "../../../asset/library/mock";
-import {
-  createGenerationLifecycle,
-  type GenerationInput,
-} from "@/features/generation/types";
 import { hasMockProject } from "../../../project/mock";
-
-export const mockGenerationLifecycle = createGenerationLifecycle({
-  createRun: createMockGenerationRun,
-  updateRun: updateMockGenerationRun,
-  removeRun: removeMockGenerationRun,
-  completeGeneration: completeMockGeneration,
-  hasProject: hasMockProject,
-  addAsset: addMockAsset,
-});
+import type { GenerationInput } from "./generation-input";
 
 const MOCK_QUEUE_DELAY_MS = 650;
 

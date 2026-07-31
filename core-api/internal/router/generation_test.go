@@ -98,6 +98,22 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 	}
 }
 
+func TestGenerationListRejectsZeroAssetID(t *testing.T) {
+	stub := &generationRouterStub{}
+	e := router.Register(nil, nil, stub, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/42/generation-runs?assetId=0", nil)
+	recorder := httptest.NewRecorder()
+
+	e.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+	}
+	if stub.listRequest != nil {
+		t.Fatalf("expected invalid filter not to reach the handler, got %+v", stub.listRequest)
+	}
+}
+
 func TestAIRoutesAreNotExposed(t *testing.T) {
 	e := router.Register(nil, nil, &generationRouterStub{}, nil)
 

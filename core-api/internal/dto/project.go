@@ -3,42 +3,42 @@ package dto
 import domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 
 type ProjectResponse struct {
-	UserID         uint                `json:"userID"`
-	ID             uint                `json:"id"`
+	UserID         uint                `json:"userID" minimum:"1"`
+	ID             uint                `json:"id" minimum:"1"`
 	Name           string              `json:"name"`
-	GameType       domain.GameType     `json:"gameType"`
-	ViewType       domain.ViewType     `json:"viewType"`
-	TargetPlatform domain.PlatformType `json:"targetPlatform"`
+	GameType       domain.GameType     `json:"gameType" enum:"RPG,ACT,SLG,Other"`
+	ViewType       domain.ViewType     `json:"viewType" enum:"TopDown,SideView,Isometric,Other"`
+	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:"PC,Mobile,Web"`
 	Description    string              `json:"description"`
 	Reference      string              `json:"reference"`
 	Style          string              `json:"style"`
 }
 
 type CreateProjectRequest struct {
-	UserID         uint                `json:"userID"`
-	Name           string              `json:"name"`
-	GameType       domain.GameType     `json:"gameType"`
-	ViewType       domain.ViewType     `json:"viewType"`
-	TargetPlatform domain.PlatformType `json:"targetPlatform"`
-	Description    string              `json:"description"`
-	Reference      string              `json:"reference"`
-	Style          string              `json:"style"`
+	UserID         uint                `json:"userID" minimum:"1"`
+	Name           string              `json:"name" minLength:"1"`
+	GameType       domain.GameType     `json:"gameType" enum:"RPG,ACT,SLG,Other"`
+	ViewType       domain.ViewType     `json:"viewType" enum:"TopDown,SideView,Isometric,Other"`
+	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:"PC,Mobile,Web"`
+	Description    string              `json:"description,omitempty"`
+	Reference      string              `json:"reference,omitempty"`
+	Style          string              `json:"style,omitempty"`
 }
 
 type CreateProjectResponse struct {
-	ID uint `json:"id"`
+	ID uint `json:"id" minimum:"1"`
 }
 
 type ListProjectsRequest struct {
-	UserID uint `query:"userID"`
+	UserID uint `query:"userID" required:"true" minimum:"1"`
 }
 
 type ListProjectsResponse struct {
-	Projects []*ProjectResponse `json:"projects"`
+	Projects []*ProjectResponse `json:"projects" nullable:"false"`
 }
 
 type ProjectDetailRequest struct {
-	ProjectID uint `query:"projectID"`
+	ProjectID uint `query:"projectID" required:"true" minimum:"1"`
 }
 
 type ProjectDetailResponse struct {
@@ -46,11 +46,11 @@ type ProjectDetailResponse struct {
 }
 
 type UpdateProjectRequest struct {
-	ProjectID      uint                 `json:"projectID"`
-	Name           *string              `json:"name,omitempty"`
-	GameType       *domain.GameType     `json:"gameType,omitempty"`
-	ViewType       *domain.ViewType     `json:"viewType,omitempty"`
-	TargetPlatform *domain.PlatformType `json:"targetPlatform,omitempty"`
+	ProjectID      uint                 `json:"projectID" minimum:"1"`
+	Name           *string              `json:"name,omitempty" minLength:"1"`
+	GameType       *domain.GameType     `json:"gameType,omitempty" enum:"RPG,ACT,SLG,Other"`
+	ViewType       *domain.ViewType     `json:"viewType,omitempty" enum:"TopDown,SideView,Isometric,Other"`
+	TargetPlatform *domain.PlatformType `json:"targetPlatform,omitempty" enum:"PC,Mobile,Web"`
 	Description    *string              `json:"description,omitempty"`
 	Reference      *string              `json:"reference,omitempty"`
 	Style          *string              `json:"style,omitempty"`
@@ -61,7 +61,7 @@ type UpdateProjectResponse struct {
 }
 
 type DeleteProjectRequest struct {
-	ProjectID uint `json:"projectID"`
+	ProjectID uint `json:"projectID" minimum:"1"`
 }
 
 type DeleteProjectResponse struct {

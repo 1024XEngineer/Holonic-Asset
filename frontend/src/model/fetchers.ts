@@ -1,6 +1,7 @@
 import { DataApiError } from "@/lib/data-api-error";
 
-type QueryValue = string | number | boolean | undefined;
+type QueryPrimitive = string | number | boolean;
+type QueryValue = QueryPrimitive | readonly QueryPrimitive[] | null | undefined;
 
 export type ApiResponse<T> = {
   code: number;
@@ -97,7 +98,7 @@ function unwrapEnvelope<T>(response: ApiResponse<T>): T {
 }
 
 function dataApiErrorCodeForStatus(status: number) {
-  if (status === 400) return "BAD_REQUEST" as const;
+  if (status === 400 || status === 422) return "BAD_REQUEST" as const;
   if (status === 404) return "NOT_FOUND" as const;
   if (status === 409) return "CONFLICT" as const;
   return "UNKNOWN" as const;
@@ -111,7 +112,11 @@ function withQuery(
 
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined) params.set(key, String(value));
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, String(item));
+      continue;
+    }
+    if (value !== undefined && value !== null) params.set(key, String(value));
   }
   const search = params.toString();
   return search ? `${path}?${search}` : path;

@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
@@ -18,10 +16,13 @@ func NewHandler(manager domain.Manager) *Handler {
 	return &Handler{AssetManager: manager}
 }
 
-func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto.Response, error) {
-	projectID, err := parseAssetPathID(x, "project_id")
-	if err != nil {
-		return dto.Response{}, err
+func (h *Handler) GetAssets(
+	x *echox.Context,
+	request dto.GetAssetsRequest,
+) (dto.SuccessResponse[dto.GetAssetsResponse], error) {
+	projectID := request.ProjectID
+	if projectID == 0 {
+		return dto.SuccessResponse[dto.GetAssetsResponse]{}, echo.ErrBadRequest
 	}
 
 	assets, err := h.AssetManager.GetAssets(x, projectID, domain.AssetListFilter{
@@ -30,7 +31,7 @@ func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto
 		Types: request.Types,
 	})
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.GetAssetsResponse]{}, err
 	}
 
 	items := make([]dto.AssetListItemResponse, len(assets))
@@ -46,21 +47,24 @@ func (h *Handler) GetAssets(x *echox.Context, request dto.GetAssetsRequest) (dto
 		}
 	}
 
-	return dto.NewSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
+	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
 }
 
-func (h *Handler) Detail(x *echox.Context) (dto.Response, error) {
-	assetID, err := parseAssetPathID(x, "asset_id")
-	if err != nil {
-		return dto.Response{}, err
+func (h *Handler) Detail(
+	x *echox.Context,
+	request dto.AssetDetailRequest,
+) (dto.SuccessResponse[dto.AssetDetailResponse], error) {
+	assetID := request.AssetID
+	if assetID == 0 {
+		return dto.SuccessResponse[dto.AssetDetailResponse]{}, echo.ErrBadRequest
 	}
 
 	asset, err := h.AssetManager.GetDetail(x, assetID)
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.AssetDetailResponse]{}, err
 	}
 
-	return dto.NewSuccessResponse(dto.AssetDetailResponse{
+	return dto.NewTypedSuccessResponse(dto.AssetDetailResponse{
 		AssetID:     asset.ID,
 		Name:        asset.Name,
 		ProjectID:   asset.ProjectID,
@@ -73,23 +77,18 @@ func (h *Handler) Detail(x *echox.Context) (dto.Response, error) {
 	}), nil
 }
 
-func parseAssetPathID(x *echox.Context, name string) (uint, error) {
-	value, err := strconv.ParseUint(x.Param(name), 10, strconv.IntSize)
-	if err != nil || value == 0 {
-		return 0, echo.ErrBadRequest
-	}
-	return uint(value), nil
-}
-
-func (h *Handler) Record(x *echox.Context, asset dto.RecordAssetRequest) (dto.Response, error) {
+func (h *Handler) Record(
+	x *echox.Context,
+	asset dto.RecordAssetRequest,
+) (dto.SuccessResponse[dto.RecordAssetResponse], error) {
 	if asset.AssetID == 0 {
-		return dto.Response{}, echo.ErrBadRequest
+		return dto.SuccessResponse[dto.RecordAssetResponse]{}, echo.ErrBadRequest
 	}
 	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID})
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}
-	return dto.NewSuccessResponse(dto.RecordAssetResponse{
+	return dto.NewTypedSuccessResponse(dto.RecordAssetResponse{
 		RecordID:  record.ID,
 		AssetID:   record.AssetID,
 		Version:   record.Version,
@@ -98,14 +97,17 @@ func (h *Handler) Record(x *echox.Context, asset dto.RecordAssetRequest) (dto.Re
 	}), nil
 }
 
-func (h *Handler) Records(x *echox.Context) (dto.Response, error) {
-	assetID, err := parseAssetPathID(x, "asset_id")
-	if err != nil {
-		return dto.Response{}, err
+func (h *Handler) Records(
+	x *echox.Context,
+	request dto.GetAssetRecordsRequest,
+) (dto.SuccessResponse[dto.GetAssetRecordsResponse], error) {
+	assetID := request.AssetID
+	if assetID == 0 {
+		return dto.SuccessResponse[dto.GetAssetRecordsResponse]{}, echo.ErrBadRequest
 	}
 	records, err := h.AssetManager.GetRecordHistory(x, assetID)
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.GetAssetRecordsResponse]{}, err
 	}
 	items := make([]dto.AssetRecordResponse, len(records))
 	for index, record := range records {
@@ -118,36 +120,48 @@ func (h *Handler) Records(x *echox.Context) (dto.Response, error) {
 			Content:   record.Content,
 		}
 	}
-	return dto.NewSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
+	return dto.NewTypedSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
 }
 
-func (h *Handler) CopyAsset(ctx *echox.Context, asset dto.CopyAssetRequest) (dto.Response, error) {
+func (h *Handler) CopyAsset(
+	ctx *echox.Context,
+	asset dto.CopyAssetRequest,
+) (dto.SuccessResponse[dto.CopyAssetResponse], error) {
 	if asset.AssetID == 0 {
-		return dto.Response{}, echo.ErrBadRequest
+		return dto.SuccessResponse[dto.CopyAssetResponse]{}, echo.ErrBadRequest
 	}
 	newAssetID, err := h.AssetManager.Copy(ctx, asset.AssetID, 0)
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.CopyAssetResponse]{}, err
 	}
-	return dto.NewSuccessResponse(dto.CopyAssetResponse{NewAssetID: newAssetID}), nil
+	return dto.NewTypedSuccessResponse(dto.CopyAssetResponse{NewAssetID: newAssetID}), nil
 }
 
-func (h *Handler) RollBackAsset(ctx *echox.Context, asset dto.RollBackAssetRequest) (dto.Response, error) {
+func (h *Handler) RollBackAsset(
+	ctx *echox.Context,
+	asset dto.RollBackAssetRequest,
+) (dto.SuccessResponse[dto.RollBackAssetResponse], error) {
 	if asset.AssetID == 0 || asset.Version == 0 {
-		return dto.Response{}, echo.ErrBadRequest
+		return dto.SuccessResponse[dto.RollBackAssetResponse]{}, echo.ErrBadRequest
 	}
 	record, err := h.AssetManager.RollBackRecord(ctx, asset.AssetID, asset.Version)
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.RollBackAssetResponse]{}, err
 	}
-	return dto.NewSuccessResponse(dto.RollBackAssetResponse{
+	return dto.NewTypedSuccessResponse(dto.RollBackAssetResponse{
 		AssetID:   record.AssetID,
 		Version:   record.Version,
 		ContentID: record.ContentID,
 	}), nil
 }
 
-func (h *Handler) UpdateAsset(ctx *echox.Context, req dto.UpdateAssetRequest) (dto.Response, error) {
+func (h *Handler) UpdateAsset(
+	ctx *echox.Context,
+	req dto.UpdateAssetRequest,
+) (dto.SuccessResponse[dto.UpdateAssetResponse], error) {
+	if req.AssetID == 0 {
+		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, echo.ErrBadRequest
+	}
 	asset, err := h.AssetManager.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
 		Name:        req.Name,
 		ProjectID:   req.ProjectID,
@@ -157,9 +171,9 @@ func (h *Handler) UpdateAsset(ctx *echox.Context, req dto.UpdateAssetRequest) (d
 		Attributes:  req.Attributes,
 	})
 	if err != nil {
-		return dto.Response{}, err
+		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, err
 	}
-	return dto.NewSuccessResponse(dto.UpdateAssetResponse{
+	return dto.NewTypedSuccessResponse(dto.UpdateAssetResponse{
 		AssetID:     asset.ID,
 		Name:        asset.Name,
 		ProjectID:   asset.ProjectID,

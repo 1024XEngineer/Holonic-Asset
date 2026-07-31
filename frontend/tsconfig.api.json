@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.api.tsbuildinfo"
+  },
+  "files": [
+    "src/env.d.ts",
+    "src/model/generated/core-api.ts",
+    "src/model/project/project.contract.ts",
+    "src/model/project/core-project.api.ts",
+    "src/model/generation/run/generation.contract.ts",
+    "src/model/generation/run/core-generation.api.ts",
+    "src/model/upload/upload.contract.ts",
+    "src/model/upload/upload.api.ts",
+    "src/model/asset/library/asset.contract.ts",
+    "src/model/asset/library/core-asset.api.ts"
+  ],
+  "include": []
+}

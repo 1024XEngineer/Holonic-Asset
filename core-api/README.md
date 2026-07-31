@@ -34,3 +34,26 @@ Generator is a self-contained business module under `internal/module/generator`;
 Assets are aggregate documents. Asset metadata lives in the asset row, while nested content is stored in `asset_contents` and referenced by the asset's current `content_id`. Asset records map a version number to an immutable content snapshot; content edits use copy-on-write, records create a new snapshot, and rollback switches the current content pointer while discarding records newer than the target. Asset resources are not modeled as a separate table.
 
 The Task module treats `Type` as an opaque string and `Payload` as opaque JSON. Business modules receive the task manager from the composition root and register their own type strings and handlers; Task never defines or switches on business task types. See `internal/module/task/README.md` for the task module usage guide.
+
+## OpenAPI Contract
+
+The Project, Generation, Upload, and Asset routes are OpenAPI-backed. Their Go
+DTOs are the source of truth for runtime request binding, the OpenAPI 3.1
+document, and generated frontend types.
+
+With the API running, the contract and interactive documentation are available
+at:
+
+- `/api/v1/openapi.json`
+- `/api/v1/openapi.yaml`
+- `/api/v1/docs`
+
+After changing an OpenAPI-backed DTO or route, regenerate the checked-in
+contract and frontend types from `frontend/`:
+
+```shell
+pnpm api:generate
+```
+
+Run `pnpm api:check` to regenerate and type-check the frontend API surface.
+Files under `frontend/src/model/generated/` must not be edited by hand.

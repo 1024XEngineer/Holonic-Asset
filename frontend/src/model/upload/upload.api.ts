@@ -1,18 +1,13 @@
+import type {
+  CreateUploadTargetRequest,
+  UploadTarget,
+} from "./upload.contract";
 import { postJson } from "@/model/fetchers";
 
-/** Matches core-api/internal/dto.CreateUploadTargetRequest. */
-export type CreateUploadTargetRequest = {
-  contentType: string;
-  contentLength: number;
-};
-
-/** Matches core-api/internal/dto.UploadTarget. */
-export type UploadTarget = {
-  objectKey: string;
-  objectURL: string;
-  uploadURL: string;
-  uploadToken: string;
-};
+export type {
+  CreateUploadTargetRequest,
+  UploadTarget,
+} from "./upload.contract";
 
 export const uploadApi = {
   createTarget: (request: CreateUploadTargetRequest) =>

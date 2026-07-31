@@ -1,0 +1,2415 @@
+{
+  "components": {
+    "schemas": {
+      "AssetDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "attributes": {},
+          "content": {},
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "type": {
+            "enum": [
+              "character",
+              "object",
+              "tileSet",
+              "audio",
+              "ui",
+              "scenery"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "projectId",
+          "type",
+          "description",
+          "tags",
+          "attributes",
+          "version"
+        ],
+        "type": "object"
+      },
+      "AssetListItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "type": {
+            "enum": [
+              "character",
+              "object",
+              "tileSet",
+              "audio",
+              "ui",
+              "scenery"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "projectId",
+          "type",
+          "description",
+          "tags",
+          "version"
+        ],
+        "type": "object"
+      },
+      "CancelGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "type": "object"
+      },
+      "CopyAssetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "CopyAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "newAssetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "newAssetId"
+        ],
+        "type": "object"
+      },
+      "CreateGenerationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "generate_character_prototype",
+              "generate_character_animation",
+              "regenerate_character_prototype",
+              "regenerate_character_animation",
+              "regenerate_character_frames",
+              "generate_object_prototype",
+              "generate_object_animation",
+              "regenerate_object_prototype",
+              "regenerate_object_animation",
+              "regenerate_object_frames",
+              "generate_tileset",
+              "regenerate_item",
+              "regenerate_tiles"
+            ],
+            "type": "string"
+          },
+          "parameters": {},
+          "prompt": {
+            "type": "string"
+          },
+          "referenceMediaIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "targetAssetPaths": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "CreateGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "generationRunId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generationRunId"
+        ],
+        "type": "object"
+      },
+      "CreateProjectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "gameType": {
+            "enum": [
+              "RPG",
+              "ACT",
+              "SLG",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "targetPlatform": {
+            "enum": [
+              "PC",
+              "Mobile",
+              "Web"
+            ],
+            "type": "string"
+          },
+          "userID": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "viewType": {
+            "enum": [
+              "TopDown",
+              "SideView",
+              "Isometric",
+              "Other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "userID",
+          "name",
+          "gameType",
+          "viewType",
+          "targetPlatform"
+        ],
+        "type": "object"
+      },
+      "CreateProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "CreateUploadTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "contentLength": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "contentType": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "contentType",
+          "contentLength"
+        ],
+        "type": "object"
+      },
+      "DeleteProjectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "projectID": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectID"
+        ],
+        "type": "object"
+      },
+      "DeleteProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+            "type": "string"
+          },
+          "message": {
+            "description": "Error message text",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value at the given location"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorModel": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "description": "A human-readable explanation specific to this occurrence of the problem.",
+            "examples": [
+              "Property foo is required but is missing."
+            ],
+            "type": "string"
+          },
+          "errors": {
+            "description": "Optional list of individual error details",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "instance": {
+            "description": "A URI reference that identifies the specific occurrence of the problem.",
+            "examples": [
+              "https://example.com/error-log/abc123"
+            ],
+            "format": "uri",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status code",
+            "examples": [
+              400
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
+            "examples": [
+              "Bad Request"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "default": "about:blank",
+            "description": "A URI reference to human-readable documentation for the error.",
+            "examples": [
+              "https://example.com/errors/example"
+            ],
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GenerationRunListItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "generate_character_prototype",
+              "generate_character_animation",
+              "regenerate_character_prototype",
+              "regenerate_character_animation",
+              "regenerate_character_frames",
+              "generate_object_prototype",
+              "generate_object_animation",
+              "regenerate_object_prototype",
+              "regenerate_object_animation",
+              "regenerate_object_frames",
+              "generate_tileset",
+              "regenerate_item",
+              "regenerate_tiles"
+            ],
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "kind",
+          "status"
+        ],
+        "type": "object"
+      },
+      "GetAssetRecordsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/RecordAssetResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "records"
+        ],
+        "type": "object"
+      },
+      "GetAssetsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetListItemResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assets"
+        ],
+        "type": "object"
+      },
+      "GetGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "generate_character_prototype",
+              "generate_character_animation",
+              "regenerate_character_prototype",
+              "regenerate_character_animation",
+              "regenerate_character_frames",
+              "generate_object_prototype",
+              "generate_object_animation",
+              "regenerate_object_prototype",
+              "regenerate_object_animation",
+              "regenerate_object_frames",
+              "generate_tileset",
+              "regenerate_item",
+              "regenerate_tiles"
+            ],
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "result": {},
+          "status": {
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "kind",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ListGenerationRunsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GenerationRunListItemResponse"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "ListProjectsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "type": "object"
+      },
+      "ProjectDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/ProjectResponse"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "ProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "gameType": {
+            "enum": [
+              "RPG",
+              "ACT",
+              "SLG",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "targetPlatform": {
+            "enum": [
+              "PC",
+              "Mobile",
+              "Web"
+            ],
+            "type": "string"
+          },
+          "userID": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "viewType": {
+            "enum": [
+              "TopDown",
+              "SideView",
+              "Isometric",
+              "Other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "userID",
+          "id",
+          "name",
+          "gameType",
+          "viewType",
+          "targetPlatform",
+          "description",
+          "reference",
+          "style"
+        ],
+        "type": "object"
+      },
+      "RecordAssetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "RecordAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "content": {},
+          "contentId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "recordId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recordId",
+          "assetId",
+          "version",
+          "contentId",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "RollBackAssetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "version"
+        ],
+        "type": "object"
+      },
+      "RollBackAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "contentId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "version",
+          "contentId"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseAssetDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssetDetailResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseCopyAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CopyAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseCreateProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseDeleteProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseGetAssetRecordsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GetAssetRecordsResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseGetAssetsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GetAssetsResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseListProjectsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ListProjectsResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseProjectDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectDetailResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseRecordAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RecordAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseRollBackAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RollBackAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseUpdateAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UpdateAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseUpdateProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UpdateProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "UpdateAssetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "attributes": {},
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "character",
+              "object",
+              "tileSet",
+              "audio",
+              "ui",
+              "scenery"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "UpdateAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "attributes": {},
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "type": {
+            "enum": [
+              "character",
+              "object",
+              "tileSet",
+              "audio",
+              "ui",
+              "scenery"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "projectId",
+          "type",
+          "description",
+          "tags",
+          "attributes",
+          "version"
+        ],
+        "type": "object"
+      },
+      "UpdateProjectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "gameType": {
+            "enum": [
+              "RPG",
+              "ACT",
+              "SLG",
+              "Other"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "projectID": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "targetPlatform": {
+            "enum": [
+              "PC",
+              "Mobile",
+              "Web"
+            ],
+            "type": "string"
+          },
+          "viewType": {
+            "enum": [
+              "TopDown",
+              "SideView",
+              "Isometric",
+              "Other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectID"
+        ],
+        "type": "object"
+      },
+      "UpdateProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "UploadTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "objectKey": {
+            "type": "string"
+          },
+          "objectURL": {
+            "type": "string"
+          },
+          "uploadToken": {
+            "type": "string"
+          },
+          "uploadURL": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "objectKey",
+          "objectURL",
+          "uploadURL",
+          "uploadToken"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Holonic Asset Core API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/asset/copy": {
+      "post": {
+        "operationId": "copyAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseCopyAssetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Copy an asset",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/rollback": {
+      "post": {
+        "operationId": "rollbackAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollBackAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseRollBackAssetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Roll back an asset",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/save": {
+      "post": {
+        "operationId": "recordAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseRecordAssetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create an asset record",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/update": {
+      "post": {
+        "operationId": "updateAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseUpdateAssetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Update an asset",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/{asset_id}": {
+      "get": {
+        "operationId": "getAsset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseAssetDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get an asset",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/{asset_id}/records": {
+      "get": {
+        "operationId": "listAssetRecords",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseGetAssetRecordsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List asset records",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/generation-runs/{run_id}": {
+      "get": {
+        "operationId": "getGenerationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a generation run",
+        "tags": [
+          "Generation"
+        ]
+      }
+    },
+    "/generation-runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancelGenerationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Cancel a generation run",
+        "tags": [
+          "Generation"
+        ]
+      }
+    },
+    "/project/create": {
+      "post": {
+        "operationId": "createProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseCreateProjectResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create a project",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/project/delete": {
+      "post": {
+        "operationId": "deleteProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseDeleteProjectResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Delete a project",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/project/detail": {
+      "get": {
+        "operationId": "getProject",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "projectID",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseProjectDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get a project",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/project/list": {
+      "get": {
+        "operationId": "listProjects",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "userID",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseListProjectsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List projects",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/project/update": {
+      "post": {
+        "operationId": "updateProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseUpdateProjectResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Update a project",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/projects/{project_id}/assets": {
+      "get": {
+        "operationId": "listAssets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": true,
+            "in": "query",
+            "name": "tags",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          {
+            "explode": true,
+            "in": "query",
+            "name": "types",
+            "schema": {
+              "items": {
+                "enum": [
+                  "character",
+                  "object",
+                  "tileSet",
+                  "audio",
+                  "ui",
+                  "scenery"
+                ],
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseGetAssetsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List project assets",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/projects/{project_id}/generation-runs": {
+      "get": {
+        "operationId": "listGenerationRuns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "assetId",
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "enum": [
+                "active"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListGenerationRunsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List generation runs",
+        "tags": [
+          "Generation"
+        ]
+      },
+      "post": {
+        "operationId": "createGenerationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create a generation run",
+        "tags": [
+          "Generation"
+        ]
+      }
+    },
+    "/uploads": {
+      "post": {
+        "operationId": "createUploadTarget",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadTarget"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create an upload target",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ]
+}
