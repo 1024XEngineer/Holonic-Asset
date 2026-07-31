@@ -14,8 +14,8 @@ import (
 )
 
 func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
-	uploader := upload.NewUploader(nil)
-	uploadHandler := handler.NewUploadHandler(uploader)
+	uploadManager := upload.NewManager(nil)
+	uploadHandler := handler.NewUploadHandler(uploadManager)
 	e := router.Register(nil, nil, nil, uploadHandler)
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -36,8 +36,8 @@ func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
 }
 
 func TestUploadRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
-	uploader := upload.NewUploader(nil)
-	uploadHandler := handler.NewUploadHandler(uploader)
+	uploadManager := upload.NewManager(nil)
+	uploadHandler := handler.NewUploadHandler(uploadManager)
 	e := router.Register(nil, nil, nil, uploadHandler)
 
 	routes := []string{
