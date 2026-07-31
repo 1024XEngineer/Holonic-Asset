@@ -12,7 +12,7 @@
 
 </p>
 
-Holonic Asset brings AI generation into real-world game development workflows. Within a shared project context, creators can generate, iterate on, connect, manage, and export characters, objects, scenes, tilesets, and UI assets instead of ending up with isolated images.
+Holonic Asset brings AI generation into real-world game development workflows. Within a shared project context, creators can generate, iterate on, connect, manage, and export characters, objects, scenes, tilesets, and UI Set assets instead of ending up with isolated images.
 
 ## Who It Is For
 
@@ -30,12 +30,12 @@ Holonic Asset organizes asset production into a continuous workflow:
 
 Project setup → Asset generation and management → Continuous iteration → Batch processing → Export and game integration
 
-Project-level visual direction, game genre, perspective, target platform, and reference images form a shared context that helps keep characters, scenes, UI, and objects consistent in style, proportions, and color palette.
+Project-level visual direction, game genre, perspective, target platform, and reference images form a shared context that helps keep characters, scenes, UI Set, and objects consistent in style, proportions, and color palette.
 
 ## Core Capabilities
 
 - **Project context**: Centrally manage visual direction and generation settings for a game, prototype, or themed asset pack.
-- **Multiple asset types**: Support characters, objects, UI, scenes, and tilesets.
+- **Multiple asset types**: Support characters, objects, UI Set, scenes, and tilesets.
 - **Continuous creation**: Repeatedly generate, partially redraw, and manually refine the same asset without losing its creative history.
 - **Version history**: Create a Record whenever a generation or edit is confirmed, making it possible to review the history and restore any version.
 - **Asset relationships and tags**: Track relationships between characters, animations, sound effects, scenes, and other assets while supporting search and batch operations.
