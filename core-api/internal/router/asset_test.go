@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
 
@@ -25,7 +25,7 @@ type assetRouterStub struct {
 }
 
 func (s *assetRouterStub) GetAssets(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.GetAssetsRequest,
 ) (dto.SuccessResponse[dto.GetAssetsResponse], error) {
 	s.projectID = request.ProjectID
@@ -34,7 +34,7 @@ func (s *assetRouterStub) GetAssets(
 }
 
 func (s *assetRouterStub) Detail(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.AssetDetailRequest,
 ) (dto.SuccessResponse[dto.AssetDetailResponse], error) {
 	s.assetID = request.AssetID
@@ -42,7 +42,7 @@ func (s *assetRouterStub) Detail(
 }
 
 func (s *assetRouterStub) UpdateAsset(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.UpdateAssetRequest,
 ) (dto.SuccessResponse[dto.UpdateAssetResponse], error) {
 	s.update = request
@@ -50,7 +50,7 @@ func (s *assetRouterStub) UpdateAsset(
 }
 
 func (s *assetRouterStub) Record(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.RecordAssetRequest,
 ) (dto.SuccessResponse[dto.RecordAssetResponse], error) {
 	s.record = request
@@ -58,7 +58,7 @@ func (s *assetRouterStub) Record(
 }
 
 func (s *assetRouterStub) Records(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.GetAssetRecordsRequest,
 ) (dto.SuccessResponse[dto.GetAssetRecordsResponse], error) {
 	s.assetID = request.AssetID
@@ -67,7 +67,7 @@ func (s *assetRouterStub) Records(
 }
 
 func (s *assetRouterStub) RollBackAsset(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.RollBackAssetRequest,
 ) (dto.SuccessResponse[dto.RollBackAssetResponse], error) {
 	s.rollback = request
@@ -218,5 +218,26 @@ func TestAssetRoutesRejectZeroPathIDs(t *testing.T) {
 				t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
 			}
 		})
+	}
+}
+
+func TestAssetUpdateRejectsInvalidType(t *testing.T) {
+	stub := &assetRouterStub{}
+	e := router.Register(stub, nil, nil, nil)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/asset/update",
+		strings.NewReader(`{"assetId":7,"type":"unsupported"}`),
+	)
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recorder := httptest.NewRecorder()
+
+	e.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+	}
+	if stub.update.AssetID != 0 {
+		t.Fatalf("expected invalid body not to reach the handler, got %+v", stub.update)
 	}
 }

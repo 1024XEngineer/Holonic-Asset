@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,41 +11,42 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
 
 type generationRouterStub struct {
 	listRequest *dto.ListGenerationRunsRequest
+	createCalls int
 }
 
-func (*generationRouterStub) Create(
-	*echox.Context,
+func (s *generationRouterStub) Create(
+	context.Context,
 	dto.CreateGenerationRequest,
-) (dto.CreateGenerationResponse, error) {
-	return dto.CreateGenerationResponse{}, nil
+) (dto.SuccessResponse[dto.CreateGenerationResponse], error) {
+	s.createCalls++
+	return dto.NewTypedSuccessResponse(dto.CreateGenerationResponse{}), nil
 }
 
 func (s *generationRouterStub) List(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.ListGenerationRunsRequest,
-) (dto.ListGenerationRunsResponse, error) {
+) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error) {
 	s.listRequest = &request
-	return dto.ListGenerationRunsResponse{}, nil
+	return dto.NewTypedSuccessResponse(dto.ListGenerationRunsResponse{}), nil
 }
 
 func (*generationRouterStub) Get(
-	*echox.Context,
+	context.Context,
 	dto.GetGenerationRequest,
-) (dto.GetGenerationResponse, error) {
-	return dto.GetGenerationResponse{}, nil
+) (dto.SuccessResponse[dto.GetGenerationResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.GetGenerationResponse{}), nil
 }
 
 func (*generationRouterStub) Cancel(
-	*echox.Context,
+	context.Context,
 	dto.CancelGenerationRequest,
-) (dto.CancelGenerationResponse, error) {
-	return dto.CancelGenerationResponse{}, nil
+) (dto.SuccessResponse[dto.CancelGenerationResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{}), nil
 }
 
 func TestGenerationRoutesAreRegistered(t *testing.T) {
@@ -59,7 +61,7 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 		{
 			method: http.MethodPost,
 			path:   "/api/v1/projects/42/generation-runs",
-			body:   `{"kind":"generate_character","prompt":"hero"}`,
+			body:   `{"kind":"generate_character_prototype","prompt":"hero"}`,
 		},
 		{
 			method: http.MethodGet,
@@ -111,6 +113,27 @@ func TestGenerationListRejectsZeroAssetID(t *testing.T) {
 	}
 	if stub.listRequest != nil {
 		t.Fatalf("expected invalid filter not to reach the handler, got %+v", stub.listRequest)
+	}
+}
+
+func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
+	stub := &generationRouterStub{}
+	e := router.Register(nil, nil, stub, nil)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/projects/42/generation-runs",
+		strings.NewReader(`{"kind":"unsupported","prompt":"hero"}`),
+	)
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recorder := httptest.NewRecorder()
+
+	e.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+	}
+	if stub.createCalls != 0 {
+		t.Fatalf("expected invalid body not to reach the handler, got %d calls", stub.createCalls)
 	}
 }
 

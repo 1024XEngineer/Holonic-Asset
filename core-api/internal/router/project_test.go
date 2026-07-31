@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
@@ -27,7 +27,7 @@ type projectRouterStub struct {
 }
 
 func (s *projectRouterStub) Create(
-	_ *echox.Context,
+	_ context.Context,
 	request dto.CreateProjectRequest,
 ) (dto.SuccessResponse[dto.CreateProjectResponse], error) {
 	s.createRequest = request
@@ -59,41 +59,46 @@ func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 	e := newProjectTestServer(&unreachableProjectDao{})
 	tests := []struct {
-		name   string
-		method string
-		path   string
-		body   string
+		name           string
+		method         string
+		path           string
+		body           string
+		expectedStatus int
 	}{
 		{
-			name:   "create without name",
-			method: http.MethodPost,
-			path:   "/api/v1/project/create",
-			body:   `{"userID":7,"gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+			name:           "create without name",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
-			name:   "list without user ID",
-			method: http.MethodGet,
-			path:   "/api/v1/project/list",
+			name:           "list without user ID",
+			method:         http.MethodGet,
+			path:           "/api/v1/project/list",
+			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
-			name:   "update without fields",
-			method: http.MethodPost,
-			path:   "/api/v1/project/update",
-			body:   `{"projectID":42}`,
+			name:           "update without fields",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/update",
+			body:           `{"projectID":42}`,
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:   "delete without project ID",
-			method: http.MethodPost,
-			path:   "/api/v1/project/delete",
-			body:   `{}`,
+			name:           "delete without project ID",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/delete",
+			body:           `{}`,
+			expectedStatus: http.StatusUnprocessableEntity,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := serveProjectRequest(t, e, test.method, test.path, test.body)
-			if recorder.Code != http.StatusBadRequest {
-				t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+			if recorder.Code != test.expectedStatus {
+				t.Fatalf("expected status %d, got %d: %s", test.expectedStatus, recorder.Code, recorder.Body.String())
 			}
 		})
 	}

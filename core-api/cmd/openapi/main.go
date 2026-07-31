@@ -9,14 +9,18 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
 
 func main() {
-	output := flag.String("output", "../openapi/openapi.json", "OpenAPI output path")
+	output := flag.String("output", "", "OpenAPI output path (required)")
 	flag.Parse()
+	if strings.TrimSpace(*output) == "" {
+		exitf("generate OpenAPI: -output is required")
+	}
 
 	server := router.Register(
 		handler.NewHandler(nil),

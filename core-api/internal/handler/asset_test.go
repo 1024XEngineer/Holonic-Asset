@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -84,7 +81,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	}}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{ProjectID: 42})
+	response, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{ProjectID: 42})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}
@@ -112,7 +109,7 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	managerStub := &assetManagerStub{}
 	h := handler.NewHandler(managerStub)
 
-	_, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{
+	_, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{
 		ProjectID: 42,
 		Query:     "hero",
 		Tags:      []string{"player"},
@@ -146,7 +143,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.UpdateAsset(newAssetHandlerContext("asset_id", "7"), dto.UpdateAssetRequest{
+	response, err := h.UpdateAsset(context.Background(), dto.UpdateAssetRequest{
 		AssetID:     7,
 		Name:        &name,
 		ProjectID:   &projectID,
@@ -176,7 +173,7 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Record(newAssetHandlerContext("asset_id", "7"), dto.RecordAssetRequest{AssetID: 7})
+	response, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
@@ -197,7 +194,7 @@ func TestAssetHandlerRollbackUsesRequestedVersion(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.RollBackAsset(newAssetHandlerContext("asset_id", "7"), dto.RollBackAssetRequest{AssetID: 7, Version: 2})
+	response, err := h.RollBackAsset(context.Background(), dto.RollBackAssetRequest{AssetID: 7, Version: 2})
 	if err != nil {
 		t.Fatalf("rollback asset: %v", err)
 	}
@@ -218,7 +215,7 @@ func TestAssetHandlerRecordsReturnsHistory(t *testing.T) {
 	h := handler.NewHandler(managerStub)
 
 	response, err := h.Records(
-		newAssetHandlerContext("asset_id", "7"),
+		context.Background(),
 		dto.GetAssetRecordsRequest{AssetID: 7},
 	)
 	if err != nil {
@@ -244,7 +241,7 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 	h := handler.NewHandler(managerStub)
 
 	response, err := h.Detail(
-		newAssetHandlerContext("asset_id", "7"),
+		context.Background(),
 		dto.AssetDetailRequest{AssetID: 7},
 	)
 	if err != nil {
@@ -261,17 +258,17 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 
 func TestAssetHandlerRejectsZeroIDs(t *testing.T) {
 	h := handler.NewHandler(&assetManagerStub{})
-	if _, err := h.GetAssets(newAssetHandlerContext("project_id", "0"), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {
+	if _, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero project ID, got %v", err)
 	}
 	if _, err := h.Detail(
-		newAssetHandlerContext("asset_id", "invalid"),
+		context.Background(),
 		dto.AssetDetailRequest{},
 	); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero asset ID, got %v", err)
 	}
 	if _, err := h.Records(
-		newAssetHandlerContext("asset_id", "0"),
+		context.Background(),
 		dto.GetAssetRecordsRequest{},
 	); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero record asset ID, got %v", err)
@@ -283,19 +280,10 @@ func TestAssetHandlerPropagatesManagerErrors(t *testing.T) {
 	h := handler.NewHandler(&assetManagerStub{getDetailErr: wantErr})
 
 	_, err := h.Detail(
-		newAssetHandlerContext("asset_id", "7"),
+		context.Background(),
 		dto.AssetDetailRequest{AssetID: 7},
 	)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-}
-
-func newAssetHandlerContext(paramName string, paramValue string) *echox.Context {
-	e := echo.New()
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	context := e.NewContext(request, httptest.NewRecorder())
-	context.SetParamNames(paramName)
-	context.SetParamValues(paramValue)
-	return &echox.Context{Context: context}
 }

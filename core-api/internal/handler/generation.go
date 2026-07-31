@@ -1,12 +1,12 @@
 package handler
 
 import (
+	"context"
 	"errors"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 )
 
@@ -19,9 +19,9 @@ func NewGenerationHandler(runs generator.RunManager) *GenerationHandler {
 }
 
 func (h *GenerationHandler) Create(
-	ctx *echox.Context,
+	ctx context.Context,
 	request dto.CreateGenerationRequest,
-) (dto.CreateGenerationResponse, error) {
+) (dto.SuccessResponse[dto.CreateGenerationResponse], error) {
 	runID, err := h.runs.Create(ctx, &generator.Request{
 		ProjectID:         request.ProjectID,
 		AssetID:           request.AssetID,
@@ -31,13 +31,16 @@ func (h *GenerationHandler) Create(
 		TargetAssetPaths:  request.TargetAssetPaths,
 		Parameters:        request.Parameters,
 	})
-	return dto.CreateGenerationResponse{GenerationRunID: runID}, err
+	if err != nil {
+		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, err
+	}
+	return dto.NewTypedSuccessResponse(dto.CreateGenerationResponse{GenerationRunID: runID}), nil
 }
 
 func (h *GenerationHandler) List(
-	ctx *echox.Context,
+	ctx context.Context,
 	request dto.ListGenerationRunsRequest,
-) (dto.ListGenerationRunsResponse, error) {
+) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error) {
 	page, err := h.runs.List(ctx, &generator.RunListQuery{
 		ProjectID: request.ProjectID,
 		AssetID:   request.AssetID,
@@ -46,13 +49,13 @@ func (h *GenerationHandler) List(
 		Cursor:    request.Cursor,
 	})
 	if errors.Is(err, generator.ErrInvalidRunListStatus) {
-		return dto.ListGenerationRunsResponse{}, echo.ErrBadRequest
+		return dto.SuccessResponse[dto.ListGenerationRunsResponse]{}, echo.ErrBadRequest
 	}
 	if err != nil {
-		return dto.ListGenerationRunsResponse{}, err
+		return dto.SuccessResponse[dto.ListGenerationRunsResponse]{}, err
 	}
 	if page == nil {
-		return dto.ListGenerationRunsResponse{Items: []dto.GenerationRunListItemResponse{}}, nil
+		return dto.NewTypedSuccessResponse(dto.ListGenerationRunsResponse{Items: []dto.GenerationRunListItemResponse{}}), nil
 	}
 
 	items := make([]dto.GenerationRunListItemResponse, len(page.Runs))
@@ -67,22 +70,22 @@ func (h *GenerationHandler) List(
 		}
 	}
 
-	return dto.ListGenerationRunsResponse{
+	return dto.NewTypedSuccessResponse(dto.ListGenerationRunsResponse{
 		Items:      items,
 		NextCursor: page.NextCursor,
-	}, nil
+	}), nil
 }
 
 func (h *GenerationHandler) Get(
-	ctx *echox.Context,
+	ctx context.Context,
 	request dto.GetGenerationRequest,
-) (dto.GetGenerationResponse, error) {
+) (dto.SuccessResponse[dto.GetGenerationResponse], error) {
 	run, err := h.runs.Get(ctx, request.GenerationRunID)
 	if err != nil {
-		return dto.GetGenerationResponse{}, err
+		return dto.SuccessResponse[dto.GetGenerationResponse]{}, err
 	}
 
-	return dto.GetGenerationResponse{
+	return dto.NewTypedSuccessResponse(dto.GetGenerationResponse{
 		ID:        run.ID,
 		ProjectID: run.ProjectID,
 		AssetID:   run.AssetID,
@@ -90,13 +93,16 @@ func (h *GenerationHandler) Get(
 		Status:    run.Status,
 		Result:    run.Result,
 		Error:     run.Error,
-	}, nil
+	}), nil
 }
 
 func (h *GenerationHandler) Cancel(
-	ctx *echox.Context,
+	ctx context.Context,
 	request dto.CancelGenerationRequest,
-) (dto.CancelGenerationResponse, error) {
+) (dto.SuccessResponse[dto.CancelGenerationResponse], error) {
 	err := h.runs.Cancel(ctx, request.GenerationRunID)
-	return dto.CancelGenerationResponse{Cancelled: err == nil}, err
+	if err != nil {
+		return dto.SuccessResponse[dto.CancelGenerationResponse]{}, err
+	}
+	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{Cancelled: true}), nil
 }

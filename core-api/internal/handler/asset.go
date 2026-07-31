@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -17,7 +18,7 @@ func NewHandler(manager domain.Manager) *Handler {
 }
 
 func (h *Handler) GetAssets(
-	x *echox.Context,
+	x context.Context,
 	request dto.GetAssetsRequest,
 ) (dto.SuccessResponse[dto.GetAssetsResponse], error) {
 	projectID := request.ProjectID
@@ -51,7 +52,7 @@ func (h *Handler) GetAssets(
 }
 
 func (h *Handler) Detail(
-	x *echox.Context,
+	x context.Context,
 	request dto.AssetDetailRequest,
 ) (dto.SuccessResponse[dto.AssetDetailResponse], error) {
 	assetID := request.AssetID
@@ -78,7 +79,7 @@ func (h *Handler) Detail(
 }
 
 func (h *Handler) Record(
-	x *echox.Context,
+	x context.Context,
 	asset dto.RecordAssetRequest,
 ) (dto.SuccessResponse[dto.RecordAssetResponse], error) {
 	if asset.AssetID == 0 {
@@ -98,7 +99,7 @@ func (h *Handler) Record(
 }
 
 func (h *Handler) Records(
-	x *echox.Context,
+	x context.Context,
 	request dto.GetAssetRecordsRequest,
 ) (dto.SuccessResponse[dto.GetAssetRecordsResponse], error) {
 	assetID := request.AssetID
@@ -124,7 +125,7 @@ func (h *Handler) Records(
 }
 
 func (h *Handler) CopyAsset(
-	ctx *echox.Context,
+	ctx context.Context,
 	asset dto.CopyAssetRequest,
 ) (dto.SuccessResponse[dto.CopyAssetResponse], error) {
 	if asset.AssetID == 0 {
@@ -138,7 +139,7 @@ func (h *Handler) CopyAsset(
 }
 
 func (h *Handler) RollBackAsset(
-	ctx *echox.Context,
+	ctx context.Context,
 	asset dto.RollBackAssetRequest,
 ) (dto.SuccessResponse[dto.RollBackAssetResponse], error) {
 	if asset.AssetID == 0 || asset.Version == 0 {
@@ -156,7 +157,7 @@ func (h *Handler) RollBackAsset(
 }
 
 func (h *Handler) UpdateAsset(
-	ctx *echox.Context,
+	ctx context.Context,
 	req dto.UpdateAssetRequest,
 ) (dto.SuccessResponse[dto.UpdateAssetResponse], error) {
 	if req.AssetID == 0 {

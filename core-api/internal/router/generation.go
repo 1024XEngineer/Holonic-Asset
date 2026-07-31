@@ -8,15 +8,14 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 )
 
 type GenerationRouter interface {
-	Create(*echox.Context, dto.CreateGenerationRequest) (dto.CreateGenerationResponse, error)
-	List(*echox.Context, dto.ListGenerationRunsRequest) (dto.ListGenerationRunsResponse, error)
-	Get(*echox.Context, dto.GetGenerationRequest) (dto.GetGenerationResponse, error)
-	Cancel(*echox.Context, dto.CancelGenerationRequest) (dto.CancelGenerationResponse, error)
+	Create(context.Context, dto.CreateGenerationRequest) (dto.SuccessResponse[dto.CreateGenerationResponse], error)
+	List(context.Context, dto.ListGenerationRunsRequest) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error)
+	Get(context.Context, dto.GetGenerationRequest) (dto.SuccessResponse[dto.GetGenerationResponse], error)
+	Cancel(context.Context, dto.CancelGenerationRequest) (dto.SuccessResponse[dto.CancelGenerationResponse], error)
 }
 
 type createGenerationInput struct {
@@ -25,7 +24,7 @@ type createGenerationInput struct {
 }
 
 type createGenerationOutput struct {
-	Body dto.CreateGenerationResponse
+	Body dto.SuccessResponse[dto.CreateGenerationResponse]
 }
 
 // optionalUint tracks whether a query parameter was present. Huma otherwise
@@ -56,36 +55,35 @@ type listGenerationRunsInput struct {
 }
 
 type listGenerationRunsOutput struct {
-	Body dto.ListGenerationRunsResponse
+	Body dto.SuccessResponse[dto.ListGenerationRunsResponse]
 }
 
 type getGenerationInput dto.GetGenerationRequest
 
 type getGenerationOutput struct {
-	Body dto.GetGenerationResponse
+	Body dto.SuccessResponse[dto.GetGenerationResponse]
 }
 
 type cancelGenerationInput dto.CancelGenerationRequest
 
 type cancelGenerationOutput struct {
-	Body dto.CancelGenerationResponse
+	Body dto.SuccessResponse[dto.CancelGenerationResponse]
 }
 
 // RegisterGenerationRoutes exposes task-backed generation use cases. AI Service
 // remains responsible for generation and any resulting asset creation.
 func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 	huma.Register(api, huma.Operation{
-		OperationID:      "createGenerationRun",
-		Method:           http.MethodPost,
-		Path:             "/projects/{project_id}/generation-runs",
-		Summary:          "Create a generation run",
-		Tags:             []string{"Generation"},
-		Errors:           []int{http.StatusBadRequest},
-		SkipValidateBody: true,
+		OperationID: "createGenerationRun",
+		Method:      http.MethodPost,
+		Path:        "/projects/{project_id}/generation-runs",
+		Summary:     "Create a generation run",
+		Tags:        []string{"Generation"},
+		Errors:      []int{http.StatusBadRequest},
 	}, func(ctx context.Context, input *createGenerationInput) (*createGenerationOutput, error) {
 		request := input.Body
 		request.ProjectID = input.ProjectID
-		response, err := r.Create(echox.FromContext(ctx), request)
+		response, err := r.Create(ctx, request)
 		return &createGenerationOutput{Body: response}, openAPIError(err)
 	})
 
@@ -106,7 +104,7 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 		if input.AssetID.IsSet {
 			request.AssetID = &input.AssetID.Value
 		}
-		response, err := r.List(echox.FromContext(ctx), request)
+		response, err := r.List(ctx, request)
 		return &listGenerationRunsOutput{Body: response}, openAPIError(err)
 	})
 
@@ -117,7 +115,7 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 		Summary:     "Get a generation run",
 		Tags:        []string{"Generation"},
 	}, func(ctx context.Context, input *getGenerationInput) (*getGenerationOutput, error) {
-		response, err := r.Get(echox.FromContext(ctx), dto.GetGenerationRequest(*input))
+		response, err := r.Get(ctx, dto.GetGenerationRequest(*input))
 		return &getGenerationOutput{Body: response}, openAPIError(err)
 	})
 
@@ -128,7 +126,7 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 		Summary:     "Cancel a generation run",
 		Tags:        []string{"Generation"},
 	}, func(ctx context.Context, input *cancelGenerationInput) (*cancelGenerationOutput, error) {
-		response, err := r.Cancel(echox.FromContext(ctx), dto.CancelGenerationRequest(*input))
+		response, err := r.Cancel(ctx, dto.CancelGenerationRequest(*input))
 		return &cancelGenerationOutput{Body: response}, openAPIError(err)
 	})
 }

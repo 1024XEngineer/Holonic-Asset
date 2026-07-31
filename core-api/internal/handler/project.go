@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -20,7 +20,7 @@ func NewProjectHandler(manager domain.Manager) *ProjectHandler {
 }
 
 func (h *ProjectHandler) Create(
-	c *echox.Context,
+	c context.Context,
 	request dto.CreateProjectRequest,
 ) (dto.SuccessResponse[dto.CreateProjectResponse], error) {
 	project := &domain.Project{
@@ -40,7 +40,7 @@ func (h *ProjectHandler) Create(
 }
 
 func (h *ProjectHandler) ListByUID(
-	c *echox.Context,
+	c context.Context,
 	request dto.ListProjectsRequest,
 ) (dto.SuccessResponse[dto.ListProjectsResponse], error) {
 	projects, err := h.manager.ListByUID(c, request.UserID)
@@ -56,7 +56,7 @@ func (h *ProjectHandler) ListByUID(
 }
 
 func (h *ProjectHandler) GetDetail(
-	c *echox.Context,
+	c context.Context,
 	request dto.ProjectDetailRequest,
 ) (dto.SuccessResponse[dto.ProjectDetailResponse], error) {
 	project, err := h.manager.GetDetail(c, request.ProjectID)
@@ -67,7 +67,7 @@ func (h *ProjectHandler) GetDetail(
 }
 
 func (h *ProjectHandler) Update(
-	c *echox.Context,
+	c context.Context,
 	request dto.UpdateProjectRequest,
 ) (dto.SuccessResponse[dto.UpdateProjectResponse], error) {
 	update := &domain.ProjectUpdate{
@@ -87,7 +87,7 @@ func (h *ProjectHandler) Update(
 }
 
 func (h *ProjectHandler) Delete(
-	c *echox.Context,
+	c context.Context,
 	request dto.DeleteProjectRequest,
 ) (dto.SuccessResponse[dto.DeleteProjectResponse], error) {
 	if err := h.manager.Delete(c, request.ProjectID); err != nil {
