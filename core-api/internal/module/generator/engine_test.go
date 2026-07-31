@@ -132,7 +132,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		Prompt:            "hero",
 		ReferenceMediaIDs: []string{"media-1"},
 		Parameters: json.RawMessage(
-			`{"asset_name":"knight","canvas_size":"64x64","perspective":"top-down","direction_count":"4"}`,
+			`{"asset_name":"knight","canvas_size":"64x64","perspective":"top_down","direction_count":"4"}`,
 		),
 	})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
 		payload.CreativeBrief != "hero" || payload.Reference != "media-1" ||
-		payload.CanvasSize != "64x64" || payload.Perspective != "top-down" ||
+		payload.CanvasSize != "64x64" || payload.Perspective != "top_down" ||
 		payload.DirectionCount != "4" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
 	}
@@ -275,7 +275,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	}{
 		{
 			taskType: generator.GenerateCharacterProtoType,
-			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top-down","direction_count":"4","reference":"media-1","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top_down","direction_count":"4","reference":"media-1","project_id":11}`),
 		},
 		{
 			taskType: generator.GenerateCharacterAnimation,
@@ -283,7 +283,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		},
 		{
 			taskType: generator.GenerateObjectProtoType,
-			payload:  json.RawMessage(`{"asset_name":"chest","creative_brief":"wooden chest","canvas_size":"64x64","perspective":"isometric","reference":"media-2","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"chest","creative_brief":"wooden chest","canvas_size":"64x64","perspective":"top_down","reference":"media-2","project_id":11}`),
 		},
 		{
 			taskType: generator.GenerateObjectAnimation,
@@ -365,7 +365,7 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 }
 
 func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
-	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top-down","direction_count":"4","reference":"media-1","project_id":42}`)
+	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"top_down","direction_count":"4","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
 	generator.NewEngine(tasks, nil, executor)

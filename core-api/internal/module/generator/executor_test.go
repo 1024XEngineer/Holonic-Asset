@@ -109,7 +109,7 @@ func (s *generationAssetWriterStub) UpdateAnimationFrames(
 	return s.err
 }
 
-func TestExecutorGeneratesCharacterPrototypeBeforeUpdatingAsset(t *testing.T) {
+func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{
 		events: &events,
@@ -121,7 +121,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeUpdatingAsset(t *testing.T) {
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
 		"canvas_size":"64x64",
-		"perspective":"top-down",
+		"perspective":"top_down",
 		"direction_count":"4",
 		"reference":"https://cdn.example/reference.png",
 		"project_id":11
@@ -134,7 +134,6 @@ func TestExecutorGeneratesCharacterPrototypeBeforeUpdatingAsset(t *testing.T) {
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
 		"create_character_asset",
-		"update_prototype",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
@@ -155,11 +154,11 @@ func TestExecutorGeneratesCharacterPrototypeBeforeUpdatingAsset(t *testing.T) {
 	if content.ViewMode != assetdomain.ViewModeTopDown || content.DirectionCount != 4 {
 		t.Fatalf("unexpected character content: %+v", content)
 	}
-	assertPrototypeResources(t, assets, 41)
+	assertPrototypeResources(t, assets.characterAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
 }
 
-func TestExecutorGeneratesObjectPrototypeBeforeUpdatingAsset(t *testing.T) {
+func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
@@ -168,7 +167,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeUpdatingAsset(t *testing.T) {
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
 		"canvas_size":"128x128",
-		"perspective":"isometric",
+		"perspective":"top_down",
 		"project_id":12
 	}`)
 
@@ -179,7 +178,6 @@ func TestExecutorGeneratesObjectPrototypeBeforeUpdatingAsset(t *testing.T) {
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
 		"create_object_asset",
-		"update_prototype",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
@@ -187,7 +185,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeUpdatingAsset(t *testing.T) {
 		assets.objectAsset.ProjectID != 12 || assets.objectAsset.Type != assetdomain.AssetTypeObject {
 		t.Fatalf("unexpected object asset: %+v", assets.objectAsset)
 	}
-	assertPrototypeResources(t, assets, 42)
+	assertPrototypeResources(t, assets.objectAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
 }
 
@@ -259,6 +257,52 @@ func TestExecutorDoesNotMutateAssetsWhenImageGenerationFails(t *testing.T) {
 	}
 }
 
+func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload json.RawMessage
+	}{
+		{
+			name: "perspective",
+			payload: json.RawMessage(`{
+				"asset_name":"hero",
+				"creative_brief":"pixel knight",
+				"canvas_size":"64x64",
+				"perspective":"top-down",
+				"direction_count":"4",
+				"project_id":11
+			}`),
+		},
+		{
+			name: "direction_count",
+			payload: json.RawMessage(`{
+				"asset_name":"hero",
+				"creative_brief":"pixel knight",
+				"canvas_size":"64x64",
+				"perspective":"top_down",
+				"direction_count":"3",
+				"project_id":11
+			}`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			assets := &generationAssetWriterStub{events: &events}
+			executor := generator.NewExecutor(images, assets)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, tt.payload)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+			if len(events) != 0 {
+				t.Fatalf("workflow should stop before side effects: %v", events)
+			}
+		})
+	}
+}
+
 func TestExecutorRequiresDependencies(t *testing.T) {
 	executor := generator.NewExecutor(nil, nil)
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
@@ -281,16 +325,24 @@ func generatedImages() *imageclient.GenerateResult {
 	}}
 }
 
-func assertPrototypeResources(t *testing.T, assets *generationAssetWriterStub, assetID uint) {
+func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset) {
 	t.Helper()
-	if assets.prototypeAssetID != assetID || len(assets.prototypeImages) != 2 {
-		t.Fatalf("unexpected prototype update: id=%d images=%+v", assets.prototypeAssetID, assets.prototypeImages)
+	if asset == nil {
+		t.Fatal("expected created asset")
 	}
-	if assets.prototypeImages[0].ID != 1 || assets.prototypeImages[0].URL == nil ||
-		*assets.prototypeImages[0].URL != "data:image/png;base64,first" ||
-		assets.prototypeImages[1].ID != 2 || assets.prototypeImages[1].URL == nil ||
-		*assets.prototypeImages[1].URL != "data:image/webp;base64,second" {
-		t.Fatalf("unexpected prototype resources: %+v", assets.prototypeImages)
+	content, err := asset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode asset content: %v", err)
+	}
+	if content.Prototype == nil || len(*content.Prototype) != 2 {
+		t.Fatalf("unexpected prototype: %+v", content.Prototype)
+	}
+	prototype := *content.Prototype
+	if prototype[0].ID != 1 || prototype[0].URL == nil ||
+		*prototype[0].URL != "data:image/png;base64,first" ||
+		prototype[1].ID != 2 || prototype[1].URL == nil ||
+		*prototype[1].URL != "data:image/webp;base64,second" {
+		t.Fatalf("unexpected prototype resources: %+v", prototype)
 	}
 }
 
