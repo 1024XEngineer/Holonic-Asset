@@ -11,14 +11,14 @@ export type ApiResponse<T> = {
 
 const apiBaseUrl = import.meta.env.VITE_CORE_API_BASE_URL ?? "/api/v1";
 
-export function getJson<T>(
+function getJson<T>(
   path: string,
   query?: Record<string, QueryValue>,
 ): Promise<T> {
   return requestJson<T>(withQuery(path, query));
 }
 
-export function postJson<T>(path: string, body?: unknown): Promise<T> {
+function postJson<T>(path: string, body?: unknown): Promise<T> {
   return requestJson<T>(path, { method: "POST" }, body);
 }
 

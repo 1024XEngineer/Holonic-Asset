@@ -794,6 +794,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseCancelGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CancelGenerationResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseCopyAssetResponse": {
         "additionalProperties": false,
         "properties": {
@@ -806,6 +831,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/CopyAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseCreateGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateGenerationResponse"
           },
           "message": {
             "const": "success",
@@ -906,6 +956,56 @@
           },
           "data": {
             "$ref": "#/components/schemas/GetAssetsResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseGetGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GetGenerationResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseListGenerationRunsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ListGenerationRunsResponse"
           },
           "message": {
             "const": "success",
@@ -1056,6 +1156,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/UpdateProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseUploadTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadTarget"
           },
           "message": {
             "const": "success",
@@ -1657,7 +1782,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetGenerationResponse"
+                  "$ref": "#/components/schemas/SuccessResponseGetGenerationResponse"
                 }
               }
             },
@@ -1700,7 +1825,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CancelGenerationResponse"
+                  "$ref": "#/components/schemas/SuccessResponseCancelGenerationResponse"
                 }
               }
             },
@@ -2231,7 +2356,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListGenerationRunsResponse"
+                  "$ref": "#/components/schemas/SuccessResponseListGenerationRunsResponse"
                 }
               }
             },
@@ -2302,7 +2427,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateGenerationResponse"
+                  "$ref": "#/components/schemas/SuccessResponseCreateGenerationResponse"
                 }
               }
             },
@@ -2363,7 +2488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UploadTarget"
+                  "$ref": "#/components/schemas/SuccessResponseUploadTarget"
                 }
               }
             },

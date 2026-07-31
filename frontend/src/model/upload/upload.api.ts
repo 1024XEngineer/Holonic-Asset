@@ -2,7 +2,7 @@ import type {
   CreateUploadTargetRequest,
   UploadTarget,
 } from "./upload.contract";
-import { postJson } from "@/model/fetchers";
+import { postEnvelope } from "@/model/fetchers";
 
 export type {
   CreateUploadTargetRequest,
@@ -11,5 +11,5 @@ export type {
 
 export const uploadApi = {
   createTarget: (request: CreateUploadTargetRequest) =>
-    postJson<UploadTarget>("/uploads", request),
+    postEnvelope<UploadTarget>("/uploads", request),
 };

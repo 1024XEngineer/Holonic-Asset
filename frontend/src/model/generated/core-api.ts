@@ -510,6 +510,16 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        SuccessResponseCancelGenerationResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["CancelGenerationResponse"];
+            /** @constant */
+            message: "success";
+        };
         SuccessResponseCopyAssetResponse: {
             /**
              * Format: int64
@@ -517,6 +527,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["CopyAssetResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseCreateGenerationResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["CreateGenerationResponse"];
             /** @constant */
             message: "success";
         };
@@ -557,6 +577,26 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["GetAssetsResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseGetGenerationResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["GetGenerationResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseListGenerationRunsResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["ListGenerationRunsResponse"];
             /** @constant */
             message: "success";
         };
@@ -617,6 +657,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["UpdateProjectResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseUploadTarget: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["UploadTarget"];
             /** @constant */
             message: "success";
         };
@@ -997,7 +1047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GetGenerationResponse"];
+                    "application/json": components["schemas"]["SuccessResponseGetGenerationResponse"];
                 };
             };
             /** @description Error */
@@ -1028,7 +1078,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CancelGenerationResponse"];
+                    "application/json": components["schemas"]["SuccessResponseCancelGenerationResponse"];
                 };
             };
             /** @description Error */
@@ -1395,7 +1445,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListGenerationRunsResponse"];
+                    "application/json": components["schemas"]["SuccessResponseListGenerationRunsResponse"];
                 };
             };
             /** @description Bad Request */
@@ -1448,7 +1498,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CreateGenerationResponse"];
+                    "application/json": components["schemas"]["SuccessResponseCreateGenerationResponse"];
                 };
             };
             /** @description Bad Request */
@@ -1499,7 +1549,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UploadTarget"];
+                    "application/json": components["schemas"]["SuccessResponseUploadTarget"];
                 };
             };
             /** @description Bad Request */
