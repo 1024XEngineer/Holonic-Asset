@@ -97,3 +97,7 @@ type RollBackAssetResponse struct {
 	Version   uint `json:"version"`
 	ContentID uint `json:"contentId"`
 }
+
+type DeleteAssetRequest struct {
+	AssetID uint `json:"assetId"`
+}

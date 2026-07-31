@@ -35,6 +35,8 @@ type assetManagerStub struct {
 	rollbackAsset   uint
 	rollbackVersion uint
 	rollbackResult  *domain.AssetRecord
+	deletedAssetID  uint
+	deleteErr       error
 }
 
 func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
@@ -50,6 +52,11 @@ func (s *assetManagerStub) RollBackRecord(_ context.Context, assetID uint, versi
 	s.rollbackAsset = assetID
 	s.rollbackVersion = version
 	return s.rollbackResult, nil
+}
+
+func (s *assetManagerStub) Delete(_ context.Context, assetID uint) error {
+	s.deletedAssetID = assetID
+	return s.deleteErr
 }
 
 func (s *assetManagerStub) GetAssets(_ context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
@@ -285,4 +292,29 @@ func newAssetHandlerContext(paramName string, paramValue string) *echox.Context 
 	context.SetParamNames(paramName)
 	context.SetParamValues(paramValue)
 	return &echox.Context{Context: context}
+}
+
+func TestAssetHandlerDelete(t *testing.T) {
+	managerStub := &assetManagerStub{}
+	h := handler.NewHandler(managerStub)
+
+	response, err := h.Delete(newAssetHandlerContext("asset_id", "7"), dto.DeleteAssetRequest{AssetID: 7})
+	if err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+	if managerStub.deletedAssetID != 7 {
+		t.Fatalf("expected asset ID 7, got %d", managerStub.deletedAssetID)
+	}
+	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestAssetHandlerDeleteRejectsZeroAssetID(t *testing.T) {
+	h := handler.NewHandler(&assetManagerStub{})
+
+	_, err := h.Delete(newAssetHandlerContext("asset_id", "0"), dto.DeleteAssetRequest{})
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request, got %v", err)
+	}
 }

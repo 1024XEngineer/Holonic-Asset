@@ -16,6 +16,7 @@ type AssetRouter interface {
 	RollBackAsset(ctx *echox.Context, req dto.RollBackAssetRequest) (dto.Response, error)
 
 	UpdateAsset(ctx *echox.Context, req dto.UpdateAssetRequest) (dto.Response, error)
+	Delete(ctx *echox.Context, req dto.DeleteAssetRequest) (dto.Response, error)
 }
 
 // RegisterRoutes registers all HTTP routes.
@@ -37,4 +38,6 @@ func RegisterAssetRoutes(e *echo.Group, r AssetRouter) {
 	asset.POST("/rollback", echox.WrapReq(r.RollBackAsset))
 
 	asset.POST("/update", echox.WrapReq(r.UpdateAsset))
+
+	asset.DELETE("/delete", echox.WrapReq(r.Delete))
 }
