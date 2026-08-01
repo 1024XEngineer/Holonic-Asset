@@ -6,7 +6,7 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-import { useHoverDropdown } from "./AppHeader.useHoverDropdown";
+import { useHoverDropdown } from "./use-hover-dropdown";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
