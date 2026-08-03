@@ -9,5 +9,9 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "endOfLine": "lf",
-  "ignorePatterns": ["**/node_modules/**", "**/routeTree.gen.ts"]
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/routeTree.gen.ts",
+    "**/model/generated/**"
+  ]
 }

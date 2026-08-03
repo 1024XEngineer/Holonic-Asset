@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 )
 
@@ -15,20 +20,30 @@ func NewUploadHandler(manager upload.Manager) *UploadHandler {
 }
 
 func (h *UploadHandler) CreateUploadTarget(
-	c *echox.Context,
+	c context.Context,
 	request dto.CreateUploadTargetRequest,
-) (*dto.UploadTarget, error) {
+) (dto.SuccessResponse[dto.UploadTarget], error) {
 	target, err := h.manager.CreateUploadTarget(c, &upload.CreateUploadTargetRequest{
 		ContentType:   request.ContentType,
 		ContentLength: request.ContentLength,
 	})
 	if err != nil {
-		return nil, err
+		return dto.SuccessResponse[dto.UploadTarget]{}, uploadHandlerError(err)
 	}
-	return &dto.UploadTarget{
+	if target == nil {
+		target = &upload.UploadTarget{}
+	}
+	return dto.NewTypedSuccessResponse(dto.UploadTarget{
 		ObjectKey:   target.ObjectKey,
 		ObjectURL:   target.ObjectURL,
 		UploadURL:   target.UploadURL,
 		UploadToken: target.UploadToken,
-	}, nil
+	}), nil
+}
+
+func uploadHandlerError(err error) error {
+	if errors.Is(err, upload.ErrInvalidUploadRequest) {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+	}
+	return err
 }

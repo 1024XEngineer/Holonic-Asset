@@ -1,6 +1,10 @@
 package upload
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
 
 // Manager exposes upload use cases to transports and other modules.
 type Manager interface {
@@ -19,6 +23,15 @@ func (m *manager) CreateUploadTarget(
 	ctx context.Context,
 	request *CreateUploadTargetRequest,
 ) (*UploadTarget, error) {
+	if request == nil {
+		return nil, fmt.Errorf("%w: request is required", ErrInvalidUploadRequest)
+	}
+	if strings.TrimSpace(request.ContentType) == "" {
+		return nil, fmt.Errorf("%w: content type is required", ErrInvalidUploadRequest)
+	}
+	if request.ContentLength <= 0 {
+		return nil, fmt.Errorf("%w: content length must be positive", ErrInvalidUploadRequest)
+	}
 	if m.store == nil {
 		return &UploadTarget{}, nil
 	}
