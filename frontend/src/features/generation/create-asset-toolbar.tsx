@@ -1,6 +1,6 @@
-import type { CreatableAssetKind } from "@/model/asset/types";
-import type { CreationRequest } from "@/model/generation/run/types";
-import type { ProjectSummary } from "@/model/project/types";
+import type { CreatableAssetKind } from "@/model/asset";
+import type { CreationRequest } from "@/model/generation";
+import type { ProjectSummary } from "@/model/project";
 
 export function CreateAssetToolbar(_props: {
   assetKinds: CreatableAssetKind[];
