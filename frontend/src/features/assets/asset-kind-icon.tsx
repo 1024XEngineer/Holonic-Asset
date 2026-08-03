@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-import type { CreatableAssetKind } from "@/model/asset/types";
+import type { CreatableAssetKind } from "@/model/asset";
 
 import { getAssetKindConfig } from "./asset-kind-config";
 

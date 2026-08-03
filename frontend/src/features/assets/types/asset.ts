@@ -1,4 +1,4 @@
-import type { AssetKind } from "@/model/asset/types";
+import type { AssetKind } from "@/model/asset";
 
 export type Asset = {
   id: string;

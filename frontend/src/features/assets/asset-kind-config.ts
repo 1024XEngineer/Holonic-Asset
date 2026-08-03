@@ -8,7 +8,7 @@ import {
   Volume2,
 } from "lucide-react";
 
-import type { AssetKind } from "@/model/asset/types";
+import type { AssetKind } from "@/model/asset";
 
 export type AssetKindConfig = {
   label: string;
