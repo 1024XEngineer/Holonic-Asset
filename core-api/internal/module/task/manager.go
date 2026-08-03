@@ -96,7 +96,10 @@ func (m *manager) Start(ctx context.Context) error {
 	m.wg.Add(1)
 	m.stateMu.Unlock()
 
-	go m.runOutbox(outboxCtx)
+	go func() {
+		defer cancel()
+		m.runOutbox(outboxCtx)
+	}()
 	return nil
 }
 
