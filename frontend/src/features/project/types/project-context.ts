@@ -1,4 +1,4 @@
-import type { ProjectSummary } from "@/model/project/types";
+import type { ProjectSummary } from "@/model/project";
 
 import type {
   NewProjectDraft,

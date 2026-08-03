@@ -1,9 +1,6 @@
-import type { AssetKind, ProjectAsset } from "@/model/asset/types";
-import type {
-  CreationRequest,
-  GenerationRun,
-} from "@/model/generation/run/types";
-import type { ProjectSummary } from "@/model/project/types";
+import type { AssetKind, ProjectAsset } from "@/model/asset";
+import type { CreationRequest, GenerationRun } from "@/model/generation";
+import type { ProjectSummary } from "@/model/project";
 
 type FilteredAsset = ProjectAsset & {
   kind: AssetKind;
