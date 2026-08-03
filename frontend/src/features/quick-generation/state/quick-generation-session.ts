@@ -6,7 +6,7 @@ import {
 import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,
-} from "@/model/generation/quick/types";
+} from "@/model/generation";
 import {
   browserReferencePreviewAdapter,
   createReferencePreviewLifecycle,
