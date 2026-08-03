@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
+import mdx from "@mdx-js/rollup";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -13,6 +14,7 @@ export default defineConfig({
       generatedRouteTree: "./src/app/routeTree.gen.ts",
       autoCodeSplitting: true,
     }),
+    mdx(),
     react(),
     tailwindcss(),
   ],
