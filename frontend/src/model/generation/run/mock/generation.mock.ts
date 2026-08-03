@@ -1,4 +1,4 @@
-import type { AssetKind, ProjectAsset } from "../../../asset/types";
+import type { AssetKind, ProjectAsset } from "@/model/asset";
 import type { GenerationRun } from "../types";
 
 export type MockGeneratedAsset = {

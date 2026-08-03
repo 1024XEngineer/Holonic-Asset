@@ -1,4 +1,4 @@
-import type { CreatableAssetKind } from "../../../asset/types";
+import type { CreatableAssetKind } from "@/model/asset";
 
 export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
