@@ -1,11 +1,11 @@
 import type { GenerateAnimationRequest } from "@/model";
 
-type CreateAnimationDialogProps = {
+type CreateAnimationTriggerProps = {
   children: (openDialog: () => void) => React.ReactNode;
   isGenerating: boolean;
   onGenerate: (request: GenerateAnimationRequest) => void;
 };
 
-export function CreateAnimationDialog(_props: CreateAnimationDialogProps) {
+export function CreateAnimationTrigger(_props: CreateAnimationTriggerProps) {
   return null;
 }

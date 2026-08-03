@@ -1,3 +1,3 @@
 export { CreateAssetToolbar } from "./create-asset-toolbar";
-export { CreateAnimationDialog } from "./create-animation-dialog";
+export { CreateAnimationTrigger } from "./create-animation-trigger";
 export { GenerationQueue } from "./generation-queue";
