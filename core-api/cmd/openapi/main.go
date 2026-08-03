@@ -43,10 +43,10 @@ func main() {
 		exitf("generate OpenAPI: %v", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(*output), 0o750); err != nil {
 		exitf("create OpenAPI output directory: %v", err)
 	}
-	if err := os.WriteFile(*output, formatted.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(*output, formatted.Bytes(), 0o600); err != nil {
 		exitf("write OpenAPI document: %v", err)
 	}
 }

@@ -35,7 +35,7 @@ type optionalUint struct {
 }
 
 func (value optionalUint) Schema(registry huma.Registry) *huma.Schema {
-	return huma.SchemaFromType(registry, reflect.TypeOf(value.Value))
+	return huma.SchemaFromType(registry, reflect.TypeFor[uint]())
 }
 
 func (value *optionalUint) Receiver() reflect.Value {
