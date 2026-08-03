@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/asset/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an asset */
+        delete: operations["deleteAsset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/asset/rollback": {
         parameters: {
             query?: never;
@@ -357,6 +374,13 @@ export interface components {
             contentLength: number;
             contentType: string;
         };
+        DeleteAssetRequest: {
+            /** Format: int64 */
+            assetId: number;
+        };
+        DeleteAssetResponse: {
+            success: boolean;
+        };
         DeleteProjectRequest: {
             /** Format: int64 */
             projectID: number;
@@ -541,6 +565,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["CreateProjectResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseDeleteAssetResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["DeleteAssetResponse"];
             /** @constant */
             message: "success";
         };
@@ -742,6 +776,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessResponseCopyAssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseDeleteAssetResponse"];
                 };
             };
             /** @description Bad Request */

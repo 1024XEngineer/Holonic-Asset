@@ -22,6 +22,7 @@ type assetRouterStub struct {
 	record    dto.RecordAssetRequest
 	records   bool
 	rollback  dto.RollBackAssetRequest
+	deleted   dto.DeleteAssetRequest
 }
 
 func (s *assetRouterStub) GetAssets(
@@ -72,6 +73,14 @@ func (s *assetRouterStub) RollBackAsset(
 ) (dto.SuccessResponse[dto.RollBackAssetResponse], error) {
 	s.rollback = request
 	return dto.NewTypedSuccessResponse(dto.RollBackAssetResponse{AssetID: request.AssetID, Version: request.Version}), nil
+}
+
+func (s *assetRouterStub) Delete(
+	_ context.Context,
+	request dto.DeleteAssetRequest,
+) (dto.SuccessResponse[dto.DeleteAssetResponse], error) {
+	s.deleted = request
+	return dto.NewTypedSuccessResponse(dto.DeleteAssetResponse{Success: true}), nil
 }
 
 func TestAssetRoutesBindPathParameters(t *testing.T) {
@@ -179,6 +188,21 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		}
 		if !assetStub.records {
 			t.Fatal("expected asset records route to be called")
+		}
+	})
+
+	t.Run("binds asset delete", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodDelete, "/api/v1/asset/delete", strings.NewReader(`{"assetId":7}`))
+		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		recorder := httptest.NewRecorder()
+
+		e.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+		}
+		if assetStub.deleted.AssetID != 7 {
+			t.Fatalf("unexpected delete request: %+v", assetStub.deleted)
 		}
 	})
 

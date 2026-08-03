@@ -156,6 +156,19 @@ func (h *Handler) RollBackAsset(
 	}), nil
 }
 
+func (h *Handler) Delete(
+	ctx context.Context,
+	request dto.DeleteAssetRequest,
+) (dto.SuccessResponse[dto.DeleteAssetResponse], error) {
+	if request.AssetID == 0 {
+		return dto.SuccessResponse[dto.DeleteAssetResponse]{}, echo.ErrBadRequest
+	}
+	if err := h.AssetManager.Delete(ctx, request.AssetID); err != nil {
+		return dto.SuccessResponse[dto.DeleteAssetResponse]{}, err
+	}
+	return dto.NewTypedSuccessResponse(dto.DeleteAssetResponse{Success: true}), nil
+}
+
 func (h *Handler) UpdateAsset(
 	ctx context.Context,
 	req dto.UpdateAssetRequest,
@@ -163,6 +176,7 @@ func (h *Handler) UpdateAsset(
 	if req.AssetID == 0 {
 		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, echo.ErrBadRequest
 	}
+
 	asset, err := h.AssetManager.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
 		Name:        req.Name,
 		ProjectID:   req.ProjectID,

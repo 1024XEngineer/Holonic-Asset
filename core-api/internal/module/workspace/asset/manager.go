@@ -6,6 +6,7 @@ import "context"
 type Manager interface {
 	GetAssets(ctx context.Context, projectID uint, filter AssetListFilter) ([]Asset, error)
 	GetDetail(ctx context.Context, id uint) (Asset, error)
+	Delete(ctx context.Context, id uint) error
 	UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (*Asset, error)
 	UpdateContent(ctx context.Context, id uint, content AssetContent) error
 	UpdateAnimationFrames(ctx context.Context, assetID uint, animationID uint, frames []Frame) error
@@ -43,6 +44,10 @@ func (m *manager) GetDetail(ctx context.Context, id uint) (Asset, error) {
 		return Asset{}, nil
 	}
 	return *value, nil
+}
+
+func (m *manager) Delete(ctx context.Context, id uint) error {
+	return m.store.Delete(ctx, id)
 }
 
 func (m *manager) UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (*Asset, error) {

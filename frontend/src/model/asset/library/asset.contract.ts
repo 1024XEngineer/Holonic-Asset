@@ -30,4 +30,8 @@ export type UpdateAssetRequest =
   operations["updateAsset"]["requestBody"]["content"]["application/json"];
 export type UpdateAssetResponse =
   operations["updateAsset"]["responses"][200]["content"]["application/json"]["data"];
+export type DeleteAssetRequest =
+  operations["deleteAsset"]["requestBody"]["content"]["application/json"];
+export type DeleteAssetResponse =
+  operations["deleteAsset"]["responses"][200]["content"]["application/json"]["data"];
 export type AssetMetadataResponse = UpdateAssetResponse;

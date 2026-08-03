@@ -20,6 +20,7 @@ type AssetContentDao interface {
 	GetAssetContent(ctx context.Context, id uint) (AssetContent, error)
 	GetAssetContentsByAssetID(ctx context.Context, assetID uint) ([]AssetContent, error)
 	DeleteAssetContents(ctx context.Context, ids []uint) error
+	DeleteAssetContentsByAssetID(ctx context.Context, assetID uint) error
 }
 
 type AssetContentDaoImpl struct {
@@ -67,6 +68,13 @@ func (a *AssetContentDaoImpl) GetAssetContentsByAssetID(ctx context.Context, ass
 		return nil, fmt.Errorf("dao: get asset contents for asset %d: %w", assetID, err)
 	}
 	return contents, nil
+}
+
+func (a *AssetContentDaoImpl) DeleteAssetContentsByAssetID(ctx context.Context, assetID uint) error {
+	if err := a.DB.WithContext(ctx).Where("asset_id = ?", assetID).Delete(&AssetContent{}).Error; err != nil {
+		return fmt.Errorf("dao: delete asset contents for asset %d: %w", assetID, err)
+	}
+	return nil
 }
 
 func (a *AssetContentDaoImpl) DeleteAssetContents(ctx context.Context, ids []uint) error {

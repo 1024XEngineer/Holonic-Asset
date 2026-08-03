@@ -106,3 +106,11 @@ type RollBackAssetResponse struct {
 	Version   uint `json:"version"`
 	ContentID uint `json:"contentId" minimum:"1"`
 }
+
+type DeleteAssetRequest struct {
+	AssetID uint `json:"assetId" minimum:"1"`
+}
+
+type DeleteAssetResponse struct {
+	Success bool `json:"success"`
+}

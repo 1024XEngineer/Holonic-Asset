@@ -21,6 +21,8 @@ export type {
   AssetType,
   CopyAssetRequest,
   CopyAssetResponse,
+  DeleteAssetRequest,
+  DeleteAssetResponse,
   GetAssetRecordsResponse,
   GetAssetsResponse,
   ListAssetsQuery,

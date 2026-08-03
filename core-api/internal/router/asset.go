@@ -38,6 +38,10 @@ type AssetRouter interface {
 		context.Context,
 		dto.UpdateAssetRequest,
 	) (dto.SuccessResponse[dto.UpdateAssetResponse], error)
+	Delete(
+		context.Context,
+		dto.DeleteAssetRequest,
+	) (dto.SuccessResponse[dto.DeleteAssetResponse], error)
 }
 
 type listAssetsInput dto.GetAssetsRequest
@@ -88,6 +92,14 @@ type updateAssetInput struct {
 
 type updateAssetOutput struct {
 	Body dto.SuccessResponse[dto.UpdateAssetResponse]
+}
+
+type deleteAssetInput struct {
+	Body dto.DeleteAssetRequest
+}
+
+type deleteAssetOutput struct {
+	Body dto.SuccessResponse[dto.DeleteAssetResponse]
 }
 
 // RegisterAssetRoutes registers the asset lifecycle contract.
@@ -174,5 +186,17 @@ func RegisterAssetRoutes(api huma.API, r AssetRouter) {
 	}, func(ctx context.Context, input *updateAssetInput) (*updateAssetOutput, error) {
 		response, err := r.UpdateAsset(ctx, input.Body)
 		return &updateAssetOutput{Body: response}, openAPIError(err)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "deleteAsset",
+		Method:      http.MethodDelete,
+		Path:        "/asset/delete",
+		Summary:     "Delete an asset",
+		Tags:        []string{"Assets"},
+		Errors:      []int{http.StatusBadRequest},
+	}, func(ctx context.Context, input *deleteAssetInput) (*deleteAssetOutput, error) {
+		response, err := r.Delete(ctx, input.Body)
+		return &deleteAssetOutput{Body: response}, openAPIError(err)
 	})
 }
