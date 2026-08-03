@@ -23,6 +23,7 @@ const navItems = [
   { to: "/", label: "Home" },
   { to: "/generate", label: "Image" },
   { to: "/projects", label: "Project" },
+  { to: "/docs", label: "Docs" },
 ] as const;
 
 function isActivePath(pathname: string, to: string) {
