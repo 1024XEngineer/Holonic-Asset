@@ -1,6 +1,7 @@
 export {
   assetApi,
   assetKeys,
+  getDefaultAssetCanvasSize,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
@@ -9,6 +10,12 @@ export {
   useGenerateAnimationMutation,
   useRecordQuery,
   useSaveAssetRevisionMutation,
+} from "./editor";
+export type {
+  GenerateAnimationInput,
+  GenerateAnimationRequest,
+  GenerateAnimationResult,
+  GeneratedEditorCharacterAnimation,
 } from "./editor";
 export {
   useAddAudioTrackMutation,
