@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 )
 
 func TestCreateGenerationRequestUsesPromptField(t *testing.T) {
@@ -20,7 +19,7 @@ func TestCreateGenerationRequestUsesPromptField(t *testing.T) {
 }
 
 func TestGenerationResponseUsesTaskStatus(t *testing.T) {
-	response := dto.GetGenerationResponse{Status: taskdomain.StatusProcessing}
+	response := dto.GetGenerationResponse{Status: "processing"}
 
 	payload, err := json.Marshal(response)
 	if err != nil {
@@ -31,7 +30,7 @@ func TestGenerationResponseUsesTaskStatus(t *testing.T) {
 	if err := json.Unmarshal(payload, &body); err != nil {
 		t.Fatalf("unmarshal generation response: %v", err)
 	}
-	if body["status"] != float64(taskdomain.StatusProcessing) {
+	if body["status"] != "processing" {
 		t.Fatalf("unexpected task status: %v", body["status"])
 	}
 	if _, exists := body["lifecycle"]; exists {

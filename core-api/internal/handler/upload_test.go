@@ -3,16 +3,11 @@ package handler_test
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 
-	"github.com/labstack/echo/v4"
-
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 )
 
@@ -47,7 +42,7 @@ func TestCreateUploadTargetForwardsRequestToManager(t *testing.T) {
 		ContentType:   "image/png",
 		ContentLength: 8,
 	}
-	handlerContext := newHandlerContext()
+	handlerContext := context.Background()
 
 	target, err := uploadHandler.CreateUploadTarget(handlerContext, request)
 	if err != nil {
@@ -62,7 +57,7 @@ func TestCreateUploadTargetForwardsRequestToManager(t *testing.T) {
 	if stub.request == nil || stub.request.ContentType != request.ContentType || stub.request.ContentLength != request.ContentLength {
 		t.Fatalf("expected request %+v, got %+v", request, stub.request)
 	}
-	if target.ObjectKey != wantTarget.ObjectKey || target.ObjectURL != wantTarget.ObjectURL || target.UploadURL != wantTarget.UploadURL || target.UploadToken != wantTarget.UploadToken {
+	if target.Data.ObjectKey != wantTarget.ObjectKey || target.Data.ObjectURL != wantTarget.ObjectURL || target.Data.UploadURL != wantTarget.UploadURL || target.Data.UploadToken != wantTarget.UploadToken {
 		t.Fatalf("expected target %+v, got %+v", wantTarget, target)
 	}
 }
@@ -73,20 +68,13 @@ func TestCreateUploadTargetPropagatesManagerError(t *testing.T) {
 	uploadHandler := handler.NewUploadHandler(stub)
 
 	target, err := uploadHandler.CreateUploadTarget(
-		newHandlerContext(),
+		context.Background(),
 		dto.CreateUploadTargetRequest{},
 	)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if target != nil {
-		t.Fatalf("expected a nil target, got %+v", target)
+	if target != (dto.SuccessResponse[dto.UploadTarget]{}) {
+		t.Fatalf("expected an empty target response, got %+v", target)
 	}
-}
-
-func newHandlerContext() *echox.Context {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	recorder := httptest.NewRecorder()
-	return &echox.Context{Context: e.NewContext(req, recorder)}
 }

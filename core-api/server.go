@@ -13,6 +13,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/viperx"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
@@ -36,7 +37,13 @@ func InitServer() (*App, error) {
 		return nil, err
 	}
 
-	return NewApp(dao.NewGormProjectDao(db)), nil
+	assetRepository := repository.NewAssetRepositoryWithDB(
+		db,
+		&dao.AssetDaoImpl{DB: db},
+		&dao.AssetContentDaoImpl{DB: db},
+		&dao.AssetRecordDaoImpl{DB: db},
+	)
+	return newApp(dao.NewGormProjectDao(db), assetRepository), nil
 }
 
 func resolveConfigPath() string {
@@ -47,9 +54,17 @@ func resolveConfigPath() string {
 }
 
 func NewApp(projectDao dao.ProjectDao) *App {
+	return newApp(projectDao, nil)
+}
+
+func newApp(projectDao dao.ProjectDao, assetStore assetdomain.Store) *App {
 	projectRepository := repository.NewProjectRepository(projectDao)
-	workspaceModule := workspace.New(projectRepository, nil)
+	workspaceModule := workspace.New(projectRepository, assetStore)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
+	var assetRouter router.AssetRouter
+	if workspaceModule.Assets != nil {
+		assetRouter = handler.NewHandler(workspaceModule.Assets)
+	}
 
 	generatorEngine := generator.NewEngine(nil, nil, nil)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
@@ -58,7 +73,7 @@ func NewApp(projectDao dao.ProjectDao) *App {
 	uploadHandler := handler.NewUploadHandler(uploadManager)
 
 	return &App{
-		engine: router.Register(nil, projectHandler, generationHandler, uploadHandler),
+		engine: router.Register(assetRouter, projectHandler, generationHandler, uploadHandler),
 	}
 }
 

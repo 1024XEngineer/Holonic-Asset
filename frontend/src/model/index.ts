@@ -26,11 +26,18 @@ export type {
   AssetListItemResponse,
   AssetMetadataResponse,
   AssetRecordResponse,
-  AssetRequest,
   AssetType,
   CharacterAssetContent,
+  CopyAssetRequest,
+  CopyAssetResponse,
+  GetAssetRecordsResponse,
+  GetAssetsResponse,
   ListAssetsQuery,
   ObjectAssetContent,
+  RecordAssetRequest,
+  RecordAssetResponse,
+  RollBackAssetRequest,
+  RollBackAssetResponse,
   TileSetAssetContent,
   TileSetItemResponse,
   TileSetTileResponse,
@@ -48,10 +55,15 @@ export {
 } from "./generation";
 export { coreGenerationApi } from "./generation/run/generation.api";
 export type {
+  CancelGenerationResponse,
   CreateGenerationRequest,
+  CreateGenerationResponse,
+  GenerationRunListItemResponse,
   GenerationRunResponse,
   GenerationTaskStatus,
   GenerationTaskType,
+  ListGenerationRunsQuery,
+  ListGenerationRunsResponse,
 } from "./generation/run/generation.api";
 export {
   reconcileProjectSelection,

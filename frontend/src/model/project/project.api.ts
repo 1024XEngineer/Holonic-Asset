@@ -7,43 +7,24 @@ import {
 } from "./mock";
 import { deleteMockProjectAssets } from "../asset/library/mock";
 import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
+import type { ProjectGameType, ProjectResponse } from "./project.contract";
 import type { ProjectSummary } from "@/features/project/types";
-import { getJson, postJson } from "@/model/fetchers";
 
-export type ProjectGameType = "RPG" | "ACT" | "SLG" | "Other";
-export type ProjectViewType = "TopDown" | "SideView" | "Isometric" | "Other";
-export type ProjectPlatform = "PC" | "Mobile" | "Web";
-
-/** Matches core-api/internal/dto.ProjectResponse. */
-export type ProjectResponse = {
-  userID: number;
-  id: number;
-  name: string;
-  gameType: ProjectGameType;
-  viewType: ProjectViewType;
-  targetPlatform: ProjectPlatform;
-  description: string;
-  reference: string;
-  style: string;
-};
-
-export type CreateProjectRequest = Omit<ProjectResponse, "id">;
-export type CreateProjectResponse = { id: number };
-export type ListProjectsResponse = { projects: ProjectResponse[] };
-export type ProjectDetailResponse = { project: ProjectResponse };
-export type UpdateProjectRequest = {
-  projectID: number;
-  name?: string;
-  gameType?: ProjectGameType;
-  viewType?: ProjectViewType;
-  targetPlatform?: ProjectPlatform;
-  description?: string;
-  reference?: string;
-  style?: string;
-};
-export type UpdateProjectResponse = { success: boolean };
-export type DeleteProjectRequest = { projectID: number };
-export type DeleteProjectResponse = { success: boolean };
+export { coreProjectApi } from "./core-project.api";
+export type {
+  CreateProjectRequest,
+  CreateProjectResponse,
+  DeleteProjectRequest,
+  DeleteProjectResponse,
+  ListProjectsResponse,
+  ProjectDetailResponse,
+  ProjectGameType,
+  ProjectPlatform,
+  ProjectResponse,
+  ProjectViewType,
+  UpdateProjectRequest,
+  UpdateProjectResponse,
+} from "./project.contract";
 
 export type ProjectApi = {
   list: () => Promise<ProjectSummary[]>;
@@ -63,20 +44,6 @@ export const projectApi: ProjectApi = {
     deleteMockProjectAssets(projectId);
     deleteMockProjectGenerationRuns(projectId);
   },
-};
-
-/** HTTP client for the routes registered by core-api. */
-export const coreProjectApi = {
-  create: (request: CreateProjectRequest) =>
-    postJson<CreateProjectResponse>("/project/create", request),
-  list: (userID: number) =>
-    getJson<ListProjectsResponse>("/project/list", { userID }),
-  detail: (projectID: number) =>
-    getJson<ProjectDetailResponse>("/project/detail", { projectID }),
-  update: (request: UpdateProjectRequest) =>
-    postJson<UpdateProjectResponse>("/project/update", request),
-  delete: (request: DeleteProjectRequest) =>
-    postJson<DeleteProjectResponse>("/project/delete", request),
 };
 
 export function toProjectSummary(

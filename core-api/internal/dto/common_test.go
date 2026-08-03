@@ -7,8 +7,8 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 )
 
-func TestNewSuccessResponse(t *testing.T) {
-	response := dto.NewSuccessResponse(struct {
+func TestNewTypedSuccessResponse(t *testing.T) {
+	response := dto.NewTypedSuccessResponse(struct {
 		ID uint `json:"id"`
 	}{ID: 7})
 
