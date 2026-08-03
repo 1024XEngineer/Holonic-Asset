@@ -1,7 +1,7 @@
 import type {
   GenerateAnimationInput,
   GenerateAnimationResult,
-} from "@/features/asset-editor/types";
+} from "./editor-animation-generation";
 
 import { generateMockAnimation } from "./mock/animation-generation";
 

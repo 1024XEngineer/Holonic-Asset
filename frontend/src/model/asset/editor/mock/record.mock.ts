@@ -6,10 +6,8 @@ import {
   mergeEditorRecord,
 } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
-import {
-  isEditorRecordForAssetKind,
-  type EditorWorkspaceData,
-} from "@/features/asset-editor/types";
+import { isEditorRecordForAssetKind } from "../editor-record.validation";
+import type { EditorWorkspaceData } from "@/features/asset-editor";
 import type {
   GetEditorRecordInput,
   SaveEditorRecordInput,

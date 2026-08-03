@@ -11,7 +11,7 @@ import type {
   UiEditorRecord,
   AudioEditorRecord,
 } from "@/features/asset-editor/types";
-import { isEditorRecordForAssetKind } from "@/features/asset-editor/types";
+import { isEditorRecordForAssetKind } from "../editor-record.validation";
 
 const swordsmanPrototype: EditorCharacterSpriteSheet = {
   format: "png-sprite-sheet",
