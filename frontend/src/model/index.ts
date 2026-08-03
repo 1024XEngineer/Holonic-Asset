@@ -1,6 +1,9 @@
 export {
   assetApi,
+  assetKinds,
   assetKeys,
+  creatableAssetKinds,
+  editorModeForAssetKind,
   getDefaultAssetCanvasSize,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
@@ -13,6 +16,26 @@ export {
   useRecordQuery,
   useSaveAssetRevisionMutation,
   useUpdateAudioTrackMutation,
+} from "./asset";
+export type {
+  AddAudioTrackInput,
+  AssetAnimation,
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetKind,
+  AssetRevision,
+  AssetRevisionStatus,
+  AudioTrack,
+  AudioTrackTone,
+  CreatableAssetKind,
+  EditorRecord,
+  EditorRecordForKind,
+  EditorWorkspaceData,
+  GenerateAudioVariationInput,
+  ProjectAsset,
+  SceneryAssetData,
+  SceneryLayer,
+  UpdateAudioTrackInput,
 } from "./asset";
 export { coreAssetApi } from "./asset/library/asset.api";
 export type {
@@ -54,6 +77,12 @@ export {
   useGenerationRunsQuery,
   useQuickAssetsQuery,
 } from "./generation";
+export type {
+  CreationRequest,
+  GenerateQuickAssetInput,
+  GenerationRun,
+  QuickGenerationAsset,
+} from "./generation";
 export { coreGenerationApi } from "./generation/run/generation.api";
 export type {
   CancelGenerationResponse,
@@ -74,6 +103,7 @@ export {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";
+export type { Project, ProjectSummary } from "./project";
 export { coreProjectApi } from "./project/project.api";
 export type {
   CreateProjectRequest,

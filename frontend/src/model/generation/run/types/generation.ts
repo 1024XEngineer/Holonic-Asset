@@ -1,4 +1,4 @@
-import type { CreatableAssetKind } from "@/features/assets";
+import type { CreatableAssetKind } from "../../../asset/types";
 
 export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
@@ -20,4 +20,9 @@ export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
   id: string;
   projectId: string;
   status: "pending" | "processing" | "failed";
+};
+
+export type GenerationInput<Reference = unknown> = {
+  projectId: string;
+  request: CreationRequest<Reference>;
 };

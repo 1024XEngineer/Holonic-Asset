@@ -1,5 +1,5 @@
 import { getMockEditorRecord, saveMockEditorRecordRevision } from "./mock";
-import type { EditorRecordApi } from "./record.contract";
+import type { EditorRecordApi } from "./types";
 
 export const recordApi: EditorRecordApi = {
   get: getMockEditorRecord,
@@ -11,4 +11,4 @@ export type {
   EditorRecordSaveResult,
   GetEditorRecordInput,
   SaveEditorRecordInput,
-} from "./record.contract";
+} from "./types";

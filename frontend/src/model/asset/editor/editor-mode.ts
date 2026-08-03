@@ -1,5 +1,5 @@
-import type { AssetKind } from "@/features/assets";
-import type { EditorRecord } from "./editor-record";
+import type { AssetKind } from "../types";
+import type { EditorRecord } from "./types";
 
 export function editorModeForAssetKind(kind: AssetKind): EditorRecord["mode"] {
   switch (kind) {

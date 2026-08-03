@@ -1,9 +1,37 @@
 export { useRecordQuery } from "./record.query";
 export { useSaveAssetRevisionMutation } from "./revision.mutation";
 export { useGenerateAnimationMutation } from "./animation-generation.mutation";
+export { editorModeForAssetKind } from "./editor-mode";
 export type {
+  AudioAssetKind,
+  AudioEditorRecord,
+  CharacterAssetKind,
+  CharacterEditorRecord,
+  EditorCanvasPosition,
+  EditorCharacterAnimation,
+  EditorCharacterAnimationClip,
+  EditorCharacterSpriteSheet,
+  EditorRecord,
+  EditorRecordApi,
+  EditorRecordForKind,
+  EditorRecordSaveResult,
+  EditorSceneryLayer,
+  EditorTilesetCell,
+  EditorTilesetItem,
+  EditorUiComponent,
+  EditorWorkspaceAsset,
+  EditorWorkspaceData,
+  EditorWorkspaceDataForKind,
   GenerateAnimationInput,
   GenerateAnimationRequest,
   GenerateAnimationResult,
   GeneratedEditorCharacterAnimation,
-} from "./editor-animation-generation";
+  GetEditorRecordInput,
+  SaveEditorRecordInput,
+  SceneryAssetKind,
+  SceneryEditorRecord,
+  TilesetAssetKind,
+  TilesetEditorRecord,
+  UiAssetKind,
+  UiEditorRecord,
+} from "./types";

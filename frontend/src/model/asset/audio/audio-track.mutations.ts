@@ -5,7 +5,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import type { AudioTrack } from "@/features/audio-studio/types";
+import type { AudioTrack } from "./types";
 import { audioApi } from "./audio.api";
 import { audioKeys } from "./audio.keys";
 

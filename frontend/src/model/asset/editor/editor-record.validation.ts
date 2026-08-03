@@ -1,4 +1,4 @@
-import type { AssetKind } from "@/features/assets";
+import type { AssetKind } from "../types";
 import type {
   EditorCanvasPosition,
   EditorCharacterAnimation,
@@ -10,7 +10,7 @@ import type {
   EditorTilesetCell,
   EditorTilesetItem,
   EditorUiComponent,
-} from "@/features/asset-editor";
+} from "./types";
 
 export function isEditorRecordForAssetKind<K extends AssetKind>(
   kind: K,

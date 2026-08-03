@@ -1,7 +1,7 @@
 import type {
   EditorCharacterAnimationClip,
   EditorCharacterSpriteSheet,
-} from "@/features/asset-editor";
+} from "./editor-record";
 
 export type GenerateAnimationRequest = {
   label: string;

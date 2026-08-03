@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { assetKeys } from "../library/keys";
-import type { EditorWorkspaceData } from "@/features/asset-editor/types";
+import type { EditorWorkspaceData } from "./types";
 import { recordApi } from "./record.api";
 import { recordKeys } from "./record.keys";
 

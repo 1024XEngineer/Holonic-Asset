@@ -7,11 +7,8 @@ import {
 } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
 import { isEditorRecordForAssetKind } from "../editor-record.validation";
-import type { EditorWorkspaceData } from "@/features/asset-editor";
-import type {
-  GetEditorRecordInput,
-  SaveEditorRecordInput,
-} from "../record.contract";
+import type { EditorWorkspaceData } from "../types";
+import type { GetEditorRecordInput, SaveEditorRecordInput } from "../types";
 
 export function getMockEditorRecord(
   input: GetEditorRecordInput,

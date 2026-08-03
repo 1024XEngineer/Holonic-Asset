@@ -1,10 +1,12 @@
 import {
   createQuickGenerationDraft,
   toGenerateQuickAssetInput,
-  type GenerateQuickAssetInput,
-  type QuickGenerationAsset,
   type QuickGenerationDraft,
 } from "../types";
+import type {
+  GenerateQuickAssetInput,
+  QuickGenerationAsset,
+} from "@/model/generation/quick/types";
 import {
   browserReferencePreviewAdapter,
   createReferencePreviewLifecycle,

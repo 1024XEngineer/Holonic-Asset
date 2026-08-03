@@ -1,8 +1,6 @@
-import type {
-  EditorRecord,
-  EditorWorkspaceData,
-} from "@/features/asset-editor/types";
-import type { AssetRevision } from "@/features/assets/types";
+import type { AssetRevision } from "../../types";
+import type { EditorRecord } from "./editor-record";
+import type { EditorWorkspaceData } from "./editor-workspace";
 
 export type GetEditorRecordInput = {
   projectId: string;

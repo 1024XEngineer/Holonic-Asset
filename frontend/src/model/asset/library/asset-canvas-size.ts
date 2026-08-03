@@ -1,4 +1,4 @@
-import type { AssetKind } from "@/features/assets";
+import type { AssetKind } from "../types";
 
 export const defaultAssetCanvasSize = "32 × 32 px";
 
