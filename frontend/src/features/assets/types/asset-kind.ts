@@ -3,19 +3,12 @@ export const assetKinds = [
   "object",
   "tileset",
   "scenery",
-  "audio",
   "ui",
+  "audio",
 ] as const;
 
 export type AssetKind = (typeof assetKinds)[number];
 
 export type CreatableAssetKind = AssetKind;
 
-export const creatableAssetKinds: CreatableAssetKind[] = [
-  "character",
-  "object",
-  "tileset",
-  "scenery",
-  "ui",
-  "audio",
-];
+export const creatableAssetKinds: CreatableAssetKind[] = [...assetKinds];

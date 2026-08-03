@@ -10,13 +10,13 @@ import {
 
 import type { AssetKind } from "./types";
 
-export type AssetTypeConfig = {
+export type AssetKindConfig = {
   label: string;
   icon: LucideIcon;
   accentClassName: string;
 };
 
-const assetTypeConfigs: Record<AssetKind, AssetTypeConfig> = {
+const assetKindConfigs: Record<AssetKind, AssetKindConfig> = {
   character: {
     label: "Character",
     icon: UserRound,
@@ -29,10 +29,10 @@ const assetTypeConfigs: Record<AssetKind, AssetTypeConfig> = {
     accentClassName: "bg-emerald-500",
   },
   scenery: { label: "Scenery", icon: Mountain, accentClassName: "bg-sky-500" },
-  audio: { label: "Audio", icon: Volume2, accentClassName: "bg-slate-500" },
   ui: { label: "UI", icon: PanelsTopLeft, accentClassName: "bg-slate-500" },
+  audio: { label: "Audio", icon: Volume2, accentClassName: "bg-slate-500" },
 };
 
-export function getAssetTypeConfig(kind: AssetKind) {
-  return assetTypeConfigs[kind];
+export function getAssetKindConfig(kind: AssetKind) {
+  return assetKindConfigs[kind];
 }
