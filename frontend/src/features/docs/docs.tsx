@@ -3,13 +3,11 @@ import type { ComponentPropsWithoutRef, ComponentType } from "react";
 
 import DirectionsEn, {
   metadata as directionsEn,
-} from "@/content/docs/en/directions.mdx";
+} from "./content/directions.mdx";
 import PerspectiveEn, {
   metadata as perspectiveEn,
-} from "@/content/docs/en/perspective.mdx";
-import ReferenceEn, {
-  metadata as referenceEn,
-} from "@/content/docs/en/reference.mdx";
+} from "./content/perspective.mdx";
+import ReferenceEn, { metadata as referenceEn } from "./content/reference.mdx";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 
