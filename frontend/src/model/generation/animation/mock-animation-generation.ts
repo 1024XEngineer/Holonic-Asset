@@ -1,4 +1,4 @@
-import type { GenerateAnimationInput, GenerateAnimationResult } from "../types";
+import type { GenerateAnimationInput, GenerateAnimationResult } from "./types";
 import { runMockRequest } from "@/lib/mock-request";
 
 export function generateMockAnimation(

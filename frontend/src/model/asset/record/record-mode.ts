@@ -1,7 +1,7 @@
 import type { AssetKind } from "../types";
-import type { EditorRecord } from "./types";
+import type { AssetRecord } from "./types";
 
-export function editorModeForAssetKind(kind: AssetKind): EditorRecord["mode"] {
+export function assetRecordModeForKind(kind: AssetKind): AssetRecord["mode"] {
   switch (kind) {
     case "character":
     case "object":

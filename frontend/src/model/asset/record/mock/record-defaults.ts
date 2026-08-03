@@ -1,19 +1,22 @@
-import type { AssetKind, ProjectAsset } from "../../types";
 import type {
-  CharacterEditorRecord,
-  EditorCharacterAnimation,
-  EditorCharacterAnimationClip,
-  EditorCharacterSpriteSheet,
-  EditorTilesetItem,
-  EditorRecordForKind,
-  SceneryEditorRecord,
-  TilesetEditorRecord,
-  UiEditorRecord,
-  AudioEditorRecord,
+  AssetKind,
+  CharacterAnimation,
+  CharacterAnimationClip,
+  CharacterSpriteSheet,
+  ProjectAsset,
+} from "../../types";
+import type {
+  CharacterAssetRecord,
+  TilesetItem,
+  AssetRecordForKind,
+  SceneryAssetRecord,
+  TilesetAssetRecord,
+  UiAssetRecord,
+  AudioAssetRecord,
 } from "../types";
-import { isEditorRecordForAssetKind } from "../editor-record.validation";
+import { isAssetRecordForKind } from "../record.validation";
 
-const swordsmanPrototype: EditorCharacterSpriteSheet = {
+const swordsmanPrototype: CharacterSpriteSheet = {
   format: "png-sprite-sheet",
   imageUrl: "/assets/characters/swordsman/prototype.png",
   frameWidth: 64,
@@ -22,7 +25,7 @@ const swordsmanPrototype: EditorCharacterSpriteSheet = {
   rows: 1,
 };
 
-const knightPrototype: EditorCharacterSpriteSheet = {
+const knightPrototype: CharacterSpriteSheet = {
   format: "png-sprite-sheet",
   imageUrl: "/assets/characters/knight/prototype.png",
   frameWidth: 128,
@@ -38,7 +41,7 @@ function createPngAnimation(
   frameCount: number,
   frameWidth: number,
   frameHeight: number,
-): EditorCharacterAnimationClip {
+): CharacterAnimationClip {
   return {
     kind: "clip",
     id,
@@ -66,7 +69,7 @@ function createSwordsmanAnimations(
   id: string,
   label: string,
   frameCounts: Record<(typeof swordsmanDirections)[number]["id"], number>,
-): EditorCharacterAnimation[] {
+): CharacterAnimation[] {
   return swordsmanDirections.map((direction) =>
     createPngAnimation(
       `${id}-${direction.id}`,
@@ -79,47 +82,45 @@ function createSwordsmanAnimations(
   );
 }
 
-const characterAnimationsByAssetId: Record<string, EditorCharacterAnimation[]> =
-  {
-    swordsman: [
-      ...createSwordsmanAnimations("idle", "Idle", {
-        front: 12,
-        back: 4,
-        left: 12,
-        right: 12,
-      }),
-      ...createSwordsmanAnimations("attack", "Attack", {
-        front: 8,
-        back: 8,
-        left: 8,
-        right: 8,
-      }),
-    ],
-    knight: [
-      createPngAnimation(
-        "idle",
-        "Idle",
-        "/assets/characters/knight/idle.png",
-        4,
-        128,
-        128,
-      ),
-      createPngAnimation(
-        "attack",
-        "Attack",
-        "/assets/characters/knight/attack-1.png",
-        5,
-        128,
-        128,
-      ),
-    ],
-  };
+const characterAnimationsByAssetId: Record<string, CharacterAnimation[]> = {
+  swordsman: [
+    ...createSwordsmanAnimations("idle", "Idle", {
+      front: 12,
+      back: 4,
+      left: 12,
+      right: 12,
+    }),
+    ...createSwordsmanAnimations("attack", "Attack", {
+      front: 8,
+      back: 8,
+      left: 8,
+      right: 8,
+    }),
+  ],
+  knight: [
+    createPngAnimation(
+      "idle",
+      "Idle",
+      "/assets/characters/knight/idle.png",
+      4,
+      128,
+      128,
+    ),
+    createPngAnimation(
+      "attack",
+      "Attack",
+      "/assets/characters/knight/attack-1.png",
+      5,
+      128,
+      128,
+    ),
+  ],
+};
 
-const characterPrototypesByAssetId: Record<string, EditorCharacterSpriteSheet> =
-  {
-    swordsman: swordsmanPrototype,
-    knight: knightPrototype,
-  };
+const characterPrototypesByAssetId: Record<string, CharacterSpriteSheet> = {
+  swordsman: swordsmanPrototype,
+  knight: knightPrototype,
+};
 
 function getCharacterDefaultSourceId(assetId: string) {
   return assetId.split("-copy-", 1)[0] ?? assetId;
@@ -127,7 +128,7 @@ function getCharacterDefaultSourceId(assetId: string) {
 
 function createFallbackCharacterPrototype(
   asset: Pick<ProjectAsset, "canvasSize">,
-): EditorCharacterSpriteSheet {
+): CharacterSpriteSheet {
   const dimensions = asset.canvasSize.match(/(\d+)\D+(\d+)/);
   const frameWidth = Number(dimensions?.[1]) || 64;
   const frameHeight = Number(dimensions?.[2]) || frameWidth;
@@ -142,7 +143,7 @@ function createFallbackCharacterPrototype(
   };
 }
 
-function createFallbackCharacterAnimations(): EditorCharacterAnimation[] {
+function createFallbackCharacterAnimations(): CharacterAnimation[] {
   return [{ kind: "clip", id: "idle", label: "Idle", frameCount: 1 }];
 }
 
@@ -157,8 +158,8 @@ function createTilesetItem({
   id: string;
   label: string;
   imageUrl: string;
-  tiles: EditorTilesetItem["tiles"];
-}): EditorTilesetItem {
+  tiles: TilesetItem["tiles"];
+}): TilesetItem {
   return {
     id,
     label,
@@ -167,7 +168,7 @@ function createTilesetItem({
   };
 }
 
-const tilesetItems: EditorTilesetItem[] = [
+const tilesetItems: TilesetItem[] = [
   createTilesetItem({
     id: "sofa-01",
     label: "Sofa 01",
@@ -265,10 +266,10 @@ const tilesetItems: EditorTilesetItem[] = [
   ),
 ];
 
-export function createDefaultEditorRecord<K extends AssetKind>(
+export function createDefaultAssetRecord<K extends AssetKind>(
   kind: K,
   asset: ProjectAsset,
-): EditorRecordForKind<K> {
+): AssetRecordForKind<K> {
   const base = { prompt: asset.description };
 
   if (kind === "character" || kind === "object") {
@@ -287,7 +288,7 @@ export function createDefaultEditorRecord<K extends AssetKind>(
         ),
         nodePositions: {},
       },
-    } as EditorRecordForKind<K>;
+    } as AssetRecordForKind<K>;
   }
 
   if (kind === "scenery") {
@@ -297,7 +298,7 @@ export function createDefaultEditorRecord<K extends AssetKind>(
       scenery: {
         layers: structuredClone(asset.scenery?.layers ?? []),
       },
-    } as EditorRecordForKind<K>;
+    } as AssetRecordForKind<K>;
   }
 
   if (kind === "tileset") {
@@ -308,7 +309,7 @@ export function createDefaultEditorRecord<K extends AssetKind>(
         gridSize: 8,
         items: structuredClone(tilesetItems),
       },
-    } as EditorRecordForKind<K>;
+    } as AssetRecordForKind<K>;
   }
 
   if (kind === "ui") {
@@ -337,72 +338,72 @@ export function createDefaultEditorRecord<K extends AssetKind>(
           },
         ],
       },
-    } as EditorRecordForKind<K>;
+    } as AssetRecordForKind<K>;
   }
 
   return {
     mode: "audio",
     ...base,
     audio: {},
-  } as EditorRecordForKind<K>;
+  } as AssetRecordForKind<K>;
 }
 
-export function mergeEditorRecord<K extends AssetKind>(
+export function mergeAssetRecord<K extends AssetKind>(
   kind: K,
-  fallback: EditorRecordForKind<K>,
+  fallback: AssetRecordForKind<K>,
   saved: unknown,
-): EditorRecordForKind<K> {
+): AssetRecordForKind<K> {
   const migrated = migrateLegacyTilesetRecord(kind, saved);
   const record = migrated ?? saved;
 
-  if (!record || !isEditorRecordForAssetKind(kind, record)) {
+  if (!record || !isAssetRecordForKind(kind, record)) {
     return fallback;
   }
 
   switch (fallback.mode) {
     case "character":
       return mergeCharacterRecord(
-        fallback as CharacterEditorRecord,
-        record as CharacterEditorRecord,
-      ) as EditorRecordForKind<K>;
+        fallback as CharacterAssetRecord,
+        record as CharacterAssetRecord,
+      ) as AssetRecordForKind<K>;
     case "scenery":
       return mergeSceneryRecord(
-        record as SceneryEditorRecord,
-      ) as EditorRecordForKind<K>;
+        record as SceneryAssetRecord,
+      ) as AssetRecordForKind<K>;
     case "tileset":
       return mergeTilesetRecord(
-        record as TilesetEditorRecord,
-      ) as EditorRecordForKind<K>;
+        record as TilesetAssetRecord,
+      ) as AssetRecordForKind<K>;
     case "ui":
-      return mergeUiRecord(record as UiEditorRecord) as EditorRecordForKind<K>;
+      return mergeUiRecord(record as UiAssetRecord) as AssetRecordForKind<K>;
     case "audio":
       return mergeAudioRecord(
-        record as AudioEditorRecord,
-      ) as EditorRecordForKind<K>;
+        record as AudioAssetRecord,
+      ) as AssetRecordForKind<K>;
   }
 }
 
 function migrateLegacyTilesetRecord(
   kind: AssetKind,
   saved: unknown,
-): TilesetEditorRecord | undefined {
+): TilesetAssetRecord | undefined {
   if (kind !== "tileset" || !isLegacySpriteSheetRecord(saved)) {
     return undefined;
   }
 
-  const migrated: TilesetEditorRecord = {
+  const migrated: TilesetAssetRecord = {
     mode: "tileset",
     prompt: saved.prompt,
     tileset: saved.spriteSheet,
   };
 
-  return isEditorRecordForAssetKind("tileset", migrated) ? migrated : undefined;
+  return isAssetRecordForKind("tileset", migrated) ? migrated : undefined;
 }
 
 function isLegacySpriteSheetRecord(value: unknown): value is {
   mode: "sprite-sheet";
   prompt: string;
-  spriteSheet: TilesetEditorRecord["tileset"];
+  spriteSheet: TilesetAssetRecord["tileset"];
 } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
@@ -419,9 +420,9 @@ function isLegacySpriteSheetRecord(value: unknown): value is {
 }
 
 function mergeCharacterRecord(
-  fallback: CharacterEditorRecord,
-  saved: CharacterEditorRecord,
-): CharacterEditorRecord {
+  fallback: CharacterAssetRecord,
+  saved: CharacterAssetRecord,
+): CharacterAssetRecord {
   return {
     mode: "character",
     prompt: saved.prompt,
@@ -437,7 +438,7 @@ function mergeCharacterRecord(
   };
 }
 
-function mergeSceneryRecord(saved: SceneryEditorRecord): SceneryEditorRecord {
+function mergeSceneryRecord(saved: SceneryAssetRecord): SceneryAssetRecord {
   return {
     mode: "scenery",
     prompt: saved.prompt,
@@ -445,7 +446,7 @@ function mergeSceneryRecord(saved: SceneryEditorRecord): SceneryEditorRecord {
   };
 }
 
-function mergeTilesetRecord(saved: TilesetEditorRecord): TilesetEditorRecord {
+function mergeTilesetRecord(saved: TilesetAssetRecord): TilesetAssetRecord {
   return {
     mode: "tileset",
     prompt: saved.prompt,
@@ -456,7 +457,7 @@ function mergeTilesetRecord(saved: TilesetEditorRecord): TilesetEditorRecord {
   };
 }
 
-function mergeUiRecord(saved: UiEditorRecord): UiEditorRecord {
+function mergeUiRecord(saved: UiAssetRecord): UiAssetRecord {
   return {
     mode: "ui",
     prompt: saved.prompt,
@@ -464,6 +465,6 @@ function mergeUiRecord(saved: UiEditorRecord): UiEditorRecord {
   };
 }
 
-function mergeAudioRecord(saved: AudioEditorRecord): AudioEditorRecord {
+function mergeAudioRecord(saved: AudioAssetRecord): AudioAssetRecord {
   return { mode: "audio", prompt: saved.prompt, audio: {} };
 }

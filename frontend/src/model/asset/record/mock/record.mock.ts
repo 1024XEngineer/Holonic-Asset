@@ -1,20 +1,17 @@
 import { assetApi } from "../../library/asset.api";
 import { listMockProjects } from "../../../project/mock";
 import { DataApiError } from "@/lib/data-api-error";
-import {
-  createDefaultEditorRecord,
-  mergeEditorRecord,
-} from "./record-defaults";
+import { createDefaultAssetRecord, mergeAssetRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
-import { isEditorRecordForAssetKind } from "../editor-record.validation";
-import type { EditorWorkspaceData } from "../types";
-import type { GetEditorRecordInput, SaveEditorRecordInput } from "../types";
+import { isAssetRecordForKind } from "../record.validation";
+import type { AssetWorkspaceData } from "../types";
+import type { GetAssetRecordInput, SaveAssetRecordInput } from "../types";
 
-export function getMockEditorRecord(
-  input: GetEditorRecordInput,
+export function getMockAssetRecord(
+  input: GetAssetRecordInput,
   options?: MockRequestOptions,
 ) {
-  return runMockRequest(async (): Promise<EditorWorkspaceData> => {
+  return runMockRequest(async (): Promise<AssetWorkspaceData> => {
     const [projects, groups] = await Promise.all([
       listMockProjects(),
       assetApi.listGroups(input.projectId),
@@ -37,7 +34,7 @@ export function getMockEditorRecord(
     const currentRevision = asset.history.find(
       (revision) => revision.isCurrent,
     );
-    const fallback = createDefaultEditorRecord(group.kind, asset);
+    const fallback = createDefaultAssetRecord(group.kind, asset);
 
     return {
       projectName: project.name,
@@ -49,16 +46,16 @@ export function getMockEditorRecord(
         version: asset.version,
         history: structuredClone(asset.history),
       },
-      record: mergeEditorRecord(group.kind, fallback, currentRevision?.content),
-    } as EditorWorkspaceData;
+      record: mergeAssetRecord(group.kind, fallback, currentRevision?.content),
+    } as AssetWorkspaceData;
   }, options);
 }
 
-export async function saveMockEditorRecordRevision({
+export async function saveMockAssetRecordRevision({
   projectId,
   assetId,
   record,
-}: SaveEditorRecordInput) {
+}: SaveAssetRecordInput) {
   const groups = await assetApi.listGroups(projectId);
   const assetGroup = groups.find((group) =>
     group.assets.some((asset) => asset.id === assetId),
@@ -70,10 +67,10 @@ export async function saveMockEditorRecordRevision({
     });
   }
   const recordMode = record.mode;
-  if (!isEditorRecordForAssetKind(assetGroup.kind, record)) {
+  if (!isAssetRecordForKind(assetGroup.kind, record)) {
     throw new DataApiError(
       "BAD_REQUEST",
-      "Editor record does not match the asset kind.",
+      "Asset record does not match the asset kind.",
       { projectId, assetId, assetKind: assetGroup.kind, mode: recordMode },
     );
   }

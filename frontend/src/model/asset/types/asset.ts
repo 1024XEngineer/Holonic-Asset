@@ -1,5 +1,26 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 
+export type CharacterSpriteSheet = {
+  format: "png-sprite-sheet";
+  imageUrl: string;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  rows: number;
+  row?: number;
+};
+
+export type CharacterAnimationClip = {
+  kind: "clip";
+  id: string;
+  label: string;
+  frameCount: number;
+  spriteSheet?: CharacterSpriteSheet;
+  audio?: { label: string; time: string };
+};
+
+export type CharacterAnimation = CharacterAnimationClip;
+
 export type AssetAnimation = {
   id: string;
   name: string;

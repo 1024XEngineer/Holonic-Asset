@@ -1,7 +1,7 @@
 import type {
-  EditorCharacterAnimationClip,
-  EditorCharacterSpriteSheet,
-} from "./editor-record";
+  CharacterAnimationClip,
+  CharacterSpriteSheet,
+} from "@/model/asset";
 
 export type GenerateAnimationRequest = {
   label: string;
@@ -11,15 +11,12 @@ export type GenerateAnimationRequest = {
 export type GenerateAnimationInput = GenerateAnimationRequest & {
   projectId: string;
   assetId: string;
-  prototype: EditorCharacterSpriteSheet;
+  prototype: CharacterSpriteSheet;
 };
 
-export type GeneratedEditorCharacterAnimation = Omit<
-  EditorCharacterAnimationClip,
-  "id"
->;
+export type GeneratedCharacterAnimation = Omit<CharacterAnimationClip, "id">;
 
 export type GenerateAnimationResult = {
   generationId: string;
-  animation: GeneratedEditorCharacterAnimation;
+  animation: GeneratedCharacterAnimation;
 };

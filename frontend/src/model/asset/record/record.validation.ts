@@ -1,60 +1,59 @@
-import type { AssetKind } from "../types";
 import type {
-  EditorCanvasPosition,
-  EditorCharacterAnimation,
-  EditorCharacterAnimationClip,
-  EditorCharacterSpriteSheet,
-  EditorRecord,
-  EditorRecordForKind,
-  EditorSceneryLayer,
-  EditorTilesetCell,
-  EditorTilesetItem,
-  EditorUiComponent,
+  AssetKind,
+  CharacterAnimation,
+  CharacterAnimationClip,
+  CharacterSpriteSheet,
+  SceneryLayer,
+} from "../types";
+import type {
+  AssetCanvasPosition,
+  AssetRecord,
+  AssetRecordForKind,
+  TilesetCell,
+  TilesetItem,
+  UiComponent,
 } from "./types";
 
-export function isEditorRecordForAssetKind<K extends AssetKind>(
+export function isAssetRecordForKind<K extends AssetKind>(
   kind: K,
   record: unknown,
-): record is EditorRecordForKind<K> {
-  return (
-    isEditorRecord(record) && recordModeMatchesAssetKind(kind, record.mode)
-  );
+): record is AssetRecordForKind<K> {
+  return isAssetRecord(record) && recordModeMatchesAssetKind(kind, record.mode);
 }
 
 function recordModeMatchesAssetKind(
   kind: AssetKind,
-  mode: EditorRecord["mode"],
+  mode: AssetRecord["mode"],
 ) {
   return kind === "object" ? mode === "character" : mode === kind;
 }
 
-function isEditorRecord(value: unknown): value is EditorRecord {
+function isAssetRecord(value: unknown): value is AssetRecord {
   if (!isPlainObject(value) || typeof value.prompt !== "string") return false;
 
   switch (value.mode) {
     case "character":
       return (
         isPlainObject(value.character) &&
-        isEditorCharacterSpriteSheet(value.character.prototype) &&
+        isCharacterSpriteSheet(value.character.prototype) &&
         isNodePositions(value.character.nodePositions) &&
         (value.character.animations === undefined ||
-          isEditorCharacterAnimations(value.character.animations))
+          isCharacterAnimations(value.character.animations))
       );
     case "scenery":
       return (
         isPlainObject(value.scenery) &&
-        isArrayOf(value.scenery.layers, isEditorSceneryLayer)
+        isArrayOf(value.scenery.layers, isSceneryLayer)
       );
     case "tileset":
       return (
         isPlainObject(value.tileset) &&
         isFiniteNumber(value.tileset.gridSize) &&
-        isArrayOf(value.tileset.items, isEditorTilesetItem)
+        isArrayOf(value.tileset.items, isTilesetItem)
       );
     case "ui":
       return (
-        isPlainObject(value.ui) &&
-        isArrayOf(value.ui.components, isEditorUiComponent)
+        isPlainObject(value.ui) && isArrayOf(value.ui.components, isUiComponent)
       );
     case "audio":
       return isPlainObject(value.audio);
@@ -65,27 +64,25 @@ function isEditorRecord(value: unknown): value is EditorRecord {
 
 function isNodePositions(
   value: unknown,
-): value is Record<string, EditorCanvasPosition> {
+): value is Record<string, AssetCanvasPosition> {
   return (
-    isPlainObject(value) && Object.values(value).every(isEditorCanvasPosition)
+    isPlainObject(value) && Object.values(value).every(isAssetCanvasPosition)
   );
 }
 
-function isEditorCanvasPosition(value: unknown): value is EditorCanvasPosition {
+function isAssetCanvasPosition(value: unknown): value is AssetCanvasPosition {
   return (
     isPlainObject(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y)
   );
 }
 
-function isEditorCharacterAnimation(
-  value: unknown,
-): value is EditorCharacterAnimation {
-  return isEditorCharacterAnimationClip(value);
+function isCharacterAnimation(value: unknown): value is CharacterAnimation {
+  return isCharacterAnimationClip(value);
 }
 
-function isEditorCharacterAnimationClip(
+function isCharacterAnimationClip(
   value: unknown,
-): value is EditorCharacterAnimationClip {
+): value is CharacterAnimationClip {
   return (
     isPlainObject(value) &&
     value.kind === "clip" &&
@@ -94,15 +91,13 @@ function isEditorCharacterAnimationClip(
     typeof value.label === "string" &&
     isPositiveInteger(value.frameCount) &&
     (value.spriteSheet === undefined ||
-      isEditorCharacterSpriteSheet(value.spriteSheet)) &&
-    (value.audio === undefined || isEditorCharacterAudio(value.audio))
+      isCharacterSpriteSheet(value.spriteSheet)) &&
+    (value.audio === undefined || isCharacterAudio(value.audio))
   );
 }
 
-function isEditorCharacterAnimations(
-  value: unknown,
-): value is EditorCharacterAnimation[] {
-  if (!isArrayOf(value, isEditorCharacterAnimation)) return false;
+function isCharacterAnimations(value: unknown): value is CharacterAnimation[] {
+  if (!isArrayOf(value, isCharacterAnimation)) return false;
   return hasUniqueAnimationIds(value);
 }
 
@@ -110,9 +105,9 @@ function hasUniqueAnimationIds(value: Array<{ id: string }>) {
   return new Set(value.map((animation) => animation.id)).size === value.length;
 }
 
-function isEditorCharacterAudio(
+function isCharacterAudio(
   value: unknown,
-): value is NonNullable<EditorCharacterAnimationClip["audio"]> {
+): value is NonNullable<CharacterAnimationClip["audio"]> {
   return (
     isPlainObject(value) &&
     typeof value.label === "string" &&
@@ -120,9 +115,7 @@ function isEditorCharacterAudio(
   );
 }
 
-function isEditorCharacterSpriteSheet(
-  value: unknown,
-): value is EditorCharacterSpriteSheet {
+function isCharacterSpriteSheet(value: unknown): value is CharacterSpriteSheet {
   return (
     isPlainObject(value) &&
     value.format === "png-sprite-sheet" &&
@@ -139,7 +132,7 @@ function isEditorCharacterSpriteSheet(
   );
 }
 
-function isEditorSceneryLayer(value: unknown): value is EditorSceneryLayer {
+function isSceneryLayer(value: unknown): value is SceneryLayer {
   return (
     isPlainObject(value) &&
     typeof value.id === "string" &&
@@ -150,17 +143,17 @@ function isEditorSceneryLayer(value: unknown): value is EditorSceneryLayer {
   );
 }
 
-function isEditorTilesetItem(value: unknown): value is EditorTilesetItem {
+function isTilesetItem(value: unknown): value is TilesetItem {
   return (
     isPlainObject(value) &&
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
-    isArrayOf(value.tiles, isEditorTilesetCell)
+    isArrayOf(value.tiles, isTilesetCell)
   );
 }
 
-function isEditorTilesetCell(value: unknown): value is EditorTilesetCell {
+function isTilesetCell(value: unknown): value is TilesetCell {
   return (
     Array.isArray(value) &&
     value.length === 2 &&
@@ -169,7 +162,7 @@ function isEditorTilesetCell(value: unknown): value is EditorTilesetCell {
   );
 }
 
-function isEditorUiComponent(value: unknown): value is EditorUiComponent {
+function isUiComponent(value: unknown): value is UiComponent {
   return (
     isPlainObject(value) &&
     typeof value.id === "string" &&
