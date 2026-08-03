@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -91,7 +88,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	}}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{})
+	response, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{ProjectID: 42})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
 	}
@@ -101,10 +98,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response: %+v", response)
 	}
-	data, ok := response.Data.(dto.GetAssetsResponse)
-	if !ok {
-		t.Fatalf("expected GetAssetsResponse data, got %T", response.Data)
-	}
+	data := response.Data
 	if len(data.Assets) != 1 || data.Assets[0].AssetID != 7 || data.Assets[0].ProjectID != 42 {
 		t.Fatalf("unexpected response data: %+v", data)
 	}
@@ -122,10 +116,11 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	managerStub := &assetManagerStub{}
 	h := handler.NewHandler(managerStub)
 
-	_, err := h.GetAssets(newAssetHandlerContext("project_id", "42"), dto.GetAssetsRequest{
-		Query: "hero",
-		Tags:  []string{"player"},
-		Types: []domain.AssetType{domain.AssetTypeCharacter},
+	_, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{
+		ProjectID: 42,
+		Query:     "hero",
+		Tags:      []string{"player"},
+		Types:     []domain.AssetType{domain.AssetTypeCharacter},
 	})
 	if err != nil {
 		t.Fatalf("get assets: %v", err)
@@ -155,7 +150,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.UpdateAsset(newAssetHandlerContext("asset_id", "7"), dto.UpdateAssetRequest{
+	response, err := h.UpdateAsset(context.Background(), dto.UpdateAssetRequest{
 		AssetID:     7,
 		Name:        &name,
 		ProjectID:   &projectID,
@@ -170,8 +165,8 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	if managerStub.updateID != 7 || managerStub.update == nil || managerStub.update.Name == nil || *managerStub.update.Name != name {
 		t.Fatalf("unexpected update request: %+v", managerStub.update)
 	}
-	data, ok := response.Data.(dto.UpdateAssetResponse)
-	if !ok || data.AssetID != 7 || data.Name != name || string(data.Attributes) != string(attributes) {
+	data := response.Data
+	if data.AssetID != 7 || data.Name != name || string(data.Attributes) != string(attributes) {
 		t.Fatalf("unexpected update response: %+v", response.Data)
 	}
 }
@@ -185,15 +180,15 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Record(newAssetHandlerContext("asset_id", "7"), dto.RecordAssetRequest{AssetID: 7})
+	response, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
 	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 {
 		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
-	data, ok := response.Data.(dto.RecordAssetResponse)
-	if !ok || data.RecordID != 15 || data.AssetID != 7 || data.Version != 3 || data.ContentID != 21 {
+	data := response.Data
+	if data.RecordID != 15 || data.AssetID != 7 || data.Version != 3 || data.ContentID != 21 {
 		t.Fatalf("unexpected record response: %+v", response.Data)
 	}
 }
@@ -206,15 +201,15 @@ func TestAssetHandlerRollbackUsesRequestedVersion(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.RollBackAsset(newAssetHandlerContext("asset_id", "7"), dto.RollBackAssetRequest{AssetID: 7, Version: 2})
+	response, err := h.RollBackAsset(context.Background(), dto.RollBackAssetRequest{AssetID: 7, Version: 2})
 	if err != nil {
 		t.Fatalf("rollback asset: %v", err)
 	}
 	if managerStub.rollbackAsset != 7 || managerStub.rollbackVersion != 2 {
 		t.Fatalf("unexpected rollback request: asset=%d version=%d", managerStub.rollbackAsset, managerStub.rollbackVersion)
 	}
-	data, ok := response.Data.(dto.RollBackAssetResponse)
-	if !ok || data.AssetID != 7 || data.Version != 2 || data.ContentID != 9 {
+	data := response.Data
+	if data.AssetID != 7 || data.Version != 2 || data.ContentID != 9 {
 		t.Fatalf("unexpected rollback response: %+v", response.Data)
 	}
 }
@@ -226,12 +221,15 @@ func TestAssetHandlerRecordsReturnsHistory(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Records(newAssetHandlerContext("asset_id", "7"))
+	response, err := h.Records(
+		context.Background(),
+		dto.GetAssetRecordsRequest{AssetID: 7},
+	)
 	if err != nil {
 		t.Fatalf("get asset records: %v", err)
 	}
-	data, ok := response.Data.(dto.GetAssetRecordsResponse)
-	if !ok || len(data.Records) != 2 || data.Records[1].Version != 2 || data.Records[1].ContentID != 22 {
+	data := response.Data
+	if len(data.Records) != 2 || data.Records[1].Version != 2 || data.Records[1].ContentID != 22 {
 		t.Fatalf("unexpected asset record history: %+v", response.Data)
 	}
 }
@@ -249,17 +247,17 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Detail(newAssetHandlerContext("asset_id", "7"))
+	response, err := h.Detail(
+		context.Background(),
+		dto.AssetDetailRequest{AssetID: 7},
+	)
 	if err != nil {
 		t.Fatalf("get asset detail: %v", err)
 	}
 	if managerStub.assetID != 7 {
 		t.Fatalf("expected asset ID 7, got %d", managerStub.assetID)
 	}
-	data, ok := response.Data.(dto.AssetDetailResponse)
-	if !ok {
-		t.Fatalf("expected AssetDetailResponse data, got %T", response.Data)
-	}
+	data := response.Data
 	if data.AssetID != 7 || data.Attributes == nil || string(data.Attributes) != `{"mesh":"hero.glb"}` {
 		t.Fatalf("unexpected response data: %+v", data)
 	}
@@ -267,11 +265,20 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 
 func TestAssetHandlerRejectsZeroIDs(t *testing.T) {
 	h := handler.NewHandler(&assetManagerStub{})
-	if _, err := h.GetAssets(newAssetHandlerContext("project_id", "0"), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {
+	if _, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero project ID, got %v", err)
 	}
-	if _, err := h.Detail(newAssetHandlerContext("asset_id", "invalid")); !errors.Is(err, echo.ErrBadRequest) {
+	if _, err := h.Detail(
+		context.Background(),
+		dto.AssetDetailRequest{},
+	); !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request for zero asset ID, got %v", err)
+	}
+	if _, err := h.Records(
+		context.Background(),
+		dto.GetAssetRecordsRequest{},
+	); !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request for zero record asset ID, got %v", err)
 	}
 }
 
@@ -279,33 +286,27 @@ func TestAssetHandlerPropagatesManagerErrors(t *testing.T) {
 	wantErr := errors.New("asset manager failed")
 	h := handler.NewHandler(&assetManagerStub{getDetailErr: wantErr})
 
-	_, err := h.Detail(newAssetHandlerContext("asset_id", "7"))
+	_, err := h.Detail(
+		context.Background(),
+		dto.AssetDetailRequest{AssetID: 7},
+	)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-}
-
-func newAssetHandlerContext(paramName string, paramValue string) *echox.Context {
-	e := echo.New()
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	context := e.NewContext(request, httptest.NewRecorder())
-	context.SetParamNames(paramName)
-	context.SetParamValues(paramValue)
-	return &echox.Context{Context: context}
 }
 
 func TestAssetHandlerDelete(t *testing.T) {
 	managerStub := &assetManagerStub{}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Delete(newAssetHandlerContext("asset_id", "7"), dto.DeleteAssetRequest{AssetID: 7})
+	response, err := h.Delete(context.Background(), dto.DeleteAssetRequest{AssetID: 7})
 	if err != nil {
 		t.Fatalf("delete asset: %v", err)
 	}
 	if managerStub.deletedAssetID != 7 {
 		t.Fatalf("expected asset ID 7, got %d", managerStub.deletedAssetID)
 	}
-	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
+	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage || !response.Data.Success {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }
@@ -313,7 +314,7 @@ func TestAssetHandlerDelete(t *testing.T) {
 func TestAssetHandlerDeleteRejectsZeroAssetID(t *testing.T) {
 	h := handler.NewHandler(&assetManagerStub{})
 
-	_, err := h.Delete(newAssetHandlerContext("asset_id", "0"), dto.DeleteAssetRequest{})
+	_, err := h.Delete(context.Background(), dto.DeleteAssetRequest{})
 	if !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request, got %v", err)
 	}

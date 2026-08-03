@@ -19,5 +19,5 @@ export type CreationRequest<Reference = unknown> = {
 export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
   id: string;
   projectId: string;
-  status: "queued" | "processing" | "failed";
+  status: "pending" | "processing" | "failed";
 };

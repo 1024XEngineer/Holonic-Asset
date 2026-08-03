@@ -3,16 +3,11 @@ package handler_test
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 
-	"github.com/labstack/echo/v4"
-
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/echox"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -52,7 +47,7 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	}
 	stub := &projectManagerStub{}
 	projectHandler := handler.NewProjectHandler(stub)
-	handlerContext := newProjectHandlerContext()
+	handlerContext := context.Background()
 
 	response, err := projectHandler.Update(handlerContext, request)
 	if err != nil {
@@ -79,11 +74,7 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response envelope: %+v", response)
 	}
-	data, ok := response.Data.(dto.UpdateProjectResponse)
-	if !ok {
-		t.Fatalf("expected UpdateProjectResponse data, got %T", response.Data)
-	}
-	if !data.Success {
+	if !response.Data.Success {
 		t.Fatal("expected successful update response")
 	}
 }
@@ -92,17 +83,11 @@ func TestUpdatePropagatesServiceError(t *testing.T) {
 	wantErr := errors.New("update project failed")
 	projectHandler := handler.NewProjectHandler(&projectManagerStub{updateErr: wantErr})
 
-	response, err := projectHandler.Update(newProjectHandlerContext(), dto.UpdateProjectRequest{ProjectID: 42})
+	response, err := projectHandler.Update(context.Background(), dto.UpdateProjectRequest{ProjectID: 42})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if response != (dto.Response{}) {
+	if response != (dto.SuccessResponse[dto.UpdateProjectResponse]{}) {
 		t.Fatalf("expected an empty response on error, got %+v", response)
 	}
-}
-
-func newProjectHandlerContext() *echox.Context {
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	return &echox.Context{Context: e.NewContext(req, httptest.NewRecorder())}
 }

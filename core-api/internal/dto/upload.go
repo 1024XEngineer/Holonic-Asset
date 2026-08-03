@@ -2,8 +2,8 @@ package dto
 
 // CreateUploadTargetRequest describes a file uploaded directly to object storage.
 type CreateUploadTargetRequest struct {
-	ContentType   string `json:"contentType"`
-	ContentLength int64  `json:"contentLength"`
+	ContentType   string `json:"contentType" minLength:"1"`
+	ContentLength int64  `json:"contentLength" minimum:"1"`
 }
 
 // UploadTarget is the HTTP response for a temporary upload target.
