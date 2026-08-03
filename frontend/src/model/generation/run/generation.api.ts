@@ -1,8 +1,7 @@
 import { enqueueMockGeneration, listMockGenerationRuns } from "./mock";
-import type { GenerationInput } from "./mock/generation-input";
-import type { GenerationRun } from "@/features/generation/types";
+import type { GenerationInput, GenerationRun } from "./types";
 
-export type { GenerationInput } from "./mock/generation-input";
+export type { GenerationInput } from "./types";
 
 export { coreGenerationApi } from "./core-generation.api";
 export type {
