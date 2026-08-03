@@ -1,0 +1,51 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" fill="white"/>
+  <style>
+    .node { fill: white; stroke: #111; stroke-width: 2; }
+    .edge { fill: none; stroke: #111; stroke-width: 2; }
+    .title { fill: #111; font-family: Arial, sans-serif; font-size: 20px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+    .label { fill: #111; font-family: Arial, sans-serif; font-size: 17px; font-weight: 400; text-anchor: middle; dominant-baseline: middle; }
+  </style>
+
+  <!-- Project and asset -->
+  <rect class="node" x="487" y="48" width="188" height="65" rx="15"/>
+  <text class="title" x="581" y="81">Project</text>
+  <path class="edge" d="M581 113V160"/>
+  <rect class="node" x="487" y="160" width="188" height="66" rx="15"/>
+  <text class="title" x="581" y="193">Asset</text>
+
+  <!-- Asset children -->
+  <path class="edge" d="M581 226V272H180M581 272H990M180 272V300M450 272V300M720 272V300M990 272V300"/>
+  <rect class="node" x="75" y="300" width="210" height="66" rx="15"/>
+  <text class="title" x="180" y="333">Character / Object</text>
+  <rect class="node" x="345" y="300" width="210" height="66" rx="15"/>
+  <text class="title" x="450" y="333">UI</text>
+  <rect class="node" x="615" y="300" width="210" height="66" rx="15"/>
+  <text class="title" x="720" y="333">Scenery</text>
+  <rect class="node" x="885" y="300" width="210" height="66" rx="15"/>
+  <text class="title" x="990" y="333">TileSet</text>
+
+  <!-- Character / Object -->
+  <path class="edge" d="M180 366V431H100M180 431H260M100 431V459M260 431V459"/>
+  <rect class="node" x="35" y="459" width="130" height="57" rx="15"/>
+  <text class="label" x="100" y="488">ProtoType</text>
+  <rect class="node" x="195" y="459" width="130" height="57" rx="15"/>
+  <text class="label" x="260" y="488">Animation</text>
+
+  <!-- UI -->
+  <path class="edge" d="M450 366V459"/>
+  <rect class="node" x="345" y="459" width="210" height="57" rx="15"/>
+  <text class="label" x="450" y="488">Component</text>
+
+  <!-- Scenery -->
+  <path class="edge" d="M720 366V459"/>
+  <rect class="node" x="615" y="459" width="210" height="57" rx="15"/>
+  <text class="label" x="720" y="488">Layer</text>
+
+  <!-- TileSet -->
+  <path class="edge" d="M990 366V459M990 516V556"/>
+  <rect class="node" x="885" y="459" width="210" height="57" rx="15"/>
+  <text class="label" x="990" y="488">Item</text>
+  <rect class="node" x="885" y="556" width="210" height="57" rx="15"/>
+  <text class="label" x="990" y="585">Tile</text>
+</svg>

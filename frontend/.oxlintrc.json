@@ -1,11 +1,31 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc"],
-  "ignorePatterns": ["**/node_modules/**", "**/routeTree.gen.ts"],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/routeTree.gen.ts",
+    "**/model/generated/**"
+  ],
   "categories": {
     "correctness": "error"
   },
-  "rules": {},
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^@/model/.+/types(?:/|$)",
+            "message": "Import through the model module index."
+          },
+          {
+            "regex": "^@/features/.+/types(?:/|$)",
+            "message": "Import through the feature module index."
+          }
+        ]
+      }
+    ]
+  },
   "env": {
     "builtin": true
   }

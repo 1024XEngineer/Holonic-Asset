@@ -2,7 +2,6 @@ package router_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,54 +9,115 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
 
-func TestProjectUpdateRoutePreservesOmittedFields(t *testing.T) {
-	projectDao := dao.NewMemoryProjectDao()
-	projectRepository := repository.NewProjectRepository(projectDao)
-	project := &domain.Project{
-		UserID:      7,
-		Name:        "Prototype",
-		Description: "original description",
-		Reference:   "old-reference",
-		Style:       "pixel",
-	}
-	if err := projectRepository.Insert(context.Background(), project); err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	projectManager := domain.NewManager(projectRepository)
-	projectHandler := handler.NewProjectHandler(projectManager)
-	e := router.Register(nil, projectHandler, nil, nil)
+type unreachableProjectDao struct {
+	dao.ProjectDao
+}
 
-	req := httptest.NewRequest(
+type projectRouterStub struct {
+	router.ProjectRouter
+	createRequest dto.CreateProjectRequest
+}
+
+func (s *projectRouterStub) Create(
+	_ context.Context,
+	request dto.CreateProjectRequest,
+) (dto.SuccessResponse[dto.CreateProjectResponse], error) {
+	s.createRequest = request
+	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: 42}), nil
+}
+
+func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
 		http.MethodPost,
-		"/api/v1/project/update",
-		strings.NewReader(fmt.Sprintf(`{"projectID":%d,"reference":"new-reference"}`, project.ID)),
+		"/api/v1/project/create",
+		`{"userID":7,"name":"Prototype","gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
 	)
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	recorder := httptest.NewRecorder()
-	e.ServeHTTP(recorder, req)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if recorder.Body.String() != "{\"success\":true}\n" {
-		t.Fatalf("unexpected update response: %s", recorder.Body.String())
+	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" {
+		t.Fatalf("unexpected create request: %+v", stub.createRequest)
+	}
+	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"id\":42}}\n" {
+		t.Fatalf("unexpected response: %s", recorder.Body.String())
+	}
+}
+
+func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
+	e := newProjectTestServer(&unreachableProjectDao{})
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		body           string
+		expectedStatus int
+	}{
+		{
+			name:           "create without name",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "list without user ID",
+			method:         http.MethodGet,
+			path:           "/api/v1/project/list",
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "update without fields",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/update",
+			body:           `{"projectID":42}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "delete without project ID",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/delete",
+			body:           `{}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
 	}
 
-	stored, err := projectDao.FindByID(context.Background(), project.ID)
-	if err != nil {
-		t.Fatalf("find project: %v", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := serveProjectRequest(t, e, test.method, test.path, test.body)
+			if recorder.Code != test.expectedStatus {
+				t.Fatalf("expected status %d, got %d: %s", test.expectedStatus, recorder.Code, recorder.Body.String())
+			}
+		})
 	}
-	if stored.Reference != "new-reference" {
-		t.Fatalf("expected updated reference, got %q", stored.Reference)
+}
+
+func newProjectTestServer(projectDao dao.ProjectDao) *echo.Echo {
+	projectRepository := repository.NewProjectRepository(projectDao)
+	projectManager := project.NewManager(projectRepository)
+	projectHandler := handler.NewProjectHandler(projectManager)
+	return router.Register(nil, projectHandler, nil, nil)
+}
+
+func serveProjectRequest(t *testing.T, e *echo.Echo, method string, path string, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if body != "" {
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	}
-	if stored.Name != "Prototype" || stored.Description != "original description" || stored.Style != "pixel" {
-		t.Fatalf("omitted fields changed: %+v", stored)
-	}
+	recorder := httptest.NewRecorder()
+	e.ServeHTTP(recorder, req)
+	return recorder
 }

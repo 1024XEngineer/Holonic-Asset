@@ -1,9 +1,9 @@
-import type { GenerationRun } from "@/features/generation/types";
+import type { GenerationRun } from "./types";
 
 export const GENERATION_POLL_INTERVAL_MS = 1_000;
 
 export function isGenerationRunActive(run: GenerationRun) {
-  return run.status === "queued" || run.status === "processing";
+  return run.status === "pending" || run.status === "processing";
 }
 
 export function generationPollingInterval(runs: GenerationRun[] | undefined) {

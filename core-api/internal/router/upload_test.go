@@ -14,8 +14,8 @@ import (
 )
 
 func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
-	uploader := upload.NewUploader(nil)
-	uploadHandler := handler.NewUploadHandler(uploader)
+	uploadManager := upload.NewManager(nil)
+	uploadHandler := handler.NewUploadHandler(uploadManager)
 	e := router.Register(nil, nil, nil, uploadHandler)
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -30,14 +30,35 @@ func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if recorder.Body.String() != "{\"objectKey\":\"\",\"objectURL\":\"\",\"uploadURL\":\"\",\"uploadToken\":\"\"}\n" {
+	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"objectKey\":\"\",\"objectURL\":\"\",\"uploadURL\":\"\",\"uploadToken\":\"\"}}\n" {
 		t.Fatalf("unexpected placeholder response: %s", recorder.Body.String())
 	}
 }
 
+func TestUploadsRouteRejectsInvalidRequest(t *testing.T) {
+	uploadManager := upload.NewManager(nil)
+	uploadHandler := handler.NewUploadHandler(uploadManager)
+	e := router.Register(nil, nil, nil, uploadHandler)
+
+	for _, body := range []string{
+		`{"contentType":"","contentLength":8}`,
+		`{"contentType":"image/png","contentLength":0}`,
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/uploads", strings.NewReader(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		recorder := httptest.NewRecorder()
+
+		e.ServeHTTP(recorder, req)
+
+		if recorder.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
 func TestUploadRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
-	uploader := upload.NewUploader(nil)
-	uploadHandler := handler.NewUploadHandler(uploader)
+	uploadManager := upload.NewManager(nil)
+	uploadHandler := handler.NewUploadHandler(uploadManager)
 	e := router.Register(nil, nil, nil, uploadHandler)
 
 	routes := []string{

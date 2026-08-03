@@ -169,6 +169,28 @@ func (r *AssetRepositoryImpl) GetAssetDetail(ctx context.Context, id uint) (*dom
 	return &result, nil
 }
 
+func (r *AssetRepositoryImpl) Delete(ctx context.Context, assetID uint) error {
+	if r.ContentDao == nil || r.RecordDao == nil {
+		return fmt.Errorf("repository: content and record storage are required")
+	}
+	return r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
+		return transactionRepository.deleteAsset(ctx, assetID)
+	})
+}
+
+func (r *AssetRepositoryImpl) deleteAsset(ctx context.Context, assetID uint) error {
+	if _, err := r.AssetDao.GetAssetForUpdate(ctx, assetID); err != nil {
+		return err
+	}
+	if err := r.RecordDao.DeleteAssetRecordsByAssetID(ctx, assetID); err != nil {
+		return err
+	}
+	if err := r.ContentDao.DeleteAssetContentsByAssetID(ctx, assetID); err != nil {
+		return err
+	}
+	return r.AssetDao.DeleteAsset(ctx, assetID)
+}
+
 func (r *AssetRepositoryImpl) UpdateAsset(
 	ctx context.Context,
 	id uint,

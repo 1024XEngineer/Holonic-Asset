@@ -5,38 +5,26 @@ import {
   updateMockGenerationRun,
 } from "./generation-runs.mock";
 import { addMockAsset } from "../../../asset/library/mock";
-import {
-  createGenerationLifecycle,
-  type GenerationInput,
-} from "@/features/generation/types";
 import { hasMockProject } from "../../../project/mock";
-
-export const mockGenerationLifecycle = createGenerationLifecycle({
-  createRun: createMockGenerationRun,
-  updateRun: updateMockGenerationRun,
-  removeRun: removeMockGenerationRun,
-  completeGeneration: completeMockGeneration,
-  hasProject: hasMockProject,
-  addAsset: addMockAsset,
-});
+import type { GenerationInput } from "../types";
 
 const MOCK_QUEUE_DELAY_MS = 650;
 
-/** Starts background work and returns immediately, matching a queued HTTP job. */
+/** Starts background work and returns immediately, matching a pending HTTP job. */
 export async function enqueueMockGeneration({
   projectId,
   request,
 }: GenerationInput) {
-  const queuedRun = createMockGenerationRun({ ...request, projectId });
+  const pendingRun = createMockGenerationRun({ ...request, projectId });
 
   globalThis.setTimeout(() => {
     if (!hasMockProject(projectId)) {
-      removeMockGenerationRun(queuedRun.id);
+      removeMockGenerationRun(pendingRun.id);
       return;
     }
 
     const processingRun = updateMockGenerationRun({
-      ...queuedRun,
+      ...pendingRun,
       status: "processing",
     });
 
@@ -52,5 +40,5 @@ export async function enqueueMockGeneration({
       });
   }, MOCK_QUEUE_DELAY_MS);
 
-  return structuredClone(queuedRun);
+  return structuredClone(pendingRun);
 }

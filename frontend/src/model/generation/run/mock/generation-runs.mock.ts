@@ -1,4 +1,4 @@
-import type { GenerationRun } from "@/features/generation/types";
+import type { GenerationRun } from "../types";
 
 let generationRuns: GenerationRun[] = [];
 
@@ -14,7 +14,7 @@ export function createMockGenerationRun(
   const createdRun: GenerationRun = {
     ...structuredClone(run),
     id: crypto.randomUUID(),
-    status: "queued",
+    status: "pending",
   };
   generationRuns = [...generationRuns, createdRun];
   return structuredClone(createdRun);
