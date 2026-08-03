@@ -315,6 +315,32 @@
         ],
         "type": "object"
       },
+      "DeleteAssetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "DeleteAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
       "DeleteProjectRequest": {
         "additionalProperties": false,
         "properties": {
@@ -890,6 +916,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseDeleteAssetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteAssetResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseDeleteProjectResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1444,6 +1495,67 @@
           }
         },
         "summary": "Copy an asset",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/asset/delete": {
+      "delete": {
+        "operationId": "deleteAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseDeleteAssetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Delete an asset",
         "tags": [
           "Assets"
         ]
