@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocsRouteImport } from './routes/docs'
 import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -19,6 +20,11 @@ import { Route as ProjectsNewRouteImport } from './routes/projects.new'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GenerateRoute = GenerateRouteImport.update({
@@ -49,6 +55,7 @@ const ProjectsNewRoute = ProjectsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/generate': typeof GenerateRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/settings': typeof SettingsRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/generate': typeof GenerateRoute
   '/settings': typeof SettingsRoute
   '/projects/new': typeof ProjectsNewRoute
@@ -65,6 +73,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/generate': typeof GenerateRoute
   '/projects': typeof ProjectsRouteWithChildren
   '/settings': typeof SettingsRoute
@@ -75,16 +84,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/docs'
     | '/generate'
     | '/projects'
     | '/settings'
     | '/projects/new'
     | '/projects/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/generate' | '/settings' | '/projects/new' | '/projects'
+  to: '/' | '/docs' | '/generate' | '/settings' | '/projects/new' | '/projects'
   id:
     | '__root__'
     | '/'
+    | '/docs'
     | '/generate'
     | '/projects'
     | '/settings'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DocsRoute: typeof DocsRoute
   GenerateRoute: typeof GenerateRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
@@ -106,6 +118,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/generate': {
@@ -162,6 +181,7 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocsRoute: DocsRoute,
   GenerateRoute: GenerateRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
   SettingsRoute: SettingsRoute,
