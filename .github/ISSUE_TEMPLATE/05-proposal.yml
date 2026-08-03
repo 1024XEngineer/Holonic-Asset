@@ -1,0 +1,67 @@
+name: Proposal
+description: Propose a notable change that needs design discussion before implementation.
+title: "[Proposal]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for notable changes to public interfaces, file formats, workflows, architecture, or project-wide behavior. Keep the initial proposal concise; a detailed design document is not required unless the discussion identifies a need for one.
+
+        The initial discussion should lead to one of three outcomes: accept the proposal, decline it, or request a design document that addresses the open concerns.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and problem
+      description: What limitation, inconsistency, or unmet need motivates this proposal? Explain who is affected and why the current behavior is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_change
+    attributes:
+      label: Proposed change
+      description: Describe the change and its intended behavior at a level sufficient for discussion. Detailed implementation work is not required at this stage.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale and expected benefits
+      description: Why should the project adopt this change? Describe the expected value and the principles or evidence supporting it.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and affected areas
+      description: Identify the public interfaces, file formats, workflows, modules, or user-visible behavior involved. State important exclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration
+      description: Could this break existing projects, assets, APIs, configuration, or workflows? Describe migration needs and how compatibility would be preserved.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches, including keeping the current behavior, were considered? Explain their tradeoffs.
+    validations:
+      required: true
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: Open questions and risks
+      description: Which decisions, constraints, dependencies, or risks still need discussion?
+  - type: textarea
+    id: design_document
+    attributes:
+      label: Design document (optional)
+      description: Link a design document if one already exists. A document may be requested later if the initial discussion needs more detail.
+  - type: textarea
+    id: related_context
+    attributes:
+      label: Related issues and references (optional)
+      description: Link related issues, discussions, experiments, prior art, or other supporting material.
