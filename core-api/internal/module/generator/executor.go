@@ -69,14 +69,8 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateObjectPrototype(ctx, request)
-	case GenerateCharacterAnimation:
-		request := CreateCharacterAnimationPayload{}
-		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
-			return nil, err
-		}
-		return e.generateAnimation(ctx, taskType, request.ParentID, request.AssetName, request.CreativeBrief)
-	case GenerateObjectAnimation:
-		request := CreateObjectAnimationPayload{}
+	case GenerateAnimation:
+		request := CreateAnimationPayload{}
 		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
 			return nil, err
 		}

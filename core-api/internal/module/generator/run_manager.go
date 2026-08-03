@@ -59,17 +59,6 @@ func buildTaskPayload(request *Request) (any, error) {
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
 		payload.Reference = valueOrFallback(payload.Reference, firstReference(request.ReferenceMediaIDs))
 		return payload, nil
-	case GenerateCharacterAnimation:
-		payload := CreateCharacterAnimationPayload{}
-		if err := decodeParameters(request, &payload); err != nil {
-			return nil, err
-		}
-		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
-		if payload.ParentID == 0 && request.AssetID != nil {
-			payload.ParentID = *request.AssetID
-		}
-		return payload, nil
 	case GenerateObjectProtoType:
 		payload := CreateObjectPrototypePayload{}
 		if err := decodeParameters(request, &payload); err != nil {
@@ -79,8 +68,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
 		payload.Reference = valueOrFallback(payload.Reference, firstReference(request.ReferenceMediaIDs))
 		return payload, nil
-	case GenerateObjectAnimation:
-		payload := CreateObjectAnimationPayload{}
+	case GenerateAnimation:
+		payload := CreateAnimationPayload{}
 		if err := decodeParameters(request, &payload); err != nil {
 			return nil, err
 		}
@@ -102,14 +91,13 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.TileNum = uint(len(payload.TileDescriptions))
 		}
 		return payload, nil
-	case RegenerateCharacterProtoType,
-		RegenerateCharacterAnimation,
-		RegenerateCharacterFrames,
-		RegenerateObjectProtoType,
-		RegenerateObjectAnimation,
-		RegenerateObjectFrames,
-		RegenerateItem,
-		RegenerateTiles:
+	case EditCharacterProtoType,
+		EditCharacterFrames,
+		EditObjectProtoType,
+		EditObjectFrames,
+		EditAnimation,
+		EditItem,
+		EditTiles:
 		return struct{}{}, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, request.Kind)

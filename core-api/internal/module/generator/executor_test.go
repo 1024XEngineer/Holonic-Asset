@@ -191,8 +191,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 
 func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	tests := []generator.TaskType{
-		generator.GenerateCharacterAnimation,
-		generator.GenerateObjectAnimation,
+		generator.GenerateAnimation,
 	}
 	for _, taskType := range tests {
 		t.Run(string(taskType), func(t *testing.T) {
@@ -246,7 +245,7 @@ func TestExecutorDoesNotMutateAssetsWhenImageGenerationFails(t *testing.T) {
 
 	_, err := executor.Generate(
 		context.Background(),
-		generator.GenerateCharacterAnimation,
+		generator.GenerateAnimation,
 		json.RawMessage(`{"asset_name":"walk","parent_id":7}`),
 	)
 	if !errors.Is(err, wantErr) {
