@@ -12,6 +12,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/viperx"
@@ -104,7 +105,8 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		DefaultModel: cfg.QNA.DefaultModel,
 	})
 	images := imageclient.NewImageGenerationService(provider)
-	executor := generator.NewExecutor(images, workspaceModule.Assets)
+	processor := imageprocessor.NewProcessor()
+	executor := generator.NewExecutor(images, processor, workspaceModule.Assets)
 	generatorEngine := generator.NewEngine(taskManager, nil, executor)
 
 	assetHandler := handler.NewHandler(workspaceModule.Assets)
