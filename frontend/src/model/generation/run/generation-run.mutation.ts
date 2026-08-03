@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { generationApi, type GenerationInput } from "./generation.api";
-import type { GenerationRun } from "@/features/generation/types";
+import { generationApi } from "./generation.api";
+import type { GenerationInput, GenerationRun } from "./types";
 import { generationKeys } from "./keys";
 
 export function useEnqueueGenerationMutation() {

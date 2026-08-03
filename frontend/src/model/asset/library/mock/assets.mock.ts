@@ -1,8 +1,5 @@
-import type {
-  AssetGroupsByProject,
-  AssetKind,
-  ProjectAsset,
-} from "@/features/assets/types";
+import type { AssetKind, ProjectAsset } from "../../types";
+import type { AssetGroupsByProject } from "../types";
 import { assetGroupsByProject as seededAssetGroups } from "./assets.seed";
 
 let assetGroupsByProject = createAssetState();

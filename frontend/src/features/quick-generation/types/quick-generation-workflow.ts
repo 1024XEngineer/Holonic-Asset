@@ -1,7 +1,7 @@
 import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,
-} from "./quick-generation";
+} from "@/model/generation";
 
 export const quickGenerationSizes = [
   "32 × 32 px",

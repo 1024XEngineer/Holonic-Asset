@@ -1,15 +1,42 @@
 export {
   assetApi,
   assetKeys,
+  getDefaultAssetCanvasSize,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
 } from "./library";
+export type { AssetGroup, AssetGroupsByProject } from "./library";
 export {
-  useGenerateAnimationMutation,
+  assetRecordModeForKind,
   useRecordQuery,
   useSaveAssetRevisionMutation,
-} from "./editor";
+} from "./record";
+export type {
+  AssetCanvasPosition,
+  AssetRecord,
+  AssetRecordApi,
+  AssetRecordForKind,
+  AssetRecordSaveResult,
+  AssetWorkspaceAsset,
+  AssetWorkspaceData,
+  AssetWorkspaceDataForKind,
+  AudioAssetKind,
+  AudioAssetRecord,
+  CharacterAssetKind,
+  CharacterAssetRecord,
+  GetAssetRecordInput,
+  SaveAssetRecordInput,
+  SceneryAssetKind,
+  SceneryAssetRecord,
+  TilesetAssetKind,
+  TilesetAssetRecord,
+  TilesetCell,
+  TilesetItem,
+  UiAssetKind,
+  UiAssetRecord,
+  UiComponent,
+} from "./record";
 export {
   useAddAudioTrackMutation,
   useAudioTracksQuery,
@@ -17,3 +44,25 @@ export {
   useGenerateAudioVariationMutation,
   useUpdateAudioTrackMutation,
 } from "./audio";
+export type {
+  AddAudioTrackInput,
+  AudioTrack,
+  AudioTrackTone,
+  GenerateAudioVariationInput,
+  UpdateAudioTrackInput,
+} from "./audio";
+export {
+  assetKinds,
+  creatableAssetKinds,
+  type AssetAnimation,
+  type AssetKind,
+  type AssetRevision,
+  type AssetRevisionStatus,
+  type CharacterAnimation,
+  type CharacterAnimationClip,
+  type CharacterSpriteSheet,
+  type CreatableAssetKind,
+  type ProjectAsset,
+  type SceneryAssetData,
+  type SceneryLayer,
+} from "./types";

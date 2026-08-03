@@ -6,4 +6,3 @@ export type {
   UiAssetCreationDraft,
   VisualAssetCreationDraft,
 } from "./asset-creation";
-export type { CreationRequest, GenerationRun } from "./generation";

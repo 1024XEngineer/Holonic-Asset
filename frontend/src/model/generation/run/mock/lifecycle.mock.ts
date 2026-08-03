@@ -6,7 +6,7 @@ import {
 } from "./generation-runs.mock";
 import { addMockAsset } from "../../../asset/library/mock";
 import { hasMockProject } from "../../../project/mock";
-import type { GenerationInput } from "./generation-input";
+import type { GenerationInput } from "../types";
 
 const MOCK_QUEUE_DELAY_MS = 650;
 

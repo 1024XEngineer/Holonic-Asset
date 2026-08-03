@@ -8,7 +8,7 @@ import {
 import { assetKeys } from "../asset/library/keys";
 import { generationKeys } from "../generation/run/keys";
 import { projectApi } from "./project.api";
-import type { ProjectSummary } from "@/features/project/types";
+import type { ProjectSummary } from "./types";
 import { projectKeys } from "./keys";
 
 export function deleteProjectMutationOptions(queryClient: QueryClient) {

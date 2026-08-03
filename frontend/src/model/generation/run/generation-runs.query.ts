@@ -9,7 +9,7 @@ import {
   findSettledGenerationRunIds,
   generationPollingInterval,
 } from "./generation-polling";
-import type { GenerationRun } from "@/features/generation/types";
+import type { GenerationRun } from "./types";
 
 export function useGenerationRunsQuery(projectId: string | undefined) {
   const queryClient = useQueryClient();

@@ -1,9 +1,5 @@
-import type {
-  AssetGroup,
-  AssetGroupsByProject,
-  AssetRevision,
-  ProjectAsset,
-} from "@/features/assets/types";
+import type { AssetRevision, ProjectAsset } from "../../types";
+import type { AssetGroup, AssetGroupsByProject } from "../types";
 
 function createHistory(
   assetId: string,

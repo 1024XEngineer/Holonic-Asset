@@ -3,10 +3,7 @@ import {
   generateMockQuickAsset,
   listMockQuickAssets,
 } from "./mock/quick-generation";
-import type {
-  GenerateQuickAssetInput,
-  QuickGenerationAsset,
-} from "@/features/quick-generation/types";
+import type { GenerateQuickAssetInput, QuickGenerationAsset } from "./types";
 
 export type QuickGenerationApi = {
   listAssets: () => Promise<QuickGenerationAsset[]>;

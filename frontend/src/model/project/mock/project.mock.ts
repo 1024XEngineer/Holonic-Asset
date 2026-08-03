@@ -1,4 +1,4 @@
-import type { ProjectSummary } from "@/features/project/types";
+import type { ProjectSummary } from "../types";
 import { projectSummaries } from "./project.seed";
 
 let projects = createProjectState();
