@@ -38,6 +38,45 @@ func TestProjectValidateCreate(t *testing.T) {
 	}
 }
 
+func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
+	if !domain.GameType("").Valid() {
+		t.Fatal("expected empty game type to be valid")
+	}
+	if !domain.ViewType("").Valid() {
+		t.Fatal("expected empty view type to be valid")
+	}
+	if !domain.PlatformType("").Valid() {
+		t.Fatal("expected empty platform type to be valid")
+	}
+	if domain.GameType("Other").Valid() {
+		t.Fatal("expected Other not to be a valid game type")
+	}
+	if domain.ViewType("Other").Valid() {
+		t.Fatal("expected Other not to be a valid view type")
+	}
+
+	project := &domain.Project{UserID: 7, Name: "Prototype"}
+	if err := project.ValidateCreate(); err != nil {
+		t.Fatalf("expected empty classifications to be valid when creating a project: %v", err)
+	}
+	if err := project.ValidateReferenceGeneration(); err != nil {
+		t.Fatalf("expected empty classifications to be valid when generating a reference: %v", err)
+	}
+
+	emptyGameType := domain.GameType("")
+	emptyViewType := domain.ViewType("")
+	emptyPlatformType := domain.PlatformType("")
+	update := &domain.ProjectUpdate{
+		ID:             42,
+		GameType:       &emptyGameType,
+		ViewType:       &emptyViewType,
+		TargetPlatform: &emptyPlatformType,
+	}
+	if err := update.Validate(); err != nil {
+		t.Fatalf("expected explicit empty classifications to be valid when updating a project: %v", err)
+	}
+}
+
 func TestProjectUpdateValidateAllowsExplicitEmptyOptionalFields(t *testing.T) {
 	empty := ""
 	update := &domain.ProjectUpdate{ID: 42, Description: &empty, Reference: &empty, Style: &empty}

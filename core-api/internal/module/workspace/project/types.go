@@ -5,15 +5,13 @@ type ViewType string
 type PlatformType string
 
 const (
-	GameTypeRPG   GameType = "RPG"
-	GameTypeACT   GameType = "ACT"
-	GameTypeSLG   GameType = "SLG"
-	GameTypeOther GameType = "Other"
+	GameTypeRPG GameType = "RPG"
+	GameTypeACT GameType = "ACT"
+	GameTypeSLG GameType = "SLG"
 
 	ViewTypeTopDown   ViewType = "TopDown"
 	ViewTypeSideView  ViewType = "SideView"
 	ViewTypeIsometric ViewType = "Isometric"
-	ViewTypeOther     ViewType = "Other"
 
 	PlatformTypePC     PlatformType = "PC"
 	PlatformTypeMobile PlatformType = "Mobile"

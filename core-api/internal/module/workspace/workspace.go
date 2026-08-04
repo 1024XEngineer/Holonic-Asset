@@ -2,6 +2,7 @@
 package workspace
 
 import (
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
@@ -12,11 +13,14 @@ type Workspace struct {
 	Assets   asset.Manager
 }
 
-// New constructs the available Workspace capabilities from their stores.
-func New(projectStore project.Store, assetStore asset.Store) *Workspace {
+func New(
+	projectStore project.Store,
+	assetStore asset.Store,
+	imageService imageclient.ImageGenerationService,
+) *Workspace {
 	workspace := &Workspace{}
 	if projectStore != nil {
-		workspace.Projects = project.NewManager(projectStore)
+		workspace.Projects = project.NewManager(projectStore, imageService)
 	}
 	if assetStore != nil {
 		workspace.Assets = asset.NewManager(assetStore)

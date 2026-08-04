@@ -14,6 +14,10 @@ type ProjectRouter interface {
 		c context.Context,
 		request dto.CreateProjectRequest,
 	) (dto.SuccessResponse[dto.CreateProjectResponse], error)
+	GenerateReference(
+		c context.Context,
+		request dto.GenerateProjectReferenceRequest,
+	) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error)
 	ListByUID(
 		c context.Context,
 		request dto.ListProjectsRequest,
@@ -38,6 +42,14 @@ type createProjectInput struct {
 
 type createProjectOutput struct {
 	Body dto.SuccessResponse[dto.CreateProjectResponse]
+}
+
+type generateProjectReferenceInput struct {
+	Body dto.GenerateProjectReferenceRequest
+}
+
+type generateProjectReferenceOutput struct {
+	Body dto.SuccessResponse[dto.GenerateProjectReferenceResponse]
 }
 
 type listProjectsInput dto.ListProjectsRequest
@@ -80,6 +92,18 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 	}, func(ctx context.Context, input *createProjectInput) (*createProjectOutput, error) {
 		response, err := r.Create(ctx, input.Body)
 		return &createProjectOutput{Body: response}, openAPIError(err)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "generateProjectReference",
+		Method:      http.MethodPost,
+		Path:        "/project/reference/generate",
+		Summary:     "Generate a project reference",
+		Tags:        []string{"Projects"},
+		Errors:      []int{http.StatusBadRequest},
+	}, func(ctx context.Context, input *generateProjectReferenceInput) (*generateProjectReferenceOutput, error) {
+		response, err := r.GenerateReference(ctx, input.Body)
+		return &generateProjectReferenceOutput{Body: response}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{

@@ -231,10 +231,10 @@
           },
           "gameType": {
             "enum": [
+              "",
               "RPG",
               "ACT",
-              "SLG",
-              "Other"
+              "SLG"
             ],
             "type": "string"
           },
@@ -250,6 +250,7 @@
           },
           "targetPlatform": {
             "enum": [
+              "",
               "PC",
               "Mobile",
               "Web"
@@ -263,20 +264,17 @@
           },
           "viewType": {
             "enum": [
+              "",
               "TopDown",
               "SideView",
-              "Isometric",
-              "Other"
+              "Isometric"
             ],
             "type": "string"
           }
         },
         "required": [
           "userID",
-          "name",
-          "gameType",
-          "viewType",
-          "targetPlatform"
+          "name"
         ],
         "type": "object"
       },
@@ -435,6 +433,67 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "GenerateProjectReferenceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "gameType": {
+            "enum": [
+              "",
+              "RPG",
+              "ACT",
+              "SLG"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "targetPlatform": {
+            "enum": [
+              "",
+              "PC",
+              "Mobile",
+              "Web"
+            ],
+            "type": "string"
+          },
+          "viewType": {
+            "enum": [
+              "",
+              "TopDown",
+              "SideView",
+              "Isometric"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "GenerateProjectReferenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference"
+        ],
         "type": "object"
       },
       "GenerationRunListItemResponse": {
@@ -630,10 +689,10 @@
           },
           "gameType": {
             "enum": [
+              "",
               "RPG",
               "ACT",
-              "SLG",
-              "Other"
+              "SLG"
             ],
             "type": "string"
           },
@@ -653,6 +712,7 @@
           },
           "targetPlatform": {
             "enum": [
+              "",
               "PC",
               "Mobile",
               "Web"
@@ -666,10 +726,10 @@
           },
           "viewType": {
             "enum": [
+              "",
               "TopDown",
               "SideView",
-              "Isometric",
-              "Other"
+              "Isometric"
             ],
             "type": "string"
           }
@@ -947,6 +1007,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/DeleteProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseGenerateProjectReferenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GenerateProjectReferenceResponse"
           },
           "message": {
             "const": "success",
@@ -1344,10 +1429,10 @@
           },
           "gameType": {
             "enum": [
+              "",
               "RPG",
               "ACT",
-              "SLG",
-              "Other"
+              "SLG"
             ],
             "type": "string"
           },
@@ -1368,6 +1453,7 @@
           },
           "targetPlatform": {
             "enum": [
+              "",
               "PC",
               "Mobile",
               "Web"
@@ -1376,10 +1462,10 @@
           },
           "viewType": {
             "enum": [
+              "",
               "TopDown",
               "SideView",
-              "Isometric",
-              "Other"
+              "Isometric"
             ],
             "type": "string"
           }
@@ -2215,6 +2301,67 @@
           }
         },
         "summary": "List projects",
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/project/reference/generate": {
+      "post": {
+        "operationId": "generateProjectReference",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateProjectReferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseGenerateProjectReferenceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Generate a project reference",
         "tags": [
           "Projects"
         ]
