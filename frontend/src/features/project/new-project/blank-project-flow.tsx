@@ -26,18 +26,12 @@ export function BlankProjectFlow({
 
   return (
     <form
-      className="mx-auto mt-12 grid max-w-2xl gap-6"
+      className="mx-auto grid w-full max-w-2xl gap-6"
       onSubmit={(event) => {
         event.preventDefault();
         void newProjectForm.handleSubmit();
       }}
     >
-      <div>
-        <h2 className="text-lg font-semibold">Name your project</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          You can add more project context later.
-        </p>
-      </div>
       <newProjectForm.Field name="name">
         {(field) => (
           <label className="grid gap-2 text-sm font-semibold">

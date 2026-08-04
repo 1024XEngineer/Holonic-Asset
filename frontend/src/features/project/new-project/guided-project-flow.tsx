@@ -17,23 +17,22 @@ export function GuidedProjectFlow({
 
   return (
     <form
-      className="mx-auto mt-12 grid max-w-2xl gap-6"
+      className="mx-auto grid w-full max-w-2xl gap-6"
       onSubmit={(event) => {
         event.preventDefault();
         if (step === 2) void newProjectForm.handleSubmit();
         else form.next();
       }}
     >
-      <div>
-        <h2 className="text-lg font-semibold">
-          {step === 1 ? "Project context" : "Project overview"}
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {step === 1
-            ? "These defaults guide the visual direction of your project."
-            : "Upload an image that represents the game world, characters, and visual language together."}
-        </p>
-      </div>
+      {step === 2 ? (
+        <div>
+          <h2 className="text-lg font-semibold">Project overview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload an image that represents the game world, characters, and
+            visual language together.
+          </p>
+        </div>
+      ) : null}
       {step === 1 ? (
         <>
           <newProjectForm.Field name="name">

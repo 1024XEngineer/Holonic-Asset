@@ -13,6 +13,7 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
   const { backToLibrary, form } = project;
   const { selectedStart } = form;
   const isBlank = selectedStart === "blank";
+  const hasCenteredForm = isBlank || selectedStart === "idea";
 
   return (
     <main className="relative min-h-screen bg-background">
@@ -26,7 +27,7 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
       </button>
       <div
         className={`mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6 ${
-          selectedStart ? "" : "flex min-h-screen flex-col"
+          !selectedStart || hasCenteredForm ? "flex min-h-screen flex-col" : ""
         }`}
       >
         <div className="mx-auto max-w-2xl text-center">
@@ -59,9 +60,13 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         ) : selectedStart === "existing" ? (
           <ExistingGameFlow active project={project} />
         ) : selectedStart === "idea" ? (
-          <IdeaProjectFlow active project={project} />
+          <div className="flex flex-1 items-center">
+            <IdeaProjectFlow active project={project} />
+          </div>
         ) : (
-          <BlankProjectFlow active project={project} />
+          <div className="flex flex-1 items-center">
+            <BlankProjectFlow active project={project} />
+          </div>
         )}
       </div>
     </main>
