@@ -29,8 +29,8 @@ export type ProjectLibraryController = {
 };
 
 export function useProjectLibrary(): ProjectLibraryController {
-  const navigate = useNavigate({ from: "/projects" });
-  const search = useSearch({ from: "/projects" });
+  const navigate = useNavigate({ from: "/projects/" });
+  const search = useSearch({ from: "/projects/" });
   const { data: projects = [], isSuccess: projectsLoaded } =
     useProjectListQuery();
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
@@ -58,9 +58,9 @@ export function useProjectLibrary(): ProjectLibraryController {
     () =>
       navigate({
         to: "/projects/new",
-        search: { project: search.project, q: search.q },
+        search: {},
       }),
-    [navigate, search.project, search.q],
+    [navigate],
   );
 
   const removeProject = useCallback(
