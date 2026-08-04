@@ -29,7 +29,7 @@ func TestNewAppBuildsApplication(t *testing.T) {
 }
 
 func TestNewAppWithAssetStoreRegistersAssetRoutes(t *testing.T) {
-	app := newApp(&projectDaoStub{}, &assetStoreStub{})
+	app := newApp(&projectDaoStub{}, &assetStoreStub{}, nil)
 
 	for _, expectedPath := range []string{
 		"/api/v1/projects/:project_id/assets",

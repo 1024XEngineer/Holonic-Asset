@@ -10,6 +10,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/viperx"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
@@ -43,7 +44,14 @@ func InitServer() (*App, error) {
 		&dao.AssetContentDaoImpl{DB: db},
 		&dao.AssetRecordDaoImpl{DB: db},
 	)
-	return newApp(dao.NewGormProjectDao(db), assetRepository), nil
+	imageProvider := imageclient.NewQNAProvider(imageclient.QNAConfig{
+		BaseURL:      cfg.QNA.BaseURL,
+		APIKey:       cfg.QNA.APIKey,
+		DefaultModel: cfg.QNA.DefaultModel,
+	})
+	imageService := imageclient.NewImageGenerationService(imageProvider)
+
+	return newApp(dao.NewGormProjectDao(db), assetRepository, imageService), nil
 }
 
 func resolveConfigPath() string {
@@ -54,12 +62,16 @@ func resolveConfigPath() string {
 }
 
 func NewApp(projectDao dao.ProjectDao) *App {
-	return newApp(projectDao, nil)
+	return newApp(projectDao, nil, nil)
 }
 
-func newApp(projectDao dao.ProjectDao, assetStore assetdomain.Store) *App {
+func newApp(
+	projectDao dao.ProjectDao,
+	assetStore assetdomain.Store,
+	imageService imageclient.ImageGenerationService,
+) *App {
 	projectRepository := repository.NewProjectRepository(projectDao)
-	workspaceModule := workspace.New(projectRepository, assetStore)
+	workspaceModule := workspace.New(projectRepository, assetStore, imageService)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
 	var assetRouter router.AssetRouter
 	if workspaceModule.Assets != nil {

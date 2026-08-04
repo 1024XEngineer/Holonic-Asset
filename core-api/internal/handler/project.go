@@ -39,6 +39,29 @@ func (h *ProjectHandler) Create(
 	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: project.ID}), nil
 }
 
+func (h *ProjectHandler) Generate(
+	c context.Context,
+	request dto.CreateProjectRequest,
+) (dto.SuccessResponse[dto.ProjectResponse], error) {
+	project := &domain.Project{
+		UserID:         request.UserID,
+		Name:           request.Name,
+		GameType:       request.GameType,
+		ViewType:       request.ViewType,
+		TargetPlatform: request.TargetPlatform,
+		Description:    request.Description,
+		Reference:      request.Reference,
+		Style:          request.Style,
+	}
+
+	generated, err := h.manager.GenerateVisualImage(c, project)
+	if err != nil {
+		return dto.SuccessResponse[dto.ProjectResponse]{}, projectHandlerError(err)
+	}
+
+	return dto.NewTypedSuccessResponse(*projectResponse(generated)), nil
+}
+
 func (h *ProjectHandler) ListByUID(
 	c context.Context,
 	request dto.ListProjectsRequest,
