@@ -1,6 +1,8 @@
-import { ProjectLibraryWorkspace } from "./project-library-workspace";
 import { useProjectLibrary } from "./state/use-project-library";
+import { ProjectLibraryWorkspace } from "./project-library-workspace";
 
 export function ProjectLibrary() {
-  return <ProjectLibraryWorkspace library={useProjectLibrary()} />;
+  const library = useProjectLibrary();
+
+  return <ProjectLibraryWorkspace library={library} />;
 }

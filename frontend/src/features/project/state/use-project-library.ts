@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 
 import {
@@ -28,11 +28,14 @@ export type ProjectLibraryController = {
   project: ProjectLibraryProjectModel;
 };
 
+const EMPTY_PROJECTS: ProjectSummary[] = [];
+
 export function useProjectLibrary(): ProjectLibraryController {
   const navigate = useNavigate({ from: "/projects/" });
   const search = useSearch({ from: "/projects/" });
-  const { data: projects = [], isSuccess: projectsLoaded } =
+  const { data: projectData, isSuccess: projectsLoaded } =
     useProjectListQuery();
+  const projects = projectData ?? EMPTY_PROJECTS;
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
   const { mutate: updateProject } = useUpdateProjectMutation();
   const project = projects.find((item) => item.id === search.project);
@@ -77,15 +80,31 @@ export function useProjectLibrary(): ProjectLibraryController {
     [deleteProject, projects, search.project, selectProject],
   );
 
-  return {
-    project: {
+  const update = useCallback(
+    (updatedProject: ProjectSummary) => updateProject(updatedProject),
+    [updateProject],
+  );
+
+  const projectModel = useMemo(
+    () => ({
       current: project,
       items: projects,
       selectedId: search.project,
       create: createProject,
       remove: removeProject,
       select: selectProject,
-      update: (updatedProject: ProjectSummary) => updateProject(updatedProject),
-    },
-  };
+      update,
+    }),
+    [
+      project,
+      projects,
+      search.project,
+      createProject,
+      removeProject,
+      selectProject,
+      update,
+    ],
+  );
+
+  return useMemo(() => ({ project: projectModel }), [projectModel]);
 }
