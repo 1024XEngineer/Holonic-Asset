@@ -52,7 +52,10 @@ const mdxComponents = {
   ),
   h3: ({ className, ...props }: ComponentPropsWithoutRef<"h3">) => (
     <h3
-      className={cn("mt-9 text-xl font-semibold tracking-tight", className)}
+      className={cn(
+        "mt-9 scroll-mt-20 text-xl font-semibold tracking-tight",
+        className,
+      )}
       {...props}
     />
   ),
@@ -108,20 +111,49 @@ export function Docs() {
 
   useEffect(() => {
     if (outline.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const activeEntry = entries.find((entry) => entry.isIntersecting);
-        if (activeEntry) setActiveOutlineId(activeEntry.target.id);
-      },
-      { rootMargin: "-18% 0px -70%" },
-    );
+    const syncActiveOutline = () => {
+      const lastOutlineId = outline[outline.length - 1].id;
+      const reachedDocumentEnd =
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 1;
+      if (reachedDocumentEnd) {
+        setActiveOutlineId(lastOutlineId);
+        return;
+      }
 
-    for (const { id } of outline) {
-      const heading = document.getElementById(id);
-      if (heading) observer.observe(heading);
-    }
+      const offset = 80;
+      let nextActiveOutlineId = outline[0].id;
+      let closestOutlineId = nextActiveOutlineId;
+      let closestDistance = Number.POSITIVE_INFINITY;
 
-    return () => observer.disconnect();
+      for (const { id } of outline) {
+        const heading = document.getElementById(id);
+        if (!heading) continue;
+
+        const distance = Math.abs(heading.getBoundingClientRect().top - offset);
+        if (distance < closestDistance) {
+          closestOutlineId = id;
+          closestDistance = distance;
+        }
+
+        if (heading.getBoundingClientRect().top <= offset) {
+          nextActiveOutlineId = id;
+        }
+      }
+
+      setActiveOutlineId(
+        closestDistance <= 32 ? closestOutlineId : nextActiveOutlineId,
+      );
+    };
+
+    syncActiveOutline();
+    window.addEventListener("scroll", syncActiveOutline, { passive: true });
+    window.addEventListener("resize", syncActiveOutline);
+
+    return () => {
+      window.removeEventListener("scroll", syncActiveOutline);
+      window.removeEventListener("resize", syncActiveOutline);
+    };
   }, [outline]);
 
   return (
@@ -171,9 +203,6 @@ export function Docs() {
 
           <aside className="hidden border-l border-neutral-950/10 bg-white px-7 py-12 lg:sticky lg:top-14 lg:block lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto">
             <nav aria-label={onThisPage}>
-              <p className="font-mono text-[0.68rem] tracking-[0.18em] text-neutral-500">
-                {onThisPage}
-              </p>
               <ol className="mt-5 space-y-3 border-l border-neutral-950/15 pl-4">
                 {outline.map(({ id, label, level }) => (
                   <li key={id}>
