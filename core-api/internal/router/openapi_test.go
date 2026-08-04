@@ -42,7 +42,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 
 	expectedMethods := map[string][]string{
 		"/project/create":                        {"post"},
-		"/project/generate":                      {"post"},
+		"/project/reference/generate":            {"post"},
 		"/project/list":                          {"get"},
 		"/project/detail":                        {"get"},
 		"/project/update":                        {"post"},

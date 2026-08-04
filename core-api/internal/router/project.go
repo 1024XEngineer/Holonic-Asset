@@ -14,10 +14,10 @@ type ProjectRouter interface {
 		c context.Context,
 		request dto.CreateProjectRequest,
 	) (dto.SuccessResponse[dto.CreateProjectResponse], error)
-	Generate(
+	GenerateReference(
 		c context.Context,
-		request dto.CreateProjectRequest,
-	) (dto.SuccessResponse[dto.ProjectResponse], error)
+		request dto.GenerateProjectReferenceRequest,
+	) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error)
 	ListByUID(
 		c context.Context,
 		request dto.ListProjectsRequest,
@@ -44,12 +44,12 @@ type createProjectOutput struct {
 	Body dto.SuccessResponse[dto.CreateProjectResponse]
 }
 
-type generateProjectInput struct {
-	Body dto.CreateProjectRequest
+type generateProjectReferenceInput struct {
+	Body dto.GenerateProjectReferenceRequest
 }
 
-type generateProjectOutput struct {
-	Body dto.SuccessResponse[dto.ProjectResponse]
+type generateProjectReferenceOutput struct {
+	Body dto.SuccessResponse[dto.GenerateProjectReferenceResponse]
 }
 
 type listProjectsInput dto.ListProjectsRequest
@@ -95,15 +95,15 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID: "generateProject",
+		OperationID: "generateProjectReference",
 		Method:      http.MethodPost,
-		Path:        "/project/generate",
-		Summary:     "Generate a project visual image",
+		Path:        "/project/reference/generate",
+		Summary:     "Generate a project reference",
 		Tags:        []string{"Projects"},
 		Errors:      []int{http.StatusBadRequest},
-	}, func(ctx context.Context, input *generateProjectInput) (*generateProjectOutput, error) {
-		response, err := r.Generate(ctx, input.Body)
-		return &generateProjectOutput{Body: response}, openAPIError(err)
+	}, func(ctx context.Context, input *generateProjectReferenceInput) (*generateProjectReferenceOutput, error) {
+		response, err := r.GenerateReference(ctx, input.Body)
+		return &generateProjectReferenceOutput{Body: response}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{

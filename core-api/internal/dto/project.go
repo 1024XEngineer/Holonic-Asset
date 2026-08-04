@@ -6,9 +6,9 @@ type ProjectResponse struct {
 	UserID         uint                `json:"userID" minimum:"1"`
 	ID             uint                `json:"id" minimum:"1"`
 	Name           string              `json:"name"`
-	GameType       domain.GameType     `json:"gameType" enum:"RPG,ACT,SLG,Other"`
-	ViewType       domain.ViewType     `json:"viewType" enum:"TopDown,SideView,Isometric,Other"`
-	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:"PC,Mobile,Web"`
+	GameType       domain.GameType     `json:"gameType" enum:",RPG,ACT,SLG"`
+	ViewType       domain.ViewType     `json:"viewType" enum:",TopDown,SideView,Isometric"`
+	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description"`
 	Reference      string              `json:"reference"`
 	Style          string              `json:"style"`
@@ -17,9 +17,9 @@ type ProjectResponse struct {
 type CreateProjectRequest struct {
 	UserID         uint                `json:"userID" minimum:"1"`
 	Name           string              `json:"name" minLength:"1"`
-	GameType       domain.GameType     `json:"gameType" enum:"RPG,ACT,SLG,Other"`
-	ViewType       domain.ViewType     `json:"viewType" enum:"TopDown,SideView,Isometric,Other"`
-	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:"PC,Mobile,Web"`
+	GameType       domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
+	ViewType       domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	TargetPlatform domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description,omitempty"`
 	Reference      string              `json:"reference,omitempty"`
 	Style          string              `json:"style,omitempty"`
@@ -27,6 +27,20 @@ type CreateProjectRequest struct {
 
 type CreateProjectResponse struct {
 	ID uint `json:"id" minimum:"1"`
+}
+
+type GenerateProjectReferenceRequest struct {
+	Name           string              `json:"name" minLength:"1"`
+	GameType       domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
+	ViewType       domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	TargetPlatform domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
+	Description    string              `json:"description,omitempty"`
+	Reference      string              `json:"reference,omitempty"`
+	Style          string              `json:"style,omitempty"`
+}
+
+type GenerateProjectReferenceResponse struct {
+	Reference string `json:"reference"`
 }
 
 type ListProjectsRequest struct {
@@ -48,9 +62,9 @@ type ProjectDetailResponse struct {
 type UpdateProjectRequest struct {
 	ProjectID      uint                 `json:"projectID" minimum:"1"`
 	Name           *string              `json:"name,omitempty" minLength:"1"`
-	GameType       *domain.GameType     `json:"gameType,omitempty" enum:"RPG,ACT,SLG,Other"`
-	ViewType       *domain.ViewType     `json:"viewType,omitempty" enum:"TopDown,SideView,Isometric,Other"`
-	TargetPlatform *domain.PlatformType `json:"targetPlatform,omitempty" enum:"PC,Mobile,Web"`
+	GameType       *domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
+	ViewType       *domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	TargetPlatform *domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    *string              `json:"description,omitempty"`
 	Reference      *string              `json:"reference,omitempty"`
 	Style          *string              `json:"style,omitempty"`

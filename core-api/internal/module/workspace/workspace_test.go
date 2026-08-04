@@ -38,7 +38,7 @@ func (*imageServiceStub) Generate(context.Context, *imageclient.GenerateRequest)
 
 func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 	module := workspace.New(&projectStoreStub{}, nil, &imageServiceStub{})
-	result, err := module.Projects.GenerateVisualImage(context.Background(), &project.Project{
+	result, err := module.Projects.GenerateReference(context.Background(), &project.Project{
 		UserID:         7,
 		Name:           "Prototype",
 		GameType:       project.GameTypeRPG,
@@ -46,10 +46,10 @@ func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 		TargetPlatform: project.PlatformTypePC,
 	})
 	if err != nil {
-		t.Fatalf("generate visual image through workspace: %v", err)
+		t.Fatalf("generate reference through workspace: %v", err)
 	}
-	if result.Reference != "data:image/png;base64,generated-image" {
-		t.Fatalf("expected injected image service result, got %q", result.Reference)
+	if result != "data:image/png;base64,generated-image" {
+		t.Fatalf("expected injected image service result, got %q", result)
 	}
 }
 

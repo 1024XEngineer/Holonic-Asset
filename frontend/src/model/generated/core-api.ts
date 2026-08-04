@@ -208,23 +208,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/project/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Generate a project visual image */
-        post: operations["generateProject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/project/list": {
         parameters: {
             query?: never;
@@ -236,6 +219,23 @@ export interface paths {
         get: operations["listProjects"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/project/reference/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a project reference */
+        post: operations["generateProjectReference"];
         delete?: never;
         options?: never;
         head?: never;
@@ -371,16 +371,16 @@ export interface components {
         CreateProjectRequest: {
             description?: string;
             /** @enum {string} */
-            gameType: "RPG" | "ACT" | "SLG" | "Other";
+            gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
             reference?: string;
             style?: string;
             /** @enum {string} */
-            targetPlatform: "PC" | "Mobile" | "Web";
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
             /** @enum {string} */
-            viewType: "TopDown" | "SideView" | "Isometric" | "Other";
+            viewType?: "" | "TopDown" | "SideView" | "Isometric";
         };
         CreateProjectResponse: {
             /** Format: int64 */
@@ -446,6 +446,21 @@ export interface components {
              */
             type: string;
         };
+        GenerateProjectReferenceRequest: {
+            description?: string;
+            /** @enum {string} */
+            gameType?: "" | "RPG" | "ACT" | "SLG";
+            name: string;
+            reference?: string;
+            style?: string;
+            /** @enum {string} */
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
+            /** @enum {string} */
+            viewType?: "" | "TopDown" | "SideView" | "Isometric";
+        };
+        GenerateProjectReferenceResponse: {
+            reference: string;
+        };
         GenerationRunListItemResponse: {
             /** Format: int64 */
             assetId?: number;
@@ -491,18 +506,18 @@ export interface components {
         ProjectResponse: {
             description: string;
             /** @enum {string} */
-            gameType: "RPG" | "ACT" | "SLG" | "Other";
+            gameType: "" | "RPG" | "ACT" | "SLG";
             /** Format: int64 */
             id: number;
             name: string;
             reference: string;
             style: string;
             /** @enum {string} */
-            targetPlatform: "PC" | "Mobile" | "Web";
+            targetPlatform: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
             /** @enum {string} */
-            viewType: "TopDown" | "SideView" | "Isometric" | "Other";
+            viewType: "" | "TopDown" | "SideView" | "Isometric";
         };
         RecordAssetRequest: {
             /** Format: int64 */
@@ -605,6 +620,16 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        SuccessResponseGenerateProjectReferenceResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["GenerateProjectReferenceResponse"];
+            /** @constant */
+            message: "success";
+        };
         SuccessResponseGetAssetRecordsResponse: {
             /**
              * Format: int64
@@ -662,16 +687,6 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["ProjectDetailResponse"];
-            /** @constant */
-            message: "success";
-        };
-        SuccessResponseProjectResponse: {
-            /**
-             * Format: int64
-             * @enum {integer}
-             */
-            code: 200;
-            data: components["schemas"]["ProjectResponse"];
             /** @constant */
             message: "success";
         };
@@ -754,16 +769,16 @@ export interface components {
         UpdateProjectRequest: {
             description?: string;
             /** @enum {string} */
-            gameType?: "RPG" | "ACT" | "SLG" | "Other";
+            gameType?: "" | "RPG" | "ACT" | "SLG";
             name?: string;
             /** Format: int64 */
             projectID: number;
             reference?: string;
             style?: string;
             /** @enum {string} */
-            targetPlatform?: "PC" | "Mobile" | "Web";
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
             /** @enum {string} */
-            viewType?: "TopDown" | "SideView" | "Isometric" | "Other";
+            viewType?: "" | "TopDown" | "SideView" | "Isometric";
         };
         UpdateProjectResponse: {
             success: boolean;
@@ -1367,18 +1382,16 @@ export interface operations {
             };
         };
     };
-    generateProject: {
+    listProjects: {
         parameters: {
-            query?: never;
+            query: {
+                userID: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateProjectRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -1386,7 +1399,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessResponseProjectResponse"];
+                    "application/json": components["schemas"]["SuccessResponseListProjectsResponse"];
                 };
             };
             /** @description Bad Request */
@@ -1418,16 +1431,18 @@ export interface operations {
             };
         };
     };
-    listProjects: {
+    generateProjectReference: {
         parameters: {
-            query: {
-                userID: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateProjectReferenceRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -1435,7 +1450,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessResponseListProjectsResponse"];
+                    "application/json": components["schemas"]["SuccessResponseGenerateProjectReferenceResponse"];
                 };
             };
             /** @description Bad Request */

@@ -11,10 +11,14 @@ import (
 )
 
 type projectStoreStub struct {
-	update *domain.ProjectUpdate
+	insertCalls int
+	update      *domain.ProjectUpdate
 }
 
-func (*projectStoreStub) Insert(context.Context, *domain.Project) error { return nil }
+func (s *projectStoreStub) Insert(context.Context, *domain.Project) error {
+	s.insertCalls++
+	return nil
+}
 
 func (*projectStoreStub) FindByID(context.Context, uint) (*domain.Project, error) {
 	return &domain.Project{}, nil
@@ -59,11 +63,9 @@ func (s *imageGenerationServiceStub) Generate(
 	return s.result, s.err
 }
 
-func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsDataURL(t *testing.T) {
+func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *testing.T) {
 	const reference = "data:image/png;base64,reference-image"
 	project := &domain.Project{
-		UserID:         7,
-		ID:             42,
 		Name:           "Lantern Vale",
 		GameType:       domain.GameTypeRPG,
 		ViewType:       domain.ViewTypeIsometric,
@@ -77,17 +79,21 @@ func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsDataURL(t *te
 			Images: []imageclient.GeneratedImage{{Base64: "generated-image-base64", MediaType: "image/png"}},
 		},
 	}
-	manager := domain.NewManager(&projectStoreStub{}, images)
+	store := &projectStoreStub{}
+	manager := domain.NewManager(store, images)
 
-	generated, err := manager.GenerateVisualImage(context.Background(), project)
+	generated, err := manager.GenerateReference(context.Background(), project)
 	if err != nil {
-		t.Fatalf("generate visual image: %v", err)
+		t.Fatalf("generate reference: %v", err)
 	}
-	if generated != project {
-		t.Fatalf("expected returned project %p, got %p", project, generated)
+	if generated != "data:image/png;base64,generated-image-base64" {
+		t.Fatalf("expected generated reference data URL, got %q", generated)
 	}
-	if generated.Reference != "data:image/png;base64,generated-image-base64" {
-		t.Fatalf("expected generated image data URL, got %q", generated.Reference)
+	if project.Reference != reference {
+		t.Fatalf("expected input reference to remain unchanged, got %q", project.Reference)
+	}
+	if store.insertCalls != 0 {
+		t.Fatalf("expected reference generation not to persist a project, got %d inserts", store.insertCalls)
 	}
 	if images.request == nil {
 		t.Fatal("expected an image generation request")
@@ -137,7 +143,7 @@ func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsDataURL(t *te
 	}
 }
 
-func TestGenerateVisualImageUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
+func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 	cases := []struct {
 		name        string
 		gameType    domain.GameType
@@ -146,13 +152,13 @@ func TestGenerateVisualImageUsesTheUserBriefForDifferentGameTypes(t *testing.T) 
 	}{
 		{
 			name:        "farming",
-			gameType:    domain.GameTypeOther,
+			gameType:    domain.GameType(""),
 			description: "玩家在安静的农场照料鸡、羊和菜地，给动物喂食，收获成熟作物。没有战斗，没有敌人。",
 			forbidden:   []string{"three rectangular crop plots", "two chickens and one sheep", "date/time and coin or produce counter"},
 		},
 		{
 			name:        "maze",
-			gameType:    domain.GameTypeOther,
+			gameType:    domain.GameType(""),
 			description: "玩家在一座废弃的石头迷宫里寻找出口，火把照亮一小段走廊。不要战斗，不要装备界面。",
 			forbidden:   []string{"farming and animal-husbandry", "chickens", "sheep", "crop plots"},
 		},
@@ -176,8 +182,8 @@ func TestGenerateVisualImageUsesTheUserBriefForDifferentGameTypes(t *testing.T) 
 			}
 			manager := domain.NewManager(&projectStoreStub{}, images)
 
-			if _, err := manager.GenerateVisualImage(context.Background(), project); err != nil {
-				t.Fatalf("generate visual image: %v", err)
+			if _, err := manager.GenerateReference(context.Background(), project); err != nil {
+				t.Fatalf("generate reference: %v", err)
 			}
 			prompt := images.request.Prompt
 			if !strings.Contains(prompt, tc.description) {
@@ -204,7 +210,7 @@ func TestGenerateVisualImageUsesTheUserBriefForDifferentGameTypes(t *testing.T) 
 	}
 }
 
-func TestGenerateVisualImageLetsTheModelFollowExplicitUIRequests(t *testing.T) {
+func TestGenerateReferenceLetsTheModelFollowExplicitUIRequests(t *testing.T) {
 	project := validProject()
 	project.Description = "玩家打开背包整理采集到的物品。"
 	images := &imageGenerationServiceStub{
@@ -214,8 +220,8 @@ func TestGenerateVisualImageLetsTheModelFollowExplicitUIRequests(t *testing.T) {
 	}
 	manager := domain.NewManager(&projectStoreStub{}, images)
 
-	if _, err := manager.GenerateVisualImage(context.Background(), project); err != nil {
-		t.Fatalf("generate visual image: %v", err)
+	if _, err := manager.GenerateReference(context.Background(), project); err != nil {
+		t.Fatalf("generate reference: %v", err)
 	}
 	for _, fragment := range []string{
 		"unless the user explicitly asks for it",
@@ -228,7 +234,7 @@ func TestGenerateVisualImageLetsTheModelFollowExplicitUIRequests(t *testing.T) {
 	}
 }
 
-func TestGenerateVisualImageDoesNotReuseGeneratedRawBase64AsStyleReference(t *testing.T) {
+func TestGenerateReferenceDoesNotReuseGeneratedRawBase64AsStyleReference(t *testing.T) {
 	project := validProject()
 	project.Reference = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
 	images := &imageGenerationServiceStub{
@@ -238,60 +244,59 @@ func TestGenerateVisualImageDoesNotReuseGeneratedRawBase64AsStyleReference(t *te
 	}
 	manager := domain.NewManager(&projectStoreStub{}, images)
 
-	if _, err := manager.GenerateVisualImage(context.Background(), project); err != nil {
-		t.Fatalf("generate visual image: %v", err)
+	if _, err := manager.GenerateReference(context.Background(), project); err != nil {
+		t.Fatalf("generate reference: %v", err)
 	}
 	if len(images.request.ReferenceImages) != 0 {
 		t.Fatalf("expected generated preview base64 not to be reused, got %+v", images.request.ReferenceImages)
 	}
 }
 
-func TestGenerateVisualImageDoesNotReplaceReferenceWhenGenerationFails(t *testing.T) {
+func TestGenerateReferenceDoesNotReplaceReferenceWhenGenerationFails(t *testing.T) {
 	wantErr := errors.New("provider unavailable")
 	project := validProject()
 	project.Reference = "existing-reference"
 	images := &imageGenerationServiceStub{err: wantErr}
 	manager := domain.NewManager(&projectStoreStub{}, images)
 
-	generated, err := manager.GenerateVisualImage(context.Background(), project)
+	generated, err := manager.GenerateReference(context.Background(), project)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected generation error %v, got %v", wantErr, err)
 	}
-	if generated != nil {
-		t.Fatalf("expected nil project, got %+v", generated)
+	if generated != "" {
+		t.Fatalf("expected empty reference, got %q", generated)
 	}
 	if project.Reference != "existing-reference" {
 		t.Fatalf("expected existing reference to remain unchanged, got %q", project.Reference)
 	}
 }
 
-func TestGenerateVisualImageRequiresImageServiceAndImageResult(t *testing.T) {
+func TestGenerateReferenceRequiresImageServiceAndImageResult(t *testing.T) {
 	project := validProject()
 	manager := domain.NewManager(&projectStoreStub{}, nil)
 
-	generated, err := manager.GenerateVisualImage(context.Background(), project)
+	generated, err := manager.GenerateReference(context.Background(), project)
 	if !errors.Is(err, domain.ErrImageServiceRequired) {
 		t.Fatalf("expected image service error, got %v", err)
 	}
-	if generated != nil {
-		t.Fatalf("expected nil project, got %+v", generated)
+	if generated != "" {
+		t.Fatalf("expected empty reference, got %q", generated)
 	}
 
 	manager = domain.NewManager(&projectStoreStub{}, &imageGenerationServiceStub{
 		result: &imageclient.GenerateResult{},
 	})
-	generated, err = manager.GenerateVisualImage(context.Background(), project)
-	if !errors.Is(err, domain.ErrVisualImageRequired) {
-		t.Fatalf("expected visual image result error, got %v", err)
+	generated, err = manager.GenerateReference(context.Background(), project)
+	if !errors.Is(err, domain.ErrReferenceRequired) {
+		t.Fatalf("expected reference result error, got %v", err)
 	}
-	if generated != nil {
-		t.Fatalf("expected nil project, got %+v", generated)
+	if generated != "" {
+		t.Fatalf("expected empty reference, got %q", generated)
 	}
 }
 
 func validProject() *domain.Project {
 	return &domain.Project{
-		UserID:         7,
 		Name:           "Test Project",
 		GameType:       domain.GameTypeACT,
 		ViewType:       domain.ViewTypeSideView,

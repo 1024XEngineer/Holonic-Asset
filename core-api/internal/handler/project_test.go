@@ -12,14 +12,14 @@ import (
 )
 
 type projectManagerStub struct {
-	updateErr     error
-	updateContext context.Context
-	update        *domain.ProjectUpdate
-	updateCalls   int
-	generateErr   error
-	generate      *domain.Project
-	generated     *domain.Project
-	generateCtx   context.Context
+	updateErr          error
+	updateContext      context.Context
+	update             *domain.ProjectUpdate
+	updateCalls        int
+	generateErr        error
+	generate           *domain.Project
+	generatedReference string
+	generateCtx        context.Context
 }
 
 func (*projectManagerStub) Create(context.Context, *domain.Project) error { return nil }
@@ -41,13 +41,10 @@ func (s *projectManagerStub) Update(ctx context.Context, update *domain.ProjectU
 
 func (*projectManagerStub) Delete(context.Context, uint) error { return nil }
 
-func (s *projectManagerStub) GenerateVisualImage(ctx context.Context, project *domain.Project) (*domain.Project, error) {
+func (s *projectManagerStub) GenerateReference(ctx context.Context, project *domain.Project) (string, error) {
 	s.generateCtx = ctx
 	s.generate = project
-	if s.generated != nil {
-		return s.generated, s.generateErr
-	}
-	return project, s.generateErr
+	return s.generatedReference, s.generateErr
 }
 
 func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
@@ -105,70 +102,59 @@ func TestUpdatePropagatesServiceError(t *testing.T) {
 	}
 }
 
-func TestGenerateForwardsProjectAndReturnsGeneratedProject(t *testing.T) {
-	generated := &domain.Project{
-		UserID:         7,
-		ID:             42,
+func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testing.T) {
+	const generatedReference = "data:image/png;base64,aGVsbG8="
+	stub := &projectManagerStub{generatedReference: generatedReference}
+	projectHandler := handler.NewProjectHandler(stub)
+	ctx := context.Background()
+
+	request := dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
 		GameType:       domain.GameTypeRPG,
 		ViewType:       domain.ViewTypeTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 		Description:    "A small village adventure",
-		Reference:      "aGVsbG8=",
+		Reference:      "optional-reference",
 		Style:          "warm pixel art",
 	}
-	stub := &projectManagerStub{generated: generated}
-	projectHandler := handler.NewProjectHandler(stub)
-	ctx := context.Background()
-
-	response, err := projectHandler.Generate(ctx, dto.CreateProjectRequest{
-		UserID:         generated.UserID,
-		Name:           generated.Name,
-		GameType:       generated.GameType,
-		ViewType:       generated.ViewType,
-		TargetPlatform: generated.TargetPlatform,
-		Description:    generated.Description,
-		Reference:      "optional-reference",
-		Style:          generated.Style,
-	})
+	response, err := projectHandler.GenerateReference(ctx, request)
 	if err != nil {
-		t.Fatalf("generate project: %v", err)
+		t.Fatalf("generate project reference: %v", err)
 	}
 	if stub.generateCtx != ctx {
 		t.Fatal("expected handler context to be forwarded to the manager")
 	}
-	if stub.generate == nil || stub.generate.UserID != generated.UserID || stub.generate.Name != generated.Name {
-		t.Fatalf("unexpected generated project request: %+v", stub.generate)
+	if stub.generate == nil || stub.generate.Name != request.Name || stub.generate.Description != request.Description {
+		t.Fatalf("unexpected project reference request: %+v", stub.generate)
 	}
-	if stub.generate.Reference != "optional-reference" {
+	if stub.generate.UserID != 0 {
+		t.Fatalf("expected reference generation not to require a user ID, got %d", stub.generate.UserID)
+	}
+	if stub.generate.Reference != request.Reference {
 		t.Fatalf("expected reference to be forwarded, got %q", stub.generate.Reference)
 	}
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response envelope: %+v", response)
 	}
-	if response.Data.Reference != generated.Reference {
-		t.Fatalf("expected generated base64 %q, got %q", generated.Reference, response.Data.Reference)
-	}
-	if response.Data.ID != generated.ID || response.Data.Name != generated.Name {
-		t.Fatalf("unexpected generated project response: %+v", response.Data)
+	if response.Data.Reference != generatedReference {
+		t.Fatalf("expected generated reference %q, got %q", generatedReference, response.Data.Reference)
 	}
 }
 
-func TestGeneratePropagatesServiceError(t *testing.T) {
+func TestGenerateReferencePropagatesServiceError(t *testing.T) {
 	wantErr := errors.New("generate project failed")
 	projectHandler := handler.NewProjectHandler(&projectManagerStub{generateErr: wantErr})
 
-	response, err := projectHandler.Generate(context.Background(), dto.CreateProjectRequest{
-		UserID:         7,
+	response, err := projectHandler.GenerateReference(context.Background(), dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
-		GameType:       domain.GameTypeOther,
+		GameType:       domain.GameType(""),
 		ViewType:       domain.ViewTypeTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if response != (dto.SuccessResponse[dto.ProjectResponse]{}) {
+	if response != (dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}) {
 		t.Fatalf("expected an empty response on error, got %+v", response)
 	}
 }

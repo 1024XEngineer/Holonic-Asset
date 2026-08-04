@@ -13,7 +13,7 @@ var (
 
 func (t GameType) Valid() bool {
 	switch t {
-	case GameTypeRPG, GameTypeACT, GameTypeSLG, GameTypeOther:
+	case "", GameTypeRPG, GameTypeACT, GameTypeSLG:
 		return true
 	default:
 		return false
@@ -22,7 +22,7 @@ func (t GameType) Valid() bool {
 
 func (t ViewType) Valid() bool {
 	switch t {
-	case ViewTypeTopDown, ViewTypeSideView, ViewTypeIsometric, ViewTypeOther:
+	case "", ViewTypeTopDown, ViewTypeSideView, ViewTypeIsometric:
 		return true
 	default:
 		return false
@@ -31,7 +31,7 @@ func (t ViewType) Valid() bool {
 
 func (t PlatformType) Valid() bool {
 	switch t {
-	case PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:
+	case "", PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:
 		return true
 	default:
 		return false
@@ -59,6 +59,17 @@ func (p *Project) ValidateCreate() error {
 	if err := ValidateUserID(p.UserID); err != nil {
 		return err
 	}
+	return p.validateDefinition()
+}
+
+func (p *Project) ValidateReferenceGeneration() error {
+	if p == nil {
+		return invalidProject("project is required")
+	}
+	return p.validateDefinition()
+}
+
+func (p *Project) validateDefinition() error {
 	if strings.TrimSpace(p.Name) == "" {
 		return invalidProject("name is required")
 	}

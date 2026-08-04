@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	visualImageSize    = "auto"
-	visualImageQuality = "high"
+	referenceSize    = "auto"
+	referenceQuality = "high"
 )
 
 var (
 	ErrImageServiceRequired = errors.New("project: image generation service is required")
-	ErrVisualImageRequired  = errors.New("project: generated visual image is required")
+	ErrReferenceRequired    = errors.New("project: generated reference is required")
 )
 
 // Manager exposes the project lifecycle to transports and other modules.
@@ -26,7 +26,7 @@ type Manager interface {
 	GetDetail(ctx context.Context, projectID uint) (*Project, error)
 	Update(ctx context.Context, update *ProjectUpdate) error
 	Delete(ctx context.Context, projectID uint) error
-	GenerateVisualImage(ctx context.Context, project *Project) (*Project, error)
+	GenerateReference(ctx context.Context, project *Project) (string, error)
 }
 
 type manager struct {
@@ -75,38 +75,37 @@ func (m *manager) Delete(ctx context.Context, projectID uint) error {
 	return m.store.Remove(ctx, projectID)
 }
 
-func (m *manager) GenerateVisualImage(ctx context.Context, project *Project) (*Project, error) {
-	if err := project.ValidateCreate(); err != nil {
-		return nil, err
+func (m *manager) GenerateReference(ctx context.Context, project *Project) (string, error) {
+	if err := project.ValidateReferenceGeneration(); err != nil {
+		return "", err
 	}
 	if m.imageClient == nil {
-		return nil, ErrImageServiceRequired
+		return "", ErrImageServiceRequired
 	}
 
 	request := &imageclient.GenerateRequest{
-		Prompt: buildVisualPrompt(project),
-		Size:   visualImageSize,
+		Prompt: buildReferencePrompt(project),
+		Size:   referenceSize,
 		Params: imageclient.Params{
-			"quality": visualImageQuality,
+			"quality": referenceQuality,
 		},
 	}
-	if reference := visualStyleReference(project.Reference); reference != "" {
+	if reference := referenceForGeneration(project.Reference); reference != "" {
 		request.ReferenceImages = []string{reference}
 	}
 
 	generated, err := m.imageClient.Generate(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("project: generate visual image: %w", err)
+		return "", fmt.Errorf("project: generate reference: %w", err)
 	}
 	if generated == nil || len(generated.Images) == 0 || strings.TrimSpace(generated.Images[0].Base64) == "" {
-		return nil, ErrVisualImageRequired
+		return "", ErrReferenceRequired
 	}
 
-	project.Reference = visualImageDataURL(generated.Images[0])
-	return project, nil
+	return referenceDataURL(generated.Images[0]), nil
 }
 
-func visualImageDataURL(image imageclient.GeneratedImage) string {
+func referenceDataURL(image imageclient.GeneratedImage) string {
 	mediaType := strings.TrimSpace(image.MediaType)
 	if mediaType == "" {
 		mediaType = "image/png"
@@ -116,7 +115,7 @@ func visualImageDataURL(image imageclient.GeneratedImage) string {
 
 var _ Manager = (*manager)(nil)
 
-func buildVisualPrompt(project *Project) string {
+func buildReferencePrompt(project *Project) string {
 	gameType := gameTypePrompt(project.GameType)
 	viewType := viewTypePrompt(project.ViewType)
 	platform := platformPrompt(project.TargetPlatform)
@@ -178,9 +177,9 @@ func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
 }
 
-// visualStyleReference only forwards references in formats accepted by the
+// referenceForGeneration only forwards references in formats accepted by the
 // image provider. Bare base64 values do not contain enough format information.
-func visualStyleReference(reference string) string {
+func referenceForGeneration(reference string) string {
 	reference = strings.TrimSpace(reference)
 	if strings.HasPrefix(reference, "data:image/") ||
 		strings.HasPrefix(reference, "https://") ||
@@ -213,12 +212,14 @@ func viewTypePrompt(viewType ViewType) string {
 
 func platformPrompt(platform PlatformType) string {
 	switch platform {
+	case PlatformTypePC:
+		return "PC; use precise information hierarchy and keyboard/controller-friendly HUD conventions; choose portrait, landscape, or square from the user brief rather than assuming widescreen"
 	case PlatformTypeMobile:
 		return "mobile; use large touch-friendly controls, strong small-screen readability, safe margins, and restrained HUD density"
 	case PlatformTypeWeb:
 		return "web; use a responsive gameplay layout, concise HUD, and instantly understandable interactions; choose portrait, landscape, or square from the user brief rather than assuming widescreen"
 	default:
-		return "PC; use precise information hierarchy and keyboard/controller-friendly HUD conventions; choose portrait, landscape, or square from the user brief rather than assuming widescreen"
+		return "an unspecified target platform; infer suitable controls, orientation, and information density from the user brief"
 	}
 }
 

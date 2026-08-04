@@ -39,12 +39,11 @@ func (h *ProjectHandler) Create(
 	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: project.ID}), nil
 }
 
-func (h *ProjectHandler) Generate(
+func (h *ProjectHandler) GenerateReference(
 	c context.Context,
-	request dto.CreateProjectRequest,
-) (dto.SuccessResponse[dto.ProjectResponse], error) {
+	request dto.GenerateProjectReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
 	project := &domain.Project{
-		UserID:         request.UserID,
 		Name:           request.Name,
 		GameType:       request.GameType,
 		ViewType:       request.ViewType,
@@ -54,12 +53,12 @@ func (h *ProjectHandler) Generate(
 		Style:          request.Style,
 	}
 
-	generated, err := h.manager.GenerateVisualImage(c, project)
+	reference, err := h.manager.GenerateReference(c, project)
 	if err != nil {
-		return dto.SuccessResponse[dto.ProjectResponse]{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}, projectHandlerError(err)
 	}
 
-	return dto.NewTypedSuccessResponse(*projectResponse(generated)), nil
+	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{Reference: reference}), nil
 }
 
 func (h *ProjectHandler) ListByUID(
