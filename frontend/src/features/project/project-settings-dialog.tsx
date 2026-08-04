@@ -19,7 +19,7 @@ import {
   createProjectSettingsDraft,
   editableProjectContextOptions,
   projectContextOptions,
-} from "./types";
+} from "./project-context";
 import type { ProjectSummary } from "@/model/project";
 
 export function ProjectSettingsDialog({

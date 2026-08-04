@@ -4,7 +4,10 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/model";
 
-import { createNewProjectDraft, toCreateProjectInput } from "../../types";
+import {
+  createNewProjectDraft,
+  toCreateProjectInput,
+} from "../../project-context";
 
 type NewProjectStart = "idea" | "blank" | "existing" | null;
 type ExistingGameImportMode = "link" | "file";
