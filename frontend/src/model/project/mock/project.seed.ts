@@ -10,6 +10,7 @@ export const projectSummaries: ProjectSummary[] = [
     platform: "PC",
     description:
       "A quiet orchard world where a young forager restores abandoned gardens by moonlight.",
+    reference: "",
     visualDirection: "",
     assetCount: 24,
   },
@@ -22,6 +23,7 @@ export const projectSummaries: ProjectSummary[] = [
     platform: "PC",
     description:
       "A mechanical harbor city built from cranes, furnaces, and weathered iron walkways.",
+    reference: "",
     visualDirection: "",
     assetCount: 18,
   },
@@ -34,6 +36,7 @@ export const projectSummaries: ProjectSummary[] = [
     platform: "Web",
     description:
       "A cheerful mushroom courier delivers parcels through a miniature woodland kingdom.",
+    reference: "",
     visualDirection: "",
     assetCount: 31,
   },

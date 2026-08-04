@@ -12,6 +12,7 @@ const projectInput: CreateProjectInput = {
   gameType: "Role-playing game",
   platform: "PC",
   description: "A second project with the same display name.",
+  reference: "",
   style: "Pixel art",
   visualStyle: "Pixel art",
   visualDirection: "",

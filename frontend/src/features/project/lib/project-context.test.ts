@@ -10,6 +10,7 @@ describe("toCreateProjectInput", () => {
       platform: "PC",
       description: "  Restore the orchard.  ",
       visualStyle: "  Pixel art  ",
+      reference: "https://example.com/game",
       visualDirection: "data:image/png;base64,preview",
     });
 
@@ -18,6 +19,7 @@ describe("toCreateProjectInput", () => {
       gameType: "Role-playing game",
       platform: "PC",
       description: "Restore the orchard.",
+      reference: "https://example.com/game",
       style: "Pixel art",
       visualStyle: "Pixel art",
       visualDirection: "data:image/png;base64,preview",

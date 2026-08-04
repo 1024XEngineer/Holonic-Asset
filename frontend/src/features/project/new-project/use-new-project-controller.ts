@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/model";
+import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import { createMockProjectPreview } from "@/model/project/mock";
 
 import {
@@ -26,10 +27,15 @@ export function useNewProjectController() {
   const [gameFile, setGameFile] = useState<File | null>(null);
   const [generatedPreview, setGeneratedPreview] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState("");
+  const [previewError, setPreviewError] = useState<string>();
+  const previewReadController = useRef<AbortController | null>(null);
   const [previewMode, setPreviewMode] =
     useState<ProjectPreviewMode>("generate");
   const projectPreview =
     previewMode === "generate" ? generatedPreview : uploadedPreview;
+
+  useEffect(() => () => previewReadController.current?.abort(), []);
+
   const form = useForm({
     defaultValues: createNewProjectDraft(),
     onSubmit: async ({ value }) => {
@@ -58,6 +64,8 @@ export function useNewProjectController() {
       chooseIdea: () => {
         setGeneratedPreview("");
         setUploadedPreview("");
+        setPreviewError(undefined);
+        form.setFieldValue("reference", "");
         setPreviewMode("generate");
         setStep(1);
         setSelectedStart("idea");
@@ -65,6 +73,8 @@ export function useNewProjectController() {
       chooseBlank: () => {
         setGeneratedPreview("");
         setUploadedPreview("");
+        setPreviewError(undefined);
+        form.setFieldValue("reference", "");
         setPreviewMode("generate");
         setStep(1);
         setSelectedStart("blank");
@@ -104,11 +114,28 @@ export function useNewProjectController() {
       generate: () =>
         setGeneratedPreview(createMockProjectPreview(form.state.values)),
       setFile: (file: File) => {
-        const reader = new FileReader();
-        reader.onload = () => setUploadedPreview(String(reader.result ?? ""));
-        reader.readAsDataURL(file);
+        previewReadController.current?.abort();
+        const controller = new AbortController();
+        previewReadController.current = controller;
+        setUploadedPreview("");
+        setPreviewError(undefined);
+        void readFileAsDataUrl(file, controller.signal).then(
+          (dataUrl) => {
+            if (controller.signal.aborted) return;
+            setUploadedPreview(dataUrl);
+          },
+          () => {
+            if (controller.signal.aborted) return;
+            setPreviewError("We couldn't read that image. Try another file.");
+          },
+        );
       },
-      clear: () => setUploadedPreview(""),
+      error: previewError,
+      clear: () => {
+        previewReadController.current?.abort();
+        setUploadedPreview("");
+        setPreviewError(undefined);
+      },
     },
     existingGameImport: {
       isOpen: importOpen,
@@ -121,6 +148,10 @@ export function useNewProjectController() {
       setGameFile,
       dismiss: () => setImportOpen(false),
       continue: () => {
+        form.setFieldValue(
+          "reference",
+          importMode === "link" ? gameUrl.trim() : (gameFile?.name ?? ""),
+        );
         setImportOpen(false);
         setStep(1);
         setSelectedStart("existing");

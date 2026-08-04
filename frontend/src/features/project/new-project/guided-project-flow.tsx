@@ -137,6 +137,7 @@ export function GuidedProjectFlow({
               className="aspect-[16/9] min-h-0"
               label="Upload project overview image"
               previewUrl={preview.url || undefined}
+              error={preview.error}
               onSelect={preview.setFile}
               onClear={preview.clear}
             />

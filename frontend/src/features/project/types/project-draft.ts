@@ -4,6 +4,7 @@ export type NewProjectDraft = {
   platform: string;
   description: string;
   visualStyle: string;
+  reference: string;
 };
 
 export type ProjectSettingsDraft = {

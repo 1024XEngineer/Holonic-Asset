@@ -29,6 +29,7 @@ export function createNewProjectDraft(): NewProjectDraft {
     platform: projectContextOptions.platforms[0],
     description: "",
     visualStyle: projectContextOptions.visualStyles[0],
+    reference: "",
   };
 }
 
@@ -42,6 +43,7 @@ export function toCreateProjectInput(
     gameType: draft.gameType,
     platform: draft.platform,
     description: draft.description.trim() || "A new game asset workspace.",
+    reference: draft.reference.trim(),
     style: visualStyle,
     visualStyle,
     visualDirection: draft.visualDirection ?? "",

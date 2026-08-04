@@ -56,6 +56,7 @@ export function toProjectSummary(
     gameType: projectGameTypeLabels[project.gameType],
     platform: project.targetPlatform,
     description: project.description,
+    reference: project.reference,
     style: project.style,
     visualStyle: project.style,
     visualDirection: "",

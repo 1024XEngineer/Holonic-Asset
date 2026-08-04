@@ -5,6 +5,7 @@ export type Project = {
   gameType: string;
   platform: string;
   description: string;
+  reference: string;
 };
 
 export type ProjectSummary = Project & {

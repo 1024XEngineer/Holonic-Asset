@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
+import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import {
   applyProjectSettings,
   createProjectSettingsDraft,
@@ -31,6 +33,8 @@ export function ProjectSettingsDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (project: ProjectSummary) => void;
 }) {
+  const [imageError, setImageError] = useState<string>();
+  const imageReadController = useRef<AbortController | null>(null);
   const form = useForm({
     defaultValues: createProjectSettingsDraft(project),
     onSubmit: ({ value }) => {
@@ -40,6 +44,8 @@ export function ProjectSettingsDialog({
       onOpenChange(false);
     },
   });
+
+  useEffect(() => () => imageReadController.current?.abort(), []);
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -182,17 +188,34 @@ export function ProjectSettingsDialog({
           <form.Field name="visualDirection">
             {(field) => (
               <div>
-                <p className="text-sm font-medium">Visual direction</p>
+                <p className="text-sm font-medium">Reference</p>
                 <ImageDropzone
                   className="mt-2 h-28"
                   previewUrl={field.state.value || undefined}
+                  error={imageError}
                   onSelect={(file) => {
-                    const reader = new FileReader();
-                    reader.onload = () =>
-                      field.handleChange(String(reader.result ?? ""));
-                    reader.readAsDataURL(file);
+                    imageReadController.current?.abort();
+                    const controller = new AbortController();
+                    imageReadController.current = controller;
+                    setImageError(undefined);
+                    void readFileAsDataUrl(file, controller.signal).then(
+                      (dataUrl) => {
+                        if (controller.signal.aborted) return;
+                        field.handleChange(dataUrl);
+                      },
+                      () => {
+                        if (controller.signal.aborted) return;
+                        setImageError(
+                          "We couldn't read that image. Try another file.",
+                        );
+                      },
+                    );
                   }}
-                  onClear={() => field.handleChange("")}
+                  onClear={() => {
+                    imageReadController.current?.abort();
+                    setImageError(undefined);
+                    field.handleChange("");
+                  }}
                 />
               </div>
             )}
