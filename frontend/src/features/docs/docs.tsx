@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 type ArticleId = "directions" | "perspective" | "reference";
 type Article = {
-  Content: ComponentType<{ components?: Record<string, ComponentType<never>> }>;
+  Content: ComponentType<{ components?: Record<string, ComponentType> }>;
   metadata: { title: string };
 };
 type OutlineItem = { id: string; label: string; level: 2 | 3 };
