@@ -13,7 +13,7 @@ export const projectContextOptions = {
     "Strategy",
     "Simulation",
   ],
-  visualStyles: ["Pixel art", "Hand-painted", "Cartoon"],
+  visualStyles: ["Top-down", "Side-on", "Isometric"],
   platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
 } as const;
 

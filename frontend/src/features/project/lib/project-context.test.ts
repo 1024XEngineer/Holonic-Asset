@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toCreateProjectInput } from "./project-context";
+import { projectContextOptions, toCreateProjectInput } from "./project-context";
 
 describe("toCreateProjectInput", () => {
   it("creates an API input without assigning project identity", () => {
@@ -9,7 +9,7 @@ describe("toCreateProjectInput", () => {
       gameType: "Role-playing game",
       platform: "PC",
       description: "  Restore the orchard.  ",
-      visualStyle: "  Pixel art  ",
+      visualStyle: "  Top-down  ",
       reference: "https://example.com/game",
       visualDirection: "data:image/png;base64,preview",
     });
@@ -20,11 +20,19 @@ describe("toCreateProjectInput", () => {
       platform: "PC",
       description: "Restore the orchard.",
       reference: "https://example.com/game",
-      style: "Pixel art",
-      visualStyle: "Pixel art",
+      style: "Top-down",
+      visualStyle: "Top-down",
       visualDirection: "data:image/png;base64,preview",
     });
     expect(input).not.toHaveProperty("id");
     expect(input).not.toHaveProperty("assetCount");
+  });
+
+  it("limits visual styles to supported game views", () => {
+    expect(projectContextOptions.visualStyles).toEqual([
+      "Top-down",
+      "Side-on",
+      "Isometric",
+    ]);
   });
 });
