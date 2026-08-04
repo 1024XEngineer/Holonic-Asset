@@ -1,4 +1,4 @@
-import { NewProjectWorkspace } from "./new-project-workspace";
+import { NewProjectWorkspace } from "./new-project";
 import { useNewProjectController } from "./use-new-project-controller";
 
 export function NewProject() {
