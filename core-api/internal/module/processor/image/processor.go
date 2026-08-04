@@ -56,7 +56,7 @@ func (p *processor) RemoveBackground(
 		request.Softness,
 		request.SpillSuppression,
 	)
-	output, report := ExtractChromaWithReport(input.image, matte, settings)
+	output, report := ExtractChromaWithReport(ToRGBA(input.image), matte, settings)
 	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (p *processor) Verify(
 		expectedMatte = &matte
 	}
 	report := verifyImage(
-		input.image,
+		ToRGBA(input.image),
 		input.format == "png",
 		input.colorType,
 		input.hasAlpha,
