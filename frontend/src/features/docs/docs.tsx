@@ -113,9 +113,10 @@ export function Docs() {
     if (outline.length === 0) return;
     const syncActiveOutline = () => {
       const lastOutlineId = outline[outline.length - 1].id;
+      const scrollableHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
       const reachedDocumentEnd =
-        window.scrollY + window.innerHeight >=
-        document.documentElement.scrollHeight - 1;
+        scrollableHeight > 0 && window.scrollY >= scrollableHeight - 1;
       if (reachedDocumentEnd) {
         setActiveOutlineId(lastOutlineId);
         return;
