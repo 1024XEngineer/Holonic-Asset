@@ -92,11 +92,10 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		return payload, nil
 	case EditCharacterProtoType,
-		EditCharacterAnimation,
 		EditCharacterFrames,
 		EditObjectProtoType,
-		EditObjectAnimation,
 		EditObjectFrames,
+		EditAnimation,
 		EditTilesetItem,
 		EditTiles:
 		return struct{}{}, nil
