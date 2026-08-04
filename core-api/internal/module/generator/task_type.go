@@ -3,21 +3,19 @@ package generator
 type TaskType string
 
 const (
-	GenerateCharacterProtoType   TaskType = "generate_character_prototype"
-	GenerateCharacterAnimation   TaskType = "generate_character_animation"
-	RegenerateCharacterProtoType TaskType = "regenerate_character_prototype"
-	RegenerateCharacterAnimation TaskType = "regenerate_character_animation"
-	RegenerateCharacterFrames    TaskType = "regenerate_character_frames"
+	GenerateCharacterProtoType TaskType = "generate_character_prototype"
+	EditCharacterProtoType     TaskType = "edit_character_prototype"
+	EditCharacterFrames        TaskType = "edit_character_frames"
 
-	GenerateObjectProtoType   TaskType = "generate_object_prototype"
-	GenerateObjectAnimation   TaskType = "generate_object_animation"
-	RegenerateObjectProtoType TaskType = "regenerate_object_prototype"
-	RegenerateObjectAnimation TaskType = "regenerate_object_animation"
-	RegenerateObjectFrames    TaskType = "regenerate_object_frames"
+	GenerateObjectProtoType TaskType = "generate_object_prototype"
+	EditObjectProtoType     TaskType = "edit_object_prototype"
+	EditObjectFrames        TaskType = "edit_object_frames"
 
-	GenerateTileSet TaskType = "generate_tileset"
-	RegenerateItem  TaskType = "regenerate_item"
-	RegenerateTiles TaskType = "regenerate_tiles"
+	GenerateAnimation TaskType = "generate_animation"
+	EditAnimation     TaskType = "edit_animation"
+	GenerateTileSet   TaskType = "generate_tileset"
+	EditTilesetItem   TaskType = "edit_tileset_item"
+	EditTiles         TaskType = "edit_tiles"
 )
 
 func ProjectLevelTaskTypes() []TaskType {
@@ -31,17 +29,15 @@ func ProjectLevelTaskTypes() []TaskType {
 func TaskTypes() []TaskType {
 	return []TaskType{
 		GenerateCharacterProtoType,
-		GenerateCharacterAnimation,
-		RegenerateCharacterProtoType,
-		RegenerateCharacterAnimation,
-		RegenerateCharacterFrames,
+		EditCharacterProtoType,
+		EditCharacterFrames,
 		GenerateObjectProtoType,
-		GenerateObjectAnimation,
-		RegenerateObjectProtoType,
-		RegenerateObjectAnimation,
-		RegenerateObjectFrames,
+		EditObjectProtoType,
+		EditObjectFrames,
+		GenerateAnimation,
+		EditAnimation,
 		GenerateTileSet,
-		RegenerateItem,
-		RegenerateTiles,
+		EditTilesetItem,
+		EditTiles,
 	}
 }

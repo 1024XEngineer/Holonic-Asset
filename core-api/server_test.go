@@ -28,6 +28,13 @@ func TestNewAppBuildsApplication(t *testing.T) {
 	}
 }
 
+func TestResolveConfigPathUsesConfigYamlByDefault(t *testing.T) {
+	t.Setenv(configPathEnv, "")
+	if path := resolveConfigPath(); path != "config.yaml" {
+		t.Fatalf("unexpected default config path: %q", path)
+	}
+}
+
 func TestNewAppWithAssetStoreRegistersAssetRoutes(t *testing.T) {
 	app := newApp(&projectDaoStub{}, &assetStoreStub{})
 

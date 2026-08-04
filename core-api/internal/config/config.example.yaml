@@ -18,14 +18,14 @@ log:
   compress: true
 
 qna:
-  baseURL: "https://example.com"
+  baseURL: "https://api.qnaigc.com"
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
 
-  qiniu:
-    accessKey: ""
-    secretKey: ""
-    bucket: ""
-    domain: ""
-    uploadURL: ""
-    uploadTokenExpiry: 1h
+qiniu:
+  accessKey: ""
+  secretKey: ""
+  bucket: ""
+  domain: ""
+  uploadURL: ""
+  uploadTokenExpiry: 1h

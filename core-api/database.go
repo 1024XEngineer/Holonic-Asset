@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -61,8 +64,33 @@ func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.D
 		_ = sqlDB.Close()
 		return nil, fmt.Errorf("app: initialize database tables: %w", err)
 	}
+	if err := InitRiver(ctx, cfg.DSN); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 
 	return db, nil
+}
+
+func InitRiver(ctx context.Context, dsn string) error {
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return fmt.Errorf("app: create River database pool: %w", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("app: ping River database: %w", err)
+	}
+
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
+	if err != nil {
+		return fmt.Errorf("app: create River migrator: %w", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		return fmt.Errorf("app: migrate River tables: %w", err)
+	}
+	return nil
 }
 
 type gormLoggerFunc func(msg string, fields ...logger.Field)

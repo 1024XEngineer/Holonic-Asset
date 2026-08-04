@@ -50,6 +50,22 @@ log:
 	}
 }
 
+func TestLoadConfigDecodesExampleConfig(t *testing.T) {
+	path := filepath.Join("..", "..", "config", "config.example.yaml")
+
+	var loaded config.Config
+	if err := viperx.LoadConfig(path, &loaded); err != nil {
+		t.Fatalf("load example config: %v", err)
+	}
+
+	if loaded.QNA.DefaultModel != "openai/gpt-image-2" {
+		t.Fatalf("unexpected qna config: %+v", loaded.QNA)
+	}
+	if loaded.QiNiu.UploadTokenExpiry != time.Hour {
+		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
+	}
+}
+
 func TestLoadConfigRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("db:\n  unknown: true\n"), 0o600); err != nil {
