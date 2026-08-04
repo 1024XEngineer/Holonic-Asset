@@ -24,7 +24,11 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         <ArrowLeft className="size-4" />
         Back
       </button>
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6">
+      <div
+        className={`mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6 ${
+          selectedStart ? "" : "flex min-h-screen flex-col"
+        }`}
+      >
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
@@ -45,10 +49,12 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         </div>
 
         {!selectedStart ? (
-          <div className="mx-auto mt-20 grid max-w-6xl gap-x-4 gap-y-8 sm:grid-cols-3">
-            <ExistingGameFlow active={false} project={project} />
-            <IdeaProjectFlow active={false} project={project} />
-            <BlankProjectFlow active={false} project={project} />
+          <div className="flex flex-1 items-center">
+            <div className="mx-auto grid w-full max-w-6xl gap-x-4 gap-y-8 sm:grid-cols-3">
+              <ExistingGameFlow active={false} project={project} />
+              <IdeaProjectFlow active={false} project={project} />
+              <BlankProjectFlow active={false} project={project} />
+            </div>
           </div>
         ) : selectedStart === "existing" ? (
           <ExistingGameFlow active project={project} />
