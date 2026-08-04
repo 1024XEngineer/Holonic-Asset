@@ -10,10 +10,15 @@ export function useCreateProjectMutation() {
   return useMutation({
     mutationFn: projectApi.create,
     onSuccess: (project) => {
-      queryClient.setQueryData<ProjectSummary[]>(
+      const current = queryClient.getQueryData<ProjectSummary[]>(
         projectKeys.list(),
-        (current = []) => [...current, project],
       );
+      if (!current) return;
+
+      queryClient.setQueryData<ProjectSummary[]>(projectKeys.list(), [
+        ...current,
+        project,
+      ]);
     },
   });
 }

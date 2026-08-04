@@ -8,7 +8,7 @@ import {
 import { deleteMockProjectAssets } from "../asset/library/mock";
 import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
 import type { ProjectGameType, ProjectResponse } from "./project.contract";
-import type { ProjectSummary } from "./types";
+import type { CreateProjectInput, ProjectSummary } from "./types";
 
 export { coreProjectApi } from "./core-project.api";
 export type {
@@ -29,7 +29,7 @@ export type {
 export type ProjectApi = {
   list: () => Promise<ProjectSummary[]>;
   detail: (projectId: string) => Promise<ProjectSummary>;
-  create: (project: ProjectSummary) => Promise<ProjectSummary>;
+  create: (input: CreateProjectInput) => Promise<ProjectSummary>;
   update: (project: ProjectSummary) => Promise<ProjectSummary>;
   delete: (projectId: string) => Promise<void>;
 };
@@ -37,7 +37,7 @@ export type ProjectApi = {
 export const projectApi: ProjectApi = {
   list: (): Promise<ProjectSummary[]> => listMockProjects(),
   detail: (projectId: string) => getMockProject(projectId),
-  create: (project: ProjectSummary) => createMockProject(project),
+  create: (input: CreateProjectInput) => createMockProject(input),
   update: (project: ProjectSummary) => updateMockProject(project),
   delete: async (projectId: string) => {
     await deleteMockProject(projectId);

@@ -126,7 +126,7 @@ export {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";
-export type { Project, ProjectSummary } from "./project";
+export type { CreateProjectInput, Project, ProjectSummary } from "./project";
 export { coreProjectApi } from "./project/project.api";
 export type {
   CreateProjectRequest,

@@ -1,4 +1,4 @@
-import type { ProjectSummary } from "@/model/project";
+import type { CreateProjectInput, ProjectSummary } from "@/model/project";
 
 import type {
   NewProjectDraft,
@@ -32,22 +32,19 @@ export function createNewProjectDraft(): NewProjectDraft {
   };
 }
 
-export function toProjectSummary(
-  draft: NewProjectDraft,
-  fallbackId = `project-${Date.now()}`,
-): ProjectSummary {
+export function toCreateProjectInput(
+  draft: NewProjectDraft & { visualDirection?: string },
+): CreateProjectInput {
   const visualStyle = draft.visualStyle.trim();
 
   return {
-    id: createProjectId(draft.name, fallbackId),
     name: draft.name.trim(),
     gameType: draft.gameType,
     platform: draft.platform,
     description: draft.description.trim() || "A new game asset workspace.",
     style: visualStyle,
     visualStyle,
-    visualDirection: "",
-    assetCount: 0,
+    visualDirection: draft.visualDirection ?? "",
   };
 }
 
@@ -117,16 +114,6 @@ export function applyProjectSettings(
     description: draft.description,
     visualDirection: draft.visualDirection,
   };
-}
-
-function createProjectId(name: string, fallbackId: string) {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || fallbackId
-  );
 }
 
 function isKnownOption(options: readonly string[], value: string) {

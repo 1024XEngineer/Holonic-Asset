@@ -4,7 +4,7 @@ export {
   createProjectSettingsDraft,
   editableProjectContextOptions,
   projectContextOptions,
-  toProjectSummary,
+  toCreateProjectInput,
   updateProjectSettingsDraft,
 } from "./project-context";
 export type {

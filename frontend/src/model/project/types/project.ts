@@ -12,3 +12,5 @@ export type ProjectSummary = Project & {
   visualDirection: string;
   assetCount: number;
 };
+
+export type CreateProjectInput = Omit<ProjectSummary, "id" | "assetCount">;
