@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -53,111 +53,185 @@ export function useNewProjectController() {
     },
   });
 
-  return {
-    backToLibrary: () =>
+  const backToLibrary = useCallback(
+    () =>
       void navigate({
         to: "/projects",
         search: { project: undefined, q: "" },
       }),
-    start: {
+    [navigate],
+  );
+
+  const chooseIdea = useCallback(() => {
+    setGeneratedPreview("");
+    setUploadedPreview("");
+    setPreviewError(undefined);
+    form.setFieldValue("reference", "");
+    setPreviewMode("generate");
+    setStep(1);
+    setSelectedStart("idea");
+  }, [form]);
+
+  const chooseBlank = useCallback(() => {
+    setGeneratedPreview("");
+    setUploadedPreview("");
+    setPreviewError(undefined);
+    form.setFieldValue("reference", "");
+    setPreviewMode("generate");
+    setStep(1);
+    setSelectedStart("blank");
+  }, [form]);
+
+  const openExistingGameImport = useCallback(() => setImportOpen(true), []);
+
+  const previous = useCallback(() => {
+    if (step === 1 || selectedStart === "blank") setSelectedStart(null);
+    else setStep(1);
+  }, [selectedStart, step]);
+
+  const next = useCallback(() => {
+    if (selectedStart === "blank") void form.handleSubmit();
+    else {
+      setPreviewMode("generate");
+      setGeneratedPreview(createMockProjectPreview(form.state.values));
+      setStep(2);
+    }
+  }, [form, selectedStart]);
+
+  const returnToStart = useCallback(() => {
+    setStep(1);
+    setSelectedStart(null);
+  }, []);
+
+  const selectGenerate = useCallback(() => {
+    setPreviewMode("generate");
+    if (!generatedPreview)
+      setGeneratedPreview(createMockProjectPreview(form.state.values));
+  }, [form, generatedPreview]);
+
+  const selectUpload = useCallback(() => setPreviewMode("upload"), []);
+
+  const generate = useCallback(
+    () => setGeneratedPreview(createMockProjectPreview(form.state.values)),
+    [form],
+  );
+
+  const setFile = useCallback((file: File) => {
+    previewReadController.current?.abort();
+    const controller = new AbortController();
+    previewReadController.current = controller;
+    setUploadedPreview("");
+    setPreviewError(undefined);
+    void readFileAsDataUrl(file, controller.signal).then(
+      (dataUrl) => {
+        if (controller.signal.aborted) return;
+        setUploadedPreview(dataUrl);
+      },
+      () => {
+        if (controller.signal.aborted) return;
+        setPreviewError("We couldn't read that image. Try another file.");
+      },
+    );
+  }, []);
+
+  const clear = useCallback(() => {
+    previewReadController.current?.abort();
+    setUploadedPreview("");
+    setPreviewError(undefined);
+  }, []);
+
+  const selectLink = useCallback(() => setImportMode("link"), []);
+  const selectFile = useCallback(() => setImportMode("file"), []);
+
+  const continueExistingGameImport = useCallback(() => {
+    form.setFieldValue(
+      "reference",
+      importMode === "link" ? gameUrl.trim() : (gameFile?.name ?? ""),
+    );
+    setImportOpen(false);
+    setStep(1);
+    setSelectedStart("existing");
+  }, [form, gameFile, gameUrl, importMode]);
+
+  const start = useMemo(
+    () => ({
       selected: selectedStart,
-      chooseIdea: () => {
-        setGeneratedPreview("");
-        setUploadedPreview("");
-        setPreviewError(undefined);
-        form.setFieldValue("reference", "");
-        setPreviewMode("generate");
-        setStep(1);
-        setSelectedStart("idea");
-      },
-      chooseBlank: () => {
-        setGeneratedPreview("");
-        setUploadedPreview("");
-        setPreviewError(undefined);
-        form.setFieldValue("reference", "");
-        setPreviewMode("generate");
-        setStep(1);
-        setSelectedStart("blank");
-      },
-      openExistingGameImport: () => setImportOpen(true),
-    },
-    form: {
+      chooseIdea,
+      chooseBlank,
+      openExistingGameImport,
+    }),
+    [chooseBlank, chooseIdea, openExistingGameImport, selectedStart],
+  );
+
+  const formController = useMemo(
+    () => ({
       instance: form,
       selectedStart,
       step,
-      previous: () => {
-        if (step === 1 || selectedStart === "blank") setSelectedStart(null);
-        else setStep(1);
-      },
-      next: () => {
-        if (selectedStart === "blank") void form.handleSubmit();
-        else {
-          setPreviewMode("generate");
-          setGeneratedPreview(createMockProjectPreview(form.state.values));
-          setStep(2);
-        }
-      },
-      returnToStart: () => {
-        setStep(1);
-        setSelectedStart(null);
-      },
-    },
-    preview: {
+      previous,
+      next,
+      returnToStart,
+    }),
+    [form, next, previous, returnToStart, selectedStart, step],
+  );
+
+  const preview = useMemo(
+    () => ({
       mode: previewMode,
       url: projectPreview,
-      selectGenerate: () => {
-        setPreviewMode("generate");
-        if (!generatedPreview)
-          setGeneratedPreview(createMockProjectPreview(form.state.values));
-      },
-      selectUpload: () => setPreviewMode("upload"),
-      generate: () =>
-        setGeneratedPreview(createMockProjectPreview(form.state.values)),
-      setFile: (file: File) => {
-        previewReadController.current?.abort();
-        const controller = new AbortController();
-        previewReadController.current = controller;
-        setUploadedPreview("");
-        setPreviewError(undefined);
-        void readFileAsDataUrl(file, controller.signal).then(
-          (dataUrl) => {
-            if (controller.signal.aborted) return;
-            setUploadedPreview(dataUrl);
-          },
-          () => {
-            if (controller.signal.aborted) return;
-            setPreviewError("We couldn't read that image. Try another file.");
-          },
-        );
-      },
+      selectGenerate,
+      selectUpload,
+      generate,
+      setFile,
       error: previewError,
-      clear: () => {
-        previewReadController.current?.abort();
-        setUploadedPreview("");
-        setPreviewError(undefined);
-      },
-    },
-    existingGameImport: {
+      clear,
+    }),
+    [
+      clear,
+      generate,
+      previewError,
+      previewMode,
+      projectPreview,
+      selectGenerate,
+      selectUpload,
+      setFile,
+    ],
+  );
+
+  const existingGameImport = useMemo(
+    () => ({
       isOpen: importOpen,
       mode: importMode,
       gameUrl,
       gameFile,
-      selectLink: () => setImportMode("link"),
-      selectFile: () => setImportMode("file"),
+      selectLink,
+      selectFile,
       setGameUrl,
       setGameFile,
       dismiss: () => setImportOpen(false),
-      continue: () => {
-        form.setFieldValue(
-          "reference",
-          importMode === "link" ? gameUrl.trim() : (gameFile?.name ?? ""),
-        );
-        setImportOpen(false);
-        setStep(1);
-        setSelectedStart("existing");
-      },
-    },
-  };
+      continue: continueExistingGameImport,
+    }),
+    [
+      continueExistingGameImport,
+      gameFile,
+      gameUrl,
+      importMode,
+      importOpen,
+      selectFile,
+      selectLink,
+    ],
+  );
+
+  return useMemo(
+    () => ({
+      backToLibrary,
+      start,
+      form: formController,
+      preview,
+      existingGameImport,
+    }),
+    [backToLibrary, existingGameImport, formController, preview, start],
+  );
 }
 
 export type NewProjectController = ReturnType<typeof useNewProjectController>;
