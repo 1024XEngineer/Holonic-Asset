@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ComponentPropsWithoutRef, ComponentType } from "react";
+import { useScrollSpy } from "@mantine/hooks";
 
 import DirectionsEn, {
   metadata as directionsEn,
@@ -16,7 +17,6 @@ type Article = {
   Content: ComponentType<{ components?: Record<string, ComponentType> }>;
   metadata: { title: string };
 };
-type OutlineItem = { id: string; label: string; level: 2 | 3 };
 
 const articles: Record<ArticleId, Article> = {
   reference: { Content: ReferenceEn, metadata: referenceEn },
@@ -25,20 +25,6 @@ const articles: Record<ArticleId, Article> = {
 };
 
 const articleOrder: ArticleId[] = ["reference", "perspective", "directions"];
-
-function createAnchorId(text: string, usedIds: Set<string>) {
-  const base =
-    text
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "section";
-  let id = base;
-  let suffix = 2;
-  while (usedIds.has(id)) id = `${base}-${suffix++}`;
-  usedIds.add(id);
-  return id;
-}
 
 const mdxComponents = {
   h2: ({ className, ...props }: ComponentPropsWithoutRef<"h2">) => (
@@ -82,80 +68,18 @@ const mdxComponents = {
 export function Docs() {
   const [activeArticle, setActiveArticle] = useState<ArticleId>("reference");
   const article = articles[activeArticle];
-  const onThisPage = "On this page";
-  const [outline, setOutline] = useState<OutlineItem[]>([]);
-  const [activeOutlineId, setActiveOutlineId] = useState("");
+  const outline = useScrollSpy({
+    selector: `#${activeArticle}-panel :is(h2, h3)`,
+    offset: 80,
+  });
+  const [selectedOutlineId, setSelectedOutlineId] = useState<string | null>(
+    null,
+  );
+  const activeOutlineId = selectedOutlineId ?? outline.data[outline.active]?.id;
 
   useEffect(() => {
-    const panel = document.getElementById(`${activeArticle}-panel`);
-    if (!panel) return;
-
-    const usedIds = new Set<string>();
-    const nextOutline = Array.from(panel.querySelectorAll("h2, h3")).map(
-      (heading) => {
-        const id =
-          heading.id || createAnchorId(heading.textContent ?? "", usedIds);
-        heading.id = id;
-        usedIds.add(id);
-        return {
-          id,
-          label: heading.textContent ?? "",
-          level: heading.tagName === "H2" ? 2 : 3,
-        } as OutlineItem;
-      },
-    );
-
-    setOutline(nextOutline);
-    setActiveOutlineId(nextOutline[0]?.id ?? "");
-  }, [activeArticle]);
-
-  useEffect(() => {
-    if (outline.length === 0) return;
-    const syncActiveOutline = () => {
-      const lastOutlineId = outline[outline.length - 1].id;
-      const scrollableHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-      const reachedDocumentEnd =
-        scrollableHeight > 0 && window.scrollY >= scrollableHeight - 1;
-      if (reachedDocumentEnd) {
-        setActiveOutlineId(lastOutlineId);
-        return;
-      }
-
-      const offset = 80;
-      let nextActiveOutlineId = outline[0].id;
-      let closestOutlineId = nextActiveOutlineId;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      for (const { id } of outline) {
-        const heading = document.getElementById(id);
-        if (!heading) continue;
-
-        const distance = Math.abs(heading.getBoundingClientRect().top - offset);
-        if (distance < closestDistance) {
-          closestOutlineId = id;
-          closestDistance = distance;
-        }
-
-        if (heading.getBoundingClientRect().top <= offset) {
-          nextActiveOutlineId = id;
-        }
-      }
-
-      setActiveOutlineId(
-        closestDistance <= 32 ? closestOutlineId : nextActiveOutlineId,
-      );
-    };
-
-    syncActiveOutline();
-    window.addEventListener("scroll", syncActiveOutline, { passive: true });
-    window.addEventListener("resize", syncActiveOutline);
-
-    return () => {
-      window.removeEventListener("scroll", syncActiveOutline);
-      window.removeEventListener("resize", syncActiveOutline);
-    };
-  }, [outline]);
+    setSelectedOutlineId(null);
+  }, [activeArticle, outline.active]);
 
   return (
     <div className="min-h-screen bg-white text-neutral-950">
@@ -164,7 +88,7 @@ export function Docs() {
         <div className="mx-auto grid max-w-[110rem] lg:grid-cols-[17rem_minmax(0,1fr)_14rem]">
           <aside className="border-b border-neutral-950/10 bg-white px-5 py-8 sm:px-8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-10 lg:py-12">
             <nav
-              aria-label={onThisPage}
+              aria-label="Documentation topics"
               role="tablist"
               className="flex gap-1 overflow-x-auto pb-1 lg:block lg:space-y-1.5 lg:overflow-visible"
             >
@@ -203,25 +127,25 @@ export function Docs() {
           </article>
 
           <aside className="hidden border-l border-neutral-950/10 bg-white px-7 py-12 lg:sticky lg:top-14 lg:block lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto">
-            <nav aria-label={onThisPage}>
+            <nav aria-label="Table of contents">
               <ol className="mt-5 space-y-3 border-l border-neutral-950/15 pl-4">
-                {outline.map(({ id, label, level }) => (
+                {outline.data.map(({ id, value, depth }) => (
                   <li key={id}>
                     <a
                       href={`#${id}`}
-                      onClick={() => setActiveOutlineId(id)}
+                      onClick={() => setSelectedOutlineId(id)}
                       aria-current={
                         activeOutlineId === id ? "location" : undefined
                       }
                       className={cn(
                         "block text-xs leading-5 transition-colors hover:text-cyan-700",
-                        level === 3 && "pl-3",
+                        depth === 3 && "pl-3",
                         activeOutlineId === id
                           ? "font-semibold text-neutral-950"
                           : "text-neutral-500",
                       )}
                     >
-                      {label}
+                      {value}
                     </a>
                   </li>
                 ))}
