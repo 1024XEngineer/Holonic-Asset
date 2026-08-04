@@ -23,7 +23,8 @@ type unreachableProjectDao struct {
 
 type projectRouterStub struct {
 	router.ProjectRouter
-	createRequest dto.CreateProjectRequest
+	createRequest            dto.CreateProjectRequest
+	generateReferenceRequest dto.GenerateProjectReferenceRequest
 }
 
 func (s *projectRouterStub) Create(
@@ -32,6 +33,70 @@ func (s *projectRouterStub) Create(
 ) (dto.SuccessResponse[dto.CreateProjectResponse], error) {
 	s.createRequest = request
 	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: 42}), nil
+}
+
+func (s *projectRouterStub) GenerateReference(
+	_ context.Context,
+	request dto.GenerateProjectReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	s.generateReferenceRequest = request
+	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{
+		Reference: "data:image/png;base64,aGVsbG8=",
+	}), nil
+}
+
+func TestProjectReferenceGenerationUsesOpenAPIContract(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/reference/generate",
+		`{"name":"Prototype","description":"养殖游戏"}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if stub.generateReferenceRequest.Name != "Prototype" || stub.generateReferenceRequest.Description != "养殖游戏" {
+		t.Fatalf("unexpected generate reference request: %+v", stub.generateReferenceRequest)
+	}
+	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"reference\":\"data:image/png;base64,aGVsbG8=\"}}\n" {
+		t.Fatalf("unexpected generate reference response: %s", recorder.Body.String())
+	}
+}
+
+func TestProjectReferenceGenerationAllowsExplicitEmptyClassifications(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/reference/generate",
+		`{"name":"Prototype","gameType":"","viewType":"","targetPlatform":""}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestProjectCreateAllowsOmittedClassifications(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/create",
+		`{"userID":7,"name":"Prototype"}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
 }
 
 func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
@@ -106,7 +171,7 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 
 func newProjectTestServer(projectDao dao.ProjectDao) *echo.Echo {
 	projectRepository := repository.NewProjectRepository(projectDao)
-	projectManager := project.NewManager(projectRepository)
+	projectManager := project.NewManager(projectRepository, nil)
 	projectHandler := handler.NewProjectHandler(projectManager)
 	return router.Register(nil, projectHandler, nil, nil)
 }
