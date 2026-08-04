@@ -15,18 +15,17 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
   const isBlank = selectedStart === "blank";
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="relative min-h-screen bg-background">
+      <button
+        type="button"
+        onClick={selectedStart ? form.returnToStart : backToLibrary}
+        className="absolute left-4 top-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:left-6 sm:top-6"
+      >
+        <ArrowLeft className="size-4" />
+        Back
+      </button>
       <div className="mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6">
-        <button
-          type="button"
-          onClick={selectedStart ? form.returnToStart : backToLibrary}
-          className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </button>
-
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {selectedStart
@@ -43,21 +42,21 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
                 : "Pick the option that best matches where you are today."}
             </p>
           </div>
-
-          {!selectedStart ? (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <ExistingGameFlow active={false} project={project} />
-              <IdeaProjectFlow active={false} project={project} />
-              <BlankProjectFlow active={false} project={project} />
-            </div>
-          ) : selectedStart === "existing" ? (
-            <ExistingGameFlow active project={project} />
-          ) : selectedStart === "idea" ? (
-            <IdeaProjectFlow active project={project} />
-          ) : (
-            <BlankProjectFlow active project={project} />
-          )}
         </div>
+
+        {!selectedStart ? (
+          <div className="mx-auto mt-20 grid max-w-6xl gap-x-4 gap-y-8 sm:grid-cols-3">
+            <ExistingGameFlow active={false} project={project} />
+            <IdeaProjectFlow active={false} project={project} />
+            <BlankProjectFlow active={false} project={project} />
+          </div>
+        ) : selectedStart === "existing" ? (
+          <ExistingGameFlow active project={project} />
+        ) : selectedStart === "idea" ? (
+          <IdeaProjectFlow active project={project} />
+        ) : (
+          <BlankProjectFlow active project={project} />
+        )}
       </div>
     </main>
   );
