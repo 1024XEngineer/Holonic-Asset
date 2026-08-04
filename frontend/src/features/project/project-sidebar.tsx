@@ -1,4 +1,11 @@
-import { ChevronLeft, ChevronRight, Folder, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Folder,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -26,7 +33,11 @@ export function ProjectSidebar({
   library: ProjectLibraryProjectModel;
 }) {
   const [isOpen, setIsOpen] = useState(true);
+  const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
+  const editingProject = items.find(
+    (project) => project.id === editingProjectId,
+  );
 
   const isSelected = (projectId: string) => projectId === selectedId;
   const projectButton = (project: ProjectSummary, compact = false) => (
@@ -114,11 +125,16 @@ export function ProjectSidebar({
                   )}
                 >
                   {projectButton(project)}
-                  <ProjectSettingsDialog
-                    project={project}
-                    onSave={update}
-                    iconOnly
-                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-foreground/10 hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-foreground"
+                    aria-label={`Edit ${project.name}`}
+                    onClick={() => setEditingProjectId(project.id)}
+                  >
+                    <Pencil />
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger
                       render={
@@ -185,6 +201,16 @@ export function ProjectSidebar({
           {items.map((project) => projectButton(project, true))}
         </div>
       </div>
+      {editingProject ? (
+        <ProjectSettingsDialog
+          key={editingProject.id}
+          project={editingProject}
+          onOpenChange={(open) => {
+            if (!open) setEditingProjectId(undefined);
+          }}
+          onSave={update}
+        />
+      ) : null}
     </aside>
   );
 }

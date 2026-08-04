@@ -1,6 +1,4 @@
-import { Pencil } from "lucide-react";
-import { useForm, useStore } from "@tanstack/react-form";
-import { useEffect, useState } from "react";
+import { useForm } from "@tanstack/react-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
@@ -22,84 +19,30 @@ import {
   createProjectSettingsDraft,
   editableProjectContextOptions,
   projectContextOptions,
-  updateProjectSettingsDraft,
-  type ProjectSettingsDraft,
 } from "./types";
 import type { ProjectSummary } from "@/model/project";
 
 export function ProjectSettingsDialog({
   project,
+  onOpenChange,
   onSave,
-  iconOnly = false,
 }: {
   project: ProjectSummary;
+  onOpenChange: (open: boolean) => void;
   onSave: (project: ProjectSummary) => void;
-  iconOnly?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const form = useForm({
-    defaultValues: { draft: createProjectSettingsDraft(project) },
+    defaultValues: createProjectSettingsDraft(project),
     onSubmit: ({ value }) => {
-      const updatedProject = applyProjectSettings(project, value.draft);
+      const updatedProject = applyProjectSettings(project, value);
       if (!updatedProject) return;
       onSave(updatedProject);
-      setOpen(false);
+      onOpenChange(false);
     },
   });
-  const values = useStore(form.store, (state) => state.values.draft);
-
-  useEffect(() => {
-    form.reset({ draft: createProjectSettingsDraft(project) });
-  }, [project]);
-
-  function update<K extends keyof ProjectSettingsDraft>(
-    key: K,
-    value: ProjectSettingsDraft[K],
-  ) {
-    form.setFieldValue(
-      "draft",
-      updateProjectSettingsDraft(form.state.values.draft, key, value),
-    );
-  }
-
-  function uploadDirection(file: File | undefined) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () =>
-      update("visualDirection", String(reader.result ?? ""));
-    reader.readAsDataURL(file);
-  }
-
-  function changeOpen(nextOpen: boolean) {
-    if (nextOpen) {
-      form.reset({ draft: createProjectSettingsDraft(project) });
-    }
-    setOpen(nextOpen);
-  }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size={iconOnly ? "icon-sm" : "sm"}
-            className={
-              iconOnly
-                ? "pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-foreground/10 hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-foreground"
-                : undefined
-            }
-            aria-label={`Edit ${project.name}`}
-          />
-        }
-      >
-        <Pencil data-icon={iconOnly ? undefined : "inline-start"} />
-        {iconOnly ? (
-          <span className="sr-only">Edit project</span>
-        ) : (
-          "Edit project"
-        )}
-      </DialogTrigger>
+    <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit project</DialogTitle>
@@ -115,84 +58,145 @@ export function ProjectSettingsDialog({
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-medium sm:col-span-2">
-              Project name
-              <Input
-                required
-                value={values.name}
-                onChange={(event) => update("name", event.target.value)}
-              />
-            </label>
-            <DropdownField
-              label="Game type"
-              value={values.gameType}
-              options={[...editableProjectContextOptions.gameTypes]}
-              onChange={(value) => update("gameType", value)}
-            />
-            <DropdownField
-              label="Visual style"
-              value={values.visualStyle}
-              options={[...editableProjectContextOptions.visualStyles]}
-              onChange={(value) => update("visualStyle", value)}
-            />
-            {values.gameType === "Other" ? (
-              <label
-                className={`grid gap-2 text-sm font-medium ${
-                  values.visualStyle === "Other" ? "" : "sm:col-span-2"
-                }`}
-              >
-                Custom game type
-                <Input
-                  required
-                  placeholder="Describe the game type"
-                  value={values.customGameType}
-                  onChange={(event) =>
-                    update("customGameType", event.target.value)
-                  }
+            <form.Field name="name">
+              {(field) => (
+                <label className="grid gap-2 text-sm font-medium sm:col-span-2">
+                  Project name
+                  <Input
+                    required
+                    value={field.state.value}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </label>
+              )}
+            </form.Field>
+            <form.Field name="gameType">
+              {(field) => (
+                <DropdownField
+                  label="Game type"
+                  value={field.state.value}
+                  options={[...editableProjectContextOptions.gameTypes]}
+                  onChange={(value) => {
+                    field.handleChange(value);
+                    if (value !== "Other")
+                      form.setFieldValue("customGameType", "");
+                  }}
                 />
-              </label>
-            ) : null}
-            {values.visualStyle === "Other" ? (
-              <label
-                className={`grid gap-2 text-sm font-medium ${
-                  values.gameType === "Other" ? "" : "sm:col-span-2"
-                }`}
-              >
-                Custom visual style
-                <Input
-                  required
-                  placeholder="Describe the visual style"
-                  value={values.customVisualStyle}
-                  onChange={(event) =>
-                    update("customVisualStyle", event.target.value)
-                  }
+              )}
+            </form.Field>
+            <form.Field name="visualStyle">
+              {(field) => (
+                <DropdownField
+                  label="Visual style"
+                  value={field.state.value}
+                  options={[...editableProjectContextOptions.visualStyles]}
+                  onChange={(value) => {
+                    field.handleChange(value);
+                    if (value !== "Other")
+                      form.setFieldValue("customVisualStyle", "");
+                  }}
                 />
-              </label>
-            ) : null}
-            <DropdownField
-              label="Target platform"
-              value={values.platform}
-              options={[...projectContextOptions.platforms]}
-              onChange={(value) => update("platform", value)}
-            />
-            <label className="grid gap-2 text-sm font-medium sm:col-span-2">
-              Game description
-              <Textarea
-                className="min-h-28 resize-y"
-                value={values.description}
-                onChange={(event) => update("description", event.target.value)}
-              />
-            </label>
+              )}
+            </form.Field>
+            <form.Subscribe
+              selector={(state) =>
+                (state.values.gameType === "Other" ? 1 : 0) |
+                (state.values.visualStyle === "Other" ? 2 : 0)
+              }
+            >
+              {(customFieldMask) => {
+                const showCustomGameType = (customFieldMask & 1) !== 0;
+                const showCustomVisualStyle = (customFieldMask & 2) !== 0;
+
+                return (
+                  <>
+                    {showCustomGameType ? (
+                      <form.Field name="customGameType">
+                        {(field) => (
+                          <label
+                            className={`grid gap-2 text-sm font-medium ${
+                              showCustomVisualStyle ? "" : "sm:col-span-2"
+                            }`}
+                          >
+                            Custom game type
+                            <Input
+                              required
+                              placeholder="Describe the game type"
+                              value={field.state.value}
+                              onChange={(event) =>
+                                field.handleChange(event.target.value)
+                              }
+                            />
+                          </label>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {showCustomVisualStyle ? (
+                      <form.Field name="customVisualStyle">
+                        {(field) => (
+                          <label
+                            className={`grid gap-2 text-sm font-medium ${
+                              showCustomGameType ? "" : "sm:col-span-2"
+                            }`}
+                          >
+                            Custom visual style
+                            <Input
+                              required
+                              placeholder="Describe the visual style"
+                              value={field.state.value}
+                              onChange={(event) =>
+                                field.handleChange(event.target.value)
+                              }
+                            />
+                          </label>
+                        )}
+                      </form.Field>
+                    ) : null}
+                  </>
+                );
+              }}
+            </form.Subscribe>
+            <form.Field name="platform">
+              {(field) => (
+                <DropdownField
+                  label="Target platform"
+                  value={field.state.value}
+                  options={[...projectContextOptions.platforms]}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
+            <form.Field name="description">
+              {(field) => (
+                <label className="grid gap-2 text-sm font-medium sm:col-span-2">
+                  Game description
+                  <Textarea
+                    className="min-h-28 resize-y"
+                    value={field.state.value}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </label>
+              )}
+            </form.Field>
           </div>
-          <div>
-            <p className="text-sm font-medium">Visual direction</p>
-            <ImageDropzone
-              className="mt-2 h-28"
-              previewUrl={values.visualDirection || undefined}
-              onSelect={uploadDirection}
-              onClear={() => update("visualDirection", "")}
-            />
-          </div>
+          <form.Field name="visualDirection">
+            {(field) => (
+              <div>
+                <p className="text-sm font-medium">Visual direction</p>
+                <ImageDropzone
+                  className="mt-2 h-28"
+                  previewUrl={field.state.value || undefined}
+                  onSelect={(file) => {
+                    const reader = new FileReader();
+                    reader.onload = () =>
+                      field.handleChange(String(reader.result ?? ""));
+                    reader.readAsDataURL(file);
+                  }}
+                  onClear={() => field.handleChange("")}
+                />
+              </div>
+            )}
+          </form.Field>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
               Cancel
