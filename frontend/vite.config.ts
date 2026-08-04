@@ -1,8 +1,10 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
+import mdx from "@mdx-js/rollup";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import rehypeSlug from "rehype-slug";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,6 +15,7 @@ export default defineConfig({
       generatedRouteTree: "./src/app/routeTree.gen.ts",
       autoCodeSplitting: true,
     }),
+    mdx({ rehypePlugins: [rehypeSlug] }),
     react(),
     tailwindcss(),
   ],

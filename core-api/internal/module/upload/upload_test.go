@@ -69,11 +69,42 @@ func TestManagerPropagatesStoreError(t *testing.T) {
 	store := &storeStub{err: wantErr}
 	manager := upload.NewManager(store)
 
-	target, err := manager.CreateUploadTarget(context.Background(), &upload.CreateUploadTargetRequest{})
+	target, err := manager.CreateUploadTarget(context.Background(), &upload.CreateUploadTargetRequest{
+		ContentType:   "image/png",
+		ContentLength: 8,
+	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
 	if target != nil {
 		t.Fatalf("expected nil target, got %+v", target)
+	}
+}
+
+func TestManagerRejectsInvalidUploadRequest(t *testing.T) {
+	store := &storeStub{}
+	manager := upload.NewManager(store)
+
+	tests := []struct {
+		name    string
+		request *upload.CreateUploadTargetRequest
+	}{
+		{name: "nil request"},
+		{name: "empty content type", request: &upload.CreateUploadTargetRequest{ContentLength: 8}},
+		{name: "blank content type", request: &upload.CreateUploadTargetRequest{ContentType: "   ", ContentLength: 8}},
+		{name: "zero content length", request: &upload.CreateUploadTargetRequest{ContentType: "image/png"}},
+		{name: "negative content length", request: &upload.CreateUploadTargetRequest{ContentType: "image/png", ContentLength: -1}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			target, err := manager.CreateUploadTarget(context.Background(), test.request)
+			if !errors.Is(err, upload.ErrInvalidUploadRequest) {
+				t.Fatalf("expected invalid upload request error, got %v", err)
+			}
+			if target != nil {
+				t.Fatalf("expected nil target, got %+v", target)
+			}
+		})
 	}
 }

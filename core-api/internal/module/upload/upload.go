@@ -1,5 +1,9 @@
 package upload
 
+import "errors"
+
+var ErrInvalidUploadRequest = errors.New("upload: invalid upload request")
+
 // CreateUploadTargetRequest is the use-case input for creating an upload target.
 type CreateUploadTargetRequest struct {
 	ContentType   string

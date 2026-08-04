@@ -1,4 +1,4 @@
-import type { AudioTrack } from "@/features/audio-studio/types";
+import type { AudioTrack } from "../types";
 
 export const audioTrackSeed = [
   {

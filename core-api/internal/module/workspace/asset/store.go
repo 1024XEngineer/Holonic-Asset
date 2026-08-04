@@ -6,6 +6,7 @@ import "context"
 type Store interface {
 	GetAssetsByProjectID(ctx context.Context, projectID uint, filter AssetListFilter) ([]Asset, error)
 	GetAssetDetail(ctx context.Context, id uint) (*Asset, error)
+	Delete(ctx context.Context, id uint) error
 	UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (*Asset, error)
 	UpdateContent(ctx context.Context, assetID uint, content AssetContent) error
 	UpdateAnimationFrames(ctx context.Context, assetID uint, animationID uint, frames []Frame) error

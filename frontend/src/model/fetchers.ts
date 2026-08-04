@@ -1,6 +1,7 @@
 import { DataApiError } from "@/lib/data-api-error";
 
-type QueryValue = string | number | boolean | undefined;
+type QueryPrimitive = string | number | boolean;
+type QueryValue = QueryPrimitive | readonly QueryPrimitive[] | null | undefined;
 
 export type ApiResponse<T> = {
   code: number;
@@ -10,14 +11,14 @@ export type ApiResponse<T> = {
 
 const apiBaseUrl = import.meta.env.VITE_CORE_API_BASE_URL ?? "/api/v1";
 
-export function getJson<T>(
+function getJson<T>(
   path: string,
   query?: Record<string, QueryValue>,
 ): Promise<T> {
   return requestJson<T>(withQuery(path, query));
 }
 
-export function postJson<T>(path: string, body?: unknown): Promise<T> {
+function postJson<T>(path: string, body?: unknown): Promise<T> {
   return requestJson<T>(path, { method: "POST" }, body);
 }
 
@@ -33,6 +34,15 @@ export async function postEnvelope<T>(
   body?: unknown,
 ): Promise<T> {
   return unwrapEnvelope(await postJson<ApiResponse<T>>(path, body));
+}
+
+export async function deleteEnvelope<T>(
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  return unwrapEnvelope(
+    await requestJson<ApiResponse<T>>(path, { method: "DELETE" }, body),
+  );
 }
 
 function asyncRequestInit(body?: unknown): RequestInit {
@@ -97,7 +107,7 @@ function unwrapEnvelope<T>(response: ApiResponse<T>): T {
 }
 
 function dataApiErrorCodeForStatus(status: number) {
-  if (status === 400) return "BAD_REQUEST" as const;
+  if (status === 400 || status === 422) return "BAD_REQUEST" as const;
   if (status === 404) return "NOT_FOUND" as const;
   if (status === 409) return "CONFLICT" as const;
   return "UNKNOWN" as const;
@@ -111,7 +121,11 @@ function withQuery(
 
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined) params.set(key, String(value));
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, String(item));
+      continue;
+    }
+    if (value !== undefined && value !== null) params.set(key, String(value));
   }
   const search = params.toString();
   return search ? `${path}?${search}` : path;

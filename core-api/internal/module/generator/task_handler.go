@@ -19,15 +19,15 @@ func (e *Engine) handleCharacterPrototype(
 	return e.execute(ctx, GenerateCharacterProtoType, message.Payload)
 }
 
-func (e *Engine) handleCharacterAnimation(
+func (e *Engine) handleAnimation(
 	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
-	payload := CreateCharacterAnimationPayload{}
+	payload := CreateAnimationPayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return e.execute(ctx, GenerateCharacterAnimation, message.Payload)
+	return e.execute(ctx, GenerateAnimation, message.Payload)
 }
 
 func (e *Engine) handleObjectPrototype(
@@ -39,17 +39,6 @@ func (e *Engine) handleObjectPrototype(
 		return nil, err
 	}
 	return e.execute(ctx, GenerateObjectProtoType, message.Payload)
-}
-
-func (e *Engine) handleObjectAnimation(
-	ctx context.Context,
-	message *taskdomain.Task,
-) (any, error) {
-	payload := CreateObjectAnimationPayload{}
-	if err := decodeTaskPayload(message, &payload); err != nil {
-		return nil, err
-	}
-	return e.execute(ctx, GenerateObjectAnimation, message.Payload)
 }
 
 func (e *Engine) handleTileSet(
@@ -97,21 +86,19 @@ func (e *Engine) execute(
 
 func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateCharacterProtoType), taskdomain.HandlerFunc(e.handleCharacterPrototype))
-	manager.Register(string(GenerateCharacterAnimation), taskdomain.HandlerFunc(e.handleCharacterAnimation))
 	manager.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
-	manager.Register(string(GenerateObjectAnimation), taskdomain.HandlerFunc(e.handleObjectAnimation))
+	manager.Register(string(GenerateAnimation), taskdomain.HandlerFunc(e.handleAnimation))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
 
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{
-		RegenerateCharacterProtoType,
-		RegenerateCharacterAnimation,
-		RegenerateCharacterFrames,
-		RegenerateObjectProtoType,
-		RegenerateObjectAnimation,
-		RegenerateObjectFrames,
-		RegenerateItem,
-		RegenerateTiles,
+		EditCharacterProtoType,
+		EditCharacterFrames,
+		EditObjectProtoType,
+		EditObjectFrames,
+		EditAnimation,
+		EditTilesetItem,
+		EditTiles,
 	} {
 		manager.Register(string(taskType), emptyHandler)
 	}

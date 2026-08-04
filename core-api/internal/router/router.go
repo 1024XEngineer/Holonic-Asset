@@ -10,18 +10,19 @@ func Register(
 	ur UploadRouter,
 ) *echo.Echo {
 	e := echo.New()
-	api := e.Group("/api/v1")
+	api := e.Group(apiBasePath)
+	openAPI := newOpenAPI(e, api)
 	if as != nil {
-		RegisterAssetRoutes(api, as)
+		RegisterAssetRoutes(openAPI, as)
 	}
 	if pr != nil {
-		RegisterProjectRoutes(api, pr)
+		RegisterProjectRoutes(openAPI, pr)
 	}
 	if gr != nil {
-		RegisterGenerationRoutes(api, gr)
+		RegisterGenerationRoutes(openAPI, gr)
 	}
 	if ur != nil {
-		RegisterUploadRoutes(api, ur)
+		RegisterUploadRoutes(openAPI, ur)
 	}
 	return e
 }
