@@ -139,13 +139,6 @@ func (a *App) Start(address string) error {
 	return a.engine.Start(address)
 }
 
-func (a *App) Stop() error {
-	if a.tasks != nil {
-		return a.tasks.Stop()
-	}
-	return nil
-}
-
 func closeDatabase(db *gorm.DB) {
 	if db == nil {
 		return
