@@ -162,16 +162,18 @@ export function ProjectSettingsDialog({
                 );
               }}
             </form.Subscribe>
-            <form.Field name="platform">
-              {(field) => (
-                <DropdownField
-                  label="Target platform"
-                  value={field.state.value}
-                  options={[...projectContextOptions.platforms]}
-                  onChange={field.handleChange}
-                />
-              )}
-            </form.Field>
+            <div className="sm:col-span-2">
+              <form.Field name="platform">
+                {(field) => (
+                  <DropdownField
+                    label="Target platform"
+                    value={field.state.value}
+                    options={[...projectContextOptions.platforms]}
+                    onChange={field.handleChange}
+                  />
+                )}
+              </form.Field>
+            </div>
             <form.Field name="description">
               {(field) => (
                 <label className="grid gap-2 text-sm font-medium sm:col-span-2">
