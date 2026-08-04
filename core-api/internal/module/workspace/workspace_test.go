@@ -32,7 +32,7 @@ type imageServiceStub struct{}
 
 func (*imageServiceStub) Generate(context.Context, *imageclient.GenerateRequest) (*imageclient.GenerateResult, error) {
 	return &imageclient.GenerateResult{
-		Images: []imageclient.GeneratedImage{{Base64: "generated-image"}},
+		Images: []imageclient.GeneratedImage{{Base64: "generated-image", MediaType: "image/png"}},
 	}, nil
 }
 
@@ -48,7 +48,7 @@ func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate visual image through workspace: %v", err)
 	}
-	if result.Reference != "generated-image" {
+	if result.Reference != "data:image/png;base64,generated-image" {
 		t.Fatalf("expected injected image service result, got %q", result.Reference)
 	}
 }

@@ -102,8 +102,16 @@ func (m *manager) GenerateVisualImage(ctx context.Context, project *Project) (*P
 		return nil, ErrVisualImageRequired
 	}
 
-	project.Reference = generated.Images[0].Base64
+	project.Reference = visualImageDataURL(generated.Images[0])
 	return project, nil
+}
+
+func visualImageDataURL(image imageclient.GeneratedImage) string {
+	mediaType := strings.TrimSpace(image.MediaType)
+	if mediaType == "" {
+		mediaType = "image/png"
+	}
+	return "data:" + mediaType + ";base64," + image.Base64
 }
 
 var _ Manager = (*manager)(nil)
@@ -170,9 +178,8 @@ func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
 }
 
-// visualStyleReference only forwards explicit external references. Generated
-// previews are stored as raw base64 in Project.Reference; feeding that value
-// back into the next request compounds malformed UI and image artifacts.
+// visualStyleReference only forwards references in formats accepted by the
+// image provider. Bare base64 values do not contain enough format information.
 func visualStyleReference(reference string) string {
 	reference = strings.TrimSpace(reference)
 	if strings.HasPrefix(reference, "data:image/") ||

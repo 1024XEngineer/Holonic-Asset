@@ -59,7 +59,7 @@ func (s *imageGenerationServiceStub) Generate(
 	return s.result, s.err
 }
 
-func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsBase64(t *testing.T) {
+func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsDataURL(t *testing.T) {
 	const reference = "data:image/png;base64,reference-image"
 	project := &domain.Project{
 		UserID:         7,
@@ -86,8 +86,8 @@ func TestGenerateVisualImageBuildsProjectScreenshotPromptAndReturnsBase64(t *tes
 	if generated != project {
 		t.Fatalf("expected returned project %p, got %p", project, generated)
 	}
-	if generated.Reference != "generated-image-base64" {
-		t.Fatalf("expected generated base64, got %q", generated.Reference)
+	if generated.Reference != "data:image/png;base64,generated-image-base64" {
+		t.Fatalf("expected generated image data URL, got %q", generated.Reference)
 	}
 	if images.request == nil {
 		t.Fatal("expected an image generation request")
