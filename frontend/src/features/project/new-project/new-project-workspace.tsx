@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { NewProjectController } from "./state/use-new-project-controller";
-import { projectContextOptions } from "../project-context";
+import { projectContextOptions } from "../lib/project-context";
 
 export function NewProjectWorkspace({
   project,

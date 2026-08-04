@@ -3,7 +3,7 @@ import type { CreateProjectInput, ProjectSummary } from "@/model/project";
 import type {
   NewProjectDraft,
   ProjectSettingsDraft,
-} from "./types/project-draft";
+} from "../types/project-draft";
 
 export const projectContextOptions = {
   gameTypes: [
