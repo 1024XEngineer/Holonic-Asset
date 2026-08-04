@@ -72,25 +72,6 @@ export function createProjectSettingsDraft(
   };
 }
 
-export function updateProjectSettingsDraft<
-  K extends keyof ProjectSettingsDraft,
->(
-  draft: ProjectSettingsDraft,
-  key: K,
-  value: ProjectSettingsDraft[K],
-): ProjectSettingsDraft {
-  const nextDraft = { ...draft, [key]: value } as ProjectSettingsDraft;
-
-  if (key === "gameType" && value !== "Other") {
-    return { ...nextDraft, customGameType: "" };
-  }
-  if (key === "visualStyle" && value !== "Other") {
-    return { ...nextDraft, customVisualStyle: "" };
-  }
-
-  return nextDraft;
-}
-
 export function applyProjectSettings(
   project: ProjectSummary,
   draft: ProjectSettingsDraft,

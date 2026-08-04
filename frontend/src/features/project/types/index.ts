@@ -5,7 +5,6 @@ export {
   editableProjectContextOptions,
   projectContextOptions,
   toCreateProjectInput,
-  updateProjectSettingsDraft,
 } from "./project-context";
 export type {
   NewProjectDraft,
