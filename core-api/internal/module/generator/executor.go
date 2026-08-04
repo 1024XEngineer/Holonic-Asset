@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
-	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -26,18 +26,18 @@ type AssetWriter interface {
 }
 
 type executor struct {
-	images    imageclient.ImageGenerationService
-	processor imageprocessor.Processor
-	assets    AssetWriter
+	images imageclient.ImageGenerationService
+	assets AssetWriter
 }
 
 // NewExecutor creates the image-to-asset workflow used by task handlers.
+// Image processing is intentionally deferred; generated images are stored as
+// data URLs until a processor and object-storage flow are available.
 func NewExecutor(
 	images imageclient.ImageGenerationService,
-	processor imageprocessor.Processor,
 	assets AssetWriter,
 ) Executor {
-	return &executor{images: images, processor: processor, assets: assets}
+	return &executor{images: images, assets: assets}
 }
 
 type ExecutionResult struct {
@@ -55,9 +55,6 @@ func (e *executor) Generate(
 	}
 	if e.assets == nil {
 		return nil, ErrAssetWriterRequired
-	}
-	if e.processor == nil && (taskType == GenerateCharacterProtoType || taskType == GenerateObjectProtoType) {
-		return nil, ErrImageProcessorRequired
 	}
 
 	switch taskType {
@@ -136,10 +133,11 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
+	imagePrompt := prompts.ObjectPrototype(payload.CreativeBrief, payload.Perspective)
 	generated, err := e.generateImages(
 		ctx,
 		GenerateObjectProtoType,
-		payload.CreativeBrief,
+		imagePrompt,
 		payload.CanvasSize,
 		payload.Reference,
 	)
@@ -220,47 +218,7 @@ func (e *executor) generateImages(
 	if result == nil || len(result.Images) == 0 {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
 	}
-	if taskType != GenerateCharacterProtoType && taskType != GenerateObjectProtoType {
-		return result, nil
-	}
-	resizeWidth, resizeHeight, err := parseCanvasSize(size)
-	if err != nil {
-		return nil, fmt.Errorf("generator: process %s images: %w", taskType, err)
-	}
-	processed := &imageclient.GenerateResult{Images: make([]imageclient.GeneratedImage, len(result.Images)), Model: result.Model, Size: result.Size, CreatedAt: result.CreatedAt, Usage: result.Usage}
-	for index, generated := range result.Images {
-		imageBase64 := generated.Base64
-		if taskType == GenerateObjectProtoType {
-			backgroundRemoved, processErr := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{ImageBase64: imageBase64})
-			if processErr != nil {
-				return nil, fmt.Errorf("generator: remove %s image %d background: %w", taskType, index+1, processErr)
-			}
-			if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
-				return nil, fmt.Errorf("generator: remove %s image %d background: empty result", taskType, index+1)
-			}
-			imageBase64 = backgroundRemoved.ImageBase64
-		}
-		resized, resizeErr := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-			ImageBase64: imageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight),
-		})
-		if resizeErr != nil {
-			return nil, fmt.Errorf("generator: resize %s image %d: %w", taskType, index+1, resizeErr)
-		}
-		if resized == nil || resized.ImageBase64 == "" {
-			return nil, fmt.Errorf("generator: resize %s image %d: empty result", taskType, index+1)
-		}
-		processed.Images[index] = imageclient.GeneratedImage{Base64: resized.ImageBase64, MediaType: resized.MIMEType}
-	}
-	return processed, nil
-}
-
-func parseCanvasSize(size string) (int, int, error) {
-	var width, height int
-	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width <= 0 || height <= 0 {
-		return 0, 0, fmt.Errorf("invalid canvas size %q", size)
-	}
-	return width, height, nil
+	return result, nil
 }
 
 func newPrototypeAsset(

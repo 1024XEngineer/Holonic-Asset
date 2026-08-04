@@ -93,11 +93,12 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{
 		EditCharacterProtoType,
+		EditCharacterAnimation,
 		EditCharacterFrames,
 		EditObjectProtoType,
+		EditObjectAnimation,
 		EditObjectFrames,
-		EditAnimation,
-		EditItem,
+		EditTilesetItem,
 		EditTiles,
 	} {
 		manager.Register(string(taskType), emptyHandler)

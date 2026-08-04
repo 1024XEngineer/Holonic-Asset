@@ -341,7 +341,7 @@ export interface components {
             /** Format: int64 */
             assetId?: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_animation" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_animation" | "edit_object_frames" | "generate_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
             prompt: string;
             referenceMediaIds?: string[] | null;
@@ -435,7 +435,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_animation" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_animation" | "edit_object_frames" | "generate_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
@@ -454,7 +454,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_animation" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_animation" | "edit_object_frames" | "generate_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             result?: unknown;

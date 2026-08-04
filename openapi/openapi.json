@@ -168,14 +168,15 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
+              "edit_character_animation",
               "edit_character_frames",
               "generate_object_prototype",
               "edit_object_prototype",
+              "edit_object_animation",
               "edit_object_frames",
               "generate_animation",
-              "edit_animation",
               "generate_tileset",
-              "edit_item",
+              "edit_tileset_item",
               "edit_tiles"
             ],
             "type": "string"
@@ -454,14 +455,15 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
+              "edit_character_animation",
               "edit_character_frames",
               "generate_object_prototype",
               "edit_object_prototype",
+              "edit_object_animation",
               "edit_object_frames",
               "generate_animation",
-              "edit_animation",
               "generate_tileset",
-              "edit_item",
+              "edit_tileset_item",
               "edit_tiles"
             ],
             "type": "string"
@@ -540,14 +542,15 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
+              "edit_character_animation",
               "edit_character_frames",
               "generate_object_prototype",
               "edit_object_prototype",
+              "edit_object_animation",
               "edit_object_frames",
               "generate_animation",
-              "edit_animation",
               "generate_tileset",
-              "edit_item",
+              "edit_tileset_item",
               "edit_tiles"
             ],
             "type": "string"
