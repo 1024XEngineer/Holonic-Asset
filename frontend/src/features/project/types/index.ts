@@ -11,4 +11,3 @@ export type {
   NewProjectDraft,
   ProjectSettingsDraft,
 } from "./project-context.types";
-export type { ProjectSummary } from "./project";

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { assetApi } from "./asset.api";
-import type { AssetKind, ProjectAsset } from "@/features/assets/types";
+import type { AssetKind, ProjectAsset } from "../types";
 import { assetKeys } from "./keys";
 
 type AddAssetInput = {

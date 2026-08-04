@@ -6,11 +6,8 @@ import {
   saveMockAssetRevision,
 } from "./mock";
 import type { AssetListItemResponse, AssetType } from "./asset.contract";
-import {
-  getDefaultAssetCanvasSize,
-  type AssetKind,
-  type ProjectAsset,
-} from "@/features/assets/types";
+import { getDefaultAssetCanvasSize } from "./asset-canvas-size";
+import type { AssetKind, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
 export type {
@@ -21,6 +18,8 @@ export type {
   AssetType,
   CopyAssetRequest,
   CopyAssetResponse,
+  DeleteAssetRequest,
+  DeleteAssetResponse,
   GetAssetRecordsResponse,
   GetAssetsResponse,
   ListAssetsQuery,

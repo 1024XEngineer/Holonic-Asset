@@ -1,10 +1,7 @@
 import { DataApiError } from "@/lib/data-api-error";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
 import { quickGenerationAssetSeed } from "./quick-generation.seed";
-import type {
-  GenerateQuickAssetInput,
-  QuickGenerationAsset,
-} from "@/features/quick-generation/types";
+import type { GenerateQuickAssetInput, QuickGenerationAsset } from "../types";
 
 const GENERATION_DELAY_MS = 700;
 

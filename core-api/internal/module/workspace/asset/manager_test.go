@@ -18,6 +18,8 @@ type assetStoreStub struct {
 	projectID    uint
 	assetID      uint
 	filter       domain.AssetListFilter
+	deletedID    uint
+	deleteErr    error
 }
 
 func (s *assetStoreStub) GetAssetsByProjectID(_ context.Context, projectID uint, filter domain.AssetListFilter) ([]domain.Asset, error) {
@@ -29,6 +31,11 @@ func (s *assetStoreStub) GetAssetsByProjectID(_ context.Context, projectID uint,
 func (s *assetStoreStub) GetAssetDetail(_ context.Context, assetID uint) (*domain.Asset, error) {
 	s.assetID = assetID
 	return s.asset, s.getDetailErr
+}
+
+func (s *assetStoreStub) Delete(_ context.Context, assetID uint) error {
+	s.deletedID = assetID
+	return s.deleteErr
 }
 
 func TestAssetManagerGetAssetsForwardsProjectIDAndResult(t *testing.T) {
@@ -72,5 +79,17 @@ func TestAssetManagerPropagatesStoreErrors(t *testing.T) {
 	_, err := manager.GetDetail(context.Background(), 7)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetManagerDeleteForwardsAssetID(t *testing.T) {
+	store := &assetStoreStub{}
+	manager := domain.NewManager(store)
+
+	if err := manager.Delete(context.Background(), 7); err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+	if store.deletedID != 7 {
+		t.Fatalf("expected asset ID 7, got %d", store.deletedID)
 	}
 }

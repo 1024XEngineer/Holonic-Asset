@@ -1,17 +1,63 @@
 export {
   assetApi,
+  assetKinds,
   assetKeys,
+  assetRecordModeForKind,
+  creatableAssetKinds,
+  getDefaultAssetCanvasSize,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
   useDeleteAudioTrackMutation,
-  useGenerateAnimationMutation,
   useGenerateAudioVariationMutation,
   useRecordQuery,
   useSaveAssetRevisionMutation,
   useUpdateAudioTrackMutation,
+} from "./asset";
+export type {
+  AddAudioTrackInput,
+  AssetAnimation,
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetKind,
+  AssetRevision,
+  AssetRevisionStatus,
+  AssetCanvasPosition,
+  AssetRecord,
+  AssetRecordApi,
+  AssetRecordForKind,
+  AssetRecordSaveResult,
+  AssetWorkspaceAsset,
+  AssetWorkspaceData,
+  AssetWorkspaceDataForKind,
+  AudioTrack,
+  AudioTrackTone,
+  CharacterAnimation,
+  CharacterAnimationClip,
+  CharacterSpriteSheet,
+  CreatableAssetKind,
+  GenerateAudioVariationInput,
+  GetAssetRecordInput,
+  ProjectAsset,
+  SaveAssetRecordInput,
+  SceneryAssetData,
+  SceneryLayer,
+  AudioAssetKind,
+  AudioAssetRecord,
+  CharacterAssetKind,
+  CharacterAssetRecord,
+  SceneryAssetKind,
+  SceneryAssetRecord,
+  TilesetAssetKind,
+  TilesetAssetRecord,
+  TilesetCell,
+  TilesetItem,
+  UiAssetKind,
+  UiAssetRecord,
+  UiComponent,
+  UpdateAudioTrackInput,
 } from "./asset";
 export { coreAssetApi } from "./asset/library/asset.api";
 export type {
@@ -49,9 +95,16 @@ export {
   generationKeys,
   useDeleteQuickAssetMutation,
   useEnqueueGenerationMutation,
+  useGenerateAnimationMutation,
   useGenerateQuickAssetMutation,
   useGenerationRunsQuery,
   useQuickAssetsQuery,
+} from "./generation";
+export type {
+  CreationRequest,
+  GenerateQuickAssetInput,
+  GenerationRun,
+  QuickGenerationAsset,
 } from "./generation";
 export { coreGenerationApi } from "./generation/run/generation.api";
 export type {
@@ -73,6 +126,7 @@ export {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";
+export type { Project, ProjectSummary } from "./project";
 export { coreProjectApi } from "./project/project.api";
 export type {
   CreateProjectRequest,
@@ -81,3 +135,9 @@ export type {
 } from "./project/project.api";
 export { uploadApi } from "./upload";
 export type { CreateUploadTargetRequest, UploadTarget } from "./upload";
+export type {
+  GenerateAnimationInput,
+  GenerateAnimationRequest,
+  GenerateAnimationResult,
+  GeneratedCharacterAnimation,
+} from "./generation";

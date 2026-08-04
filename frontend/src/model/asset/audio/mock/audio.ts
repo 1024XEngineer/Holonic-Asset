@@ -7,7 +7,7 @@ import type {
   AudioTrackTone,
   GenerateAudioVariationInput,
   UpdateAudioTrackInput,
-} from "@/features/audio-studio/types";
+} from "../types";
 
 const generatedTrackTones: AudioTrackTone[] = [
   "blue",

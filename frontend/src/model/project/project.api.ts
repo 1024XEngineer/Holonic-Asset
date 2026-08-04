@@ -8,7 +8,7 @@ import {
 import { deleteMockProjectAssets } from "../asset/library/mock";
 import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
 import type { ProjectGameType, ProjectResponse } from "./project.contract";
-import type { ProjectSummary } from "@/features/project/types";
+import type { ProjectSummary } from "./types";
 
 export { coreProjectApi } from "./core-project.api";
 export type {

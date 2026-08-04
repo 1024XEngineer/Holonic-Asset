@@ -21,6 +21,7 @@ type AssetRecordDao interface {
 	CreateAssetRecords(ctx context.Context, records []AssetRecord) error
 	DeleteAssetRecord(ctx context.Context, assetID uint, version uint) error
 	DeleteAssetRecordsAfterVersion(ctx context.Context, assetID uint, version uint) error
+	DeleteAssetRecordsByAssetID(ctx context.Context, assetID uint) error
 	GetAssetRecord(ctx context.Context, assetID uint, version uint) (AssetRecord, error)
 	GetAssetRecordsByAssetID(ctx context.Context, assetID uint) ([]AssetRecord, error)
 }
@@ -69,6 +70,13 @@ func (a *AssetRecordDaoImpl) DeleteAssetRecordsAfterVersion(ctx context.Context,
 		Delete(&AssetRecord{})
 	if result.Error != nil {
 		return fmt.Errorf("dao: delete asset records after %d/%d: %w", assetID, version, result.Error)
+	}
+	return nil
+}
+
+func (a *AssetRecordDaoImpl) DeleteAssetRecordsByAssetID(ctx context.Context, assetID uint) error {
+	if err := a.DB.WithContext(ctx).Where("asset_id = ?", assetID).Delete(&AssetRecord{}).Error; err != nil {
+		return fmt.Errorf("dao: delete asset records for asset %d: %w", assetID, err)
 	}
 	return nil
 }

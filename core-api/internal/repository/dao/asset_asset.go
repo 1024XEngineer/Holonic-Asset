@@ -38,6 +38,7 @@ type AssetDao interface {
 	GetAsset(ctx context.Context, id uint) (Asset, error)
 	GetAssetForUpdate(ctx context.Context, id uint) (Asset, error)
 	UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (Asset, error)
+	DeleteAsset(ctx context.Context, id uint) error
 	UpdateAssetCurrentContent(ctx context.Context, id uint, version uint, contentID uint) error
 }
 
@@ -126,6 +127,17 @@ func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUp
 		return Asset{}, fmt.Errorf("dao: get updated asset %d: %w", id, err)
 	}
 	return asset, nil
+}
+
+func (a *AssetDaoImpl) DeleteAsset(ctx context.Context, id uint) error {
+	result := a.DB.WithContext(ctx).Where("id = ?", id).Delete(&Asset{})
+	if result.Error != nil {
+		return fmt.Errorf("dao: delete asset %d: %w", id, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("dao: asset %d not found", id)
+	}
+	return nil
 }
 
 func (a *AssetDaoImpl) UpdateAssetCurrentContent(
