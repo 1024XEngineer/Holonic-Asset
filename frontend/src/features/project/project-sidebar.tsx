@@ -27,12 +27,14 @@ import type { ProjectSummary } from "@/model/project";
 import { ProjectSettingsDialog } from "./project-settings-dialog";
 import type { ProjectLibraryProjectModel } from "./state/use-project-library";
 
+const PROJECT_SIDEBAR_OPEN_STORAGE_KEY = "game-asset-pack:project-sidebar-open";
+
 export function ProjectSidebar({
   library,
 }: {
   library: ProjectLibraryProjectModel;
 }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(readProjectSidebarOpen);
   const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
   const editingProject = items.find(
@@ -95,7 +97,13 @@ export function ProjectSidebar({
             variant="outline"
             size="icon-sm"
             className="hidden md:inline-flex"
-            onClick={() => setIsOpen((current) => !current)}
+            onClick={() =>
+              setIsOpen((current) => {
+                const next = !current;
+                writeProjectSidebarOpen(next);
+                return next;
+              })
+            }
           >
             {isOpen ? <ChevronLeft /> : <ChevronRight />}
           </Button>
@@ -213,4 +221,20 @@ export function ProjectSidebar({
       ) : null}
     </aside>
   );
+}
+
+function readProjectSidebarOpen() {
+  try {
+    return localStorage.getItem(PROJECT_SIDEBAR_OPEN_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeProjectSidebarOpen(isOpen: boolean) {
+  try {
+    localStorage.setItem(PROJECT_SIDEBAR_OPEN_STORAGE_KEY, String(isOpen));
+  } catch {
+    // The sidebar remains usable when browser storage is unavailable.
+  }
 }
