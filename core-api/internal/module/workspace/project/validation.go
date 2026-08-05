@@ -22,7 +22,7 @@ func (t GameType) Valid() bool {
 
 func (p Perspective) Valid() bool {
 	switch p {
-	case "", PerspectiveTopDown, PerspectiveSideOn, PerspectiveIsometric:
+	case PerspectiveTopDown, PerspectiveSideOn, PerspectiveIsometric:
 		return true
 	default:
 		return false
