@@ -56,10 +56,22 @@ export function useAssetLibraryController({
   const copyMutation = useCopyAssetMutation();
   const deleteMutation = useDeleteAssetMutation();
   const updateMutation = useUpdateAssetMutation();
-  const { mutateAsync: mutateCopyAsset } = copyMutation;
-  const { mutateAsync: mutateDeleteAsset } = deleteMutation;
+  const {
+    isError: hasCopyError,
+    mutateAsync: mutateCopyAsset,
+    reset: resetCopyAsset,
+  } = copyMutation;
+  const {
+    isError: hasDeleteError,
+    mutateAsync: mutateDeleteAsset,
+    reset: resetDeleteAsset,
+  } = deleteMutation;
   const { mutateAsync: mutateUpdateAsset, reset: resetUpdateAsset } =
     updateMutation;
+  const resetActionErrors = useCallback(() => {
+    if (hasCopyError) resetCopyAsset();
+    if (hasDeleteError) resetDeleteAsset();
+  }, [hasCopyError, hasDeleteError, resetCopyAsset, resetDeleteAsset]);
   const {
     assetIds: copyingAssetIds,
     add: markAssetCopying,
@@ -107,10 +119,12 @@ export function useAssetLibraryController({
   }, [allAssets, assetGroups, editingAssetId, filteredAssets]);
 
   useEffect(() => {
+    resetCopyAsset();
+    resetDeleteAsset();
     setQuery("");
     setSelectedKinds([...assetKinds]);
     setEditingAssetId(undefined);
-  }, [projectId, setSelectedKinds]);
+  }, [projectId, resetCopyAsset, resetDeleteAsset, setSelectedKinds]);
 
   useEffect(() => {
     if (editingAssetId && !editingAsset) setEditingAssetId(undefined);
@@ -119,17 +133,25 @@ export function useAssetLibraryController({
   const copyAsset = useCallback(
     (assetId: string) => {
       if (!projectId || !markAssetCopying(assetId)) return;
+      resetActionErrors();
 
       void mutateCopyAsset({ projectId, assetId })
         .catch(() => undefined)
         .finally(() => unmarkAssetCopying(assetId));
     },
-    [markAssetCopying, mutateCopyAsset, projectId, unmarkAssetCopying],
+    [
+      markAssetCopying,
+      mutateCopyAsset,
+      projectId,
+      resetActionErrors,
+      unmarkAssetCopying,
+    ],
   );
 
   const deleteAsset = useCallback(
     (assetId: string) => {
       if (!projectId || !markAssetDeleting(assetId)) return;
+      resetActionErrors();
       if (editingAssetId === assetId) setEditingAssetId(undefined);
 
       void mutateDeleteAsset({ projectId, assetId })
@@ -140,6 +162,7 @@ export function useAssetLibraryController({
       markAssetDeleting,
       mutateDeleteAsset,
       projectId,
+      resetActionErrors,
       editingAssetId,
       unmarkAssetDeleting,
     ],
