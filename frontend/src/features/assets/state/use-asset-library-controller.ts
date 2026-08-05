@@ -109,8 +109,9 @@ export function useAssetLibraryController({
 
   useEffect(() => {
     setQuery("");
+    setSelectedKinds([...assetKinds]);
     setEditingAssetId(undefined);
-  }, [projectId]);
+  }, [projectId, setSelectedKinds]);
 
   useEffect(() => {
     if (editingAssetId && !editingAsset) setEditingAssetId(undefined);
