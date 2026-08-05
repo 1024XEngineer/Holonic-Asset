@@ -14,7 +14,7 @@ const projectInput: CreateProjectInput = {
   description: "A second project with the same display name.",
   reference: "",
   style: "Pixel art",
-  visualStyle: "Top-down",
+  perspective: "Top-down",
   visualDirection: "",
 };
 

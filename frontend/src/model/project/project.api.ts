@@ -7,7 +7,11 @@ import {
 } from "./mock";
 import { deleteMockProjectAssets } from "../asset/library/mock";
 import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
-import type { ProjectGameType, ProjectResponse } from "./project.contract";
+import type {
+  ProjectGameType,
+  ProjectResponse,
+  ProjectViewType,
+} from "./project.contract";
 import type { CreateProjectInput, ProjectSummary } from "./types";
 
 export { coreProjectApi } from "./core-project.api";
@@ -58,7 +62,7 @@ export function toProjectSummary(
     description: project.description,
     reference: project.reference,
     style: project.style,
-    visualStyle: project.style,
+    perspective: projectViewTypeLabels[project.viewType],
     visualDirection: "",
     assetCount,
   };
@@ -68,5 +72,12 @@ const projectGameTypeLabels: Record<ProjectGameType, string> = {
   RPG: "Role-playing game",
   ACT: "Action",
   SLG: "Strategy",
+  Other: "Other",
+};
+
+const projectViewTypeLabels: Record<ProjectViewType, string> = {
+  TopDown: "Top-down",
+  SideView: "Side-on",
+  Isometric: "Isometric",
   Other: "Other",
 };

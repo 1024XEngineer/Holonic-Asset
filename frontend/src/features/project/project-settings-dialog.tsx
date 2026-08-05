@@ -90,16 +90,16 @@ export function ProjectSettingsDialog({
                 />
               )}
             </form.Field>
-            <form.Field name="visualStyle">
+            <form.Field name="perspective">
               {(field) => (
                 <DropdownField
-                  label="Visual style"
+                  label="Perspective"
                   value={field.state.value}
-                  options={[...editableProjectContextOptions.visualStyles]}
+                  options={[...editableProjectContextOptions.perspectives]}
                   onChange={(value) => {
                     field.handleChange(value);
                     if (value !== "Other")
-                      form.setFieldValue("customVisualStyle", "");
+                      form.setFieldValue("customPerspective", "");
                   }}
                 />
               )}
@@ -107,12 +107,12 @@ export function ProjectSettingsDialog({
             <form.Subscribe
               selector={(state) =>
                 (state.values.gameType === "Other" ? 1 : 0) |
-                (state.values.visualStyle === "Other" ? 2 : 0)
+                (state.values.perspective === "Other" ? 2 : 0)
               }
             >
               {(customFieldMask) => {
                 const showCustomGameType = (customFieldMask & 1) !== 0;
-                const showCustomVisualStyle = (customFieldMask & 2) !== 0;
+                const showCustomPerspective = (customFieldMask & 2) !== 0;
 
                 return (
                   <>
@@ -121,7 +121,7 @@ export function ProjectSettingsDialog({
                         {(field) => (
                           <label
                             className={`grid gap-2 text-sm font-medium ${
-                              showCustomVisualStyle ? "" : "sm:col-span-2"
+                              showCustomPerspective ? "" : "sm:col-span-2"
                             }`}
                           >
                             Custom game type
@@ -137,18 +137,18 @@ export function ProjectSettingsDialog({
                         )}
                       </form.Field>
                     ) : null}
-                    {showCustomVisualStyle ? (
-                      <form.Field name="customVisualStyle">
+                    {showCustomPerspective ? (
+                      <form.Field name="customPerspective">
                         {(field) => (
                           <label
                             className={`grid gap-2 text-sm font-medium ${
                               showCustomGameType ? "" : "sm:col-span-2"
                             }`}
                           >
-                            Custom visual style
+                            Custom perspective
                             <Input
                               required
-                              placeholder="Describe the visual style"
+                              placeholder="Describe the perspective"
                               value={field.state.value}
                               onChange={(event) =>
                                 field.handleChange(event.target.value)

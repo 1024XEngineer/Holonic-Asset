@@ -2,12 +2,12 @@ export function createMockProjectPreview({
   description,
   gameType,
   name,
-  visualStyle,
+  perspective,
 }: {
   description: string;
   gameType: string;
   name: string;
-  visualStyle: string;
+  perspective: string;
 }) {
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
@@ -15,8 +15,8 @@ export function createMockProjectPreview({
   const context = canvas.getContext("2d");
   if (!context) return "";
 
-  const isPixelArt = /pixel/i.test(visualStyle);
-  const palette = isPixelArt
+  const isTopDown = /top-down/i.test(perspective);
+  const palette = isTopDown
     ? { sky: "#15253e", ground: "#2e704b", detail: "#f0bb52", ui: "#111827" }
     : { sky: "#30516c", ground: "#537d58", detail: "#e6b968", ui: "#1f2937" };
   const projectName = name.trim() || "Untitled game";
@@ -48,7 +48,7 @@ export function createMockProjectPreview({
   context.fillText(projectName, 76, 98);
   context.fillStyle = "#cbd5e1";
   context.font = "24px system-ui";
-  context.fillText(visualStyle || "Visual direction", 76, 138);
+  context.fillText(perspective || "Perspective", 76, 138);
 
   context.fillStyle = "#ffffff";
   context.font = "28px system-ui";

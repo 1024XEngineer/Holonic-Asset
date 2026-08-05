@@ -9,7 +9,7 @@ export type Project = {
 };
 
 export type ProjectSummary = Project & {
-  visualStyle: string;
+  perspective: string;
   visualDirection: string;
   assetCount: number;
 };

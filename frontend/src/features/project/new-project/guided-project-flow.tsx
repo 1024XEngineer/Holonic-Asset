@@ -71,10 +71,10 @@ export function GuidedProjectFlow({
               )}
             </newProjectForm.Field>
           </div>
-          <newProjectForm.Field name="visualStyle">
+          <newProjectForm.Field name="perspective">
             {(field) => (
               <label className="grid gap-2 text-sm font-semibold">
-                Visual style
+                Perspective
                 <input
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}

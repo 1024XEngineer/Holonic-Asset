@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { cn } from "@/lib/utils";
 
-export function ProjectChrome({
+export function ProjectWorkspaceLayout({
   children,
   sidebar,
 }: {

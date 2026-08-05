@@ -9,7 +9,7 @@ describe("toCreateProjectInput", () => {
       gameType: "Role-playing game",
       platform: "PC",
       description: "  Restore the orchard.  ",
-      visualStyle: "  Top-down  ",
+      perspective: "  Top-down  ",
       reference: "https://example.com/game",
       visualDirection: "data:image/png;base64,preview",
     });
@@ -21,15 +21,15 @@ describe("toCreateProjectInput", () => {
       description: "Restore the orchard.",
       reference: "https://example.com/game",
       style: "Top-down",
-      visualStyle: "Top-down",
+      perspective: "Top-down",
       visualDirection: "data:image/png;base64,preview",
     });
     expect(input).not.toHaveProperty("id");
     expect(input).not.toHaveProperty("assetCount");
   });
 
-  it("limits visual styles to supported game views", () => {
-    expect(projectContextOptions.visualStyles).toEqual([
+  it("limits perspectives to supported game views", () => {
+    expect(projectContextOptions.perspectives).toEqual([
       "Top-down",
       "Side-on",
       "Isometric",

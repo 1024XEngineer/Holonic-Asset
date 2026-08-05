@@ -13,13 +13,13 @@ export const projectContextOptions = {
     "Strategy",
     "Simulation",
   ],
-  visualStyles: ["Top-down", "Side-on", "Isometric"],
+  perspectives: ["Top-down", "Side-on", "Isometric"],
   platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
 } as const;
 
 export const editableProjectContextOptions = {
   gameTypes: [...projectContextOptions.gameTypes, "Other"],
-  visualStyles: [...projectContextOptions.visualStyles, "Other"],
+  perspectives: [...projectContextOptions.perspectives, "Other"],
 } as const;
 
 export function createNewProjectDraft(): NewProjectDraft {
@@ -28,7 +28,7 @@ export function createNewProjectDraft(): NewProjectDraft {
     gameType: projectContextOptions.gameTypes[0],
     platform: projectContextOptions.platforms[0],
     description: "",
-    visualStyle: projectContextOptions.visualStyles[0],
+    perspective: projectContextOptions.perspectives[0],
     reference: "",
   };
 }
@@ -36,7 +36,7 @@ export function createNewProjectDraft(): NewProjectDraft {
 export function toCreateProjectInput(
   draft: NewProjectDraft & { visualDirection?: string },
 ): CreateProjectInput {
-  const visualStyle = draft.visualStyle.trim();
+  const perspective = draft.perspective.trim();
 
   return {
     name: draft.name.trim(),
@@ -44,8 +44,8 @@ export function toCreateProjectInput(
     platform: draft.platform,
     description: draft.description.trim() || "A new game asset workspace.",
     reference: draft.reference.trim(),
-    style: visualStyle,
-    visualStyle,
+    style: perspective,
+    perspective,
     visualDirection: draft.visualDirection ?? "",
   };
 }
@@ -57,17 +57,17 @@ export function createProjectSettingsDraft(
     projectContextOptions.gameTypes,
     project.gameType,
   );
-  const hasKnownVisualStyle = isKnownOption(
-    projectContextOptions.visualStyles,
-    project.visualStyle,
+  const hasKnownPerspective = isKnownOption(
+    projectContextOptions.perspectives,
+    project.perspective,
   );
 
   return {
     name: project.name,
     gameType: hasKnownGameType ? project.gameType : "Other",
     customGameType: hasKnownGameType ? "" : project.gameType,
-    visualStyle: hasKnownVisualStyle ? project.visualStyle : "Other",
-    customVisualStyle: hasKnownVisualStyle ? "" : project.visualStyle,
+    perspective: hasKnownPerspective ? project.perspective : "Other",
+    customPerspective: hasKnownPerspective ? "" : project.perspective,
     platform: project.platform,
     description: project.description,
     visualDirection: project.visualDirection,
@@ -80,19 +80,19 @@ export function applyProjectSettings(
 ): ProjectSummary | undefined {
   const name = draft.name.trim();
   const gameType = resolveEditableOption(draft.gameType, draft.customGameType);
-  const visualStyle = resolveEditableOption(
-    draft.visualStyle,
-    draft.customVisualStyle,
+  const perspective = resolveEditableOption(
+    draft.perspective,
+    draft.customPerspective,
   );
 
-  if (!name || !gameType || !visualStyle) return undefined;
+  if (!name || !gameType || !perspective) return undefined;
 
   return {
     ...project,
     name,
     gameType,
-    visualStyle,
-    style: visualStyle,
+    perspective,
+    style: perspective,
     platform: draft.platform,
     description: draft.description,
     visualDirection: draft.visualDirection,

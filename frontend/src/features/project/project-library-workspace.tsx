@@ -1,5 +1,5 @@
 import { AppHeader } from "@/components/layouts/app-header";
-import { ProjectChrome } from "@/components/layouts/project-chrome";
+import { ProjectWorkspaceLayout } from "@/components/layouts/project-workspace-layout";
 
 import { ProjectSidebar } from "./project-sidebar";
 import type { ProjectLibraryController } from "./state/use-project-library";
@@ -12,9 +12,11 @@ export function ProjectLibraryWorkspace({
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <ProjectChrome sidebar={<ProjectSidebar library={library.project} />}>
+      <ProjectWorkspaceLayout
+        sidebar={<ProjectSidebar library={library.project} />}
+      >
         <div className="h-full bg-background" />
-      </ProjectChrome>
+      </ProjectWorkspaceLayout>
     </div>
   );
 }
