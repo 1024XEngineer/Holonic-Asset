@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ComponentPropsWithoutRef, ComponentType } from "react";
 import { useScrollSpy } from "@mantine/hooks";
+import { Link } from "@tanstack/react-router";
 
 import DirectionsEn, {
   metadata as directionsEn,
@@ -9,22 +10,34 @@ import PerspectiveEn, {
   metadata as perspectiveEn,
 } from "./content/perspective.mdx";
 import ReferenceEn, { metadata as referenceEn } from "./content/reference.mdx";
+import TilesetsEn, { metadata as tilesetsEn } from "./content/tilesets.mdx";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 
-type ArticleId = "directions" | "perspective" | "reference";
 type Article = {
   Content: ComponentType<{ components?: Record<string, ComponentType> }>;
   metadata: { title: string };
 };
 
+export const articleOrder = [
+  "reference",
+  "perspective",
+  "directions",
+  "tilesets",
+] as const;
+
+export type ArticleId = (typeof articleOrder)[number];
+
 const articles: Record<ArticleId, Article> = {
   reference: { Content: ReferenceEn, metadata: referenceEn },
   perspective: { Content: PerspectiveEn, metadata: perspectiveEn },
   directions: { Content: DirectionsEn, metadata: directionsEn },
+  tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
 };
 
-const articleOrder: ArticleId[] = ["reference", "perspective", "directions"];
+export function isArticleId(value: string): value is ArticleId {
+  return articleOrder.includes(value as ArticleId);
+}
 
 const mdxComponents = {
   h2: ({ className, ...props }: ComponentPropsWithoutRef<"h2">) => (
@@ -65,11 +78,14 @@ const mdxComponents = {
   ),
 };
 
-export function Docs() {
-  const [activeArticle, setActiveArticle] = useState<ArticleId>("reference");
-  const article = articles[activeArticle];
+type DocsProps = {
+  articleId: ArticleId;
+};
+
+export function Docs({ articleId }: DocsProps) {
+  const article = articles[articleId];
   const outline = useScrollSpy({
-    selector: `#${activeArticle}-panel :is(h2, h3)`,
+    selector: `#${articleId}-panel :is(h2, h3)`,
     offset: 80,
   });
   const [selectedOutlineId, setSelectedOutlineId] = useState<string | null>(
@@ -79,7 +95,7 @@ export function Docs() {
 
   useEffect(() => {
     setSelectedOutlineId(null);
-  }, [activeArticle, outline.active]);
+  }, [articleId, outline.active]);
 
   return (
     <div className="min-h-screen bg-white text-neutral-950">
@@ -89,36 +105,30 @@ export function Docs() {
           <aside className="border-b border-neutral-950/10 bg-white px-5 py-8 sm:px-8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-10 lg:py-12">
             <nav
               aria-label="Documentation topics"
-              role="tablist"
               className="flex gap-1 overflow-x-auto pb-1 lg:block lg:space-y-1.5 lg:overflow-visible"
             >
               {articleOrder.map((id) => {
-                const active = activeArticle === id;
+                const active = articleId === id;
                 return (
-                  <button
+                  <Link
                     key={id}
-                    id={`${id}-tab`}
-                    role="tab"
-                    type="button"
-                    aria-controls={`${id}-panel`}
-                    aria-selected={active}
-                    onClick={() => setActiveArticle(id)}
+                    to="/docs/$articleId"
+                    params={{ articleId: id }}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       "block shrink-0 px-1 py-1 text-left text-sm text-neutral-500 transition-colors hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 lg:w-full",
                       active && "font-semibold text-neutral-950",
                     )}
                   >
                     {articles[id].metadata.title}
-                  </button>
+                  </Link>
                 );
               })}
             </nav>
           </aside>
 
           <article
-            id={`${activeArticle}-panel`}
-            role="tabpanel"
-            aria-labelledby={`${activeArticle}-tab`}
+            id={`${articleId}-panel`}
             className="min-w-0 px-5 py-16 sm:px-8 sm:py-24 lg:px-12"
           >
             <div className="mx-auto max-w-3xl">
