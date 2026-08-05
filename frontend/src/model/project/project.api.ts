@@ -79,5 +79,4 @@ const projectPerspectiveLabels: Record<ProjectPerspective, string> = {
   TopDown: "Top-down",
   SideOn: "Side-On",
   Isometric: "Isometric",
-  "": "Top-down",
 };
