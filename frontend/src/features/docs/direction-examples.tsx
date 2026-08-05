@@ -16,6 +16,20 @@ const eightDirections = [
   ["south-east", "South-east"],
 ] as const;
 
+export function OneDirectionExample() {
+  return (
+    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid aspect-square place-items-start overflow-hidden border border-neutral-950/10 bg-[#f0eee7]">
+        <img
+          src="/assets/characters/knight/idle.png"
+          alt="Idle knight shown from a single direction"
+          className="h-full max-w-none w-auto translate-x-[6.25%] -translate-y-1/4 [image-rendering:pixelated]"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function FourDirectionExample() {
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

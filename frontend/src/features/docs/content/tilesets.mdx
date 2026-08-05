@@ -1,0 +1,30 @@
+export const metadata = { title: "Split tilesets" };
+
+## Split tilesets by construction rules.
+
+A tileset is a working palette, not every environment asset from the same game. Keep tiles together when they share a grid, placement rules, and a purpose. Split them when those rules change.
+
+## Decide what belongs together
+
+### Share a grid, boundaries, and placement rules
+
+Floor, wall, and edge tiles belong in the same tileset when they snap to the same grid, describe the same scale, and share collision and rotation rules. For example, a 16 x 16 grass tile can form one terrain tileset with its center, straight edge, outer corner, inner corner, cliff, and water-edge variants. Keep every variant needed for a continuous boundary together; otherwise, the pieces needed to complete a shape become hard to find.
+
+### Split by purpose and material boundaries
+
+Terrain, architecture, and interior assets can share a visual style while serving different construction tasks, so they work better as separate tilesets: terrain for outdoor ground, architecture for walls, roofs, and exterior structure, and interiors for floors, furniture, and fixtures. Keep repeatable ground, walls, and borders in a base tileset; move flowers, cracks, signs, and other optional details into a decoration tileset so the base layout stays separate from visual variation. Grass, snow, desert, and cave tiles can also be split by material when each tileset has a complete set of centers, edges, and corners. When two materials must meet directly, keep their transition tiles with the matching boundary pieces.
+
+### Keep multi-tile items intact
+
+Keep a bed, tree, shopfront, or large rock as one named item that occupies several grid cells. Do not split it into unrelated pieces unless each piece must be placed independently. A complete item preserves its silhouette and avoids accidental gaps when it is moved or edited.
+
+## Use a simple split check
+
+Before creating a new tileset, ask:
+
+- Do these tiles work together to build the same part of a scene?
+- Do they use the same grid size, scale, collision, and rotation rules?
+- Are all neighboring edges, corners, and material transitions available in the same tileset?
+- Can optional decoration be removed without breaking the map's readable structure?
+
+If the answer is yes to most of these questions, keep the tiles together. If they require different construction steps or placement rules, create separate tilesets.
