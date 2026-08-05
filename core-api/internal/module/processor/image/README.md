@@ -55,7 +55,13 @@ Optional parameters:
 - `material`: selects a threshold preset based on the material type.
 - `threshold`, `softness`, `spill_suppression`: override the preset parameters.
 
-Processing includes color-key alpha extraction, matte decontamination, spill suppression, edge speckle cleanup, and transparent-pixel RGB cleanup.
+Processing selects between two internal chroma paths without changing the
+public API. Subjects with substantial key-coloured content use global Euclidean
+distance alpha and matte decontamination, which also clears enclosed background
+regions without applying key-dominance alpha to the subject. Other images use a
+border-connected soft matte with key-dominance alpha, partial-alpha despill,
+one-pixel edge contraction, and light alpha feathering. Both paths finish with
+edge speckle cleanup and transparent-pixel RGB cleanup.
 
 ## Resize
 
@@ -74,9 +80,14 @@ image64Base64 := result.ImageBase64
 Defaults are suitable for ordinary 2D game assets:
 
 - Output dimensions are strictly equal to the specified width and height.
-- The subject is cropped by alpha and its aspect ratio is preserved.
+- When content cropping is enabled, the alpha-bounded subject is selected
+  without trimming it to the target aspect ratio.
+- The selected content is resized with contain semantics: its aspect ratio is
+  preserved, it is centred, and any unused target area remains transparent.
 - A transparent safety margin is automatically added.
-- Downscaling uses alpha-aware area sampling.
+- Downscaling uses alpha-weighted area sampling in straight-alpha colour space;
+  enlargement uses alpha-weighted bilinear sampling. This prevents dark or
+  contaminated RGB from bleeding through transparent edges.
 - Full-color and smooth semi-transparent edges are preserved.
 
 Only set the following when you explicitly need traditional pixel art:

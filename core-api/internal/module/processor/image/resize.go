@@ -12,6 +12,9 @@ import (
 type RasterMode string
 
 const (
+	resizeSamplingArea     = "alpha-aware-area"
+	resizeSamplingBilinear = "alpha-aware-bilinear"
+
 	// RasterModeSmooth is intended for regular 2D game art. It uses alpha-aware
 	// area resampling and preserves semi-transparent edge coverage.
 	RasterModeSmooth RasterMode = "smooth"
@@ -67,8 +70,9 @@ type ResizeReport struct {
 //
 // The old implementation sampled one source pixel per destination pixel. That
 // discarded most source information and produced jagged silhouettes. Area
-// filtering instead integrates every covered source pixel in premultiplied
-// alpha space, avoiding transparent-edge halos and preserving small features.
+// filtering instead integrates every covered source pixel with alpha-weighted
+// straight colours, avoiding transparent-edge halos and preserving small
+// features.
 func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeReport, error) {
 	if input == nil {
 		return nil, ResizeReport{}, fmt.Errorf("input image is required")
@@ -94,19 +98,22 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 		return nil, ResizeReport{}, fmt.Errorf("asset margin must be between 0 and half the target dimensions")
 	}
 
-	img := ToRGBA(input)
+	img := toNRGBA(input)
 	inW, inH := img.Bounds().Dx(), img.Bounds().Dy()
+	if inW <= 0 || inH <= 0 {
+		return nil, ResizeReport{}, fmt.Errorf("resize source must not be empty")
+	}
 	crop := image.Rect(0, 0, inW, inH)
 	cropped := false
 	if opts.CropContent {
 		if bounds, ok := alphaBounds(img); ok {
-			crop = fitCrop(bounds, inW, inH, opts.Width-2*margin, opts.Height-2*margin)
+			crop = bounds
 			cropped = crop != image.Rect(0, 0, inW, inH)
 		}
 	}
 
 	innerW, innerH := opts.Width-2*margin, opts.Height-2*margin
-	out := qualityResize(img, crop, innerW, innerH)
+	out, placement, sampling := resizeContain(img, crop, innerW, innerH)
 	if opts.PaletteSize > 0 {
 		applyPalette(out, opts.PaletteSize)
 	}
@@ -114,19 +121,23 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 		applyHardAlpha(out, 112)
 	}
 
-	canvas := image.NewRGBA(image.Rect(0, 0, opts.Width, opts.Height))
+	canvas := image.NewNRGBA(image.Rect(0, 0, opts.Width, opts.Height))
 	for y := range out.Bounds().Dy() {
 		for x := range out.Bounds().Dx() {
-			canvas.SetRGBA(margin+x, margin+y, out.RGBAAt(x, y))
+			canvas.SetNRGBA(
+				margin+placement.X+x,
+				margin+placement.Y+y,
+				out.NRGBAAt(x, y),
+			)
 		}
 	}
-	ScrubTransparentRGB(canvas)
-	return canvas, ResizeReport{
+	scrubTransparentNRGBA(canvas)
+	return ToRGBA(canvas), ResizeReport{
 		InputWidth: inW, InputHeight: inH,
 		OutputWidth: opts.Width, OutputHeight: opts.Height,
 		CroppedToContent: cropped, Margin: margin,
 		PaletteSize: opts.PaletteSize, HardAlpha: opts.HardAlpha,
-		Mode: mode, Sampling: "alpha-aware-area",
+		Mode: mode, Sampling: sampling,
 	}, nil
 }
 
@@ -169,66 +180,49 @@ func alphaBounds(img image.Image) (image.Rectangle, bool) {
 	return image.Rect(minX-b.Min.X, minY-b.Min.Y, maxX-b.Min.X, maxY-b.Min.Y), true
 }
 
-// fitCrop expands the subject bounds to the destination aspect ratio, keeping
-// the subject centred and staying inside the source image.
-func fitCrop(subject image.Rectangle, srcW, srcH, dstW, dstH int) image.Rectangle {
-	if dstW <= 0 || dstH <= 0 {
-		return image.Rect(0, 0, srcW, srcH)
+// resizeContain preserves the selected source rectangle's aspect ratio and
+// centres the scaled result inside the available destination area.
+func resizeContain(
+	src *image.NRGBA,
+	crop image.Rectangle,
+	dstW, dstH int,
+) (*image.NRGBA, image.Point, string) {
+	scaledW, scaledH := containDimensions(crop.Dx(), crop.Dy(), dstW, dstH)
+	placement := image.Pt((dstW-scaledW)/2, (dstH-scaledH)/2)
+	resized, sampling := qualityResize(src, crop, scaledW, scaledH)
+	return resized, placement, sampling
+}
+
+func containDimensions(srcW, srcH, dstW, dstH int) (int, int) {
+	if int64(srcW)*int64(dstH) > int64(srcH)*int64(dstW) {
+		scaledH := roundedScale(srcH, dstW, srcW)
+		return dstW, max(1, min(dstH, scaledH))
 	}
-	cx, cy := float64(subject.Min.X+subject.Max.X)/2, float64(subject.Min.Y+subject.Max.Y)/2
-	w, h := float64(subject.Dx()), float64(subject.Dy())
-	targetRatio := float64(dstW) / float64(dstH)
-	if w/h < targetRatio {
-		w = h * targetRatio
-	} else {
-		h = w / targetRatio
-	}
-	if w > float64(srcW) {
-		w = float64(srcW)
-		h = w / targetRatio
-	}
-	if h > float64(srcH) {
-		h = float64(srcH)
-		w = h * targetRatio
-	}
-	x0, y0 := int(cx-w/2+0.5), int(cy-h/2+0.5)
-	if x0 < 0 {
-		x0 = 0
-	}
-	if y0 < 0 {
-		y0 = 0
-	}
-	cw, ch := int(w+0.5), int(h+0.5)
-	if x0+cw > srcW {
-		x0 = srcW - cw
-	}
-	if y0+ch > srcH {
-		y0 = srcH - ch
-	}
-	if x0 < 0 {
-		x0 = 0
-	}
-	if y0 < 0 {
-		y0 = 0
-	}
-	return image.Rect(x0, y0, x0+cw, y0+ch)
+	scaledW := roundedScale(srcW, dstH, srcH)
+	return max(1, min(dstW, scaledW)), dstH
+}
+
+func roundedScale(value, numerator, denominator int) int {
+	scaled := int64(value) * int64(numerator)
+	return int((scaled + int64(denominator)/2) / int64(denominator))
 }
 
 // qualityResize integrates source coverage for reductions. For enlargement it
 // uses bilinear interpolation; nearest-neighbour enlargement is a presentation
 // choice that should be done by the game engine for an existing pixel sprite.
-func qualityResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *image.RGBA {
+func qualityResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) (*image.NRGBA, string) {
 	if crop.Dx() <= dstW && crop.Dy() <= dstH {
-		return bilinearResize(src, crop, dstW, dstH)
+		return bilinearResize(src, crop, dstW, dstH), resizeSamplingBilinear
 	}
-	return areaResize(src, crop, dstW, dstH)
+	return areaResize(src, crop, dstW, dstH), resizeSamplingArea
 }
 
-// areaResize performs exact box/area resampling in premultiplied-alpha space.
-// It considers all source pixels covered by a destination pixel rather than a
-// single nearest sample, which is essential when reducing 1024px art to 64px.
-func areaResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *image.RGBA {
-	out := image.NewRGBA(image.Rect(0, 0, dstW, dstH))
+// areaResize performs exact box/area resampling with alpha-weighted straight
+// colours. It considers all source pixels covered by a destination pixel
+// rather than a single nearest sample, which is essential when reducing
+// 1024px art to 64px.
+func areaResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) *image.NRGBA {
+	out := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
 	scaleX := float64(crop.Dx()) / float64(dstW)
 	scaleY := float64(crop.Dy()) / float64(dstH)
 	for dy := range dstH {
@@ -239,7 +233,7 @@ func areaResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *image.RG
 			sx0 := float64(crop.Min.X) + float64(dx)*scaleX
 			sx1 := float64(crop.Min.X) + float64(dx+1)*scaleX
 			x0, x1 := int(math.Floor(sx0)), int(math.Ceil(sx1))
-			var sumR, sumG, sumB, sumA, sumWeight float64
+			var sumR, sumG, sumB, sumAlpha, sumWeight float64
 			for sy := y0; sy < y1; sy++ {
 				if sy < crop.Min.Y || sy >= crop.Max.Y {
 					continue
@@ -257,28 +251,29 @@ func areaResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *image.RG
 					if weight <= 0 {
 						continue
 					}
-					p := src.RGBAAt(sx, sy)
-					sumR += float64(p.R) * weight
-					sumG += float64(p.G) * weight
-					sumB += float64(p.B) * weight
-					sumA += float64(p.A) * weight
+					p := src.NRGBAAt(sx, sy)
+					alphaWeight := float64(p.A) * weight
+					sumR += float64(p.R) * alphaWeight
+					sumG += float64(p.G) * alphaWeight
+					sumB += float64(p.B) * alphaWeight
+					sumAlpha += alphaWeight
 					sumWeight += weight
 				}
 			}
-			if sumWeight == 0 {
+			if sumWeight == 0 || sumAlpha == 0 {
 				continue
 			}
-			out.SetRGBA(dx, dy, color.RGBA{
-				R: clampByte(sumR / sumWeight), G: clampByte(sumG / sumWeight),
-				B: clampByte(sumB / sumWeight), A: clampByte(sumA / sumWeight),
+			out.SetNRGBA(dx, dy, color.NRGBA{
+				R: clampByte(sumR / sumAlpha), G: clampByte(sumG / sumAlpha),
+				B: clampByte(sumB / sumAlpha), A: clampByte(sumAlpha / sumWeight),
 			})
 		}
 	}
 	return out
 }
 
-func bilinearResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *image.RGBA {
-	out := image.NewRGBA(image.Rect(0, 0, dstW, dstH))
+func bilinearResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) *image.NRGBA {
+	out := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
 	for dy := range dstH {
 		sy := float64(crop.Min.Y) + (float64(dy)+0.5)*float64(crop.Dy())/float64(dstH) - 0.5
 		y0 := int(math.Floor(sy))
@@ -295,20 +290,44 @@ func bilinearResize(src *image.RGBA, crop image.Rectangle, dstW, dstH int) *imag
 				x0, fx = crop.Min.X, 0
 			}
 			x1 := min(x0+1, crop.Max.X-1)
-			p00, p10 := src.RGBAAt(x0, y0), src.RGBAAt(x1, y0)
-			p01, p11 := src.RGBAAt(x0, y1), src.RGBAAt(x1, y1)
-			mix := func(a, b, c, d uint8) uint8 {
-				top := float64(a)*(1-fx) + float64(b)*fx
-				bottom := float64(c)*(1-fx) + float64(d)*fx
-				return clampByte(top*(1-fy) + bottom*fy)
+			pixels := [4]color.NRGBA{
+				src.NRGBAAt(x0, y0),
+				src.NRGBAAt(x1, y0),
+				src.NRGBAAt(x0, y1),
+				src.NRGBAAt(x1, y1),
 			}
-			out.SetRGBA(dx, dy, color.RGBA{
-				R: mix(p00.R, p10.R, p01.R, p11.R), G: mix(p00.G, p10.G, p01.G, p11.G),
-				B: mix(p00.B, p10.B, p01.B, p11.B), A: mix(p00.A, p10.A, p01.A, p11.A),
-			})
+			weights := [4]float64{
+				(1 - fx) * (1 - fy),
+				fx * (1 - fy),
+				(1 - fx) * fy,
+				fx * fy,
+			}
+			out.SetNRGBA(dx, dy, alphaWeightedNRGBA(pixels, weights))
 		}
 	}
 	return out
+}
+
+func alphaWeightedNRGBA(pixels [4]color.NRGBA, weights [4]float64) color.NRGBA {
+	var sumR, sumG, sumB, sumAlpha, sumWeight float64
+	for index, pixel := range pixels {
+		weight := weights[index]
+		alphaWeight := float64(pixel.A) * weight
+		sumR += float64(pixel.R) * alphaWeight
+		sumG += float64(pixel.G) * alphaWeight
+		sumB += float64(pixel.B) * alphaWeight
+		sumAlpha += alphaWeight
+		sumWeight += weight
+	}
+	if sumWeight == 0 || sumAlpha == 0 {
+		return color.NRGBA{}
+	}
+	return color.NRGBA{
+		R: clampByte(sumR / sumAlpha),
+		G: clampByte(sumG / sumAlpha),
+		B: clampByte(sumB / sumAlpha),
+		A: clampByte(sumAlpha / sumWeight),
+	}
 }
 
 func clampByte(value float64) uint8 {
@@ -321,39 +340,29 @@ func clampByte(value float64) uint8 {
 	return uint8(math.Round(value))
 }
 
-func applyHardAlpha(img *image.RGBA, threshold uint8) {
+func applyHardAlpha(img *image.NRGBA, threshold uint8) {
 	for y := range img.Bounds().Dy() {
 		for x := range img.Bounds().Dx() {
-			p := img.RGBAAt(x, y)
+			p := img.NRGBAAt(x, y)
 			if p.A < threshold {
-				img.SetRGBA(x, y, color.RGBA{})
+				img.SetNRGBA(x, y, color.NRGBA{})
 				continue
 			}
-			// RGB is premultiplied. Restore straight colour before making the
-			// pixel fully opaque, otherwise edge pixels become dark fringes.
-			img.SetRGBA(x, y, color.RGBA{
-				R: unpremultiply(p.R, p.A), G: unpremultiply(p.G, p.A),
-				B: unpremultiply(p.B, p.A), A: 255,
-			})
+			p.A = 255
+			img.SetNRGBA(x, y, p)
 		}
 	}
 }
 
-func intToUint8(value int) uint8 {
-	if value <= 0 {
-		return 0
+func scrubTransparentNRGBA(img *image.NRGBA) {
+	for y := range img.Bounds().Dy() {
+		for x := range img.Bounds().Dx() {
+			pixel := img.NRGBAAt(x, y)
+			if pixel.A <= TransparentAlphaMax {
+				img.SetNRGBA(x, y, color.NRGBA{})
+			}
+		}
 	}
-	if value >= 255 {
-		return 255
-	}
-	return uint8(value)
-}
-
-func unpremultiply(channel, alpha uint8) uint8 {
-	if alpha == 0 {
-		return 0
-	}
-	return intToUint8((int(channel)*255 + int(alpha)/2) / int(alpha))
 }
 
 type palettePoint struct {
@@ -421,7 +430,7 @@ func splitPaletteBox(box paletteBox) (paletteBox, paletteBox, bool) {
 // applyPalette uses weighted median-cut rather than retaining only the most
 // frequent histogram buckets. This keeps isolated accent colours and small
 // equipment details much more reliably.
-func applyPalette(img *image.RGBA, limit int) {
+func applyPalette(img *image.NRGBA, limit int) {
 	if limit <= 0 {
 		return
 	}
@@ -429,21 +438,20 @@ func applyPalette(img *image.RGBA, limit int) {
 	hist := make(map[int]*accumulator)
 	for y := range img.Bounds().Dy() {
 		for x := range img.Bounds().Dx() {
-			p := img.RGBAAt(x, y)
+			p := img.NRGBAAt(x, y)
 			if p.A <= TransparentAlphaMax {
 				continue
 			}
-			r, g, b := unpremultiply(p.R, p.A), unpremultiply(p.G, p.A), unpremultiply(p.B, p.A)
-			key := int(r>>3)<<10 | int(g>>3)<<5 | int(b>>3)
+			key := int(p.R>>3)<<10 | int(p.G>>3)<<5 | int(p.B>>3)
 			entry := hist[key]
 			if entry == nil {
 				entry = &accumulator{}
 				hist[key] = entry
 			}
 			weight := uint64(p.A)
-			entry.r += uint64(r) * weight
-			entry.g += uint64(g) * weight
-			entry.b += uint64(b) * weight
+			entry.r += uint64(p.R) * weight
+			entry.g += uint64(p.G) * weight
+			entry.b += uint64(p.B) * weight
 			entry.weight += weight
 		}
 	}
@@ -495,24 +503,24 @@ func applyPalette(img *image.RGBA, limit int) {
 	}
 	for y := range img.Bounds().Dy() {
 		for x := range img.Bounds().Dx() {
-			p := img.RGBAAt(x, y)
+			p := img.NRGBAAt(x, y)
 			if p.A <= TransparentAlphaMax {
 				continue
 			}
-			r, g, b := unpremultiply(p.R, p.A), unpremultiply(p.G, p.A), unpremultiply(p.B, p.A)
 			best, bestDist := palette[0], int64(math.MaxInt64)
 			for _, candidate := range palette {
-				dr, dg, db := int64(r)-int64(candidate.R), int64(g)-int64(candidate.G), int64(b)-int64(candidate.B)
+				dr := int64(p.R) - int64(candidate.R)
+				dg := int64(p.G) - int64(candidate.G)
+				db := int64(p.B) - int64(candidate.B)
 				distance := 2*dr*dr + 4*dg*dg + 3*db*db
 				if distance < bestDist {
 					best, bestDist = candidate, distance
 				}
 			}
-			alpha := int(p.A)
-			img.SetRGBA(x, y, color.RGBA{
-				R: intToUint8((int(best.R)*alpha + 127) / 255),
-				G: intToUint8((int(best.G)*alpha + 127) / 255),
-				B: intToUint8((int(best.B)*alpha + 127) / 255),
+			img.SetNRGBA(x, y, color.NRGBA{
+				R: best.R,
+				G: best.G,
+				B: best.B,
 				A: p.A,
 			})
 		}

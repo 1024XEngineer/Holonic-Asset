@@ -16,7 +16,7 @@ import (
 const pngMIMEType = "image/png"
 
 type decodedBase64Image struct {
-	image     *image.RGBA
+	image     image.Image
 	format    string
 	colorType string
 	hasAlpha  bool
@@ -29,7 +29,7 @@ func DecodeBase64Image(value string) (*image.RGBA, error) {
 	if err != nil {
 		return nil, err
 	}
-	return decoded.image, nil
+	return ToRGBA(decoded.image), nil
 }
 
 // EncodePNGBase64 encodes an image as a raw (non-data-URL) PNG Base64 string.
@@ -62,7 +62,7 @@ func decodeBase64Image(value string) (decodedBase64Image, error) {
 	}
 
 	return decodedBase64Image{
-		image:     ToRGBA(decoded),
+		image:     decoded,
 		format:    format,
 		colorType: colorType,
 		hasAlpha:  hasAlpha,
@@ -110,6 +110,16 @@ func decodeBase64Payload(value string) ([]byte, error) {
 func ToRGBA(src image.Image) *image.RGBA {
 	bounds := src.Bounds()
 	out := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	draw.Draw(out, out.Bounds(), src, bounds.Min, draw.Src)
+	return out
+}
+
+// toNRGBA normalizes an image to zero-based, straight-alpha NRGBA. Resize
+// sampling uses this representation so RGB channels are never accidentally
+// interpreted as premultiplied values.
+func toNRGBA(src image.Image) *image.NRGBA {
+	bounds := src.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 	draw.Draw(out, out.Bounds(), src, bounds.Min, draw.Src)
 	return out
 }

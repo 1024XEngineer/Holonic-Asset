@@ -260,7 +260,7 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		frame := image.NewNRGBA(image.Rect(0, 0, frameWidth, frameHeight))
 		if cells[i].visible {
 			cropped := cloneNRGBA(working[i].SubImage(shared))
-			resized := qualityResize(ToRGBA(cropped), cropped.Bounds(), drawW, drawH)
+			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH)
 			draw.Draw(frame, image.Rect(destX, destY, destX+drawW, destY+drawH), resized, image.Point{}, draw.Over)
 		}
 		scrubTransparentNRGBA(frame)
@@ -519,16 +519,4 @@ func clampAnimationInt(value, minimum, maximum int) int {
 		return maximum
 	}
 	return value
-}
-
-func scrubTransparentNRGBA(img *image.NRGBA) {
-	for y := range img.Bounds().Dy() {
-		row := y * img.Stride
-		for x := range img.Bounds().Dx() {
-			offset := row + x*4
-			if img.Pix[offset+3] <= TransparentAlphaMax {
-				img.Pix[offset], img.Pix[offset+1], img.Pix[offset+2] = 0, 0, 0
-			}
-		}
-	}
 }
