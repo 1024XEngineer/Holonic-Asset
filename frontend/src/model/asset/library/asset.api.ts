@@ -8,6 +8,7 @@ import {
 } from "./mock";
 import type { AssetListItemResponse, AssetType } from "./asset.contract";
 import { getDefaultAssetCanvasSize } from "./asset-canvas-size";
+import { assetPerspectiveOptions } from "./types";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
@@ -136,7 +137,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       description: item.description,
       version: `v${item.version}`,
       canvasSize: getDefaultAssetCanvasSize(kind),
-      perspective: "Not specified",
+      perspective: assetPerspectiveOptions[0],
       tags: item.tags ?? [],
       history: [],
       animations: [],

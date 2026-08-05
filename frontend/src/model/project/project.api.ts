@@ -77,7 +77,7 @@ const projectGameTypeLabels: Record<ProjectGameType, string> = {
 
 const projectPerspectiveLabels: Record<ProjectPerspective, string> = {
   TopDown: "Top-down",
-  SideOn: "Side-on",
+  SideOn: "Side-On",
   Isometric: "Isometric",
-  "": "Unspecified",
+  "": "Top-down",
 };

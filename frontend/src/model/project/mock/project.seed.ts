@@ -19,7 +19,7 @@ export const projectSummaries: ProjectSummary[] = [
     name: "Iron Harbor",
     style: "Industrial platformer",
     gameType: "Platformer",
-    perspective: "Side-on",
+    perspective: "Side-On",
     platform: "PC",
     description:
       "A mechanical harbor city built from cranes, furnaces, and weathered iron walkways.",

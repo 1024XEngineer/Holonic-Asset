@@ -1,13 +1,21 @@
 export {
   assetApi,
+  assetCanvasSizeOptions,
   assetKeys,
+  assetPerspectiveOptions,
   getDefaultAssetCanvasSize,
+  isAssetPerspective,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
   useUpdateAssetMutation,
 } from "./library";
-export type { AssetGroup, AssetGroupsByProject } from "./library";
+export type {
+  AssetCanvasSize,
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetPerspective,
+} from "./library";
 export {
   assetRecordModeForKind,
   useRecordQuery,

@@ -1,21 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  AlertCircle,
-  ChevronDown,
-  Layers3,
-  Ruler,
-  Tags,
-  X,
-} from "lucide-react";
+import { AlertCircle, Layers3, Ruler, Tags, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -30,7 +22,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AssetKindIcon } from "@/components/asset-kind";
-import type { AssetMetadataUpdate } from "@/model/asset";
+import {
+  assetCanvasSizeOptions,
+  assetPerspectiveOptions,
+  isAssetPerspective,
+  type AssetMetadataUpdate,
+} from "@/model/asset";
 
 import { AssetPreview } from "./asset-preview";
 import type { AssetLibraryItem } from "./types/asset";
@@ -63,15 +60,17 @@ export function AssetEditDialog({
     setDescription(asset.description);
     setTags(asset.tags);
     setCanvasSize(asset.canvasSize);
-    setPerspective(asset.perspective);
+    setPerspective(
+      isAssetPerspective(asset.perspective)
+        ? asset.perspective
+        : assetPerspectiveOptions[0],
+    );
   }, [asset]);
 
   const tagOptions = Array.from(new Set([...availableTags, ...tags]));
-  const canvasOptions = Array.from(new Set([...canvasSizeOptions, canvasSize]));
-  const perspectives = Array.from(
-    new Set([...perspectiveOptions, perspective]),
+  const canvasOptions = Array.from(
+    new Set([...assetCanvasSizeOptions, canvasSize]),
   );
-
   const toggleTag = (tag: string, checked: boolean) => {
     setTags((currentTags) =>
       checked
@@ -206,32 +205,34 @@ export function AssetEditDialog({
                     ) : null}
                   </Field>
                   <div className="grid grid-cols-2 gap-4">
-                    <Field
-                      label="Canvas"
-                      htmlFor="asset-canvas"
-                      icon={<Ruler className="size-3.5" />}
-                    >
-                      <SingleSelect
-                        disabled={isSaving}
-                        id="asset-canvas"
-                        value={canvasSize}
-                        options={canvasOptions}
-                        onValueChange={setCanvasSize}
-                      />
-                    </Field>
-                    <Field
-                      label="Perspective"
-                      htmlFor="asset-perspective"
-                      icon={<Layers3 className="size-3.5" />}
-                    >
-                      <SingleSelect
-                        disabled={isSaving}
-                        id="asset-perspective"
-                        value={perspective}
-                        options={perspectives}
-                        onValueChange={setPerspective}
-                      />
-                    </Field>
+                    <DropdownField
+                      disabled={isSaving}
+                      label={
+                        <>
+                          <Ruler className="size-3.5" />
+                          Canvas
+                        </>
+                      }
+                      onChange={setCanvasSize}
+                      options={canvasOptions}
+                      size="compact"
+                      value={canvasSize}
+                    />
+                    <DropdownField
+                      disabled={isSaving}
+                      label={
+                        <>
+                          <Layers3 className="size-3.5" />
+                          Perspective
+                        </>
+                      }
+                      onChange={(value) => {
+                        if (isAssetPerspective(value)) setPerspective(value);
+                      }}
+                      options={assetPerspectiveOptions}
+                      size="compact"
+                      value={perspective}
+                    />
                   </div>
                   {error ? (
                     <div
@@ -273,65 +274,6 @@ const availableTags = [
   "terrain",
   "top-down",
 ];
-
-const canvasSizeOptions = [
-  "16 × 16 px",
-  "32 × 32 px",
-  "48 × 64 px",
-  "64 × 64 px",
-  "128 × 128 px",
-  "320 × 180 px",
-  "1920 × 1080 px",
-];
-
-const perspectiveOptions = [
-  "Top-down",
-  "Side view",
-  "Screen space",
-  "Isometric",
-];
-
-function SingleSelect({
-  disabled,
-  id,
-  onValueChange,
-  options,
-  value,
-}: {
-  disabled: boolean;
-  id: string;
-  onValueChange: (value: string) => void;
-  options: string[];
-  value: string;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            disabled={disabled}
-            id={id}
-            type="button"
-            variant="outline"
-            className="h-8 w-full justify-between px-2.5 font-normal"
-          />
-        }
-      >
-        <span className="truncate">{value || "Not specified"}</span>
-        <ChevronDown className="text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[var(--anchor-width)] min-w-40">
-        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
-          {options.map((option) => (
-            <DropdownMenuRadioItem key={option} value={option}>
-              {option}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 function Field({
   children,

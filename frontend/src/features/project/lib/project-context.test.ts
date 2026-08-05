@@ -31,7 +31,7 @@ describe("toCreateProjectInput", () => {
   it("limits perspectives to supported game views", () => {
     expect(projectContextOptions.perspectives).toEqual([
       "Top-down",
-      "Side-on",
+      "Side-On",
       "Isometric",
     ]);
   });

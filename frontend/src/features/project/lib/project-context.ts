@@ -1,3 +1,4 @@
+import { assetPerspectiveOptions } from "@/model/asset";
 import type { CreateProjectInput, ProjectSummary } from "@/model/project";
 
 import type {
@@ -13,7 +14,7 @@ export const projectContextOptions = {
     "Strategy",
     "Simulation",
   ],
-  perspectives: ["Top-down", "Side-on", "Isometric"],
+  perspectives: assetPerspectiveOptions,
   platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
 } as const;
 
