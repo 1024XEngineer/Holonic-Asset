@@ -117,7 +117,7 @@ var _ Manager = (*manager)(nil)
 
 func buildReferencePrompt(project *Project) string {
 	gameType := gameTypePrompt(project.GameType)
-	viewType := viewTypePrompt(project.ViewType)
+	perspective := perspectivePrompt(project.Perspective)
 	platform := platformPrompt(project.TargetPlatform)
 	gameplayPlan := gameplayPlanPrompt(project)
 	hudPlan := hudPlanPrompt(project)
@@ -160,7 +160,7 @@ REFERENCE IMAGE
 If a reference image is supplied, use it only for visual language, palette relationships, sprite scale, or material treatment. Do not copy its words, logos, HUD layout, or accidental artifacts. Keep the user's game type and described activity in control of the composition.`,
 		promptValue(project.Name, "Untitled game project"),
 		gameType,
-		viewType,
+		perspective,
 		platform,
 		style,
 		description,
@@ -197,13 +197,13 @@ func gameTypePrompt(gameType GameType) string {
 	return fmt.Sprintf("the user-described game type %q; rely on the user description for its actual activity", label)
 }
 
-func viewTypePrompt(viewType ViewType) string {
-	switch viewType {
-	case ViewTypeTopDown:
+func perspectivePrompt(perspective Perspective) string {
+	switch perspective {
+	case PerspectiveTopDown:
 		return "top-down 2D pixel-art gameplay camera with a readable tile-based playfield, clear paths, interactables, and spatial relationships"
-	case ViewTypeSideView:
-		return "side-view 2D pixel-art gameplay camera with layered parallax backgrounds, a clear traversal line, readable platforms, and strong sprite silhouettes"
-	case ViewTypeIsometric:
+	case PerspectiveSideOn:
+		return "side-on 2D pixel-art gameplay camera with layered parallax backgrounds, a clear traversal line, readable platforms, and strong sprite silhouettes"
+	case PerspectiveIsometric:
 		return "2D isometric pixel-art gameplay camera with a consistent pixel grid, clear depth, walkable tiles, elevation, and tactical readability"
 	default:
 		return "choose the 2D pixel-art gameplay camera best suited to the brief and keep it consistent with an authentic playable screenshot"

@@ -68,7 +68,7 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *test
 	project := &domain.Project{
 		Name:           "Lantern Vale",
 		GameType:       domain.GameTypeRPG,
-		ViewType:       domain.ViewTypeIsometric,
+		Perspective:    domain.PerspectiveIsometric,
 		TargetPlatform: domain.PlatformTypeMobile,
 		Description:    "A courier explores a flooded clockwork city and protects a caravan from mechanical beasts.",
 		Reference:      reference,
@@ -170,7 +170,7 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 				UserID:         7,
 				Name:           tc.name,
 				GameType:       tc.gameType,
-				ViewType:       domain.ViewTypeTopDown,
+				Perspective:    domain.PerspectiveTopDown,
 				TargetPlatform: domain.PlatformTypePC,
 				Description:    tc.description,
 				Style:          "简单的2D像素风",
@@ -299,7 +299,7 @@ func validProject() *domain.Project {
 	return &domain.Project{
 		Name:           "Test Project",
 		GameType:       domain.GameTypeACT,
-		ViewType:       domain.ViewTypeSideView,
+		Perspective:    domain.PerspectiveSideOn,
 		TargetPlatform: domain.PlatformTypePC,
 	}
 }

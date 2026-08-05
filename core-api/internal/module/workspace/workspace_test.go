@@ -42,7 +42,7 @@ func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 		UserID:         7,
 		Name:           "Prototype",
 		GameType:       project.GameTypeRPG,
-		ViewType:       project.ViewTypeTopDown,
+		Perspective:    project.PerspectiveTopDown,
 		TargetPlatform: project.PlatformTypePC,
 	})
 	if err != nil {
