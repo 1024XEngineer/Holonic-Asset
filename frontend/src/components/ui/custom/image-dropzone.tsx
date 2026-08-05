@@ -18,6 +18,7 @@ const imageAccept = {
 export function ImageDropzone({
   className,
   fileName,
+  error,
   label = "Upload a reference image",
   onClear,
   onSelect,
@@ -25,6 +26,7 @@ export function ImageDropzone({
 }: {
   className?: string;
   fileName?: string;
+  error?: string;
   label?: string;
   onClear?: () => void;
   onSelect: (file: File) => void;
@@ -84,6 +86,8 @@ export function ImageDropzone({
         <p className="text-xs text-destructive">
           Use a PNG, JPEG, or WebP image.
         </p>
+      ) : error ? (
+        <p className="text-xs text-destructive">{error}</p>
       ) : null}
     </div>
   );

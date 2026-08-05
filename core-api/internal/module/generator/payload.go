@@ -12,9 +12,9 @@ type CreateCharacterPrototypePayload struct {
 	ProjectID      uint   `json:"project_id"`
 }
 
-// CreateCharacterAnimationPayload is the complete input consumed by the
-// character animation task handler.
-type CreateCharacterAnimationPayload struct {
+// CreateAnimationPayload is the common input consumed by character and object
+// animation generation.
+type CreateAnimationPayload struct {
 	AssetName     string `json:"asset_name"`
 	ProjectID     uint   `json:"project_id"`
 	ParentID      uint   `json:"parent_id"`
@@ -30,15 +30,6 @@ type CreateObjectPrototypePayload struct {
 	Perspective   string `json:"perspective"`
 	Reference     string `json:"reference"`
 	ProjectID     uint   `json:"project_id"`
-}
-
-// CreateObjectAnimationPayload is the complete input consumed by the object
-// animation task handler.
-type CreateObjectAnimationPayload struct {
-	AssetName     string `json:"asset_name"`
-	ProjectID     uint   `json:"project_id"`
-	ParentID      uint   `json:"parent_id"`
-	CreativeBrief string `json:"creative_brief"`
 }
 
 // CreateTileSetPayload is the complete input consumed by the tileset task

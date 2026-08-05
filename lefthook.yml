@@ -14,7 +14,8 @@ pre-commit:
     frontend-format:
       root: "frontend/"
       glob: "*.{js,jsx,ts,tsx}"
-      run: pnpm format {staged_files}
+      exclude: "src/model/generated/**"
+      run: pnpm format {files}
       stage_fixed: true
 
     frontend-lint:

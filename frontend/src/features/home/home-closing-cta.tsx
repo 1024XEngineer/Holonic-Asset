@@ -24,9 +24,7 @@ export function HomeClosingCta() {
           <Button
             nativeButton={false}
             size="lg"
-            render={
-              <Link to="/projects/new" search={{ project: undefined, q: "" }} />
-            }
+            render={<Link to="/projects/new" />}
           >
             <Plus data-icon="inline-start" />
             Start a project

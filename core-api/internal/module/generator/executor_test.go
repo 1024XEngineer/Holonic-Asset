@@ -164,7 +164,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		result: generatedImages(),
 	}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, assets)
+	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -181,6 +181,8 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
+		"resize_image",
+		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
@@ -210,7 +212,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, assets)
+	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
 	payload := json.RawMessage(`{
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
@@ -225,6 +227,10 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
+		"process_image",
+		"resize_image",
+		"process_image",
+		"resize_image",
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
@@ -239,15 +245,14 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 
 func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	tests := []generator.TaskType{
-		generator.GenerateCharacterAnimation,
-		generator.GenerateObjectAnimation,
+		generator.GenerateAnimation,
 	}
 	for _, taskType := range tests {
 		t.Run(string(taskType), func(t *testing.T) {
 			events := []string{}
 			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(images, assets)
+			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
 			payload := json.RawMessage(`{
 				"asset_name":"walk",
 				"creative_brief":"walking cycle",
@@ -290,11 +295,11 @@ func TestExecutorDoesNotMutateAssetsWhenImageGenerationFails(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, err: wantErr}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, assets)
+	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
 
 	_, err := executor.Generate(
 		context.Background(),
-		generator.GenerateCharacterAnimation,
+		generator.GenerateAnimation,
 		json.RawMessage(`{"asset_name":"walk","parent_id":7}`),
 	)
 	if !errors.Is(err, wantErr) {
@@ -338,7 +343,7 @@ func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T)
 			events := []string{}
 			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(images, assets)
+			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
 
 			_, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, tt.payload)
 			if err == nil {
@@ -352,17 +357,27 @@ func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T)
 }
 
 func TestExecutorRequiresDependencies(t *testing.T) {
-	executor := generator.NewExecutor(nil, nil)
+	executor := generator.NewExecutor(nil, nil, nil)
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrImageServiceRequired) {
 		t.Fatalf("expected image service required error, got %v", err)
 	}
 
 	events := []string{}
-	executor = generator.NewExecutor(&imageGenerationServiceStub{events: &events}, nil)
+	executor = generator.NewExecutor(&imageGenerationServiceStub{events: &events}, nil, nil)
 	_, err = executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrAssetWriterRequired) {
 		t.Fatalf("expected asset writer required error, got %v", err)
+	}
+
+	executor = generator.NewExecutor(
+		&imageGenerationServiceStub{events: &events},
+		nil,
+		&generationAssetWriterStub{events: &events},
+	)
+	_, err = executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
+	if !errors.Is(err, generator.ErrImageProcessorRequired) {
+		t.Fatalf("expected image processor required error, got %v", err)
 	}
 }
 
@@ -389,7 +404,7 @@ func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset) {
 	if prototype[0].ID != 1 || prototype[0].URL == nil ||
 		*prototype[0].URL != "data:image/png;base64,first" ||
 		prototype[1].ID != 2 || prototype[1].URL == nil ||
-		*prototype[1].URL != "data:image/webp;base64,second" {
+		*prototype[1].URL != "data:image/png;base64,second" {
 		t.Fatalf("unexpected prototype resources: %+v", prototype)
 	}
 }

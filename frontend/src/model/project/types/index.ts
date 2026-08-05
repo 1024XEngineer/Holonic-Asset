@@ -1,1 +1,1 @@
-export type { Project, ProjectSummary } from "./project";
+export type { CreateProjectInput, Project, ProjectSummary } from "./project";

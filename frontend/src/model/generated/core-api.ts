@@ -225,6 +225,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/project/reference/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a project reference */
+        post: operations["generateProjectReference"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/project/update": {
         parameters: {
             query?: never;
@@ -341,7 +358,7 @@ export interface components {
             /** Format: int64 */
             assetId?: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "generate_character_animation" | "regenerate_character_prototype" | "regenerate_character_animation" | "regenerate_character_frames" | "generate_object_prototype" | "generate_object_animation" | "regenerate_object_prototype" | "regenerate_object_animation" | "regenerate_object_frames" | "generate_tileset" | "regenerate_item" | "regenerate_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
             prompt: string;
             referenceMediaIds?: string[] | null;
@@ -354,16 +371,16 @@ export interface components {
         CreateProjectRequest: {
             description?: string;
             /** @enum {string} */
-            gameType: "RPG" | "ACT" | "SLG" | "Other";
+            gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
-            targetPlatform: "PC" | "Mobile" | "Web";
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
-            /** @enum {string} */
-            viewType: "TopDown" | "SideView" | "Isometric" | "Other";
         };
         CreateProjectResponse: {
             /** Format: int64 */
@@ -429,13 +446,28 @@ export interface components {
              */
             type: string;
         };
+        GenerateProjectReferenceRequest: {
+            description?: string;
+            /** @enum {string} */
+            gameType?: "" | "RPG" | "ACT" | "SLG";
+            name: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            reference?: string;
+            style?: string;
+            /** @enum {string} */
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
+        };
+        GenerateProjectReferenceResponse: {
+            reference: string;
+        };
         GenerationRunListItemResponse: {
             /** Format: int64 */
             assetId?: number;
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "generate_character_animation" | "regenerate_character_prototype" | "regenerate_character_animation" | "regenerate_character_frames" | "generate_object_prototype" | "generate_object_animation" | "regenerate_object_prototype" | "regenerate_object_animation" | "regenerate_object_frames" | "generate_tileset" | "regenerate_item" | "regenerate_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
@@ -454,7 +486,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "generate_character_animation" | "regenerate_character_prototype" | "regenerate_character_animation" | "regenerate_character_frames" | "generate_object_prototype" | "generate_object_animation" | "regenerate_object_prototype" | "regenerate_object_animation" | "regenerate_object_frames" | "generate_tileset" | "regenerate_item" | "regenerate_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             result?: unknown;
@@ -474,18 +506,18 @@ export interface components {
         ProjectResponse: {
             description: string;
             /** @enum {string} */
-            gameType: "RPG" | "ACT" | "SLG" | "Other";
+            gameType: "" | "RPG" | "ACT" | "SLG";
             /** Format: int64 */
             id: number;
             name: string;
+            /** @enum {string} */
+            perspective: "" | "TopDown" | "SideOn" | "Isometric";
             reference: string;
             style: string;
             /** @enum {string} */
-            targetPlatform: "PC" | "Mobile" | "Web";
+            targetPlatform: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
-            /** @enum {string} */
-            viewType: "TopDown" | "SideView" | "Isometric" | "Other";
         };
         RecordAssetRequest: {
             /** Format: int64 */
@@ -585,6 +617,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["DeleteProjectResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseGenerateProjectReferenceResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["GenerateProjectReferenceResponse"];
             /** @constant */
             message: "success";
         };
@@ -727,16 +769,16 @@ export interface components {
         UpdateProjectRequest: {
             description?: string;
             /** @enum {string} */
-            gameType?: "RPG" | "ACT" | "SLG" | "Other";
+            gameType?: "" | "RPG" | "ACT" | "SLG";
             name?: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
             /** Format: int64 */
             projectID: number;
             reference?: string;
             style?: string;
             /** @enum {string} */
-            targetPlatform?: "PC" | "Mobile" | "Web";
-            /** @enum {string} */
-            viewType?: "TopDown" | "SideView" | "Isometric" | "Other";
+            targetPlatform?: "" | "PC" | "Mobile" | "Web";
         };
         UpdateProjectResponse: {
             success: boolean;
@@ -1358,6 +1400,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessResponseListProjectsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    generateProjectReference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateProjectReferenceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseGenerateProjectReferenceResponse"];
                 };
             };
             /** @description Bad Request */

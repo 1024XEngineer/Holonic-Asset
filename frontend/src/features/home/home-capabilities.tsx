@@ -144,7 +144,6 @@ export function HomeCapabilities() {
                 </p>
                 <Link
                   to={to}
-                  search={{ project: undefined, q: "" }}
                   className="mt-7 inline-flex h-12 items-center gap-2 rounded-lg border border-cyan-700 px-5 text-base font-semibold text-cyan-700 transition-colors hover:bg-cyan-700 hover:text-white focus-visible:ring-3 focus-visible:ring-cyan-700/50 focus-visible:outline-none"
                 >
                   Explore assets
