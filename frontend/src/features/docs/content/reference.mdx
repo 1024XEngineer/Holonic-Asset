@@ -1,6 +1,10 @@
 export const metadata = { title: "Why references matter" };
 
+import { ReferenceComparison } from "@/features/docs/reference-comparison";
+
 ## A reference is a visual constraint, not just inspiration.
+
+### Introduction
 
 A clear reference tells the generator which proportions, colour treatment, silhouette, and equipment must remain consistent. Start with one primary image that establishes the result you want.
 
@@ -21,3 +25,17 @@ A clear reference tells the generator which proportions, colour treatment, silho
 ### Keep the prompt explicit
 
 Use the reference to establish the visual language, then name the details that cannot change. If a weapon, hairstyle, or colour matters, include it in the prompt. This keeps a supporting image from accidentally changing the primary reference's perspective or style.
+
+## See the difference
+
+This reference defines the target character's identity and visual style. The two results below target the same role.
+
+<img
+  src="/project/reference/reference-exp.png"
+  alt="Pixel-art farming game reference for a character generation example"
+  className="mt-6 block h-auto w-full border border-neutral-950/10 bg-[#f0eee7]"
+/>
+
+Both results use the same prompt. The first uses the prompt alone; the second adds this image as a reference, producing stronger visual consistency.
+
+<ReferenceComparison />
