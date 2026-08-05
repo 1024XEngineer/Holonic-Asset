@@ -61,9 +61,8 @@ func TestMigrateProjectPerspectiveWithPostgreSQL(t *testing.T) {
 	}
 	if err := tx.Exec(`INSERT INTO projects (id, view_type) VALUES
 		(1, 'SideView'),
-		(2, 'Other'),
-		(3, 'TopDown'),
-		(4, NULL)`).Error; err != nil {
+		(2, 'TopDown'),
+		(3, NULL)`).Error; err != nil {
 		t.Fatalf("insert legacy project perspectives: %v", err)
 	}
 
@@ -73,22 +72,21 @@ func TestMigrateProjectPerspectiveWithPostgreSQL(t *testing.T) {
 	assertProjectPerspectiveColumns(t, tx)
 	assertProjectPerspectiveValues(t, tx, map[int64]string{
 		1: "SideOn",
-		2: "",
+		2: "TopDown",
 		3: "TopDown",
-		4: "",
 	})
 
 	if err := tx.Exec(`ALTER TABLE projects ADD COLUMN view_type TEXT`).Error; err != nil {
 		t.Fatalf("add partial-migration legacy column: %v", err)
 	}
-	if err := tx.Exec(`UPDATE projects SET perspective = '', view_type = 'Isometric' WHERE id = 3`).Error; err != nil {
+	if err := tx.Exec(`UPDATE projects SET perspective = '', view_type = 'Isometric' WHERE id = 2`).Error; err != nil {
 		t.Fatalf("prepare partial migration: %v", err)
 	}
 	if err := migrateProjectPerspective(tx); err != nil {
 		t.Fatalf("merge partial project perspective migration: %v", err)
 	}
 	assertProjectPerspectiveColumns(t, tx)
-	assertProjectPerspectiveValues(t, tx, map[int64]string{3: "Isometric"})
+	assertProjectPerspectiveValues(t, tx, map[int64]string{2: "Isometric"})
 
 	if err := migrateProjectPerspective(tx); err != nil {
 		t.Fatalf("repeat project perspective migration: %v", err)

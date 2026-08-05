@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
@@ -27,8 +28,11 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	}
 
 	var document struct {
-		OpenAPI string `json:"openapi"`
-		Paths   map[string]struct {
+		OpenAPI    string `json:"openapi"`
+		Components struct {
+			Schemas map[string]json.RawMessage `json:"schemas"`
+		} `json:"components"`
+		Paths map[string]struct {
 			Get  json.RawMessage `json:"get"`
 			Post json.RawMessage `json:"post"`
 		} `json:"paths"`
@@ -38,6 +42,30 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	}
 	if document.OpenAPI != "3.1.0" {
 		t.Fatalf("expected OpenAPI 3.1.0, got %q", document.OpenAPI)
+	}
+	expectedPerspectives := []string{"TopDown", "SideOn", "Isometric"}
+	type perspectiveSchema struct {
+		Enum    []string `json:"enum"`
+		Default string   `json:"default"`
+	}
+	perspectiveSchemas := map[string]perspectiveSchema{}
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
+		var schema struct {
+			Properties map[string]perspectiveSchema `json:"properties"`
+		}
+		if err := json.Unmarshal(document.Components.Schemas[schemaName], &schema); err != nil {
+			t.Fatalf("decode %s schema: %v", schemaName, err)
+		}
+		perspective := schema.Properties["perspective"]
+		perspectiveSchemas[schemaName] = perspective
+		if !reflect.DeepEqual(perspective.Enum, expectedPerspectives) {
+			t.Fatalf("unexpected %s perspective enum: %v", schemaName, perspective.Enum)
+		}
+	}
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest"} {
+		if got := perspectiveSchemas[schemaName].Default; got != "TopDown" {
+			t.Fatalf("unexpected %s perspective default: %q", schemaName, got)
+		}
 	}
 
 	expectedMethods := map[string][]string{

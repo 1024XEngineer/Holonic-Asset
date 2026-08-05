@@ -67,7 +67,7 @@ func TestAssetDecodeContentInitializesMissingContent(t *testing.T) {
 
 func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
-	content.ViewMode = domain.ViewModeSideOn
+	content.Perspective = domain.PerspectiveSideOn
 	content.DirectionCount = 2
 	prototype := domain.Prototype{{ID: 1}, {ID: 2}, {ID: 3}}
 	content.Prototype = &prototype
@@ -83,8 +83,21 @@ func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testin
 	if decoded.DirectionCount != 2 {
 		t.Fatalf("unexpected direction count: %d", decoded.DirectionCount)
 	}
+	if decoded.Perspective != domain.PerspectiveSideOn {
+		t.Fatalf("unexpected perspective: %q", decoded.Perspective)
+	}
 	if decoded.Prototype == nil || len(*decoded.Prototype) != 3 {
 		t.Fatalf("prototype images should be preserved independently: %+v", decoded.Prototype)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatalf("decode raw asset content: %v", err)
+	}
+	if raw["perspective"] != "side_on" {
+		t.Fatalf("expected perspective field: %s", payload)
+	}
+	if _, exists := raw["viewMode"]; exists {
+		t.Fatalf("legacy viewMode field must not be encoded: %s", payload)
 	}
 }
 

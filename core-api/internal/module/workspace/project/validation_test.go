@@ -38,21 +38,18 @@ func TestProjectValidateCreate(t *testing.T) {
 	}
 }
 
-func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
+func TestProjectPerspectiveRequiresSupportedValue(t *testing.T) {
 	if !domain.GameType("").Valid() {
 		t.Fatal("expected empty game type to be valid")
 	}
-	if !domain.Perspective("").Valid() {
-		t.Fatal("expected empty perspective to be valid")
+	if domain.Perspective("").Valid() {
+		t.Fatal("expected empty perspective to be invalid")
 	}
 	if !domain.PlatformType("").Valid() {
 		t.Fatal("expected empty platform type to be valid")
 	}
 	if domain.GameType("Other").Valid() {
 		t.Fatal("expected Other not to be a valid game type")
-	}
-	if domain.Perspective("Other").Valid() {
-		t.Fatal("expected Other not to be a valid perspective")
 	}
 	if domain.Perspective("SideView").Valid() {
 		t.Fatal("expected legacy SideView not to be a valid perspective")
@@ -62,24 +59,27 @@ func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
 	}
 
 	project := &domain.Project{UserID: 7, Name: "Prototype"}
-	if err := project.ValidateCreate(); err != nil {
-		t.Fatalf("expected empty classifications to be valid when creating a project: %v", err)
+	if err := project.ValidateCreate(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected empty perspective to be rejected when creating a project: %v", err)
 	}
-	if err := project.ValidateReferenceGeneration(); err != nil {
-		t.Fatalf("expected empty classifications to be valid when generating a reference: %v", err)
+	if err := project.ValidateReferenceGeneration(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected empty perspective to be rejected when generating a reference: %v", err)
 	}
 
 	emptyGameType := domain.GameType("")
 	emptyPerspective := domain.Perspective("")
 	emptyPlatformType := domain.PlatformType("")
-	update := &domain.ProjectUpdate{
+	validUpdate := &domain.ProjectUpdate{
 		ID:             42,
 		GameType:       &emptyGameType,
-		Perspective:    &emptyPerspective,
 		TargetPlatform: &emptyPlatformType,
 	}
-	if err := update.Validate(); err != nil {
-		t.Fatalf("expected explicit empty classifications to be valid when updating a project: %v", err)
+	if err := validUpdate.Validate(); err != nil {
+		t.Fatalf("expected other empty classifications to remain valid: %v", err)
+	}
+	invalidUpdate := &domain.ProjectUpdate{ID: 42, Perspective: &emptyPerspective}
+	if err := invalidUpdate.Validate(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected explicit empty perspective to be rejected: %v", err)
 	}
 }
 

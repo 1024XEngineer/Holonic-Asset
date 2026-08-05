@@ -201,7 +201,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode character content: %v", err)
 	}
-	if content.ViewMode != assetdomain.ViewModeTopDown || content.DirectionCount != 4 {
+	if content.Perspective != assetdomain.PerspectiveTopDown || content.DirectionCount != 4 {
 		t.Fatalf("unexpected character content: %+v", content)
 	}
 	assertPrototypeResources(t, assets.characterAsset)

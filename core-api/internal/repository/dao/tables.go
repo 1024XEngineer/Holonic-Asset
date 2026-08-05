@@ -57,12 +57,11 @@ func migrateProjectPerspective(db *gorm.DB) error {
 	if hasPerspective {
 		if err := db.Exec(`UPDATE projects
 			SET perspective = CASE
-				WHEN perspective IS NULL THEN ''
+				WHEN perspective IS NULL OR perspective = '' THEN 'TopDown'
 				WHEN perspective = 'SideView' THEN 'SideOn'
-				WHEN perspective = 'Other' THEN ''
-				ELSE perspective
+				ELSE 'TopDown'
 			END
-			WHERE perspective IS NULL OR perspective IN ('SideView', 'Other')`).Error; err != nil {
+			WHERE perspective IS NULL OR perspective NOT IN ('TopDown', 'SideOn', 'Isometric')`).Error; err != nil {
 			return fmt.Errorf("dao: normalize project perspective values: %w", err)
 		}
 	}

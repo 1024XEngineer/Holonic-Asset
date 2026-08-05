@@ -2,15 +2,15 @@ package asset
 
 import "encoding/json"
 
-type ViewMode string
+type Perspective string
 
 const (
-	ViewModeSideOn  ViewMode = "side_on"
-	ViewModeTopDown ViewMode = "top_down"
+	PerspectiveSideOn  Perspective = "side_on"
+	PerspectiveTopDown Perspective = "top_down"
 )
 
 type AssetContent struct {
-	ViewMode       ViewMode       `json:"viewMode,omitempty"`
+	Perspective    Perspective    `json:"perspective,omitempty"`
 	DirectionCount uint           `json:"directionCount,omitempty"`
 	Prototype      *Prototype     `json:"prototype,omitempty"`
 	Animations     []Animation    `json:"animations,omitempty"`
