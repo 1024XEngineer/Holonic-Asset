@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 
 import { assetKinds, type AssetGroup, type AssetKind } from "@/model/asset";
 
-import { getAssetKindConfig } from "../asset-kind-config";
+import { toAssetLibraryItem } from "../lib/to-asset-library-item";
 import type { AssetLibraryItem } from "../types/asset";
 
 export function filterAssetGroups(
@@ -15,8 +15,6 @@ export function filterAssetGroups(
   return assetGroups
     .filter((group) => selectedKinds.includes(group.kind))
     .flatMap((group) => {
-      const config = getAssetKindConfig(group.kind);
-
       return group.assets
         .filter((asset) => {
           if (!normalizedQuery) return true;
@@ -32,12 +30,7 @@ export function filterAssetGroups(
             value.toLocaleLowerCase().includes(normalizedQuery),
           );
         })
-        .map((asset) => ({
-          ...asset,
-          kind: group.kind,
-          accentClassName: config.accentClassName,
-          kindLabel: config.label,
-        }));
+        .map((asset) => toAssetLibraryItem(asset, group.kind));
     });
 }
 

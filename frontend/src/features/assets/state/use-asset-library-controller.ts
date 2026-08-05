@@ -12,7 +12,7 @@ import type { AssetKind, AssetMetadataUpdate } from "@/model/asset";
 import type { GenerationRun } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
 
-import { getAssetKindConfig } from "../asset-kind-config";
+import { toAssetLibraryItem } from "../lib/to-asset-library-item";
 import type { AssetLibraryItem } from "../types/asset";
 import { useAssetLibrary } from "./use-asset-library";
 
@@ -103,8 +103,7 @@ export function useAssetLibraryController({
     );
     if (!group) return undefined;
 
-    const config = getAssetPresentation(group.kind);
-    return { ...asset, kind: group.kind, ...config };
+    return toAssetLibraryItem(asset, group.kind);
   }, [allAssets, assetGroups, editingAssetId, filteredAssets]);
 
   useEffect(() => {
@@ -236,12 +235,4 @@ function usePendingAssetIds() {
   }, []);
 
   return { assetIds, add, remove };
-}
-
-function getAssetPresentation(kind: AssetKind) {
-  const config = getAssetKindConfig(kind);
-  return {
-    accentClassName: config.accentClassName,
-    kindLabel: config.label,
-  };
 }
