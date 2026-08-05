@@ -9,6 +9,7 @@ import (
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -17,6 +18,53 @@ type imageGenerationServiceStub struct {
 	request *imageclient.GenerateRequest
 	result  *imageclient.GenerateResult
 	err     error
+}
+
+type imageProcessorStub struct {
+	events *[]string
+	err    error
+}
+
+func (s *imageProcessorStub) RemoveBackground(
+	_ context.Context,
+	request *imageprocessor.RemoveBackgroundRequest,
+) (*imageprocessor.RemoveBackgroundResult, error) {
+	*s.events = append(*s.events, "process_image")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.RemoveBackgroundResult{
+		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+	}, nil
+}
+
+func (s *imageProcessorStub) Resize(
+	_ context.Context,
+	request *imageprocessor.ResizeRequest,
+) (*imageprocessor.ResizeResult, error) {
+	*s.events = append(*s.events, "resize_image")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.ResizeResult{ImageBase64: request.ImageBase64, MIMEType: "image/png"}, nil
+}
+
+func (s *imageProcessorStub) Verify(
+	_ context.Context,
+	_ *imageprocessor.VerifyRequest,
+) (*imageprocessor.VerificationReport, error) {
+	return &imageprocessor.VerificationReport{Passed: true}, nil
+}
+
+func (s *imageProcessorStub) SplitImage(
+	_ context.Context,
+	_ *imageprocessor.SplitImageRequest,
+) (*imageprocessor.SplitImageResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.SplitImageResult{}, nil
 }
 
 func (s *imageGenerationServiceStub) Generate(
@@ -358,4 +406,5 @@ func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.Exe
 }
 
 var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)
+var _ imageprocessor.Processor = (*imageProcessorStub)(nil)
 var _ generator.AssetWriter = (*generationAssetWriterStub)(nil)
