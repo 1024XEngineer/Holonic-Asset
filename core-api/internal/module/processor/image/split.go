@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"image/draw"
 	"sort"
 )
 
@@ -536,13 +535,6 @@ func alphaBoundsNRGBA(img *image.NRGBA, threshold uint8) (image.Rectangle, bool)
 
 func rectangleToAlphaBoundingBox(rect image.Rectangle) AlphaBoundingBox {
 	return AlphaBoundingBox{X: rect.Min.X, Y: rect.Min.Y, Width: rect.Dx(), Height: rect.Dy()}
-}
-
-func toNRGBA(src image.Image) *image.NRGBA {
-	bounds := src.Bounds()
-	out := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
-	draw.Draw(out, out.Bounds(), src, bounds.Min, draw.Src)
-	return out
 }
 
 func cloneNRGBA(src image.Image) *image.NRGBA {
