@@ -7,6 +7,7 @@ export const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: "intent",
+  scrollRestoration: ({ location }) => location.pathname.startsWith("/docs"),
 });
 
 declare module "@tanstack/react-router" {

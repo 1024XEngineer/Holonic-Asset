@@ -1,5 +1,7 @@
 export const metadata = { title: "Perspective types" };
 
+import { PerspectiveExample } from "@/features/docs/perspective-examples";
+
 ## Choose the camera for your world before generating its assets.
 
 Perspective controls how players read space. Decide it before creating characters, props, and scenery so every asset can share the same visual rules.
@@ -8,14 +10,29 @@ Perspective controls how players read space. Decide it before creating character
 
 Use top-down when players need to see terrain, nearby opponents, and movement around a character. It is a practical fit for action RPGs and tactical maps.
 
+<PerspectiveExample
+  image="top-down-2d.jpg"
+  alt="Top-down game scene showing terrain, props, and characters from above"
+/>
+
 ### Side-On
 
-Use side-on when jumping height, horizontal rhythm, and silhouette readability drive the experience. It suits platformers and side-scrolling action games.
+Use Side-On when jumping height, horizontal rhythm, and silhouette readability drive the experience. It suits platformers and side-scrolling action games.
+
+<PerspectiveExample
+  image="side-on.jpg"
+  alt="Side-On game scene showing a character and platform environment"
+/>
 
 ### Isometric
 
 Use isometric when the scene needs both building volume and a readable map layout. It suits simulation and strategy scenes.
 
+<PerspectiveExample
+  image="isometric.png"
+  alt="Isometric game scene showing buildings and terrain at an angled view"
+/>
+
 ## Keep one camera language
 
-Once you choose a perspective, include it in every character, prop, and environment request. Mixing top-down characters with side-on props makes the asset set difficult to combine, even when colour and style match.
+Once you choose a perspective, include it in every character, prop, and environment request. Mixing Top-down characters with Side-On props makes the asset set difficult to combine, even when colour and style match.
