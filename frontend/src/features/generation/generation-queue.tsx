@@ -3,13 +3,14 @@ import { AlertCircle, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AssetKindIcon } from "@/features/assets/asset-kind-icon";
 import { getAssetKindConfig } from "@/features/assets/asset-kind-config";
-import type { GenerationRun } from "@/model/generation";
+import {
+  isGenerationRunActive,
+  type GenerationRun,
+} from "@/model/generation";
 
 export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
   if (runs.length === 0) return null;
-  const hasActiveRuns = runs.some(
-    (run) => run.status === "pending" || run.status === "processing",
-  );
+  const hasActiveRuns = runs.some(isGenerationRunActive);
 
   return (
     <section className="border-b py-5" aria-labelledby="generation-queue-title">
