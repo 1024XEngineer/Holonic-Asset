@@ -41,7 +41,7 @@ export function AssetCard({
       className="group relative gap-0 overflow-hidden rounded-lg py-0 shadow-xs transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-md has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/40"
       size="sm"
     >
-      {/* TODO: Link the card to the project-scoped asset editor when that route is implemented. */}
+      {/* TODO: Link the card to its asset editor when the editor route is implemented. */}
       <div className="min-w-0">
         <AssetPreview
           accentClassName={asset.accentClassName}
