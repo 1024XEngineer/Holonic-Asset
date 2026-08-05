@@ -1,0 +1,38 @@
+# OS and editor files
+.DS_Store
+.idea/
+**/.vscode/*
+!**/.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Dependencies and build outputs
+node_modules/
+dist/
+dist-ssr/
+
+# Logs
+logs/
+*.log
+*.out
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend
+/frontend/**/*.local
+/frontend/.tanstack/tmp/
+
+# Go backend
+/core-api/bin/
+/core-api/configCache/
+
+# Local backend configuration
+/core-api/**/.env
+/core-api/**/config.yaml
+/core-api/docker-compose.yaml

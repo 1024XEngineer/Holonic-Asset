@@ -23,7 +23,8 @@ type unreachableProjectDao struct {
 
 type projectRouterStub struct {
 	router.ProjectRouter
-	createRequest dto.CreateProjectRequest
+	createRequest            dto.CreateProjectRequest
+	generateReferenceRequest dto.GenerateProjectReferenceRequest
 }
 
 func (s *projectRouterStub) Create(
@@ -34,6 +35,70 @@ func (s *projectRouterStub) Create(
 	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: 42}), nil
 }
 
+func (s *projectRouterStub) GenerateReference(
+	_ context.Context,
+	request dto.GenerateProjectReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	s.generateReferenceRequest = request
+	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{
+		Reference: "data:image/png;base64,aGVsbG8=",
+	}), nil
+}
+
+func TestProjectReferenceGenerationUsesOpenAPIContract(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/reference/generate",
+		`{"name":"Prototype","description":"养殖游戏"}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if stub.generateReferenceRequest.Name != "Prototype" || stub.generateReferenceRequest.Description != "养殖游戏" {
+		t.Fatalf("unexpected generate reference request: %+v", stub.generateReferenceRequest)
+	}
+	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"reference\":\"data:image/png;base64,aGVsbG8=\"}}\n" {
+		t.Fatalf("unexpected generate reference response: %s", recorder.Body.String())
+	}
+}
+
+func TestProjectReferenceGenerationAllowsExplicitEmptyClassifications(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/reference/generate",
+		`{"name":"Prototype","gameType":"","perspective":"","targetPlatform":""}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestProjectCreateAllowsOmittedClassifications(t *testing.T) {
+	stub := &projectRouterStub{}
+	e := router.Register(nil, stub, nil, nil)
+	recorder := serveProjectRequest(
+		t,
+		e,
+		http.MethodPost,
+		"/api/v1/project/create",
+		`{"userID":7,"name":"Prototype"}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 	stub := &projectRouterStub{}
 	e := router.Register(nil, stub, nil, nil)
@@ -42,13 +107,14 @@ func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 		e,
 		http.MethodPost,
 		"/api/v1/project/create",
-		`{"userID":7,"name":"Prototype","gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+		`{"userID":7,"name":"Prototype","gameType":"RPG","perspective":"SideOn","targetPlatform":"PC"}`,
 	)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" {
+	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" ||
+		stub.createRequest.Perspective != project.PerspectiveSideOn {
 		t.Fatalf("unexpected create request: %+v", stub.createRequest)
 	}
 	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"id\":42}}\n" {
@@ -69,7 +135,28 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 			name:           "create without name",
 			method:         http.MethodPost,
 			path:           "/api/v1/project/create",
-			body:           `{"userID":7,"gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+			body:           `{"userID":7,"gameType":"RPG","perspective":"TopDown","targetPlatform":"PC"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with legacy view type field",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","viewType":"SideView"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with legacy side view value",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","perspective":"SideView"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with other perspective",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","perspective":"Other"}`,
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
@@ -106,7 +193,7 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 
 func newProjectTestServer(projectDao dao.ProjectDao) *echo.Echo {
 	projectRepository := repository.NewProjectRepository(projectDao)
-	projectManager := project.NewManager(projectRepository)
+	projectManager := project.NewManager(projectRepository, nil)
 	projectHandler := handler.NewProjectHandler(projectManager)
 	return router.Register(nil, projectHandler, nil, nil)
 }

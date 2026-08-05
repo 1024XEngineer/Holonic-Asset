@@ -72,7 +72,7 @@ const projectGameTypeLabels: Record<ProjectGameType, string> = {
   RPG: "Role-playing game",
   ACT: "Action",
   SLG: "Strategy",
-  Other: "Other",
+  "": "Unspecified",
 };
 
 const projectViewTypeLabels: Record<ProjectViewType, string> = {

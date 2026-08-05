@@ -27,7 +27,7 @@ func (h *ProjectHandler) Create(
 		UserID:         request.UserID,
 		Name:           request.Name,
 		GameType:       request.GameType,
-		ViewType:       request.ViewType,
+		Perspective:    request.Perspective,
 		TargetPlatform: request.TargetPlatform,
 		Description:    request.Description,
 		Reference:      request.Reference,
@@ -37,6 +37,28 @@ func (h *ProjectHandler) Create(
 		return dto.SuccessResponse[dto.CreateProjectResponse]{}, projectHandlerError(err)
 	}
 	return dto.NewTypedSuccessResponse(dto.CreateProjectResponse{ID: project.ID}), nil
+}
+
+func (h *ProjectHandler) GenerateReference(
+	c context.Context,
+	request dto.GenerateProjectReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	project := &domain.Project{
+		Name:           request.Name,
+		GameType:       request.GameType,
+		Perspective:    request.Perspective,
+		TargetPlatform: request.TargetPlatform,
+		Description:    request.Description,
+		Reference:      request.Reference,
+		Style:          request.Style,
+	}
+
+	reference, err := h.manager.GenerateReference(c, project)
+	if err != nil {
+		return dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}, projectHandlerError(err)
+	}
+
+	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{Reference: reference}), nil
 }
 
 func (h *ProjectHandler) ListByUID(
@@ -74,7 +96,7 @@ func (h *ProjectHandler) Update(
 		ID:             request.ProjectID,
 		Name:           request.Name,
 		GameType:       request.GameType,
-		ViewType:       request.ViewType,
+		Perspective:    request.Perspective,
 		TargetPlatform: request.TargetPlatform,
 		Description:    request.Description,
 		Reference:      request.Reference,
@@ -105,7 +127,7 @@ func projectResponse(project *domain.Project) *dto.ProjectResponse {
 		ID:             project.ID,
 		Name:           project.Name,
 		GameType:       project.GameType,
-		ViewType:       project.ViewType,
+		Perspective:    project.Perspective,
 		TargetPlatform: project.TargetPlatform,
 		Description:    project.Description,
 		Reference:      project.Reference,
