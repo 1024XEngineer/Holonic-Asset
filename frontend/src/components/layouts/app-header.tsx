@@ -145,9 +145,6 @@ export function AppHeader() {
               <Link
                 key={to}
                 to={to}
-                search={
-                  to === "/projects" ? { project: undefined, q: "" } : undefined
-                }
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex h-9 items-center rounded-md px-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:px-3 sm:text-sm",

@@ -5,10 +5,13 @@ export type Project = {
   gameType: string;
   platform: string;
   description: string;
+  reference: string;
 };
 
 export type ProjectSummary = Project & {
-  visualStyle: string;
+  perspective: string;
   visualDirection: string;
   assetCount: number;
 };
+
+export type CreateProjectInput = Omit<ProjectSummary, "id" | "assetCount">;

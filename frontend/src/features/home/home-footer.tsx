@@ -24,9 +24,6 @@ export function HomeFooter() {
             <Link
               key={to}
               to={to}
-              search={
-                to === "/projects" ? { project: undefined, q: "" } : undefined
-              }
               className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               {label}
