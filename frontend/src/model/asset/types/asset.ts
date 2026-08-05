@@ -38,6 +38,29 @@ export type SceneryLayer = {
 
 export type SceneryAssetData = { layers: SceneryLayer[] };
 
+export type AssetPreviewFrame = {
+  columns: number;
+  rows: number;
+  column: number;
+  row: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  offsetX?: number;
+  displayWidth?: string;
+};
+
+export type AssetPreviewOffset = { x: string; y: string };
+
+export type AssetPreviewCrop = {
+  sourceWidth: number;
+  sourceHeight: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  displayOffsetY?: string;
+};
+
 export type ProjectAsset = {
   id: string;
   name: string;
@@ -46,6 +69,11 @@ export type ProjectAsset = {
   canvasSize: string;
   perspective: string;
   tags: string[];
+  thumbnailUrl?: string;
+  previewCrop?: AssetPreviewCrop;
+  previewFrame?: AssetPreviewFrame;
+  previewOffset?: AssetPreviewOffset;
+  previewScale?: number;
   history: AssetRevision[];
   animations: AssetAnimation[];
   scenery?: SceneryAssetData;

@@ -7,6 +7,9 @@ export {
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 export type {
   AssetAnimation,
+  AssetPreviewCrop,
+  AssetPreviewFrame,
+  AssetPreviewOffset,
   CharacterAnimation,
   CharacterAnimationClip,
   CharacterSpriteSheet,

@@ -19,6 +19,9 @@ export {
 export type {
   AddAudioTrackInput,
   AssetAnimation,
+  AssetPreviewCrop,
+  AssetPreviewFrame,
+  AssetPreviewOffset,
   AssetGroup,
   AssetGroupsByProject,
   AssetKind,
