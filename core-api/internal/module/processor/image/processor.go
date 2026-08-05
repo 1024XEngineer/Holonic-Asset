@@ -12,6 +12,7 @@ type Processor interface {
 	RemoveBackground(context.Context, *RemoveBackgroundRequest) (*RemoveBackgroundResult, error)
 	Resize(context.Context, *ResizeRequest) (*ResizeResult, error)
 	Verify(context.Context, *VerifyRequest) (*VerificationReport, error)
+	SplitImage(context.Context, *SplitImageRequest) (*SplitImageResult, error)
 }
 
 type processor struct{}
