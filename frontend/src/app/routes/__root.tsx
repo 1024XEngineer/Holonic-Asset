@@ -41,10 +41,7 @@ function RouteStatus({
 
 function ProjectLibraryLink() {
   return (
-    <Button
-      nativeButton={false}
-      render={<Link to="/projects" search={{ project: undefined, q: "" }} />}
-    >
+    <Button nativeButton={false} render={<Link to="/projects" />}>
       Go to project library
     </Button>
   );
