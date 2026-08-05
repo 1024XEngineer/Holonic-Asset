@@ -88,6 +88,10 @@ export function Docs() {
     setSelectedOutlineId(null);
   }, [activeArticle, outline.active]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeArticle]);
+
   return (
     <div className="min-h-screen bg-white text-neutral-950">
       <AppHeader />
