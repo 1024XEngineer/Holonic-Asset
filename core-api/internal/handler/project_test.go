@@ -78,7 +78,7 @@ func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
 	if stub.update.Reference == nil || *stub.update.Reference != reference {
 		t.Fatalf("expected reference %q, got %+v", reference, stub.update.Reference)
 	}
-	if stub.update.Name != nil || stub.update.GameType != nil || stub.update.ViewType != nil || stub.update.Style != nil {
+	if stub.update.Name != nil || stub.update.GameType != nil || stub.update.Perspective != nil || stub.update.Style != nil {
 		t.Fatalf("expected omitted fields to remain nil, got %+v", stub.update)
 	}
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
@@ -111,7 +111,7 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 	request := dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
 		GameType:       domain.GameTypeRPG,
-		ViewType:       domain.ViewTypeTopDown,
+		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 		Description:    "A small village adventure",
 		Reference:      "optional-reference",
@@ -148,7 +148,7 @@ func TestGenerateReferencePropagatesServiceError(t *testing.T) {
 	response, err := projectHandler.GenerateReference(context.Background(), dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
 		GameType:       domain.GameType(""),
-		ViewType:       domain.ViewTypeTopDown,
+		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 	})
 	if !errors.Is(err, wantErr) {
