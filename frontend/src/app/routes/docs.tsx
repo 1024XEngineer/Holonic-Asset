@@ -1,9 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-import { Docs } from "@/features/docs";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/docs")({
-  component: Docs,
+  component: Outlet,
   head: () => ({
     title: "Docs | Holonic Asset",
     meta: [
