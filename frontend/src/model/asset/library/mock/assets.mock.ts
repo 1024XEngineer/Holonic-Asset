@@ -1,4 +1,6 @@
-import type { AssetKind, ProjectAsset } from "../../types";
+import { DataApiError } from "@/lib/data-api-error";
+
+import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../../types";
 import type { AssetGroupsByProject } from "../types";
 import { assetGroupsByProject as seededAssetGroups } from "./assets.seed";
 
@@ -82,6 +84,37 @@ export async function deleteMockAsset(projectId: string, assetId: string) {
     })),
   };
   return structuredClone(assetGroupsByProject[projectId]);
+}
+
+export async function updateMockAsset(
+  projectId: string,
+  assetId: string,
+  metadata: AssetMetadataUpdate,
+) {
+  const groups = assetGroupsByProject[projectId] ?? [];
+  let assetFound = false;
+
+  const updatedGroups = groups.map((group) => ({
+    ...group,
+    assets: group.assets.map((asset) => {
+      if (asset.id !== assetId) return asset;
+      assetFound = true;
+      return { ...asset, ...structuredClone(metadata) };
+    }),
+  }));
+
+  if (!assetFound) {
+    throw new DataApiError("NOT_FOUND", "Asset was not found.", {
+      projectId,
+      assetId,
+    });
+  }
+
+  assetGroupsByProject = {
+    ...assetGroupsByProject,
+    [projectId]: updatedGroups,
+  };
+  return structuredClone(updatedGroups);
 }
 
 export async function saveMockAssetRevision<Payload>(

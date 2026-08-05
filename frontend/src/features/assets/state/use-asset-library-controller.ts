@@ -5,9 +5,10 @@ import {
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
+  useUpdateAssetMutation,
 } from "@/model/asset";
 import { useGenerationRunsQuery } from "@/model/generation";
-import type { AssetKind } from "@/model/asset";
+import type { AssetKind, AssetMetadataUpdate } from "@/model/asset";
 import type { GenerationRun } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
 
@@ -27,6 +28,8 @@ export type AssetLibraryController = {
   actionError?: Error;
   error?: Error;
   isLoading: boolean;
+  isUpdatingAsset: boolean;
+  updateError?: Error;
   copyingAssetIds: ReadonlySet<string>;
   deletingAssetIds: ReadonlySet<string>;
   clearFilters: () => void;
@@ -35,6 +38,7 @@ export type AssetLibraryController = {
   deleteAsset: (assetId: string) => void;
   openAssetEditor: (assetId: string) => void;
   retry: () => void;
+  updateAsset: (metadata: AssetMetadataUpdate) => void;
   setQuery: (query: string) => void;
   setSelectedKinds: (kinds: AssetKind[]) => void;
 };
@@ -51,8 +55,11 @@ export function useAssetLibraryController({
   const generationsQuery = useGenerationRunsQuery(projectId);
   const copyMutation = useCopyAssetMutation();
   const deleteMutation = useDeleteAssetMutation();
+  const updateMutation = useUpdateAssetMutation();
   const { mutateAsync: mutateCopyAsset } = copyMutation;
   const { mutateAsync: mutateDeleteAsset } = deleteMutation;
+  const { mutateAsync: mutateUpdateAsset, reset: resetUpdateAsset } =
+    updateMutation;
   const {
     assetIds: copyingAssetIds,
     add: markAssetCopying,
@@ -147,6 +154,35 @@ export function useAssetLibraryController({
     void refetchAssets();
   }, [refetchAssets]);
 
+  const closeAssetEditor = useCallback(() => {
+    resetUpdateAsset();
+    setEditingAssetId(undefined);
+  }, [resetUpdateAsset]);
+
+  const openAssetEditor = useCallback(
+    (assetId: string) => {
+      resetUpdateAsset();
+      setEditingAssetId(assetId);
+    },
+    [resetUpdateAsset],
+  );
+
+  const updateAsset = useCallback(
+    (metadata: AssetMetadataUpdate) => {
+      if (!projectId || !editingAssetId) return;
+      const assetId = editingAssetId;
+
+      void mutateUpdateAsset({ projectId, assetId, metadata })
+        .then(() => {
+          setEditingAssetId((currentId) =>
+            currentId === assetId ? undefined : currentId,
+          );
+        })
+        .catch(() => undefined);
+    },
+    [editingAssetId, mutateUpdateAsset, projectId],
+  );
+
   return {
     project,
     query,
@@ -159,14 +195,17 @@ export function useAssetLibraryController({
     actionError: copyMutation.error ?? deleteMutation.error ?? undefined,
     error: assetsQuery.error ?? undefined,
     isLoading: assetsQuery.isPending,
+    isUpdatingAsset: updateMutation.isPending,
+    updateError: updateMutation.error ?? undefined,
     copyingAssetIds,
     deletingAssetIds,
     clearFilters,
-    closeAssetEditor: () => setEditingAssetId(undefined),
+    closeAssetEditor,
     copyAsset,
     deleteAsset,
-    openAssetEditor: setEditingAssetId,
+    openAssetEditor,
     retry,
+    updateAsset,
     setQuery,
     setSelectedKinds,
   };

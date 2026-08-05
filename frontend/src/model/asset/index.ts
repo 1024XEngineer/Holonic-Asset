@@ -5,6 +5,7 @@ export {
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
+  useUpdateAssetMutation,
 } from "./library";
 export type { AssetGroup, AssetGroupsByProject } from "./library";
 export {
@@ -55,6 +56,7 @@ export {
   assetKinds,
   creatableAssetKinds,
   type AssetAnimation,
+  type AssetMetadataUpdate,
   type AssetPreviewCrop,
   type AssetPreviewFrame,
   type AssetPreviewOffset,

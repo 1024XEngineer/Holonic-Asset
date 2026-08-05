@@ -1,5 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronDown, Layers3, Ruler, Tags, X } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronDown,
+  Layers3,
+  Ruler,
+  Tags,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { AssetMetadataUpdate } from "@/model/asset";
 
 import { AssetKindIcon } from "./asset-kind-icon";
 import { AssetPreview } from "./asset-preview";
@@ -29,11 +37,17 @@ import type { AssetLibraryItem } from "./types/asset";
 
 export function AssetEditDialog({
   asset,
+  error,
+  isSaving,
   onClose,
+  onSave,
   projectId,
 }: {
   asset?: AssetLibraryItem;
+  error?: Error;
+  isSaving: boolean;
   onClose: () => void;
+  onSave: (metadata: AssetMetadataUpdate) => void;
   projectId?: string;
 }) {
   const [name, setName] = useState("");
@@ -67,149 +81,183 @@ export function AssetEditDialog({
   };
 
   return (
-    <Dialog open={Boolean(asset)} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={Boolean(asset)}
+      onOpenChange={(open) => !open && !isSaving && onClose()}
+    >
       {asset ? (
         <DialogContent
           className="max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 sm:max-w-3xl"
           showCloseButton={false}
         >
-          <DialogClose
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="absolute right-2 top-2 z-10 bg-background/80 backdrop-blur-sm"
-              />
-            }
+          <form
+            className="contents"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSave({ name, description, tags, canvasSize, perspective });
+            }}
           >
-            <X />
-            <span className="sr-only">Close</span>
-          </DialogClose>
+            <DialogClose
+              render={
+                <Button
+                  disabled={isSaving}
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute right-2 top-2 z-10 bg-background/80 backdrop-blur-sm"
+                />
+              }
+            >
+              <X />
+              <span className="sr-only">Close</span>
+            </DialogClose>
 
-          <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(20rem,1fr)]">
-            <AssetPreview
-              accentClassName={asset.accentClassName}
-              assetId={asset.id}
-              className="aspect-square border-b sm:aspect-auto sm:min-h-[34rem] sm:border-b-0 sm:border-r"
-              kind={asset.kind}
-              name={asset.name}
-              previewCrop={asset.previewCrop}
-              previewFrame={asset.previewFrame}
-              previewOffset={asset.previewOffset}
-              previewScale={asset.previewScale}
-              projectId={projectId}
-              thumbnailUrl={asset.thumbnailUrl}
-            />
-            <div className="min-w-0 p-5 sm:p-6">
-              <DialogHeader className="pr-7">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <AssetKindIcon kind={asset.kind} className="size-3.5" />
-                  {asset.kindLabel}
-                  <span aria-hidden="true">/</span>
-                  {asset.version}
-                </div>
-                <DialogTitle className="text-xl leading-tight">
-                  Edit asset
-                </DialogTitle>
-                <DialogDescription>
-                  Update the asset information used throughout this project.
-                </DialogDescription>
-              </DialogHeader>
+            <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(20rem,1fr)]">
+              <AssetPreview
+                accentClassName={asset.accentClassName}
+                assetId={asset.id}
+                className="aspect-square border-b sm:aspect-auto sm:min-h-[34rem] sm:border-b-0 sm:border-r"
+                kind={asset.kind}
+                name={asset.name}
+                previewCrop={asset.previewCrop}
+                previewFrame={asset.previewFrame}
+                previewOffset={asset.previewOffset}
+                previewScale={asset.previewScale}
+                projectId={projectId}
+                thumbnailUrl={asset.thumbnailUrl}
+              />
+              <div className="min-w-0 p-5 sm:p-6">
+                <DialogHeader className="pr-7">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <AssetKindIcon kind={asset.kind} className="size-3.5" />
+                    {asset.kindLabel}
+                    <span aria-hidden="true">/</span>
+                    {asset.version}
+                  </div>
+                  <DialogTitle className="text-xl leading-tight">
+                    Edit asset
+                  </DialogTitle>
+                  <DialogDescription>
+                    Update the asset information used throughout this project.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <div className="mt-6 space-y-5">
-                <Field label="Name" htmlFor="asset-name">
-                  <Input
-                    id="asset-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </Field>
-                <Field label="Description" htmlFor="asset-description">
-                  <Textarea
-                    id="asset-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                  />
-                </Field>
-                <Field
-                  label="Tags"
-                  htmlFor="asset-tags"
-                  icon={<Tags className="size-3.5" />}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          id="asset-tags"
-                          type="button"
-                          variant="outline"
-                          className="h-8 w-full justify-between font-normal"
-                        />
-                      }
+                <div className="mt-6 space-y-5">
+                  <Field label="Name" htmlFor="asset-name">
+                    <Input
+                      disabled={isSaving}
+                      id="asset-name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Description" htmlFor="asset-description">
+                    <Textarea
+                      disabled={isSaving}
+                      id="asset-description"
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                    />
+                  </Field>
+                  <Field
+                    label="Tags"
+                    htmlFor="asset-tags"
+                    icon={<Tags className="size-3.5" />}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            disabled={isSaving}
+                            id="asset-tags"
+                            type="button"
+                            variant="outline"
+                            className="h-8 w-full justify-between font-normal"
+                          />
+                        }
+                      >
+                        {tags.length > 0
+                          ? `${tags.length} tag${tags.length === 1 ? "" : "s"} selected`
+                          : "Select tags"}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[var(--anchor-width)] min-w-52">
+                        {tagOptions.map((tag) => (
+                          <DropdownMenuCheckboxItem
+                            key={tag}
+                            checked={tags.includes(tag)}
+                            closeOnClick={false}
+                            onCheckedChange={(checked) =>
+                              toggleTag(tag, checked)
+                            }
+                          >
+                            {tag}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {tags.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : null}
+                  </Field>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field
+                      label="Canvas"
+                      htmlFor="asset-canvas"
+                      icon={<Ruler className="size-3.5" />}
                     >
-                      {tags.length > 0
-                        ? `${tags.length} tag${tags.length === 1 ? "" : "s"} selected`
-                        : "Select tags"}
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-[var(--anchor-width)] min-w-52">
-                      {tagOptions.map((tag) => (
-                        <DropdownMenuCheckboxItem
-                          key={tag}
-                          checked={tags.includes(tag)}
-                          closeOnClick={false}
-                          onCheckedChange={(checked) => toggleTag(tag, checked)}
-                        >
-                          {tag}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  {tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {tags.map((tag) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
+                      <SingleSelect
+                        disabled={isSaving}
+                        id="asset-canvas"
+                        value={canvasSize}
+                        options={canvasOptions}
+                        onValueChange={setCanvasSize}
+                      />
+                    </Field>
+                    <Field
+                      label="Perspective"
+                      htmlFor="asset-perspective"
+                      icon={<Layers3 className="size-3.5" />}
+                    >
+                      <SingleSelect
+                        disabled={isSaving}
+                        id="asset-perspective"
+                        value={perspective}
+                        options={perspectives}
+                        onValueChange={setPerspective}
+                      />
+                    </Field>
+                  </div>
+                  {error ? (
+                    <div
+                      className="flex items-start gap-2 border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                      role="alert"
+                    >
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{error.message}</span>
                     </div>
                   ) : null}
-                </Field>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field
-                    label="Canvas"
-                    htmlFor="asset-canvas"
-                    icon={<Ruler className="size-3.5" />}
-                  >
-                    <SingleSelect
-                      id="asset-canvas"
-                      value={canvasSize}
-                      options={canvasOptions}
-                      onValueChange={setCanvasSize}
-                    />
-                  </Field>
-                  <Field
-                    label="Perspective"
-                    htmlFor="asset-perspective"
-                    icon={<Layers3 className="size-3.5" />}
-                  >
-                    <SingleSelect
-                      id="asset-perspective"
-                      value={perspective}
-                      options={perspectives}
-                      onValueChange={setPerspective}
-                    />
-                  </Field>
                 </div>
               </div>
             </div>
-          </div>
-          <DialogFooter className="mx-0 mb-0 rounded-none sm:col-span-2">
-            <DialogClose render={<Button variant="outline" />}>
-              Close
-            </DialogClose>
-            <Button type="button">Save changes</Button>
-          </DialogFooter>
+            <DialogFooter className="mx-0 mb-0 rounded-none sm:col-span-2">
+              <DialogClose
+                render={
+                  <Button type="button" variant="outline" disabled={isSaving} />
+                }
+              >
+                Close
+              </DialogClose>
+              <Button type="submit" disabled={isSaving || !name.trim()}>
+                {isSaving ? "Saving..." : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       ) : null}
     </Dialog>
@@ -244,11 +292,13 @@ const perspectiveOptions = [
 ];
 
 function SingleSelect({
+  disabled,
   id,
   onValueChange,
   options,
   value,
 }: {
+  disabled: boolean;
   id: string;
   onValueChange: (value: string) => void;
   options: string[];
@@ -259,6 +309,7 @@ function SingleSelect({
       <DropdownMenuTrigger
         render={
           <Button
+            disabled={disabled}
             id={id}
             type="button"
             variant="outline"

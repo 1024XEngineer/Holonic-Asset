@@ -83,7 +83,10 @@ export function AssetLibraryWorkspace({
 
       <AssetEditDialog
         asset={library.editingAsset}
+        error={library.updateError}
+        isSaving={library.isUpdatingAsset}
         onClose={library.closeAssetEditor}
+        onSave={library.updateAsset}
         projectId={project.id}
       />
     </>

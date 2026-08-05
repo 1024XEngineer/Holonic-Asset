@@ -78,3 +78,8 @@ export type ProjectAsset = {
   animations: AssetAnimation[];
   scenery?: SceneryAssetData;
 };
+
+export type AssetMetadataUpdate = Pick<
+  ProjectAsset,
+  "name" | "description" | "tags" | "canvasSize" | "perspective"
+>;

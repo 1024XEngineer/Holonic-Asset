@@ -4,10 +4,11 @@ import {
   deleteMockAsset,
   listMockAssetGroups,
   saveMockAssetRevision,
+  updateMockAsset,
 } from "./mock";
 import type { AssetListItemResponse, AssetType } from "./asset.contract";
 import { getDefaultAssetCanvasSize } from "./asset-canvas-size";
-import type { AssetKind, ProjectAsset } from "../types";
+import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
 export type {
@@ -112,6 +113,8 @@ export const assetApi = {
     copyMockAsset(projectId, assetId),
   delete: (projectId: string, assetId: string) =>
     deleteMockAsset(projectId, assetId),
+  update: (projectId: string, assetId: string, metadata: AssetMetadataUpdate) =>
+    updateMockAsset(projectId, assetId, metadata),
   saveRevision: <Payload>({
     projectId,
     assetId,

@@ -5,6 +5,7 @@ import {
   deleteMockAsset,
   listMockAssetGroups,
   resetMockAssets,
+  updateMockAsset,
 } from "./assets.mock";
 
 describe("mock asset library operations", () => {
@@ -64,5 +65,42 @@ describe("mock asset library operations", () => {
 
     expect(ids).not.toContain("swordsman");
     expect(ids).toContain("knight");
+  });
+
+  it("persists metadata updates without changing other assets", async () => {
+    const groups = await updateMockAsset("moonlit-orchard", "swordsman", {
+      name: "Veteran Swordsman",
+      description: "A battle-worn four-direction character",
+      tags: ["hero", "veteran"],
+      canvasSize: "128 × 128 px",
+      perspective: "Isometric",
+    });
+    const characters = groups.find((group) => group.kind === "character");
+
+    expect(characters?.assets[0]).toMatchObject({
+      id: "swordsman",
+      name: "Veteran Swordsman",
+      description: "A battle-worn four-direction character",
+      tags: ["hero", "veteran"],
+      canvasSize: "128 × 128 px",
+      perspective: "Isometric",
+    });
+    expect(characters?.assets[1]?.name).toBe("Knight");
+    expect(await listMockAssetGroups("moonlit-orchard")).toEqual(groups);
+  });
+
+  it("rejects metadata updates for missing assets", async () => {
+    await expect(
+      updateMockAsset("moonlit-orchard", "missing", {
+        name: "Missing",
+        description: "",
+        tags: [],
+        canvasSize: "64 × 64 px",
+        perspective: "Top-down",
+      }),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Asset was not found.",
+    });
   });
 });
