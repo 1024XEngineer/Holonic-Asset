@@ -242,6 +242,15 @@
             "minLength": 1,
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "",
+              "TopDown",
+              "SideOn",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "reference": {
             "type": "string"
           },
@@ -261,15 +270,6 @@
             "format": "int64",
             "minimum": 1,
             "type": "integer"
-          },
-          "viewType": {
-            "enum": [
-              "",
-              "TopDown",
-              "SideView",
-              "Isometric"
-            ],
-            "type": "string"
           }
         },
         "required": [
@@ -454,6 +454,15 @@
             "minLength": 1,
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "",
+              "TopDown",
+              "SideOn",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "reference": {
             "type": "string"
           },
@@ -466,15 +475,6 @@
               "PC",
               "Mobile",
               "Web"
-            ],
-            "type": "string"
-          },
-          "viewType": {
-            "enum": [
-              "",
-              "TopDown",
-              "SideView",
-              "Isometric"
             ],
             "type": "string"
           }
@@ -704,6 +704,15 @@
           "name": {
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "",
+              "TopDown",
+              "SideOn",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "reference": {
             "type": "string"
           },
@@ -723,15 +732,6 @@
             "format": "int64",
             "minimum": 1,
             "type": "integer"
-          },
-          "viewType": {
-            "enum": [
-              "",
-              "TopDown",
-              "SideView",
-              "Isometric"
-            ],
-            "type": "string"
           }
         },
         "required": [
@@ -739,7 +739,7 @@
           "id",
           "name",
           "gameType",
-          "viewType",
+          "perspective",
           "targetPlatform",
           "description",
           "reference",
@@ -1440,6 +1440,15 @@
             "minLength": 1,
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "",
+              "TopDown",
+              "SideOn",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "projectID": {
             "format": "int64",
             "minimum": 1,
@@ -1457,15 +1466,6 @@
               "PC",
               "Mobile",
               "Web"
-            ],
-            "type": "string"
-          },
-          "viewType": {
-            "enum": [
-              "",
-              "TopDown",
-              "SideView",
-              "Isometric"
             ],
             "type": "string"
           }

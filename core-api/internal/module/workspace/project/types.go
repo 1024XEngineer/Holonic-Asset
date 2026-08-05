@@ -1,7 +1,7 @@
 package project
 
 type GameType string
-type ViewType string
+type Perspective string
 type PlatformType string
 
 const (
@@ -9,9 +9,9 @@ const (
 	GameTypeACT GameType = "ACT"
 	GameTypeSLG GameType = "SLG"
 
-	ViewTypeTopDown   ViewType = "TopDown"
-	ViewTypeSideView  ViewType = "SideView"
-	ViewTypeIsometric ViewType = "Isometric"
+	PerspectiveTopDown   Perspective = "TopDown"
+	PerspectiveSideOn    Perspective = "SideOn"
+	PerspectiveIsometric Perspective = "Isometric"
 
 	PlatformTypePC     PlatformType = "PC"
 	PlatformTypeMobile PlatformType = "Mobile"

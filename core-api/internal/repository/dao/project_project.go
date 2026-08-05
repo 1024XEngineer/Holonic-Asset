@@ -18,7 +18,7 @@ type Project struct {
 	UserID         uint `gorm:"index"`
 	Name           string
 	GameType       string
-	ViewType       string
+	Perspective    string
 	TargetPlatform string
 	Description    string
 	Reference      string
@@ -30,7 +30,7 @@ type ProjectUpdate struct {
 	ID             uint
 	Name           *string
 	GameType       *string
-	ViewType       *string
+	Perspective    *string
 	TargetPlatform *string
 	Description    *string
 	Reference      *string
@@ -122,8 +122,8 @@ func projectUpdateFields(update *ProjectUpdate) map[string]any {
 	if update.GameType != nil {
 		fields["game_type"] = *update.GameType
 	}
-	if update.ViewType != nil {
-		fields["view_type"] = *update.ViewType
+	if update.Perspective != nil {
+		fields["perspective"] = *update.Perspective
 	}
 	if update.TargetPlatform != nil {
 		fields["target_platform"] = *update.TargetPlatform

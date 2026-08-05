@@ -7,7 +7,7 @@ type ProjectResponse struct {
 	ID             uint                `json:"id" minimum:"1"`
 	Name           string              `json:"name"`
 	GameType       domain.GameType     `json:"gameType" enum:",RPG,ACT,SLG"`
-	ViewType       domain.ViewType     `json:"viewType" enum:",TopDown,SideView,Isometric"`
+	Perspective    domain.Perspective  `json:"perspective" enum:",TopDown,SideOn,Isometric"`
 	TargetPlatform domain.PlatformType `json:"targetPlatform" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description"`
 	Reference      string              `json:"reference"`
@@ -18,7 +18,7 @@ type CreateProjectRequest struct {
 	UserID         uint                `json:"userID" minimum:"1"`
 	Name           string              `json:"name" minLength:"1"`
 	GameType       domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
-	ViewType       domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	Perspective    domain.Perspective  `json:"perspective,omitempty" enum:",TopDown,SideOn,Isometric"`
 	TargetPlatform domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description,omitempty"`
 	Reference      string              `json:"reference,omitempty"`
@@ -32,7 +32,7 @@ type CreateProjectResponse struct {
 type GenerateProjectReferenceRequest struct {
 	Name           string              `json:"name" minLength:"1"`
 	GameType       domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
-	ViewType       domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	Perspective    domain.Perspective  `json:"perspective,omitempty" enum:",TopDown,SideOn,Isometric"`
 	TargetPlatform domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description,omitempty"`
 	Reference      string              `json:"reference,omitempty"`
@@ -63,7 +63,7 @@ type UpdateProjectRequest struct {
 	ProjectID      uint                 `json:"projectID" minimum:"1"`
 	Name           *string              `json:"name,omitempty" minLength:"1"`
 	GameType       *domain.GameType     `json:"gameType,omitempty" enum:",RPG,ACT,SLG"`
-	ViewType       *domain.ViewType     `json:"viewType,omitempty" enum:",TopDown,SideView,Isometric"`
+	Perspective    *domain.Perspective  `json:"perspective,omitempty" enum:",TopDown,SideOn,Isometric"`
 	TargetPlatform *domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    *string              `json:"description,omitempty"`
 	Reference      *string              `json:"reference,omitempty"`

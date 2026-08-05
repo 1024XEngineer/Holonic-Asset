@@ -4,8 +4,8 @@ type Project struct {
 	UserID         uint
 	ID             uint
 	Name           string
-	GameType       GameType `json:"gameType"`
-	ViewType       ViewType `json:"viewType"`
+	GameType       GameType    `json:"gameType"`
+	Perspective    Perspective `json:"perspective"`
 	TargetPlatform PlatformType
 	Description    string
 	Reference      string
@@ -18,7 +18,7 @@ type ProjectUpdate struct {
 	ID             uint
 	Name           *string
 	GameType       *GameType
-	ViewType       *ViewType
+	Perspective    *Perspective
 	TargetPlatform *PlatformType
 	Description    *string
 	Reference      *string

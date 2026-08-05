@@ -12,7 +12,7 @@ func TestProjectValidateCreate(t *testing.T) {
 		UserID:         7,
 		Name:           "Prototype",
 		GameType:       domain.GameTypeRPG,
-		ViewType:       domain.ViewTypeTopDown,
+		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 	}
 
@@ -21,12 +21,12 @@ func TestProjectValidateCreate(t *testing.T) {
 	}
 
 	tests := map[string]*domain.Project{
-		"nil project":       nil,
-		"missing user":      {Name: "Prototype", GameType: domain.GameTypeRPG, ViewType: domain.ViewTypeTopDown, TargetPlatform: domain.PlatformTypePC},
-		"blank name":        {UserID: 7, Name: " ", GameType: domain.GameTypeRPG, ViewType: domain.ViewTypeTopDown, TargetPlatform: domain.PlatformTypePC},
-		"invalid game type": {UserID: 7, Name: "Prototype", GameType: "FPS", ViewType: domain.ViewTypeTopDown, TargetPlatform: domain.PlatformTypePC},
-		"invalid view type": {UserID: 7, Name: "Prototype", GameType: domain.GameTypeRPG, ViewType: "FirstPerson", TargetPlatform: domain.PlatformTypePC},
-		"invalid platform":  {UserID: 7, Name: "Prototype", GameType: domain.GameTypeRPG, ViewType: domain.ViewTypeTopDown, TargetPlatform: "Console"},
+		"nil project":         nil,
+		"missing user":        {Name: "Prototype", GameType: domain.GameTypeRPG, Perspective: domain.PerspectiveTopDown, TargetPlatform: domain.PlatformTypePC},
+		"blank name":          {UserID: 7, Name: " ", GameType: domain.GameTypeRPG, Perspective: domain.PerspectiveTopDown, TargetPlatform: domain.PlatformTypePC},
+		"invalid game type":   {UserID: 7, Name: "Prototype", GameType: "FPS", Perspective: domain.PerspectiveTopDown, TargetPlatform: domain.PlatformTypePC},
+		"invalid perspective": {UserID: 7, Name: "Prototype", GameType: domain.GameTypeRPG, Perspective: "FirstPerson", TargetPlatform: domain.PlatformTypePC},
+		"invalid platform":    {UserID: 7, Name: "Prototype", GameType: domain.GameTypeRPG, Perspective: domain.PerspectiveTopDown, TargetPlatform: "Console"},
 	}
 
 	for name, project := range tests {
@@ -42,8 +42,8 @@ func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
 	if !domain.GameType("").Valid() {
 		t.Fatal("expected empty game type to be valid")
 	}
-	if !domain.ViewType("").Valid() {
-		t.Fatal("expected empty view type to be valid")
+	if !domain.Perspective("").Valid() {
+		t.Fatal("expected empty perspective to be valid")
 	}
 	if !domain.PlatformType("").Valid() {
 		t.Fatal("expected empty platform type to be valid")
@@ -51,8 +51,14 @@ func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
 	if domain.GameType("Other").Valid() {
 		t.Fatal("expected Other not to be a valid game type")
 	}
-	if domain.ViewType("Other").Valid() {
-		t.Fatal("expected Other not to be a valid view type")
+	if domain.Perspective("Other").Valid() {
+		t.Fatal("expected Other not to be a valid perspective")
+	}
+	if domain.Perspective("SideView").Valid() {
+		t.Fatal("expected legacy SideView not to be a valid perspective")
+	}
+	if !domain.PerspectiveSideOn.Valid() {
+		t.Fatal("expected SideOn to be a valid perspective")
 	}
 
 	project := &domain.Project{UserID: 7, Name: "Prototype"}
@@ -64,12 +70,12 @@ func TestProjectClassificationsAllowEmptyValues(t *testing.T) {
 	}
 
 	emptyGameType := domain.GameType("")
-	emptyViewType := domain.ViewType("")
+	emptyPerspective := domain.Perspective("")
 	emptyPlatformType := domain.PlatformType("")
 	update := &domain.ProjectUpdate{
 		ID:             42,
 		GameType:       &emptyGameType,
-		ViewType:       &emptyViewType,
+		Perspective:    &emptyPerspective,
 		TargetPlatform: &emptyPlatformType,
 	}
 	if err := update.Validate(); err != nil {
