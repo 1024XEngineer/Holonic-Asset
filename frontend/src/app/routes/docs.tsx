@@ -10,7 +10,7 @@ export const Route = createFileRoute("/docs")({
       {
         name: "description",
         content:
-          "A practical guide to references, perspectives, and directional game assets.",
+          "A practical guide to references, perspectives, directions, and tilesets for game assets.",
       },
     ],
   }),

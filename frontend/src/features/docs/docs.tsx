@@ -9,10 +9,11 @@ import PerspectiveEn, {
   metadata as perspectiveEn,
 } from "./content/perspective.mdx";
 import ReferenceEn, { metadata as referenceEn } from "./content/reference.mdx";
+import TilesetsEn, { metadata as tilesetsEn } from "./content/tilesets.mdx";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 
-type ArticleId = "directions" | "perspective" | "reference";
+type ArticleId = "directions" | "perspective" | "reference" | "tilesets";
 type Article = {
   Content: ComponentType<{ components?: Record<string, ComponentType> }>;
   metadata: { title: string };
@@ -22,9 +23,15 @@ const articles: Record<ArticleId, Article> = {
   reference: { Content: ReferenceEn, metadata: referenceEn },
   perspective: { Content: PerspectiveEn, metadata: perspectiveEn },
   directions: { Content: DirectionsEn, metadata: directionsEn },
+  tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
 };
 
-const articleOrder: ArticleId[] = ["reference", "perspective", "directions"];
+const articleOrder: ArticleId[] = [
+  "reference",
+  "perspective",
+  "directions",
+  "tilesets",
+];
 
 const mdxComponents = {
   h2: ({ className, ...props }: ComponentPropsWithoutRef<"h2">) => (
