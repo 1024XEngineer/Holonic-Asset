@@ -1,12 +1,7 @@
-import type { AssetKind } from "@/model/asset";
+import type { AssetKind, ProjectAsset } from "@/model/asset";
 
-export type Asset = {
-  id: string;
-  name: string;
+export type AssetLibraryItem = ProjectAsset & {
   kind: AssetKind;
-  version: string;
-  size: string;
-  description: string;
-  tags: string[];
-  accent: string;
+  accentClassName: string;
+  kindLabel: string;
 };
