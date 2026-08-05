@@ -13,16 +13,16 @@ var (
 
 func (t GameType) Valid() bool {
 	switch t {
-	case GameTypeRPG, GameTypeACT, GameTypeSLG, GameTypeOther:
+	case "", GameTypeRPG, GameTypeACT, GameTypeSLG:
 		return true
 	default:
 		return false
 	}
 }
 
-func (t ViewType) Valid() bool {
-	switch t {
-	case ViewTypeTopDown, ViewTypeSideView, ViewTypeIsometric, ViewTypeOther:
+func (p Perspective) Valid() bool {
+	switch p {
+	case "", PerspectiveTopDown, PerspectiveSideOn, PerspectiveIsometric:
 		return true
 	default:
 		return false
@@ -31,7 +31,7 @@ func (t ViewType) Valid() bool {
 
 func (t PlatformType) Valid() bool {
 	switch t {
-	case PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:
+	case "", PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:
 		return true
 	default:
 		return false
@@ -59,14 +59,25 @@ func (p *Project) ValidateCreate() error {
 	if err := ValidateUserID(p.UserID); err != nil {
 		return err
 	}
+	return p.validateDefinition()
+}
+
+func (p *Project) ValidateReferenceGeneration() error {
+	if p == nil {
+		return invalidProject("project is required")
+	}
+	return p.validateDefinition()
+}
+
+func (p *Project) validateDefinition() error {
 	if strings.TrimSpace(p.Name) == "" {
 		return invalidProject("name is required")
 	}
 	if !p.GameType.Valid() {
 		return invalidProject("gameType is invalid")
 	}
-	if !p.ViewType.Valid() {
-		return invalidProject("viewType is invalid")
+	if !p.Perspective.Valid() {
+		return invalidProject("perspective is invalid")
 	}
 	if !p.TargetPlatform.Valid() {
 		return invalidProject("targetPlatform is invalid")
@@ -90,8 +101,8 @@ func (u *ProjectUpdate) Validate() error {
 	if u.GameType != nil && !u.GameType.Valid() {
 		return invalidProject("gameType is invalid")
 	}
-	if u.ViewType != nil && !u.ViewType.Valid() {
-		return invalidProject("viewType is invalid")
+	if u.Perspective != nil && !u.Perspective.Valid() {
+		return invalidProject("perspective is invalid")
 	}
 	if u.TargetPlatform != nil && !u.TargetPlatform.Valid() {
 		return invalidProject("targetPlatform is invalid")
@@ -102,7 +113,7 @@ func (u *ProjectUpdate) Validate() error {
 func (u *ProjectUpdate) hasChanges() bool {
 	return u.Name != nil ||
 		u.GameType != nil ||
-		u.ViewType != nil ||
+		u.Perspective != nil ||
 		u.TargetPlatform != nil ||
 		u.Description != nil ||
 		u.Reference != nil ||

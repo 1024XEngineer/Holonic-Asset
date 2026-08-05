@@ -48,12 +48,16 @@ func resolveConfigPath() string {
 }
 
 func NewApp(projectDao dao.ProjectDao) *App {
-	return newApp(projectDao, nil)
+	return newApp(projectDao, nil, nil)
 }
 
-func newApp(projectDao dao.ProjectDao, assetStore assetdomain.Store) *App {
+func newApp(
+	projectDao dao.ProjectDao,
+	assetStore assetdomain.Store,
+	imageService imageclient.ImageGenerationService,
+) *App {
 	projectRepository := repository.NewProjectRepository(projectDao)
-	workspaceModule := workspace.New(projectRepository, assetStore)
+	workspaceModule := workspace.New(projectRepository, assetStore, imageService)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
 	var assetRouter router.AssetRouter
 	if workspaceModule.Assets != nil {
@@ -84,7 +88,13 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		&dao.AssetRecordDaoImpl{DB: db},
 	)
 	projectRepository := repository.NewProjectRepository(dao.NewGormProjectDao(db))
-	workspaceModule := workspace.New(projectRepository, assetRepository)
+	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
+		BaseURL:      cfg.QNA.BaseURL,
+		APIKey:       cfg.QNA.APIKey,
+		DefaultModel: cfg.QNA.DefaultModel,
+	})
+	images := imageclient.NewImageGenerationService(provider)
+	workspaceModule := workspace.New(projectRepository, assetRepository, images)
 
 	uploadStore, err := upload.NewQiniuStorage(cfg.QiNiu)
 	if err != nil {
@@ -99,12 +109,6 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		return nil, err
 	}
 
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      cfg.QNA.BaseURL,
-		APIKey:       cfg.QNA.APIKey,
-		DefaultModel: cfg.QNA.DefaultModel,
-	})
-	images := imageclient.NewImageGenerationService(provider)
 	processor := imageprocessor.NewProcessor()
 	executor := generator.NewExecutor(images, processor, workspaceModule.Assets)
 	generatorEngine := generator.NewEngine(taskManager, nil, executor)

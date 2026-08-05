@@ -3,15 +3,15 @@ export type NewProjectDraft = {
   gameType: string;
   platform: string;
   description: string;
-  visualStyle: string;
+  perspective: string;
+  reference: string;
 };
 
 export type ProjectSettingsDraft = {
   name: string;
   gameType: string;
   customGameType: string;
-  visualStyle: string;
-  customVisualStyle: string;
+  perspective: string;
   platform: string;
   description: string;
   visualDirection: string;

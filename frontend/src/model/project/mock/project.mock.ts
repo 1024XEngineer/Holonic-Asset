@@ -1,7 +1,8 @@
-import type { ProjectSummary } from "../types";
+import type { CreateProjectInput, ProjectSummary } from "../types";
 import { projectSummaries } from "./project.seed";
 
 let projects = createProjectState();
+let nextProjectId = 1;
 
 function createProjectState() {
   return structuredClone(projectSummaries);
@@ -17,7 +18,12 @@ export async function getMockProject(projectId: string) {
   return structuredClone(project);
 }
 
-export async function createMockProject(project: ProjectSummary) {
+export async function createMockProject(input: CreateProjectInput) {
+  const project: ProjectSummary = {
+    ...input,
+    id: String(nextProjectId++),
+    assetCount: 0,
+  };
   projects = [...projects, structuredClone(project)];
   return structuredClone(project);
 }
@@ -39,4 +45,5 @@ export function hasMockProject(projectId: string) {
 
 export function resetMockProjects() {
   projects = createProjectState();
+  nextProjectId = 1;
 }
