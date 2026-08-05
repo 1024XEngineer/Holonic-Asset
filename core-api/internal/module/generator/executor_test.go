@@ -57,6 +57,16 @@ func (s *imageProcessorStub) Verify(
 	return &imageprocessor.VerificationReport{Passed: true}, nil
 }
 
+func (s *imageProcessorStub) SplitImage(
+	_ context.Context,
+	_ *imageprocessor.SplitImageRequest,
+) (*imageprocessor.SplitImageResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.SplitImageResult{}, nil
+}
+
 func (s *imageGenerationServiceStub) Generate(
 	_ context.Context,
 	request *imageclient.GenerateRequest,
