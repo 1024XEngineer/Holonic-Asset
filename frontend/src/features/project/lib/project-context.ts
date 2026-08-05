@@ -19,7 +19,6 @@ export const projectContextOptions = {
 
 export const editableProjectContextOptions = {
   gameTypes: [...projectContextOptions.gameTypes, "Other"],
-  perspectives: [...projectContextOptions.perspectives, "Other"],
 } as const;
 
 export function createNewProjectDraft(): NewProjectDraft {
@@ -57,17 +56,11 @@ export function createProjectSettingsDraft(
     projectContextOptions.gameTypes,
     project.gameType,
   );
-  const hasKnownPerspective = isKnownOption(
-    projectContextOptions.perspectives,
-    project.perspective,
-  );
-
   return {
     name: project.name,
     gameType: hasKnownGameType ? project.gameType : "Other",
     customGameType: hasKnownGameType ? "" : project.gameType,
-    perspective: hasKnownPerspective ? project.perspective : "Other",
-    customPerspective: hasKnownPerspective ? "" : project.perspective,
+    perspective: project.perspective,
     platform: project.platform,
     description: project.description,
     visualDirection: project.visualDirection,
@@ -80,10 +73,7 @@ export function applyProjectSettings(
 ): ProjectSummary | undefined {
   const name = draft.name.trim();
   const gameType = resolveEditableOption(draft.gameType, draft.customGameType);
-  const perspective = resolveEditableOption(
-    draft.perspective,
-    draft.customPerspective,
-  );
+  const perspective = draft.perspective.trim();
 
   if (!name || !gameType || !perspective) return undefined;
 

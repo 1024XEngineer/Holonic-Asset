@@ -12,7 +12,6 @@ export type ProjectSettingsDraft = {
   gameType: string;
   customGameType: string;
   perspective: string;
-  customPerspective: string;
   platform: string;
   description: string;
   visualDirection: string;

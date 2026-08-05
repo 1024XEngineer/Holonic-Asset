@@ -95,72 +95,33 @@ export function ProjectSettingsDialog({
                 <DropdownField
                   label="Perspective"
                   value={field.state.value}
-                  options={[...editableProjectContextOptions.perspectives]}
-                  onChange={(value) => {
-                    field.handleChange(value);
-                    if (value !== "Other")
-                      form.setFieldValue("customPerspective", "");
-                  }}
+                  options={projectContextOptions.perspectives}
+                  onChange={field.handleChange}
                 />
               )}
             </form.Field>
             <form.Subscribe
-              selector={(state) =>
-                (state.values.gameType === "Other" ? 1 : 0) |
-                (state.values.perspective === "Other" ? 2 : 0)
-              }
+              selector={(state) => state.values.gameType === "Other"}
             >
-              {(customFieldMask) => {
-                const showCustomGameType = (customFieldMask & 1) !== 0;
-                const showCustomPerspective = (customFieldMask & 2) !== 0;
-
-                return (
-                  <>
-                    {showCustomGameType ? (
-                      <form.Field name="customGameType">
-                        {(field) => (
-                          <label
-                            className={`grid gap-2 text-sm font-medium ${
-                              showCustomPerspective ? "" : "sm:col-span-2"
-                            }`}
-                          >
-                            Custom game type
-                            <Input
-                              required
-                              placeholder="Describe the game type"
-                              value={field.state.value}
-                              onChange={(event) =>
-                                field.handleChange(event.target.value)
-                              }
-                            />
-                          </label>
-                        )}
-                      </form.Field>
-                    ) : null}
-                    {showCustomPerspective ? (
-                      <form.Field name="customPerspective">
-                        {(field) => (
-                          <label
-                            className={`grid gap-2 text-sm font-medium ${
-                              showCustomGameType ? "" : "sm:col-span-2"
-                            }`}
-                          >
-                            Custom perspective
-                            <Input
-                              required
-                              placeholder="Describe the perspective"
-                              value={field.state.value}
-                              onChange={(event) =>
-                                field.handleChange(event.target.value)
-                              }
-                            />
-                          </label>
-                        )}
-                      </form.Field>
-                    ) : null}
-                  </>
-                );
-              }}
+              {(showCustomGameType) =>
+                showCustomGameType ? (
+                  <form.Field name="customGameType">
+                    {(field) => (
+                      <label className="grid gap-2 text-sm font-medium sm:col-span-2">
+                        Custom game type
+                        <Input
+                          required
+                          placeholder="Describe the game type"
+                          value={field.state.value}
+                          onChange={(event) =>
+                            field.handleChange(event.target.value)
+                          }
+                        />
+                      </label>
+                    )}
+                  </form.Field>
+                ) : null
+              }
             </form.Subscribe>
             <div className="sm:col-span-2">
               <form.Field name="platform">
