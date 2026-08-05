@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, Layers3, Ruler, Tags, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,9 +51,16 @@ export function AssetEditDialog({
   const [tags, setTags] = useState<string[]>([]);
   const [canvasSize, setCanvasSize] = useState("");
   const [perspective, setPerspective] = useState("");
+  const initializedAssetIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!asset) return;
+    if (!asset) {
+      initializedAssetIdRef.current = undefined;
+      return;
+    }
+    if (initializedAssetIdRef.current === asset.id) return;
+
+    initializedAssetIdRef.current = asset.id;
 
     setName(asset.name);
     setDescription(asset.description);
