@@ -12,6 +12,9 @@ import (
 type RasterMode string
 
 const (
+	resizeSamplingArea     = "alpha-aware-area"
+	resizeSamplingBilinear = "alpha-aware-bilinear"
+
 	// RasterModeSmooth is intended for regular 2D game art. It uses alpha-aware
 	// area resampling and preserves semi-transparent edge coverage.
 	RasterModeSmooth RasterMode = "smooth"
@@ -110,7 +113,7 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	}
 
 	innerW, innerH := opts.Width-2*margin, opts.Height-2*margin
-	out, placement := resizeContain(img, crop, innerW, innerH)
+	out, placement, sampling := resizeContain(img, crop, innerW, innerH)
 	if opts.PaletteSize > 0 {
 		applyPalette(out, opts.PaletteSize)
 	}
@@ -134,7 +137,7 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 		OutputWidth: opts.Width, OutputHeight: opts.Height,
 		CroppedToContent: cropped, Margin: margin,
 		PaletteSize: opts.PaletteSize, HardAlpha: opts.HardAlpha,
-		Mode: mode, Sampling: "alpha-aware-area",
+		Mode: mode, Sampling: sampling,
 	}, nil
 }
 
@@ -183,10 +186,11 @@ func resizeContain(
 	src *image.NRGBA,
 	crop image.Rectangle,
 	dstW, dstH int,
-) (*image.NRGBA, image.Point) {
+) (*image.NRGBA, image.Point, string) {
 	scaledW, scaledH := containDimensions(crop.Dx(), crop.Dy(), dstW, dstH)
 	placement := image.Pt((dstW-scaledW)/2, (dstH-scaledH)/2)
-	return qualityResize(src, crop, scaledW, scaledH), placement
+	resized, sampling := qualityResize(src, crop, scaledW, scaledH)
+	return resized, placement, sampling
 }
 
 func containDimensions(srcW, srcH, dstW, dstH int) (int, int) {
@@ -206,11 +210,11 @@ func roundedScale(value, numerator, denominator int) int {
 // qualityResize integrates source coverage for reductions. For enlargement it
 // uses bilinear interpolation; nearest-neighbour enlargement is a presentation
 // choice that should be done by the game engine for an existing pixel sprite.
-func qualityResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) *image.NRGBA {
+func qualityResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) (*image.NRGBA, string) {
 	if crop.Dx() <= dstW && crop.Dy() <= dstH {
-		return bilinearResize(src, crop, dstW, dstH)
+		return bilinearResize(src, crop, dstW, dstH), resizeSamplingBilinear
 	}
-	return areaResize(src, crop, dstW, dstH)
+	return areaResize(src, crop, dstW, dstH), resizeSamplingArea
 }
 
 // areaResize performs exact box/area resampling with alpha-weighted straight

@@ -541,14 +541,14 @@ func extractBorderConnectedChroma(
 		}
 	}
 
-	removable := borderConnectedChromaMask(pixels, width, height)
+	connected := borderConnectedChromaMask(pixels, width, height)
 	for y := range height {
 		for x := range width {
 			index := y*width + x
 			candidate := pixels[index]
 			alpha := candidate.sourceAlpha
 			rgb := candidate.rgb
-			if removable[index] {
+			if connected[index] && candidate.candidate {
 				alpha = candidate.outputAlpha
 				if alpha == 0 {
 					output.SetRGBA(x, y, color.RGBA{})
@@ -586,7 +586,8 @@ func borderConnectedChromaMask(
 	queue := make([]int, 0, 2*(width+height))
 	enqueue := func(x, y int) {
 		index := y*width + x
-		if connected[index] || !pixels[index].candidate {
+		pixel := pixels[index]
+		if connected[index] || (!pixel.candidate && pixel.sourceAlpha > TransparentAlphaMax) {
 			return
 		}
 		connected[index] = true
