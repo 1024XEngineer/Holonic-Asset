@@ -20,16 +20,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AssetKindIcon } from "@/components/asset-kind";
+import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import {
   assetCanvasSizeOptions,
   assetPerspectiveOptions,
   isAssetPerspective,
+  type AssetLibraryItem,
   type AssetMetadataUpdate,
 } from "@/model/asset";
 
 import { AssetPreview } from "./asset-preview";
-import type { AssetLibraryItem } from "./types/asset";
 
 export function AssetEditDialog({
   asset,
@@ -127,7 +127,7 @@ export function AssetEditDialog({
                 <DialogHeader className="pr-7">
                   <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <AssetKindIcon kind={asset.kind} className="size-3.5" />
-                    {asset.kindLabel}
+                    {getAssetKindConfig(asset.kind).label}
                     <span aria-hidden="true">/</span>
                     {asset.version}
                   </div>

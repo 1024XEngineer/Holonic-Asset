@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssetGroup, ProjectAsset } from "@/model/asset";
+import type { AssetLibraryItem } from "@/model/asset";
 
-import { countAssetsByKind, filterAssetGroups } from "./use-asset-library";
+import { filterAssetLibraryItems } from "./use-asset-library";
 
-function asset(overrides: Partial<ProjectAsset> = {}): ProjectAsset {
+function asset(overrides: Partial<AssetLibraryItem> = {}): AssetLibraryItem {
   return {
     id: "asset-1",
+    kind: "character",
     name: "Moonlit Swordsman",
     description: "Four-direction character",
     version: "v2",
-    canvasSize: "64 × 64 px",
+    canvasSize: "64 x 64 px",
     perspective: "Top-down",
     tags: ["hero", "pixel-art"],
     history: [],
@@ -19,54 +20,28 @@ function asset(overrides: Partial<ProjectAsset> = {}): ProjectAsset {
   };
 }
 
-const groups: AssetGroup[] = [
-  { kind: "character", assets: [asset()] },
-  {
+const items: AssetLibraryItem[] = [
+  asset(),
+  asset({
+    id: "asset-2",
     kind: "object",
-    assets: [
-      asset({
-        id: "asset-2",
-        name: "Storage Barrel",
-        description: "Wooden prop",
-        tags: ["storage", "wood"],
-      }),
-    ],
-  },
+    name: "Storage Barrel",
+    description: "Wooden prop",
+    tags: ["storage", "wood"],
+  }),
 ];
 
-describe("filterAssetGroups", () => {
-  it("searches asset tags and metadata without changing model data", () => {
-    const result = filterAssetGroups(groups, "PIXEL-ART", [
-      "character",
-      "object",
-    ]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      id: "asset-1",
-      kind: "character",
-      kindLabel: "Character",
-    });
-    expect(groups[0].assets[0]).not.toHaveProperty("kind");
+describe("filterAssetLibraryItems", () => {
+  it("searches asset tags and metadata case-insensitively", () => {
+    expect(
+      filterAssetLibraryItems(items, "PIXEL-ART", ["character", "object"]),
+    ).toMatchObject([{ id: "asset-1", kind: "character" }]);
   });
 
   it("combines type selection with text search", () => {
-    expect(filterAssetGroups(groups, "wood", ["character"])).toEqual([]);
-    expect(filterAssetGroups(groups, "wood", ["object"])[0]?.id).toBe(
+    expect(filterAssetLibraryItems(items, "wood", ["character"])).toEqual([]);
+    expect(filterAssetLibraryItems(items, "wood", ["object"])[0]?.id).toBe(
       "asset-2",
     );
-  });
-});
-
-describe("countAssetsByKind", () => {
-  it("returns stable zero counts for empty asset kinds", () => {
-    expect(countAssetsByKind(groups)).toEqual({
-      character: 1,
-      object: 1,
-      tileset: 0,
-      scenery: 0,
-      ui: 0,
-      audio: 0,
-    });
   });
 });

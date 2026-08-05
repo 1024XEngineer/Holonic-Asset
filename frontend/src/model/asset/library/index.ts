@@ -1,5 +1,7 @@
 export { assetApi } from "./asset.api";
 export { getDefaultAssetCanvasSize } from "./asset-canvas-size";
+export { createAssetLibraryCollection } from "./asset-library-collection";
+export type { AssetLibraryCollection } from "./asset-library-collection";
 export { assetKeys } from "./keys";
 export { useCopyAssetMutation } from "./asset-copy.mutation";
 export { useDeleteAssetMutation } from "./asset-delete.mutation";
@@ -14,5 +16,6 @@ export type {
   AssetCanvasSize,
   AssetGroup,
   AssetGroupsByProject,
+  AssetLibraryItem,
   AssetPerspective,
 } from "./types";

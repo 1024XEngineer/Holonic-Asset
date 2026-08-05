@@ -3,6 +3,7 @@ export {
   assetCanvasSizeOptions,
   assetKeys,
   assetPerspectiveOptions,
+  createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
   isAssetPerspective,
   useAssetLibraryQuery,
@@ -14,6 +15,8 @@ export type {
   AssetCanvasSize,
   AssetGroup,
   AssetGroupsByProject,
+  AssetLibraryCollection,
+  AssetLibraryItem,
   AssetPerspective,
 } from "./library";
 export {

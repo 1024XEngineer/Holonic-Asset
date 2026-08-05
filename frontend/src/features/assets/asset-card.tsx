@@ -14,10 +14,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AssetKindIcon } from "@/components/asset-kind";
+import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import type { AssetLibraryItem } from "@/model/asset";
 
 import { AssetPreview } from "./asset-preview";
-import type { AssetLibraryItem } from "./types/asset";
 
 export function AssetCard({
   asset,
@@ -36,6 +36,8 @@ export function AssetCard({
   onEdit: () => void;
   projectId?: string;
 }) {
+  const kindConfig = getAssetKindConfig(asset.kind);
+
   return (
     <Card
       className="group relative gap-0 overflow-hidden rounded-lg py-0 shadow-xs transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-md has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/40"
@@ -72,7 +74,7 @@ export function AssetCard({
           <div className="flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
             <span className="flex min-w-0 items-center gap-1.5">
               <AssetKindIcon kind={asset.kind} className="size-3.5" />
-              <span className="truncate">{asset.kindLabel}</span>
+              <span className="truncate">{kindConfig.label}</span>
             </span>
             <span className="shrink-0">{asset.canvasSize}</span>
           </div>

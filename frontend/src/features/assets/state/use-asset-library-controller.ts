@@ -2,18 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   assetKinds,
+  createAssetLibraryCollection,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
   useUpdateAssetMutation,
 } from "@/model/asset";
 import { useGenerationRunsQuery } from "@/model/generation";
-import type { AssetKind, AssetMetadataUpdate } from "@/model/asset";
+import type {
+  AssetKind,
+  AssetLibraryItem,
+  AssetMetadataUpdate,
+} from "@/model/asset";
 import type { GenerationRun } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
 
-import { toAssetLibraryItem } from "../lib/to-asset-library-item";
-import type { AssetLibraryItem } from "../types/asset";
 import { useAssetLibrary } from "./use-asset-library";
 
 export type AssetLibraryController = {
@@ -84,6 +87,10 @@ export function useAssetLibraryController({
   } = usePendingAssetIds();
   const { refetch: refetchAssets } = assetsQuery;
   const assetGroups = useMemo(() => assetsQuery.data ?? [], [assetsQuery.data]);
+  const assetCollection = useMemo(
+    () => createAssetLibraryCollection(assetGroups),
+    [assetGroups],
+  );
   const generationRuns = useMemo(
     () => generationsQuery.data ?? [],
     [generationsQuery.data],
@@ -94,29 +101,15 @@ export function useAssetLibraryController({
     selectedKinds,
     setSelectedKinds,
     totalAssets,
-  } = useAssetLibrary(assetGroups, query);
-  const allAssets = useMemo(
-    () => assetGroups.flatMap((group) => group.assets),
-    [assetGroups],
-  );
+  } = useAssetLibrary(assetCollection, query);
   const editingAsset = useMemo(() => {
     if (!editingAssetId) return undefined;
 
-    const item = filteredAssets.find((asset) => asset.id === editingAssetId);
-    if (item) return item;
-
-    const asset = allAssets.find(
-      (candidate) => candidate.id === editingAssetId,
+    return (
+      filteredAssets.find((asset) => asset.id === editingAssetId) ??
+      assetCollection.find(editingAssetId)
     );
-    if (!asset) return undefined;
-
-    const group = assetGroups.find((candidate) =>
-      candidate.assets.some((groupAsset) => groupAsset.id === editingAssetId),
-    );
-    if (!group) return undefined;
-
-    return toAssetLibraryItem(asset, group.kind);
-  }, [allAssets, assetGroups, editingAssetId, filteredAssets]);
+  }, [assetCollection, editingAssetId, filteredAssets]);
 
   useEffect(() => {
     resetCopyAsset();

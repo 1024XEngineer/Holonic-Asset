@@ -5,6 +5,7 @@ import {
   deleteMockAsset,
   listMockAssetGroups,
   resetMockAssets,
+  saveMockAssetRevision,
   updateMockAsset,
 } from "./assets.mock";
 
@@ -89,18 +90,29 @@ describe("mock asset library operations", () => {
     expect(await listMockAssetGroups("moonlit-orchard")).toEqual(groups);
   });
 
-  it("rejects metadata updates for missing assets", async () => {
-    await expect(
-      updateMockAsset("moonlit-orchard", "missing", {
-        name: "Missing",
-        description: "",
-        tags: [],
-        canvasSize: "64 × 64 px",
-        perspective: "Top-down",
-      }),
-    ).rejects.toMatchObject({
+  it.each([
+    ["copy", () => copyMockAsset("moonlit-orchard", "missing")],
+    ["delete", () => deleteMockAsset("moonlit-orchard", "missing")],
+    [
+      "update",
+      () =>
+        updateMockAsset("moonlit-orchard", "missing", {
+          name: "Missing",
+          description: "",
+          tags: [],
+          canvasSize: "64 × 64 px",
+          perspective: "Top-down",
+        }),
+    ],
+    [
+      "save revision",
+      () => saveMockAssetRevision("moonlit-orchard", "missing", "Missing", {}),
+    ],
+  ])("rejects a missing asset during %s", async (_name, operation) => {
+    await expect(operation()).rejects.toMatchObject({
       code: "NOT_FOUND",
       message: "Asset was not found.",
+      details: { projectId: "moonlit-orchard", assetId: "missing" },
     });
   });
 });

@@ -1,15 +1,12 @@
 import { ImageOff } from "lucide-react";
 
-import { AssetKindIcon } from "@/components/asset-kind";
+import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { cn } from "@/lib/utils";
 import { getGridBounds } from "@/lib/grid-bounds";
-import { useRecordQuery } from "@/model/asset";
-
-import type { AssetLibraryItem } from "./types/asset";
+import { useRecordQuery, type AssetLibraryItem } from "@/model/asset";
 
 type AssetPreviewAsset = Pick<
   AssetLibraryItem,
-  | "accentClassName"
   | "id"
   | "kind"
   | "name"
@@ -30,7 +27,6 @@ export function AssetPreview({
   projectId?: string;
 }) {
   const {
-    accentClassName,
     id: assetId,
     kind,
     name,
@@ -119,7 +115,7 @@ export function AssetPreview({
           <span
             className={cn(
               "grid size-14 place-items-center rounded-md text-white shadow-sm",
-              accentClassName,
+              getAssetKindConfig(kind).accentClassName,
             )}
           >
             <AssetKindIcon kind={kind} className="size-6" />

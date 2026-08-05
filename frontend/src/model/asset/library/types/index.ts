@@ -7,4 +7,8 @@ export {
   isAssetPerspective,
   type AssetPerspective,
 } from "./asset-perspective";
-export type { AssetGroup, AssetGroupsByProject } from "./asset-library";
+export type {
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetLibraryItem,
+} from "./asset-library";
