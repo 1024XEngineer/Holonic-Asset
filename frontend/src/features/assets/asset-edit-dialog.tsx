@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AlertCircle, Layers3, Ruler, Tags, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import {
   DropdownMenu,
@@ -113,17 +112,9 @@ export function AssetEditDialog({
 
             <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(20rem,1fr)]">
               <AssetPreview
-                accentClassName={asset.accentClassName}
-                assetId={asset.id}
+                asset={asset}
                 className="aspect-square border-b sm:aspect-auto sm:min-h-[34rem] sm:border-b-0 sm:border-r"
-                kind={asset.kind}
-                name={asset.name}
-                previewCrop={asset.previewCrop}
-                previewFrame={asset.previewFrame}
-                previewOffset={asset.previewOffset}
-                previewScale={asset.previewScale}
                 projectId={projectId}
-                thumbnailUrl={asset.thumbnailUrl}
               />
               <div className="min-w-0 p-5 sm:p-6">
                 <DialogHeader className="pr-7">
@@ -171,13 +162,11 @@ export function AssetEditDialog({
                             id="asset-tags"
                             type="button"
                             variant="outline"
-                            className="h-8 w-full justify-between font-normal"
+                            className="h-8 w-full justify-start truncate font-normal"
                           />
                         }
                       >
-                        {tags.length > 0
-                          ? `${tags.length} tag${tags.length === 1 ? "" : "s"} selected`
-                          : "Select tags"}
+                        {tags.length > 0 ? tags.join(", ") : "Select tags"}
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-[var(--anchor-width)] min-w-52">
                         {tagOptions.map((tag) => (
@@ -194,15 +183,6 @@ export function AssetEditDialog({
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    {tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {tags.map((tag) => (
-                          <Badge key={tag} variant="secondary">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
                   </Field>
                   <div className="grid grid-cols-2 gap-4">
                     <DropdownField

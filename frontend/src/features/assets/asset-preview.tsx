@@ -3,39 +3,44 @@ import { ImageOff } from "lucide-react";
 import { AssetKindIcon } from "@/components/asset-kind";
 import { cn } from "@/lib/utils";
 import { getGridBounds } from "@/lib/grid-bounds";
-import {
-  useRecordQuery,
-  type AssetKind,
-  type AssetPreviewCrop,
-  type AssetPreviewFrame,
-  type AssetPreviewOffset,
-} from "@/model/asset";
+import { useRecordQuery } from "@/model/asset";
+
+import type { AssetLibraryItem } from "./types/asset";
+
+type AssetPreviewAsset = Pick<
+  AssetLibraryItem,
+  | "accentClassName"
+  | "id"
+  | "kind"
+  | "name"
+  | "previewCrop"
+  | "previewFrame"
+  | "previewOffset"
+  | "previewScale"
+  | "thumbnailUrl"
+>;
 
 export function AssetPreview({
-  accentClassName,
-  assetId,
+  asset,
   className,
-  kind,
-  name,
-  previewCrop,
-  previewFrame,
-  previewOffset,
-  previewScale,
   projectId,
-  thumbnailUrl,
 }: {
-  accentClassName: string;
-  assetId: string;
+  asset: AssetPreviewAsset;
   className?: string;
-  kind: AssetKind;
-  name: string;
-  previewCrop?: AssetPreviewCrop;
-  previewFrame?: AssetPreviewFrame;
-  previewOffset?: AssetPreviewOffset;
-  previewScale?: number;
   projectId?: string;
-  thumbnailUrl?: string;
 }) {
+  const {
+    accentClassName,
+    id: assetId,
+    kind,
+    name,
+    previewCrop,
+    previewFrame,
+    previewOffset,
+    previewScale,
+    thumbnailUrl,
+  } = asset;
+
   return (
     <div
       className={cn(

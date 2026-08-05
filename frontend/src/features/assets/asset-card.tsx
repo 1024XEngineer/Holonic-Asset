@@ -43,18 +43,7 @@ export function AssetCard({
     >
       {/* TODO: Link the card to its asset editor when the editor route is implemented. */}
       <div className="min-w-0">
-        <AssetPreview
-          accentClassName={asset.accentClassName}
-          assetId={asset.id}
-          kind={asset.kind}
-          name={asset.name}
-          previewCrop={asset.previewCrop}
-          previewFrame={asset.previewFrame}
-          previewOffset={asset.previewOffset}
-          previewScale={asset.previewScale}
-          projectId={projectId}
-          thumbnailUrl={asset.thumbnailUrl}
-        />
+        <AssetPreview asset={asset} projectId={projectId} />
         <div className="space-y-3 p-3.5">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
@@ -62,6 +51,19 @@ export function AssetCard({
               <p className="mt-1 line-clamp-2 min-h-9 text-xs leading-[1.125rem] text-muted-foreground">
                 {asset.description}
               </p>
+              {asset.tags.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1" aria-label="Tags">
+                  {asset.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="h-4 rounded-sm px-1 text-[10px] font-medium leading-none"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <Badge variant="outline" className="rounded-md">
               {asset.version}
