@@ -75,7 +75,7 @@ func TestProjectReferenceGenerationAllowsExplicitEmptyClassifications(t *testing
 		e,
 		http.MethodPost,
 		"/api/v1/project/reference/generate",
-		`{"name":"Prototype","gameType":"","viewType":"","targetPlatform":""}`,
+		`{"name":"Prototype","gameType":"","perspective":"","targetPlatform":""}`,
 	)
 
 	if recorder.Code != http.StatusOK {
@@ -107,13 +107,14 @@ func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 		e,
 		http.MethodPost,
 		"/api/v1/project/create",
-		`{"userID":7,"name":"Prototype","gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+		`{"userID":7,"name":"Prototype","gameType":"RPG","perspective":"SideOn","targetPlatform":"PC"}`,
 	)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" {
+	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" ||
+		stub.createRequest.Perspective != project.PerspectiveSideOn {
 		t.Fatalf("unexpected create request: %+v", stub.createRequest)
 	}
 	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"id\":42}}\n" {
@@ -134,7 +135,28 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 			name:           "create without name",
 			method:         http.MethodPost,
 			path:           "/api/v1/project/create",
-			body:           `{"userID":7,"gameType":"RPG","viewType":"TopDown","targetPlatform":"PC"}`,
+			body:           `{"userID":7,"gameType":"RPG","perspective":"TopDown","targetPlatform":"PC"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with legacy view type field",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","viewType":"SideView"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with legacy side view value",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","perspective":"SideView"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:           "create with other perspective",
+			method:         http.MethodPost,
+			path:           "/api/v1/project/create",
+			body:           `{"userID":7,"name":"Prototype","perspective":"Other"}`,
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{

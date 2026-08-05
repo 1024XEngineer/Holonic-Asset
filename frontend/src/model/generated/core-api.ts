@@ -373,14 +373,14 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
-            /** @enum {string} */
-            viewType?: "" | "TopDown" | "SideView" | "Isometric";
         };
         CreateProjectResponse: {
             /** Format: int64 */
@@ -451,12 +451,12 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";
-            /** @enum {string} */
-            viewType?: "" | "TopDown" | "SideView" | "Isometric";
         };
         GenerateProjectReferenceResponse: {
             reference: string;
@@ -510,14 +510,14 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+            /** @enum {string} */
+            perspective: "" | "TopDown" | "SideOn" | "Isometric";
             reference: string;
             style: string;
             /** @enum {string} */
             targetPlatform: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
-            /** @enum {string} */
-            viewType: "" | "TopDown" | "SideView" | "Isometric";
         };
         RecordAssetRequest: {
             /** Format: int64 */
@@ -771,14 +771,14 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name?: string;
+            /** @enum {string} */
+            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
             /** Format: int64 */
             projectID: number;
             reference?: string;
             style?: string;
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";
-            /** @enum {string} */
-            viewType?: "" | "TopDown" | "SideView" | "Isometric";
         };
         UpdateProjectResponse: {
             success: boolean;

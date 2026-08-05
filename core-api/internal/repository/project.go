@@ -72,7 +72,7 @@ func convertProjectToDao(project *domain.Project) *dao.Project {
 		UserID:         project.UserID,
 		Name:           project.Name,
 		GameType:       string(project.GameType),
-		ViewType:       string(project.ViewType),
+		Perspective:    string(project.Perspective),
 		TargetPlatform: string(project.TargetPlatform),
 		Description:    project.Description,
 		Reference:      project.Reference,
@@ -95,9 +95,9 @@ func convertProjectUpdateToDao(update *domain.ProjectUpdate) *dao.ProjectUpdate 
 		value := string(*update.GameType)
 		converted.GameType = &value
 	}
-	if update.ViewType != nil {
-		value := string(*update.ViewType)
-		converted.ViewType = &value
+	if update.Perspective != nil {
+		value := string(*update.Perspective)
+		converted.Perspective = &value
 	}
 	if update.TargetPlatform != nil {
 		value := string(*update.TargetPlatform)
@@ -115,7 +115,7 @@ func convertProjectToDomain(project *dao.Project) *domain.Project {
 		UserID:         project.UserID,
 		Name:           project.Name,
 		GameType:       domain.GameType(project.GameType),
-		ViewType:       domain.ViewType(project.ViewType),
+		Perspective:    domain.Perspective(project.Perspective),
 		TargetPlatform: domain.PlatformType(project.TargetPlatform),
 		Description:    project.Description,
 		Reference:      project.Reference,
