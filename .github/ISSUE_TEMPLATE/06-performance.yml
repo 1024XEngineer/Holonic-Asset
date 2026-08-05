@@ -1,0 +1,96 @@
+name: Performance
+description: Report a measurable performance problem, regression, or optimization opportunity.
+title: "[Perf]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Performance work needs a reproducible workload, a quantified baseline, and a measurable target. Compare results under equivalent conditions and note warm-up, caching, sample count, and variance where relevant.
+
+        If no historical baseline exists, provide the current measurements and explain how the target was chosen. Do not trade correctness, stability, or asset output quality for speed without making that tradeoff explicit.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and impact
+      description: Which user or system workflow is affected, what is slow or resource intensive, and why is the impact significant?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Performance area
+      description: Select the area that best matches the bottleneck or affected workflow.
+      options:
+        - Frontend UI or canvas rendering
+        - API or database
+        - Asset generation
+        - Asset processing, upload, or export
+        - Background task or queue
+        - Build, CI, or developer tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Current performance and baseline
+      description: Provide concrete metrics with units. Compare against a previous version, commit, implementation, or representative target when possible.
+      placeholder: |
+        Metric: p95 response time / frame rate / throughput / peak memory / bundle size / ...
+        Current: ...
+        Baseline: ...
+        Difference: ...
+    validations:
+      required: true
+  - type: textarea
+    id: workload
+    attributes:
+      label: Reproduction workload and measurement method
+      description: Include exact steps or commands, input and asset characteristics, project size, concurrency, cache state, warm-up, repetitions, and measurement tools as applicable.
+      placeholder: |
+        1. Prepare a project with ... assets of ... dimensions and formats.
+        2. Run ... in a production build with ... concurrent tasks.
+        3. Warm up ..., repeat ... times, and record ... using ....
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and versions
+      description: Include the affected and last known good commit or version, build mode, browser or client, OS, CPU, memory, GPU, database, storage, network, and external provider details that can influence the result.
+    validations:
+      required: true
+  - type: textarea
+    id: target
+    attributes:
+      label: Target and acceptance criteria
+      description: Define measurable completion criteria under the stated workload, including correctness, stability, and asset quality guardrails.
+      placeholder: |
+        - Under ..., p95 ... is at most ....
+        - Peak memory remains below ....
+        - Generated, processed, and exported assets remain functionally and visually equivalent.
+        - Existing tests pass and the optimization adds a repeatable regression check where practical.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope, constraints, and exclusions
+      description: Identify affected modules or execution paths, known constraints, and work that should remain out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Profiling evidence (optional)
+      description: Attach benchmark output, traces, flame graphs, browser profiles, query plans, metrics, screenshots, or redacted logs. Explain what the evidence indicates.
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed optimization and alternatives (optional)
+      description: Describe suspected bottlenecks, possible changes, alternatives considered, and expected tradeoffs. A proposed implementation is not required.
+  - type: textarea
+    id: related_context
+    attributes:
+      label: Related issues and changes (optional)
+      description: Link related issues, pull requests, commits, experiments, or benchmarks. Identify a suspected regression-introducing change when known.
