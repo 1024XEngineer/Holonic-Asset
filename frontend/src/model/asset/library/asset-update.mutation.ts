@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { AssetMetadataUpdate } from "../types";
 import { assetApi } from "./asset.api";
-import { assetKeys } from "./keys";
+import { createAssetLibraryCacheSync } from "./asset-library-cache";
 
 type UpdateAssetInput = {
   projectId: string;
@@ -16,8 +16,6 @@ export function useUpdateAssetMutation() {
   return useMutation({
     mutationFn: ({ projectId, assetId, metadata }: UpdateAssetInput) =>
       assetApi.update(projectId, assetId, metadata),
-    onSuccess: (assetGroups, { projectId }) => {
-      queryClient.setQueryData(assetKeys.library(projectId), assetGroups);
-    },
+    onSuccess: createAssetLibraryCacheSync(queryClient),
   });
 }
