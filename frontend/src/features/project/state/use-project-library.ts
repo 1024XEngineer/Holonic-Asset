@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 
 import {
   reconcileProjectSelection,
@@ -30,38 +30,43 @@ export type ProjectLibraryController = {
 
 const EMPTY_PROJECTS: ProjectSummary[] = [];
 
-export function useProjectLibrary(): ProjectLibraryController {
-  const navigate = useNavigate({ from: "/projects/" });
-  const search = useSearch({ from: "/projects/" });
+export function useProjectLibrary(
+  selectedProjectId?: string,
+): ProjectLibraryController {
+  const navigate = useNavigate();
   const { data: projectData, isSuccess: projectsLoaded } =
     useProjectListQuery();
   const projects = projectData ?? EMPTY_PROJECTS;
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
   const { mutate: updateProject } = useUpdateProjectMutation();
-  const project = projects.find((item) => item.id === search.project);
+  const project = projects.find((item) => item.id === selectedProjectId);
 
   const selectProject = useCallback(
-    (projectId: string | undefined, replace = false) =>
-      navigate({
-        to: "/projects",
-        search: { project: projectId, q: "" },
-        replace,
-      }),
+    (projectId: string | undefined, replace = false) => {
+      if (projectId)
+        return navigate({
+          to: "/projects/$projectId",
+          params: { projectId },
+          replace,
+        });
+
+      return navigate({ to: "/projects", replace });
+    },
     [navigate],
   );
 
   useEffect(() => {
     if (!projectsLoaded) return;
-    const selection = reconcileProjectSelection(projects, search.project);
+    const selection = reconcileProjectSelection(projects, selectedProjectId);
     if (selection.redirectProjectId)
       void selectProject(selection.redirectProjectId, true);
-  }, [projects, projectsLoaded, search.project, selectProject]);
+    else if (selectedProjectId && !project) void selectProject(undefined, true);
+  }, [project, projects, projectsLoaded, selectedProjectId, selectProject]);
 
   const createProject = useCallback(
     () =>
       navigate({
         to: "/projects/new",
-        search: {},
       }),
     [navigate],
   );
@@ -72,12 +77,12 @@ export function useProjectLibrary(): ProjectLibraryController {
       const fallbackProjectId = removeProjectSelection(
         projects,
         projectId,
-        search.project,
+        selectedProjectId,
       );
-      if (search.project === projectId)
+      if (selectedProjectId === projectId)
         await selectProject(fallbackProjectId, true);
     },
-    [deleteProject, projects, search.project, selectProject],
+    [deleteProject, projects, selectedProjectId, selectProject],
   );
 
   const update = useCallback(
@@ -89,7 +94,7 @@ export function useProjectLibrary(): ProjectLibraryController {
     () => ({
       current: project,
       items: projects,
-      selectedId: search.project,
+      selectedId: selectedProjectId,
       create: createProject,
       remove: removeProject,
       select: selectProject,
@@ -98,7 +103,7 @@ export function useProjectLibrary(): ProjectLibraryController {
     [
       project,
       projects,
-      search.project,
+      selectedProjectId,
       createProject,
       removeProject,
       selectProject,

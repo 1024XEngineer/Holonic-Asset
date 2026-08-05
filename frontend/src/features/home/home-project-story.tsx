@@ -113,9 +113,7 @@ export function HomeProjectStory() {
             <Button
               className="mt-8 bg-white text-neutral-950 hover:bg-lime-300"
               nativeButton={false}
-              render={
-                <Link to="/projects" search={{ project: undefined, q: "" }} />
-              }
+              render={<Link to="/projects" />}
             >
               See the project workspace
               <ArrowRight data-icon="inline-end" />

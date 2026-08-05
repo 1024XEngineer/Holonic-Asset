@@ -47,8 +47,8 @@ export function useNewProjectController() {
         }),
       );
       await navigate({
-        to: "/projects",
-        search: { project: project.id, q: "" },
+        to: "/projects/$projectId",
+        params: { projectId: project.id },
       });
     },
   });
@@ -57,7 +57,6 @@ export function useNewProjectController() {
     () =>
       void navigate({
         to: "/projects",
-        search: { project: undefined, q: "" },
       }),
     [navigate],
   );
