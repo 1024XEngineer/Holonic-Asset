@@ -144,9 +144,14 @@ export function AppHeader() {
             className="inline-flex shrink-0 rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <img
+              src="/logos/logo-light-nobackground.svg"
+              alt=""
+              className="size-5 sm:hidden"
+            />
+            <img
               src="/logos/logo-light-with-name.svg"
-              alt="Holonic Asset"
-              className="h-5 w-auto sm:h-6"
+              alt=""
+              className="hidden h-6 w-auto sm:block"
             />
           </Link>
         </div>
