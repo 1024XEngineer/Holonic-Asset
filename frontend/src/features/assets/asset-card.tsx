@@ -14,8 +14,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AssetKindIcon } from "@/components/asset-kind";
 
-import { AssetKindIcon } from "./asset-kind-icon";
 import { AssetPreview } from "./asset-preview";
 import type { AssetLibraryItem } from "./types/asset";
 

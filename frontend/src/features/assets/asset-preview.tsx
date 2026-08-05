@@ -1,5 +1,6 @@
 import { ImageOff } from "lucide-react";
 
+import { AssetKindIcon } from "@/components/asset-kind";
 import { cn } from "@/lib/utils";
 import { getGridBounds } from "@/lib/grid-bounds";
 import {
@@ -9,8 +10,6 @@ import {
   type AssetPreviewFrame,
   type AssetPreviewOffset,
 } from "@/model/asset";
-
-import { AssetKindIcon } from "./asset-kind-icon";
 
 export function AssetPreview({
   accentClassName,

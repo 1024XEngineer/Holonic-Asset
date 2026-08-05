@@ -29,9 +29,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AssetKindIcon } from "@/components/asset-kind";
 import type { AssetMetadataUpdate } from "@/model/asset";
 
-import { AssetKindIcon } from "./asset-kind-icon";
 import { AssetPreview } from "./asset-preview";
 import type { AssetLibraryItem } from "./types/asset";
 

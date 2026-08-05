@@ -1,6 +1,7 @@
-import { getAssetKindConfig } from "../asset-kind-config";
-import type { AssetLibraryItem } from "../types/asset";
+import { getAssetKindConfig } from "@/components/asset-kind";
 import type { AssetKind, ProjectAsset } from "@/model/asset";
+
+import type { AssetLibraryItem } from "../types/asset";
 
 export function toAssetLibraryItem(
   asset: ProjectAsset,

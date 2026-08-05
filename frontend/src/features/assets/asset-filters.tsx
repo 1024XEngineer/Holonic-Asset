@@ -1,5 +1,6 @@
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 
+import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,9 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { assetKinds, type AssetKind } from "@/model/asset";
-
-import { AssetKindIcon } from "./asset-kind-icon";
-import { getAssetKindConfig } from "./asset-kind-config";
 
 export function AssetFilters({
   counts,

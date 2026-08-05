@@ -1,12 +1,8 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
 
+import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { Badge } from "@/components/ui/badge";
-import { AssetKindIcon } from "@/features/assets/asset-kind-icon";
-import { getAssetKindConfig } from "@/features/assets/asset-kind-config";
-import {
-  isGenerationRunActive,
-  type GenerationRun,
-} from "@/model/generation";
+import { isGenerationRunActive, type GenerationRun } from "@/model/generation";
 
 export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
   if (runs.length === 0) return null;
