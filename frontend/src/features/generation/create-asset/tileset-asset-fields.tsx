@@ -17,7 +17,7 @@ import { TileShapePicker } from "./tile-shape-picker";
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 
 function createEmptyItem(): TilesetAssetCreationDraft<File>["tiles"][number] {
-  return { description: "", reference: undefined, shape: [] };
+  return { description: "", reference: undefined, shape: [[0, 0]] };
 }
 
 export function TilesetAssetFields({

@@ -31,14 +31,31 @@ export function CreateAssetForm({
   project: ProjectSummary;
 }) {
   const [useProjectContext, setUseProjectContext] = useState(true);
+  const [tilesetShapeError, setTilesetShapeError] = useState(false);
   const form = useForm({
     defaultValues: { draft: createAssetCreationDraft<File>(kind) },
-    onSubmit: ({ value }) =>
-      onCreate(toCreationRequest({ ...value.draft, useProjectContext })),
+    onSubmit: ({ value }) => {
+      if (
+        value.draft.kind === "tileset" &&
+        value.draft.tiles.some((tile) => tile.shape.length === 0)
+      ) {
+        setTilesetShapeError(true);
+        return;
+      }
+
+      onCreate(toCreationRequest({ ...value.draft, useProjectContext }));
+    },
   });
   const draft = form.state.values.draft;
-  const setDraft = (nextDraft: AssetCreationDraft<File>) =>
+  const setDraft = (nextDraft: AssetCreationDraft<File>) => {
+    if (
+      nextDraft.kind === "tileset" &&
+      nextDraft.tiles.every((tile) => tile.shape.length > 0)
+    ) {
+      setTilesetShapeError(false);
+    }
     form.setFieldValue("draft", nextDraft);
+  };
 
   return (
     <form
@@ -85,7 +102,14 @@ export function CreateAssetForm({
       {draft.kind === "scenery" ? (
         <SceneryAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "tileset" ? (
-        <TilesetAssetFields draft={draft} onChange={setDraft} />
+        <>
+          <TilesetAssetFields draft={draft} onChange={setDraft} />
+          {tilesetShapeError ? (
+            <p className="text-sm text-destructive" role="alert">
+              Each tileset item must have at least one occupied tile.
+            </p>
+          ) : null}
+        </>
       ) : draft.kind === "ui" ? (
         <UiAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "character" || draft.kind === "object" ? (
