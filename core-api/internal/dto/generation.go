@@ -9,13 +9,12 @@ import (
 type GenerationStatus string
 
 type CreateGenerationRequest struct {
-	ProjectID         uint               `param:"project_id" path:"project_id" json:"-" minimum:"1"`
-	AssetID           *uint              `json:"assetId,omitempty" minimum:"1"`
-	Kind              generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_character_frames,generate_object_prototype,edit_object_prototype,edit_object_frames,generate_animation,edit_animation,generate_tileset,edit_tileset_item,edit_tiles"`
-	Prompt            string             `json:"prompt"`
-	ReferenceMediaIDs []string           `json:"referenceMediaIds,omitempty"`
-	TargetAssetPaths  []string           `json:"targetAssetPaths,omitempty"`
-	Parameters        json.RawMessage    `json:"parameters,omitempty"`
+	ProjectID        uint               `param:"project_id" path:"project_id" json:"-" minimum:"1"`
+	AssetID          *uint              `json:"assetId,omitempty" minimum:"1"`
+	Kind             generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_character_frames,generate_object_prototype,edit_object_prototype,edit_object_frames,generate_animation,edit_animation,generate_tileset,edit_tileset_item,edit_tiles"`
+	Prompt           string             `json:"prompt"`
+	TargetAssetPaths []string           `json:"targetAssetPaths,omitempty"`
+	Parameters       json.RawMessage    `json:"parameters,omitempty"`
 }
 
 type CreateGenerationResponse struct {
