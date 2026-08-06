@@ -29,6 +29,13 @@ log:
   maxBackups: 7
   maxAge: 14
   compress: true
+qiniu:
+  accessKey: test-ak
+  secretKey: test-sk
+  bucket: asset-bucket
+  domain: cdn.example.com
+  uploadTokenExpiry: 45m
+  downloadURLExpiry: 20m
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatalf("write config fixture: %v", err)
@@ -48,6 +55,9 @@ log:
 	if loaded.Log.Path != "./logs/app.log" || !loaded.Log.Compress {
 		t.Fatalf("unexpected log config: %+v", loaded.Log)
 	}
+	if loaded.QiNiu.AccessKey != "test-ak" || loaded.QiNiu.SecretKey != "test-sk" || loaded.QiNiu.Bucket != "asset-bucket" || loaded.QiNiu.Domain != "cdn.example.com" || loaded.QiNiu.UploadTokenExpiry != 45*time.Minute || loaded.QiNiu.DownloadURLExpiry != 20*time.Minute {
+		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
+	}
 }
 
 func TestLoadConfigDecodesExampleConfig(t *testing.T) {
@@ -61,7 +71,7 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
 	}
-	if loaded.QiNiu.UploadTokenExpiry != time.Hour {
+	if loaded.QiNiu.UploadTokenExpiry != time.Hour || loaded.QiNiu.DownloadURLExpiry != 30*time.Minute {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
 	}
 }
@@ -75,6 +85,17 @@ func TestLoadConfigRejectsUnknownFields(t *testing.T) {
 	var loaded config.Config
 	if err := viperx.LoadConfig(path, &loaded); err == nil {
 		t.Fatal("expected unknown config field to be rejected")
+	}
+}
+
+func TestExampleConfigDecodes(t *testing.T) {
+	path := filepath.Join("..", "..", "config", "config.example.yaml")
+	var loaded config.Config
+	if err := viperx.LoadConfig(path, &loaded); err != nil {
+		t.Fatalf("load example config: %v", err)
+	}
+	if loaded.QiNiu.UploadTokenExpiry != time.Hour || loaded.QiNiu.DownloadURLExpiry != 30*time.Minute {
+		t.Fatalf("unexpected example qiniu config: %+v", loaded.QiNiu)
 	}
 }
 
