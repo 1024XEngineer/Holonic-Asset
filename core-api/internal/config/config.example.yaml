@@ -17,10 +17,14 @@ log:
   maxAge: 14
   compress: true
 
-qna:
+image:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
+
+video:
+  baseURL: "https://api.qnaigc.com"
+  apiKey: ""
 
 qiniu:
   accessKey: ""
