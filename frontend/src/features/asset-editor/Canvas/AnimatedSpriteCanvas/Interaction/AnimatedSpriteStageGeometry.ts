@@ -20,7 +20,8 @@ import {
   getAnimatedSpriteAnimation,
   type NodeId,
 } from "../animated-sprite-node";
-import { getGridRowCount } from "../../lib/grid-row-count";
+import { getAnimatedSpriteFrameCount } from "../animated-sprite-frame-count";
+import { getGridRowCount } from "../grid-row-count";
 
 const FRAME_GRID_INSET = 8;
 const FRAME_GRID_TOP = 48;
@@ -52,33 +53,14 @@ export type AnimatedSpriteNodeLayout = {
   expandControl?: Bounds;
 };
 
-export function getFrameCount(
-  node: NodeId,
-  prototypeOrAnimations?:
-    | { columns: number; rows: number }
-    | readonly CharacterAnimation[],
-  animations: readonly CharacterAnimation[] = [],
-) {
-  const prototype = isAnimationList(prototypeOrAnimations)
-    ? undefined
-    : prototypeOrAnimations;
-  const resolvedAnimations = isAnimationList(prototypeOrAnimations)
-    ? prototypeOrAnimations
-    : animations;
-  if (node === "prototype")
-    return Math.max(1, (prototype?.columns ?? 1) * (prototype?.rows ?? 1));
-  return Math.max(
-    1,
-    getAnimatedSpriteAnimation(node, resolvedAnimations)?.frameCount ?? 1,
-  );
-}
-
 function getExpandedHeight(
   node: NodeId,
   prototype: SpriteSheetShape | undefined,
   animations: readonly CharacterAnimation[],
 ) {
-  return getExpandedNodeHeight(getFrameCount(node, prototype, animations));
+  return getExpandedNodeHeight(
+    getAnimatedSpriteFrameCount(node, prototype, animations),
+  );
 }
 
 export function getNodeBounds(
@@ -127,7 +109,11 @@ export function getAnimatedSpriteNodeLayout(
     prototype,
     resolvedAnimations,
   );
-  const frameCount = getFrameCount(node, prototype, resolvedAnimations);
+  const frameCount = getAnimatedSpriteFrameCount(
+    node,
+    prototype,
+    resolvedAnimations,
+  );
   const frames = expanded
     ? Array.from({ length: frameCount }, (_, index) =>
         getFrameBounds(position, index),

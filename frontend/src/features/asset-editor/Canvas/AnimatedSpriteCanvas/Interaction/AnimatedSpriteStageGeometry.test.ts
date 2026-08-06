@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CharacterAnimation } from "@/model";
+import { getAnimatedSpriteFrameCount } from "../animated-sprite-frame-count";
 import {
   getFrameBounds,
-  getFrameCount,
   getNodeBounds,
   hitTestAnimatedSpriteScene,
 } from "./AnimatedSpriteStageGeometry";
@@ -22,7 +22,7 @@ const scene = {
 describe("AnimatedSpriteStageGeometry", () => {
   it("supports prototype sheets with multiple frames", () => {
     expect(
-      getFrameCount("prototype", { columns: 4, rows: 2 }, animations),
+      getAnimatedSpriteFrameCount("prototype", { columns: 4, rows: 2 }),
     ).toBe(8);
     expect(
       getNodeBounds(
@@ -36,7 +36,7 @@ describe("AnimatedSpriteStageGeometry", () => {
   });
 
   it("keeps the original animation-only call shape usable", () => {
-    expect(getFrameCount("idle", animations)).toBe(8);
+    expect(getAnimatedSpriteFrameCount("idle", undefined, animations)).toBe(8);
     expect(getNodeBounds("idle", { x: 0, y: 0 }, true, animations).width).toBe(
       448,
     );
