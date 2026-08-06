@@ -302,7 +302,7 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 		Type:        "character",
 		Description: "main character",
 		Tags:        []string{"hero", "player"},
-		Attributes:  []byte(`{"view":"side_on"}`),
+		Attributes:  []byte(`{"perspective":"Side-On"}`),
 		ContentID:   &currentContentID,
 		Version:     2,
 	}}

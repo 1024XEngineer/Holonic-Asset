@@ -291,14 +291,11 @@ func newPrototypeAsset(
 }
 
 func parsePerspective(perspective string) (assetdomain.Perspective, error) {
-	switch perspective {
-	case string(assetdomain.PerspectiveSideOn):
-		return assetdomain.PerspectiveSideOn, nil
-	case string(assetdomain.PerspectiveTopDown):
-		return assetdomain.PerspectiveTopDown, nil
-	default:
+	value := assetdomain.Perspective(perspective)
+	if !value.Valid() {
 		return "", fmt.Errorf("generator: invalid perspective %q", perspective)
 	}
+	return value, nil
 }
 
 func parseDirectionCount(directionCount string) (uint, error) {
