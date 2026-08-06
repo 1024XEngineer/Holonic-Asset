@@ -16,11 +16,7 @@ export type {
   AssetLibraryCollection,
   AssetLibraryItem,
 } from "./library";
-export {
-  assetRecordModeForKind,
-  useRecordQuery,
-  useSaveAssetRevisionMutation,
-} from "./record";
+export { useRecordQuery, useSaveAssetRevisionMutation } from "./record";
 export type {
   AssetCanvasPosition,
   AssetRecord,

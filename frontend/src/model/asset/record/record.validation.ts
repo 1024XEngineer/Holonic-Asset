@@ -13,19 +13,13 @@ import type {
   TilesetItem,
   UiComponent,
 } from "./types";
+import type { SpriteAssetRecordData } from "./types/asset-record";
 
 export function isAssetRecordForKind<K extends AssetKind>(
   kind: K,
   record: unknown,
 ): record is AssetRecordForKind<K> {
-  return isAssetRecord(record) && recordModeMatchesAssetKind(kind, record.mode);
-}
-
-function recordModeMatchesAssetKind(
-  kind: AssetKind,
-  mode: AssetRecord["mode"],
-) {
-  return kind === "object" ? mode === "character" : mode === kind;
+  return isAssetRecord(record) && record.mode === kind;
 }
 
 function isAssetRecord(value: unknown): value is AssetRecord {
@@ -33,13 +27,9 @@ function isAssetRecord(value: unknown): value is AssetRecord {
 
   switch (value.mode) {
     case "character":
-      return (
-        isPlainObject(value.character) &&
-        isCharacterSpriteSheet(value.character.prototype) &&
-        isNodePositions(value.character.nodePositions) &&
-        (value.character.animations === undefined ||
-          isCharacterAnimations(value.character.animations))
-      );
+      return isSpriteAssetRecordData(value.character);
+    case "object":
+      return isSpriteAssetRecordData(value.object);
     case "scenery":
       return (
         isPlainObject(value.scenery) &&
@@ -60,6 +50,17 @@ function isAssetRecord(value: unknown): value is AssetRecord {
     default:
       return false;
   }
+}
+
+function isSpriteAssetRecordData(
+  value: unknown,
+): value is SpriteAssetRecordData {
+  return (
+    isPlainObject(value) &&
+    isCharacterSpriteSheet(value.prototype) &&
+    isNodePositions(value.nodePositions) &&
+    (value.animations === undefined || isCharacterAnimations(value.animations))
+  );
 }
 
 function isNodePositions(

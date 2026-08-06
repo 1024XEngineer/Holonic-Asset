@@ -1,6 +1,5 @@
 export { useRecordQuery } from "./record.query";
 export { useSaveAssetRevisionMutation } from "./revision.mutation";
-export { assetRecordModeForKind } from "./record-mode";
 export type {
   AudioAssetKind,
   AudioAssetRecord,
