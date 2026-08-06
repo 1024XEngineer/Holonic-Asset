@@ -10,6 +10,7 @@ type taskStoreStub struct {
 	createdTask *Task
 	status      Status
 	result      json.RawMessage
+	listFilter  *ListFilter
 }
 
 func (s *taskStoreStub) CreateWithOutbox(_ context.Context, task *Task) (uint, error) {
@@ -21,7 +22,8 @@ func (*taskStoreStub) GetTaskByID(context.Context, uint) (*Task, error) {
 	return &Task{ID: 42}, nil
 }
 
-func (*taskStoreStub) ListTasksByStatus(context.Context, Status) ([]*Task, error) {
+func (s *taskStoreStub) ListTasks(_ context.Context, filter *ListFilter) ([]*Task, error) {
+	s.listFilter = filter
 	return []*Task{{ID: 42, Status: StatusPending}}, nil
 }
 
@@ -64,12 +66,13 @@ func TestManagerDelegatesTaskOperations(t *testing.T) {
 		t.Fatalf("unexpected task detail: %+v", detail)
 	}
 
-	tasks, err := manager.ListByStatus(context.Background(), StatusPending)
+	filter := &ListFilter{Statuses: []Status{StatusPending}, Types: []string{"example.v1"}, Limit: 20}
+	tasks, err := manager.List(context.Background(), filter)
 	if err != nil {
-		t.Fatalf("list tasks by status: %v", err)
+		t.Fatalf("list tasks: %v", err)
 	}
-	if len(tasks) != 1 || tasks[0].ID != id || tasks[0].Status != StatusPending {
-		t.Fatalf("unexpected task list: %+v", tasks)
+	if store.listFilter != filter || len(tasks) != 1 || tasks[0].ID != id || tasks[0].Status != StatusPending {
+		t.Fatalf("unexpected task list: filter=%+v tasks=%+v", store.listFilter, tasks)
 	}
 
 	if err := manager.Cancel(context.Background(), id); err != nil {

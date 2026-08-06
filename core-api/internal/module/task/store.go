@@ -28,7 +28,7 @@ type TaskResultStore interface {
 type TaskStore interface {
 	CreateWithOutbox(ctx context.Context, task *Task) (uint, error)
 	GetTaskByID(ctx context.Context, taskID uint) (*Task, error)
-	ListTasksByStatus(ctx context.Context, status Status) ([]*Task, error)
+	ListTasks(ctx context.Context, filter *ListFilter) ([]*Task, error)
 	UpdateTaskStatus(ctx context.Context, taskID uint, status Status) error
 	TaskResultStore
 	OutboxStore

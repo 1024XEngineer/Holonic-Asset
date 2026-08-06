@@ -20,13 +20,20 @@ type Task struct {
 	UpdatedAt time.Time
 }
 
+type TaskListFilter struct {
+	Statuses []uint
+	Types    []string
+	BeforeID uint
+	Limit    int
+}
+
 type TaskDao interface {
 	Create(ctx context.Context, task *Task) error
 
 	UpdateStatus(ctx context.Context, taskID uint, status uint) error
 	UpdateResult(ctx context.Context, taskID uint, status uint, result datatypes.JSON) error
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
-	ListByStatus(ctx context.Context, status uint) ([]*Task, error)
+	List(ctx context.Context, filter TaskListFilter) ([]*Task, error)
 }
 
 type TaskDaoImpl struct {
@@ -75,14 +82,28 @@ func (d *TaskDaoImpl) GetDetail(ctx context.Context, taskID uint) (*Task, error)
 	return &task, nil
 }
 
-func (d *TaskDaoImpl) ListByStatus(ctx context.Context, status uint) ([]*Task, error) {
+func (d *TaskDaoImpl) List(ctx context.Context, filter TaskListFilter) ([]*Task, error) {
 	var tasks []*Task
-	err := d.DB.WithContext(ctx).
-		Where("status = ?", status).
-		Order("created_at ASC, id ASC").
-		Find(&tasks).Error
-	if err != nil {
-		return nil, fmt.Errorf("dao: list tasks by status %d: %w", status, err)
+	if err := d.listQuery(ctx, filter).Find(&tasks).Error; err != nil {
+		return nil, fmt.Errorf("dao: list tasks: %w", err)
 	}
 	return tasks, nil
+}
+
+func (d *TaskDaoImpl) listQuery(ctx context.Context, filter TaskListFilter) *gorm.DB {
+	query := d.DB.WithContext(ctx)
+	if len(filter.Statuses) > 0 {
+		query = query.Where("status IN ?", filter.Statuses)
+	}
+	if len(filter.Types) > 0 {
+		query = query.Where("type IN ?", filter.Types)
+	}
+	if filter.BeforeID > 0 {
+		query = query.Where("id < ?", filter.BeforeID)
+	}
+	query = query.Order("id DESC")
+	if filter.Limit > 0 {
+		query = query.Limit(filter.Limit)
+	}
+	return query
 }

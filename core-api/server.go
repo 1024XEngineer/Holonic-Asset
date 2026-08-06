@@ -77,7 +77,7 @@ func newAppWithServices(
 		assetRouter = handler.NewHandler(workspaceModule.Assets, references)
 	}
 
-	generatorEngine := generator.NewEngine(nil, nil, nil)
+	generatorEngine := generator.NewEngine(nil, nil)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
 
 	uploadManager := upload.NewManager(uploadStore)
@@ -123,7 +123,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 
 	processor := imageprocessor.NewProcessor()
 	executor := generator.NewExecutor(images, processor, workspaceModule.Assets, uploadStore)
-	generatorEngine := generator.NewEngine(taskManager, nil, executor, generator.EngineDependencies{
+	generatorEngine := generator.NewEngine(taskManager, executor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,
 		References: uploadStore,
 	})

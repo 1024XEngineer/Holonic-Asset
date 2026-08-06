@@ -76,7 +76,7 @@ if err != nil {
 	return err
 }
 
-pending, err := manager.ListByStatus(ctx, task.StatusPending)
+pending, err := manager.List(ctx, &task.ListFilter{Statuses: []task.Status{task.StatusPending}})
 if err != nil {
 	return err
 }
