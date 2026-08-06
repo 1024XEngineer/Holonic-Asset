@@ -10,8 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import type { CreationRequest } from "@/model/generation";
+import { perspectiveOptions, type Perspective } from "@/model/project";
 import type { VisualAssetCreationDraft } from "../types";
+
+const perspectiveLabels: Record<Perspective, string> = {
+  "Top-Down": "Top-Down",
+  "Side-On": "Side-On",
+  Isometric: "Isometric",
+};
 
 export function VisualAssetFields({
   draft,
@@ -37,19 +43,11 @@ export function VisualAssetFields({
         <OptionSelect
           label="Perspective"
           value={draft.perspective}
-          options={[
-            ["top-down", "Top down"],
-            ["side-on", "Side on"],
-            ["isometric", "Isometric"],
-          ]}
-          onChange={(perspective) =>
-            onChange({
-              ...draft,
-              perspective: perspective as NonNullable<
-                CreationRequest<File>["perspective"]
-              >,
-            })
-          }
+          options={perspectiveOptions.map((perspective) => [
+            perspective,
+            perspectiveLabels[perspective],
+          ])}
+          onChange={(perspective) => onChange({ ...draft, perspective })}
         />
       </div>
 
@@ -66,9 +64,7 @@ export function VisualAssetFields({
             onChange={(directionCount) =>
               onChange({
                 ...draft,
-                directionCount: directionCount as NonNullable<
-                  CreationRequest<File>["directionCount"]
-                >,
+                directionCount,
               })
             }
           />
@@ -86,16 +82,16 @@ export function VisualAssetFields({
   );
 }
 
-function OptionSelect({
+function OptionSelect<Value extends string>({
   label,
   options,
   value,
   onChange,
 }: {
   label: string;
-  options: [value: string, label: string][];
-  value: string;
-  onChange: (value: string) => void;
+  options: readonly (readonly [value: Value, label: string])[];
+  value: Value;
+  onChange: (value: Value) => void;
 }) {
   const [open, setOpen] = useState(false);
   const selectedLabel =
