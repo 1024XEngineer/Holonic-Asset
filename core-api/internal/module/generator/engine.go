@@ -9,7 +9,7 @@ import (
 
 // Engine coordinates Generator runs with the generic Task module.
 type Engine struct {
-	reader     RunReader
+	reader     *RunReader
 	tasks      taskdomain.Manager
 	executor   Executor
 	projects   ProjectReader
@@ -29,16 +29,15 @@ type EngineDependencies struct {
 	References ReferenceStore
 }
 
-// NewEngine constructs Generator and binds its handlers to the injected task manager.
+// NewEngine constructs Generator from the generic Task module and binds its handlers.
 // A nil manager is accepted while the application composition root is incomplete.
 func NewEngine(
 	tasks taskdomain.Manager,
-	reader RunReader,
 	executor Executor,
 	dependencies ...EngineDependencies,
 ) *Engine {
 	engine := &Engine{
-		reader:   reader,
+		reader:   NewRunReader(tasks),
 		tasks:    tasks,
 		executor: executor,
 	}
