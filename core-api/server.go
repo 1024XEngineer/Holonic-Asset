@@ -89,9 +89,9 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	)
 	projectRepository := repository.NewProjectRepository(dao.NewGormProjectDao(db))
 	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      cfg.QNA.BaseURL,
-		APIKey:       cfg.QNA.APIKey,
-		DefaultModel: cfg.QNA.DefaultModel,
+		BaseURL:      cfg.Image.BaseURL,
+		APIKey:       cfg.Image.APIKey,
+		DefaultModel: cfg.Image.DefaultModel,
 	})
 	images := imageclient.NewImageGenerationService(provider)
 	workspaceModule := workspace.New(projectRepository, assetRepository, images)
