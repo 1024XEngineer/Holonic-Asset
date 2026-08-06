@@ -5,7 +5,7 @@ import {
   getCanvasNodes,
   type CanvasPosition,
 } from "../AnimatedSpriteCanvas.constants";
-import { getFrameCount } from "../Interaction/AnimatedSpriteStageGeometry";
+import { getAnimatedSpriteFrameCount } from "../animated-sprite-frame-count";
 import type {
   AnimatedSpriteSceneSnapshot,
   AnimatedSpriteSceneState,
@@ -55,7 +55,11 @@ export class AnimatedSpriteScene {
       if (canvasNodes.has(frame.nodeId)) this.state.expanded.add(frame.nodeId);
     }
     for (const node of this.state.playing) {
-      const frameCount = getFrameCount(node, model.prototype, model.animations);
+      const frameCount = getAnimatedSpriteFrameCount(
+        node,
+        model.prototype,
+        model.animations,
+      );
       this.state.previewFrames.set(
         node,
         (this.state.previewFrames.get(node) ?? 0) % frameCount,
@@ -81,7 +85,11 @@ export class AnimatedSpriteScene {
   }
   advanceAnimation(model: AnimatedSpriteCanvasModel) {
     for (const node of this.state.playing) {
-      const frameCount = getFrameCount(node, model.prototype, model.animations);
+      const frameCount = getAnimatedSpriteFrameCount(
+        node,
+        model.prototype,
+        model.animations,
+      );
       this.state.previewFrames.set(
         node,
         ((this.state.previewFrames.get(node) ?? 0) + 1) % frameCount,

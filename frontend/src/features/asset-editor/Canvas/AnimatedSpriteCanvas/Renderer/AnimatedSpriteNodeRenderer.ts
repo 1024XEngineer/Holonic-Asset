@@ -1,6 +1,8 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { CharacterAnimation, CharacterSpriteSheet } from "@/model";
-import { getGridRowCount } from "../../lib/grid-row-count";
+import { getAnimatedSpritePixelScale } from "../animated-sprite-scale";
+import { getGridRowCount } from "../grid-row-count";
+import { getSpriteSheetFrameCount } from "../sprite-sheet-grid";
 import {
   getAnimatedSpriteAnimation,
   getAnimatedSpriteNodeLabel,
@@ -10,7 +12,6 @@ import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
 import { getAnimatedSpriteNodeLayout } from "../Interaction/AnimatedSpriteStageGeometry";
 import {
   FRAME_SIZE,
-  getAnimatedSpritePixelScale,
   STAGE_ACCENT,
 } from "../Runtime/AnimatedSpriteStage.constants";
 import type { Bounds } from "../Runtime/AnimatedSpriteCanvas.types";
@@ -58,7 +59,10 @@ export function drawAnimatedSpriteNode({
   );
 
   const spriteSheet = node === "prototype" ? prototype : animation?.spriteSheet;
-  const pixelScale = getAnimatedSpritePixelScale(spriteSheet ?? prototype);
+  const pixelScale = getAnimatedSpritePixelScale(
+    spriteSheet ?? prototype,
+    FRAME_SIZE,
+  );
   if (expanded) {
     layout.frames.forEach((frame, index) =>
       drawFrame(
@@ -251,7 +255,7 @@ function drawSpriteSheetPreview(
   containerWidth: number,
   pixelScale: number,
 ) {
-  const frameCount = Math.max(1, spriteSheet.columns * spriteSheet.rows);
+  const frameCount = getSpriteSheetFrameCount(spriteSheet);
   const columns = frameCount === 1 ? 1 : 2;
   const rows = getGridRowCount(frameCount, columns);
   const gap = 8;

@@ -1,13 +1,13 @@
 import type { NodeId } from "../animated-sprite-node";
 import { intersectsRect, normalizeRect } from "@/lib/rect";
 import { snapToStep } from "@/lib/snap-to-step";
+import { getAnimatedSpriteFrameCount } from "../animated-sprite-frame-count";
 import {
   getCanvasNodes,
   type CanvasPosition,
 } from "../AnimatedSpriteCanvas.constants";
 import {
   getFrameBounds,
-  getFrameCount,
   getNodeBounds,
   hitTestAnimatedSpriteScene,
 } from "./AnimatedSpriteStageGeometry";
@@ -188,7 +188,7 @@ export class AnimatedSpriteStageInteraction {
     const position = this.context.getScene().positions[node];
     const indexes = Array.from(
       {
-        length: getFrameCount(
+        length: getAnimatedSpriteFrameCount(
           node,
           this.context.getPrototype?.(),
           this.context.getAnimations(),
