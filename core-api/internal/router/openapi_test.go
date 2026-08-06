@@ -43,7 +43,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	if document.OpenAPI != "3.1.0" {
 		t.Fatalf("expected OpenAPI 3.1.0, got %q", document.OpenAPI)
 	}
-	expectedPerspectives := []string{"TopDown", "SideOn", "Isometric"}
+	expectedPerspectives := []string{"Top-Down", "Side-On", "Isometric"}
 	type perspectiveSchema struct {
 		Enum    []string `json:"enum"`
 		Default string   `json:"default"`
@@ -63,7 +63,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		}
 	}
 	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest"} {
-		if got := perspectiveSchemas[schemaName].Default; got != "TopDown" {
+		if got := perspectiveSchemas[schemaName].Default; got != "Top-Down" {
 			t.Fatalf("unexpected %s perspective default: %q", schemaName, got)
 		}
 	}

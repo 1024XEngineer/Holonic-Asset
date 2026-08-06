@@ -18,7 +18,7 @@ type Project struct {
 	UserID         uint `gorm:"index"`
 	Name           string
 	GameType       string
-	Perspective    string `gorm:"not null;default:TopDown"`
+	Perspective    string `gorm:"not null;default:Top-Down"`
 	TargetPlatform string
 	Description    string
 	Reference      string

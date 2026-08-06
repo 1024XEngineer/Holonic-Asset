@@ -16,7 +16,7 @@ import (
 
 const defaultMigrationTestDatabaseURL = "postgres://holonic:holonic_dev_password@localhost:5432/holonic_asset?sslmode=disable"
 
-func TestMigrateProjectPerspectiveWithPostgreSQL(t *testing.T) {
+func TestMigratePerspectivesWithPostgreSQL(t *testing.T) {
 	databaseURL := strings.TrimSpace(os.Getenv("PROJECT_TEST_DATABASE_URL"))
 	if databaseURL == "" {
 		databaseURL = defaultMigrationTestDatabaseURL
@@ -71,9 +71,9 @@ func TestMigrateProjectPerspectiveWithPostgreSQL(t *testing.T) {
 	}
 	assertProjectPerspectiveColumns(t, tx)
 	assertProjectPerspectiveValues(t, tx, map[int64]string{
-		1: "SideOn",
-		2: "TopDown",
-		3: "TopDown",
+		1: "Side-On",
+		2: "Top-Down",
+		3: "Top-Down",
 	})
 
 	if err := tx.Exec(`ALTER TABLE projects ADD COLUMN view_type TEXT`).Error; err != nil {
@@ -91,6 +91,27 @@ func TestMigrateProjectPerspectiveWithPostgreSQL(t *testing.T) {
 	if err := migrateProjectPerspective(tx); err != nil {
 		t.Fatalf("repeat project perspective migration: %v", err)
 	}
+
+	if err := tx.Exec(`CREATE TABLE asset_contents (
+		id BIGINT PRIMARY KEY,
+		content JSONB NOT NULL
+	)`).Error; err != nil {
+		t.Fatalf("create legacy asset contents table: %v", err)
+	}
+	if err := tx.Exec(`INSERT INTO asset_contents (id, content) VALUES
+		(1, '{"viewMode":"side_on"}'),
+		(2, '{"perspective":"top_down"}'),
+		(3, '{"perspective":"Isometric"}')`).Error; err != nil {
+		t.Fatalf("insert legacy asset content perspectives: %v", err)
+	}
+	if err := migrateAssetContentPerspective(tx); err != nil {
+		t.Fatalf("migrate asset content perspectives: %v", err)
+	}
+	assertAssetContentPerspectives(t, tx, map[int64]string{
+		1: "Side-On",
+		2: "Top-Down",
+		3: "Isometric",
+	})
 }
 
 func assertProjectPerspectiveColumns(t *testing.T, db *gorm.DB) {
@@ -113,5 +134,26 @@ func assertProjectPerspectiveValues(t *testing.T, db *gorm.DB, expected map[int6
 		if got != want {
 			t.Errorf("project %d: expected perspective %q, got %q", id, want, got)
 		}
+	}
+}
+
+func assertAssetContentPerspectives(t *testing.T, db *gorm.DB, expected map[int64]string) {
+	t.Helper()
+	for id, want := range expected {
+		var got string
+		if err := db.Raw(`SELECT content->>'perspective' FROM asset_contents WHERE id = ?`, id).Scan(&got).Error; err != nil {
+			t.Fatalf("read perspective for asset content %d: %v", id, err)
+		}
+		if got != want {
+			t.Errorf("asset content %d: expected perspective %q, got %q", id, want, got)
+		}
+	}
+
+	var legacyCount int64
+	if err := db.Raw(`SELECT COUNT(*) FROM asset_contents WHERE content ? 'viewMode'`).Scan(&legacyCount).Error; err != nil {
+		t.Fatalf("count legacy asset content fields: %v", err)
+	}
+	if legacyCount != 0 {
+		t.Fatalf("expected legacy viewMode fields to be removed, got %d", legacyCount)
 	}
 }
