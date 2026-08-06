@@ -73,7 +73,7 @@ describe("saveEditorSessionRevision", () => {
         isActive: () => true,
         saveRevision: () => Promise.reject(new Error("network")),
       }),
-    ).resolves.toEqual({ status: "failed" });
+    ).resolves.toEqual({ status: "failed", message: "network" });
     expect(getEditorSessionSnapshot(failedStore, { phase: "idle" }).dirty).toBe(
       true,
     );
@@ -93,5 +93,17 @@ describe("saveEditorSessionRevision", () => {
     expect(
       getEditorSessionSnapshot(supersededStore, { phase: "idle" }).dirty,
     ).toBe(true);
+  });
+
+  it("uses a generic message when a save rejects with a non-error value", async () => {
+    const store = createEditorSessionStore(initialRecord);
+
+    await expect(
+      saveEditorSessionRevision({
+        store,
+        isActive: () => true,
+        saveRevision: () => Promise.reject("network"),
+      }),
+    ).resolves.toEqual({ status: "failed", message: "Save failed" });
   });
 });
