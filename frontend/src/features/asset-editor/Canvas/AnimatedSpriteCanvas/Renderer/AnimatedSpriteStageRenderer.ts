@@ -17,12 +17,15 @@ import {
 } from "../Runtime/AnimatedSpriteStage.constants";
 import type { AnimatedSpriteSceneSnapshot } from "../Runtime/AnimatedSpriteCanvas.types";
 import { drawAnimatedSpriteNode } from "./AnimatedSpriteNodeRenderer";
+import { SpriteSheetFrameTextureCache } from "./SpriteSheetFrameTextureCache";
 
 export class AnimatedSpriteStageRenderer {
   private readonly contentLayer = new Container();
   private readonly gridLayer = new Container();
   private grid?: TilingSprite;
   private gridPixelScale?: number;
+  private readonly frameTextures = new SpriteSheetFrameTextureCache();
+  private destroyed = false;
 
   constructor(stage: Container, world: Container) {
     this.gridLayer.eventMode = "none";
@@ -34,11 +37,13 @@ export class AnimatedSpriteStageRenderer {
     this.contentLayer
       .removeChildren()
       .forEach((child) => child.destroy({ children: true }));
+    this.frameTextures.retainSpriteSheets(getActiveSpriteSheets(model));
     this.drawGrid(model.prototype);
     for (const node of getCanvasNodes(model.animations)) {
       this.contentLayer.addChild(
         drawAnimatedSpriteNode({
           node,
+          frameTextures: this.frameTextures,
           position: state.positions[node],
           selected: model.selection.nodeIds.includes(node),
           selectedFrames: model.selection.frames
@@ -69,6 +74,24 @@ export class AnimatedSpriteStageRenderer {
     this.grid.tilePosition.set(viewport.x, viewport.y);
   }
 
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.contentLayer
+      .removeChildren()
+      .forEach((child) => child.destroy({ children: true }));
+    this.frameTextures.destroy();
+    this.contentLayer.removeFromParent();
+    this.contentLayer.destroy();
+    this.gridLayer.removeFromParent();
+    this.gridLayer.destroy({
+      children: true,
+      texture: true,
+      textureSource: true,
+    });
+    this.grid = undefined;
+  }
+
   private drawGrid(prototype: AnimatedSpriteCanvasModel["prototype"]) {
     const pixelScale = getAnimatedSpritePixelScale(prototype, FRAME_SIZE);
     if (this.gridPixelScale === pixelScale && this.grid) return;
@@ -91,6 +114,15 @@ export class AnimatedSpriteStageRenderer {
         .stroke({ color: STAGE_ACCENT, width: 1 }),
     );
   }
+}
+
+function getActiveSpriteSheets(model: AnimatedSpriteCanvasModel) {
+  return [
+    model.prototype,
+    ...model.animations.flatMap((animation) =>
+      animation.spriteSheet ? [animation.spriteSheet] : [],
+    ),
+  ];
 }
 
 function createPixelGrid() {

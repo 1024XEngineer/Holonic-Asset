@@ -16,11 +16,13 @@ import {
 } from "../Runtime/AnimatedSpriteStage.constants";
 import type { Bounds } from "../Runtime/AnimatedSpriteCanvas.types";
 import { drawSpriteSheetFrame } from "./SpriteSheetFrameRenderer";
+import type { SpriteSheetFrameTextureCache } from "./SpriteSheetFrameTextureCache";
 
 const COLLAPSED_PREVIEW_Y = 80;
 
 export function drawAnimatedSpriteNode({
   node,
+  frameTextures,
   position,
   selected,
   selectedFrames,
@@ -32,6 +34,7 @@ export function drawAnimatedSpriteNode({
   unavailableTextureUrls,
 }: {
   node: NodeId;
+  frameTextures: SpriteSheetFrameTextureCache;
   position: CanvasPosition;
   selected: boolean;
   selectedFrames: number[];
@@ -72,6 +75,7 @@ export function drawAnimatedSpriteNode({
         selectedFrames.includes(index),
         spriteSheet,
         pixelScale,
+        frameTextures,
         unavailableTextureUrls,
       ),
     );
@@ -82,6 +86,7 @@ export function drawAnimatedSpriteNode({
   ) {
     drawSpriteSheetPreview(
       container,
+      frameTextures,
       prototype,
       layout.bounds.width,
       pixelScale,
@@ -92,6 +97,7 @@ export function drawAnimatedSpriteNode({
   ) {
     drawSpriteSheetFrame({
       container,
+      frameTextures,
       spriteSheet,
       frame: previewFrame,
       bounds: {
@@ -182,6 +188,7 @@ function drawFrame(
   selected: boolean,
   spriteSheet: CharacterSpriteSheet | undefined,
   pixelScale: number,
+  frameTextures: SpriteSheetFrameTextureCache,
   unavailableTextureUrls?: ReadonlySet<string>,
 ) {
   if (selected)
@@ -202,6 +209,7 @@ function drawFrame(
   )
     drawSpriteSheetFrame({
       container,
+      frameTextures,
       spriteSheet,
       frame: index,
       bounds,
@@ -251,6 +259,7 @@ function drawPlaceholder(container: Container, bounds: Bounds, frame: number) {
 
 function drawSpriteSheetPreview(
   container: Container,
+  frameTextures: SpriteSheetFrameTextureCache,
   spriteSheet: CharacterSpriteSheet,
   containerWidth: number,
   pixelScale: number,
@@ -267,6 +276,7 @@ function drawSpriteSheetPreview(
   for (let frame = 0; frame < frameCount; frame += 1)
     drawSpriteSheetFrame({
       container,
+      frameTextures,
       spriteSheet,
       frame,
       bounds: {

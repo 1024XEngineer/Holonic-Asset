@@ -39,8 +39,8 @@ export class AnimatedSpriteCanvasRuntime {
   async initialize(host: HTMLElement) {
     await this.preloadAnimatedSpriteTextures(this.props.model);
     if (this.destroyed) return;
-    await this.runtime.initialize(host);
-    if (this.destroyed) return;
+    const initialized = await this.runtime.initialize(host);
+    if (!initialized) return;
     const { app } = this.runtime;
     const viewport = new Viewport({
       screenWidth: app.screen.width,
@@ -103,11 +103,17 @@ export class AnimatedSpriteCanvasRuntime {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (!this.runtime.initialized) {
+      this.runtime.destroy();
+      return;
+    }
     this.runtime.app.ticker.remove(this.updateAnimation);
     this.resizeObserver?.disconnect();
     this.interaction?.destroy();
     this.viewport?.off("moved", this.syncViewportGrid);
     this.viewport?.off("zoomed", this.syncViewportGrid);
+    this.renderer?.destroy();
+    this.renderer = undefined;
     this.viewport?.removeFromParent();
     this.viewport?.destroy({ children: true });
     this.viewport = undefined;

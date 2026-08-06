@@ -1,25 +1,26 @@
-import { Container, Rectangle, Sprite, Texture } from "pixi.js";
+import { Container, Sprite } from "pixi.js";
 import type { CharacterSpriteSheet } from "@/model";
 import { snapToStep } from "@/lib/snap-to-step";
-import { getSpriteSheetFramePosition } from "../sprite-sheet-grid";
+import type { SpriteSheetFrameTextureCache } from "./SpriteSheetFrameTextureCache";
 
 type FrameBounds = { x: number; y: number; width: number; height: number };
-const frameTextures = new Map<string, Texture>();
 
 export function drawSpriteSheetFrame({
   container,
+  frameTextures,
   spriteSheet,
   frame,
   bounds,
   pixelScale,
 }: {
   container: Container;
+  frameTextures: SpriteSheetFrameTextureCache;
   spriteSheet: CharacterSpriteSheet;
   frame: number;
   bounds: FrameBounds;
   pixelScale: number;
 }) {
-  const texture = getSpriteSheetFrameTexture(spriteSheet, frame);
+  const texture = frameTextures.get(spriteSheet, frame);
   const sprite = new Sprite(texture);
   const renderedWidth = spriteSheet.frameWidth * pixelScale;
   const renderedHeight = spriteSheet.frameHeight * pixelScale;
@@ -32,33 +33,4 @@ export function drawSpriteSheetFrame({
   sprite.scale.set(pixelScale);
   sprite.texture.source.scaleMode = "nearest";
   container.addChild(sprite);
-}
-
-function getSpriteSheetFrameTexture(
-  spriteSheet: CharacterSpriteSheet,
-  frame: number,
-) {
-  const { column, row } = getSpriteSheetFramePosition(frame, spriteSheet);
-  const cacheKey = [
-    spriteSheet.imageUrl,
-    column,
-    row,
-    spriteSheet.frameWidth,
-    spriteSheet.frameHeight,
-  ].join(":");
-  let texture = frameTextures.get(cacheKey);
-  if (!texture) {
-    const source = Texture.from(spriteSheet.imageUrl).source;
-    texture = new Texture({
-      source,
-      frame: new Rectangle(
-        column * spriteSheet.frameWidth,
-        row * spriteSheet.frameHeight,
-        spriteSheet.frameWidth,
-        spriteSheet.frameHeight,
-      ),
-    });
-    frameTextures.set(cacheKey, texture);
-  }
-  return texture;
 }
