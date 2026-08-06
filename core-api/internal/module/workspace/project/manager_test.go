@@ -12,11 +12,13 @@ import (
 
 type projectStoreStub struct {
 	insertCalls int
+	inserted    *domain.Project
 	update      *domain.ProjectUpdate
 }
 
-func (s *projectStoreStub) Insert(context.Context, *domain.Project) error {
+func (s *projectStoreStub) Insert(_ context.Context, project *domain.Project) error {
 	s.insertCalls++
+	s.inserted = project
 	return nil
 }
 
@@ -33,6 +35,31 @@ func (s *projectStoreStub) Update(_ context.Context, update *domain.ProjectUpdat
 	return nil
 }
 
+type referenceStoreStub struct {
+	resolved     string
+	persisted    string
+	resolveCall  string
+	resolveCalls []string
+	persistCall  string
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.resolveCall = reference
+	s.resolveCalls = append(s.resolveCalls, reference)
+	if s.resolved != "" {
+		return s.resolved, nil
+	}
+	return "signed:" + reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persistCall = reference
+	if s.persisted != "" {
+		return s.persisted, nil
+	}
+	return "key:" + reference, nil
+}
+
 func (*projectStoreStub) Remove(context.Context, uint) error { return nil }
 
 func TestUpdateForwardsPartialProjectUpdate(t *testing.T) {
@@ -46,6 +73,47 @@ func TestUpdateForwardsPartialProjectUpdate(t *testing.T) {
 	}
 	if store.update != update {
 		t.Fatalf("expected update pointer %p, got %p", update, store.update)
+	}
+}
+
+func TestCreatePersistsReferenceAsObjectKey(t *testing.T) {
+	store := &projectStoreStub{}
+	references := &referenceStoreStub{persisted: "projects/7/reference.png"}
+	project := validProject()
+	project.UserID = 101
+	project.Name = "Starbound"
+	project.Reference = "https://cdn.example/reference.png?e=123&token=signed"
+	manager := domain.NewManager(store, nil, references)
+
+	if err := manager.Create(context.Background(), project); err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if references.persistCall != "https://cdn.example/reference.png?e=123&token=signed" || store.inserted == nil || store.inserted.Reference != "projects/7/reference.png" {
+		t.Fatalf("reference was not normalized before persistence: persist=%q project=%+v", references.persistCall, store.inserted)
+	}
+}
+
+func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
+	project := validProject()
+	project.Reference = "projects/7/reference.png"
+	images := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
+		Images: []imageclient.GeneratedImage{{Base64: "generated-image-base64", MediaType: "image/png"}},
+	}}
+	references := &referenceStoreStub{resolved: "https://cdn.example/reference.png?e=456&token=signed", persisted: "projects/7/generated.png"}
+	manager := domain.NewManager(&projectStoreStub{}, images, references)
+
+	generated, err := manager.GenerateReference(context.Background(), project)
+	if err != nil {
+		t.Fatalf("generate reference: %v", err)
+	}
+	if len(references.resolveCalls) != 2 || references.resolveCalls[0] != "projects/7/reference.png" || references.resolveCalls[1] != "projects/7/generated.png" || references.persistCall != "data:image/png;base64,generated-image-base64" {
+		t.Fatalf("unexpected reference storage calls: %+v", references)
+	}
+	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
+		t.Fatalf("expected signed input reference, got %+v", images.request.ReferenceImages)
+	}
+	if generated != references.resolved {
+		t.Fatalf("expected generated reference URL %q, got %q", references.resolved, generated)
 	}
 }
 
