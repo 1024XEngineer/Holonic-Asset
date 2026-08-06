@@ -35,7 +35,7 @@ func TestProjectRoutesSupportCRUDLifecycleWithPostgreSQL(t *testing.T) {
 		"userID":%d,
 		"name":"Prototype",
 		"gameType":"RPG",
-		"perspective":"TopDown",
+		"perspective":"Top-Down",
 		"targetPlatform":"PC",
 		"description":"original description",
 		"reference":"old-reference",

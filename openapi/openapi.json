@@ -243,10 +243,10 @@
             "type": "string"
           },
           "perspective": {
-            "default": "TopDown",
+            "default": "Top-Down",
             "enum": [
-              "TopDown",
-              "SideOn",
+              "Top-Down",
+              "Side-On",
               "Isometric"
             ],
             "type": "string"
@@ -455,10 +455,10 @@
             "type": "string"
           },
           "perspective": {
-            "default": "TopDown",
+            "default": "Top-Down",
             "enum": [
-              "TopDown",
-              "SideOn",
+              "Top-Down",
+              "Side-On",
               "Isometric"
             ],
             "type": "string"
@@ -706,8 +706,8 @@
           },
           "perspective": {
             "enum": [
-              "TopDown",
-              "SideOn",
+              "Top-Down",
+              "Side-On",
               "Isometric"
             ],
             "type": "string"
@@ -1441,8 +1441,8 @@
           },
           "perspective": {
             "enum": [
-              "TopDown",
-              "SideOn",
+              "Top-Down",
+              "Side-On",
               "Isometric"
             ],
             "type": "string"

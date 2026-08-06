@@ -14,6 +14,9 @@ func InitTables(db *gorm.DB) error {
 	if err := migrateProjectPerspective(db); err != nil {
 		return err
 	}
+	if err := migrateAssetContentPerspective(db); err != nil {
+		return err
+	}
 
 	return db.AutoMigrate(
 		&Project{},
@@ -57,13 +60,38 @@ func migrateProjectPerspective(db *gorm.DB) error {
 	if hasPerspective {
 		if err := db.Exec(`UPDATE projects
 			SET perspective = CASE
-				WHEN perspective IS NULL OR perspective = '' THEN 'TopDown'
-				WHEN perspective = 'SideView' THEN 'SideOn'
-				ELSE 'TopDown'
+				WHEN regexp_replace(lower(perspective), '[-_ ]', '', 'g') = 'topdown' THEN 'Top-Down'
+				WHEN regexp_replace(lower(perspective), '[-_ ]', '', 'g') IN ('sideon', 'sideview') THEN 'Side-On'
+				WHEN lower(perspective) = 'isometric' THEN 'Isometric'
+				ELSE 'Top-Down'
 			END
-			WHERE perspective IS NULL OR perspective NOT IN ('TopDown', 'SideOn', 'Isometric')`).Error; err != nil {
+			WHERE perspective IS NULL OR perspective NOT IN ('Top-Down', 'Side-On', 'Isometric')`).Error; err != nil {
 			return fmt.Errorf("dao: normalize project perspective values: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func migrateAssetContentPerspective(db *gorm.DB) error {
+	migrator := db.Migrator()
+	if !migrator.HasTable(&AssetContent{}) || !migrator.HasColumn(&AssetContent{}, "content") {
+		return nil
+	}
+
+	if err := db.Exec(`UPDATE asset_contents
+		SET content = (content - 'viewMode') || jsonb_build_object(
+			'perspective',
+			CASE
+				WHEN regexp_replace(lower(COALESCE(NULLIF(content->>'perspective', ''), content->>'viewMode')), '[-_ ]', '', 'g') = 'topdown' THEN 'Top-Down'
+				WHEN regexp_replace(lower(COALESCE(NULLIF(content->>'perspective', ''), content->>'viewMode')), '[-_ ]', '', 'g') IN ('sideon', 'sideview') THEN 'Side-On'
+				WHEN lower(COALESCE(NULLIF(content->>'perspective', ''), content->>'viewMode')) = 'isometric' THEN 'Isometric'
+				ELSE 'Top-Down'
+			END
+		)
+		WHERE content ? 'viewMode'
+		   OR content ? 'perspective'`).Error; err != nil {
+		return fmt.Errorf("dao: normalize asset content perspective values: %w", err)
 	}
 
 	return nil

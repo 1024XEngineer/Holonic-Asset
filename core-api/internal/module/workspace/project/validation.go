@@ -20,15 +20,6 @@ func (t GameType) Valid() bool {
 	}
 }
 
-func (p Perspective) Valid() bool {
-	switch p {
-	case PerspectiveTopDown, PerspectiveSideOn, PerspectiveIsometric:
-		return true
-	default:
-		return false
-	}
-}
-
 func (t PlatformType) Valid() bool {
 	switch t {
 	case "", PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:

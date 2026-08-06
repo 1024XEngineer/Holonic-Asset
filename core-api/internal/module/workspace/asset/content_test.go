@@ -65,6 +65,22 @@ func TestAssetDecodeContentInitializesMissingContent(t *testing.T) {
 	}
 }
 
+func TestAssetContentRejectsUnsupportedPerspective(t *testing.T) {
+	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	content.Perspective = "side_on"
+	if _, err := domain.EncodeContent(content); err == nil {
+		t.Fatal("expected legacy perspective to be rejected when encoding content")
+	}
+
+	asset := domain.Asset{
+		Type:    domain.AssetTypeCharacter,
+		Content: json.RawMessage(`{"perspective":"side_on"}`),
+	}
+	if _, err := asset.DecodeContent(); err == nil {
+		t.Fatal("expected legacy perspective to be rejected when decoding content")
+	}
+}
+
 func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
 	content.Perspective = domain.PerspectiveSideOn
@@ -93,7 +109,7 @@ func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testin
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		t.Fatalf("decode raw asset content: %v", err)
 	}
-	if raw["perspective"] != "side_on" {
+	if raw["perspective"] != "Side-On" {
 		t.Fatalf("expected perspective field: %s", payload)
 	}
 	if _, exists := raw["viewMode"]; exists {

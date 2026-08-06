@@ -111,7 +111,7 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *test
 	for _, fragment := range []string{
 		"Lantern Vale",
 		`the user-described game type "RPG"`,
-		"2D isometric pixel-art gameplay camera",
+		"Isometric 2D pixel-art gameplay perspective",
 		"mobile",
 		project.Description,
 		project.Style,

@@ -55,7 +55,7 @@ func TestProjectPerspectiveRequiresSupportedValue(t *testing.T) {
 		t.Fatal("expected legacy SideView not to be a valid perspective")
 	}
 	if !domain.PerspectiveSideOn.Valid() {
-		t.Fatal("expected SideOn to be a valid perspective")
+		t.Fatal("expected Side-On to be a valid perspective")
 	}
 
 	project := &domain.Project{UserID: 7, Name: "Prototype"}
