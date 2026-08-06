@@ -99,10 +99,10 @@ Current project template. Active repository template still wins.
 
 ## Checklist (Required)
 
-- [x] The PR is focused and does not include unrelated changes.
-- [x] Asset names, formats, dimensions, and metadata follow project conventions.
-- [x] Licensing and attribution information is included or unchanged as appropriate.
-- [x] Documentation or examples were updated when needed.
+- [ ] The PR is focused and does not include unrelated changes.
+- [ ] Asset names, formats, dimensions, and metadata follow project conventions.
+- [ ] Licensing and attribution information is included or unchanged as appropriate.
+- [ ] Documentation or examples were updated when needed.
 ```
 
 If no repository template exists, use the generic fallback below.
