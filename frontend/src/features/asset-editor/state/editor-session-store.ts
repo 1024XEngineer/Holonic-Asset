@@ -51,7 +51,11 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
             }
 
             const current = state.record.character.nodePositions[nodeId];
-            if (current?.x === position.x && current.y === position.y) {
+            if (
+              current &&
+              current.x === position.x &&
+              current.y === position.y
+            ) {
               return state;
             }
 
