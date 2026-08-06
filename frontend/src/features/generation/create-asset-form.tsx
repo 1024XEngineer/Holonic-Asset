@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 
@@ -24,17 +25,21 @@ export function CreateAssetForm({
   onCancel,
   onCreate,
   project,
+  error,
+  isSubmitting = false,
 }: {
   kind: CreatableAssetKind;
   onCancel: () => void;
-  onCreate: (request: CreationRequest<File>) => void;
+  onCreate: (request: CreationRequest<File>) => void | Promise<void>;
   project: ProjectSummary;
+  error?: Error | null;
+  isSubmitting?: boolean;
 }) {
   const [useProjectContext, setUseProjectContext] = useState(true);
   const [tilesetShapeError, setTilesetShapeError] = useState(false);
   const form = useForm({
     defaultValues: { draft: createAssetCreationDraft<File>(kind) },
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       if (
         value.draft.kind === "tileset" &&
         value.draft.tiles.some((tile) => tile.shape.length === 0)
@@ -43,7 +48,7 @@ export function CreateAssetForm({
         return;
       }
 
-      onCreate(toCreationRequest({ ...value.draft, useProjectContext }));
+      await onCreate(toCreationRequest({ ...value.draft, useProjectContext }));
     },
   });
   const draft = form.state.values.draft;
@@ -148,11 +153,27 @@ export function CreateAssetForm({
         </div>
       ) : null}
 
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error.message || "Unable to create the asset. Please try again."}
+        </p>
+      ) : null}
+
       <div className="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isSubmitting}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
-        <Button type="submit">Create {getAssetKindConfig(kind).label}</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <LoaderCircle className="animate-spin" /> : null}
+          {isSubmitting
+            ? "Creating..."
+            : `Create ${getAssetKindConfig(kind).label}`}
+        </Button>
       </div>
     </form>
   );

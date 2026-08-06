@@ -16,7 +16,12 @@ export function CreateAssetPage({
 }) {
   const navigate = useNavigate();
   const { data: projects = [] } = useProjectListQuery();
-  const { mutate: enqueueGeneration } = useEnqueueGenerationMutation();
+  const {
+    error: enqueueError,
+    isPending: isEnqueuePending,
+    mutateAsync: enqueueGeneration,
+    reset: resetEnqueue,
+  } = useEnqueueGenerationMutation();
   const project = projects.find((item) => item.id === projectId);
   const kind = assetKinds.includes(rawKind as CreatableAssetKind)
     ? (rawKind as CreatableAssetKind)
@@ -52,9 +57,16 @@ export function CreateAssetPage({
             kind={kind}
             project={project}
             onCancel={goBack}
-            onCreate={(request) => {
-              enqueueGeneration({ projectId: project.id, request });
-              goBack();
+            error={enqueueError}
+            isSubmitting={isEnqueuePending}
+            onCreate={async (request) => {
+              resetEnqueue();
+              try {
+                await enqueueGeneration({ projectId: project.id, request });
+                goBack();
+              } catch {
+                // Keep the form mounted so the user can retry the request.
+              }
             }}
           />
         </section>
