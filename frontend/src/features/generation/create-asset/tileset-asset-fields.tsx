@@ -32,10 +32,7 @@ export function TilesetAssetFields({
   );
 
   useEffect(
-    () =>
-      setExpandedItems(
-        new Set(draft.tiles.map((_, index) => index)),
-      ),
+    () => setExpandedItems(new Set(draft.tiles.map((_, index) => index))),
     [draft.tiles.length],
   );
 
