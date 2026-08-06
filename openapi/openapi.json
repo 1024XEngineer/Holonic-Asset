@@ -184,15 +184,6 @@
           "prompt": {
             "type": "string"
           },
-          "referenceMediaIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
           "targetAssetPaths": {
             "items": {
               "type": "string"

@@ -1,46 +1,340 @@
-package upload_test
+package upload
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
+
+	qiniustorage "github.com/qiniu/go-sdk/v7/storage"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 )
 
-func TestQiniuStorageReturnsPlaceholderValues(t *testing.T) {
-	store, err := upload.NewQiniuStorage(config.QiniuConfig{})
+type bucketManagerStub struct {
+	info       qiniustorage.FileInfo
+	statErr    error
+	statBucket string
+	statKey    string
+}
+
+type formUploaderStub struct {
+	key     string
+	data    []byte
+	extra   *qiniustorage.PutExtra
+	uptoken string
+	err     error
+}
+
+func (s *formUploaderStub) Put(
+	_ context.Context,
+	_ any,
+	uptoken string,
+	key string,
+	data io.Reader,
+	_ int64,
+	extra *qiniustorage.PutExtra,
+) error {
+	s.key = key
+	s.uptoken = uptoken
+	s.extra = extra
+	s.data, _ = io.ReadAll(data)
+	return s.err
+}
+
+func (s *bucketManagerStub) Stat(bucket, key string) (qiniustorage.FileInfo, error) {
+	s.statBucket, s.statKey = bucket, key
+	return s.info, s.statErr
+}
+
+func validQiniuConfig() config.QiniuConfig {
+	return config.QiniuConfig{
+		AccessKey: "test-access-key",
+		SecretKey: "test-secret-key",
+		Bucket:    "asset-bucket",
+		Domain:    "cdn.example.com",
+	}
+}
+
+func TestNewQiniuStorageValidatesConfig(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*config.QiniuConfig)
+		field  string
+	}{
+		{name: "access key", mutate: func(cfg *config.QiniuConfig) { cfg.AccessKey = "" }, field: "accessKey"},
+		{name: "secret key", mutate: func(cfg *config.QiniuConfig) { cfg.SecretKey = "" }, field: "secretKey"},
+		{name: "bucket", mutate: func(cfg *config.QiniuConfig) { cfg.Bucket = "" }, field: "bucket"},
+		{name: "domain", mutate: func(cfg *config.QiniuConfig) { cfg.Domain = "" }, field: "domain"},
+		{name: "invalid domain", mutate: func(cfg *config.QiniuConfig) { cfg.Domain = "://bad" }, field: "domain"},
+		{name: "invalid upload URL", mutate: func(cfg *config.QiniuConfig) { cfg.UploadURL = "ftp://upload.example.com" }, field: "uploadURL"},
+		{name: "invalid expiry", mutate: func(cfg *config.QiniuConfig) { cfg.UploadTokenExpiry = -time.Second }, field: "uploadTokenExpiry"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := validQiniuConfig()
+			test.mutate(&cfg)
+			store, err := NewQiniuStorage(cfg)
+			if !errors.Is(err, ErrInvalidStorageConfig) {
+				t.Fatalf("expected invalid storage config, got %v", err)
+			}
+			if !strings.Contains(err.Error(), test.field) {
+				t.Fatalf("expected error to mention %q, got %v", test.field, err)
+			}
+			if store != nil {
+				t.Fatalf("expected nil store, got %+v", store)
+			}
+		})
+	}
+}
+
+func TestCreateUploadTargetSignsRestrictedToken(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	store.random = strings.NewReader("0123456789abcdef")
+
+	target, err := store.CreateUploadTarget(context.Background(), UploadRequest{
+		ContentType:   "image/png; charset=binary",
+		ContentLength: 128,
+	})
+	if err != nil {
+		t.Fatalf("create upload target: %v", err)
+	}
+
+	wantKey := "uploads/30313233343536373839616263646566"
+	if target.ObjectKey != wantKey {
+		t.Fatalf("expected object key %q, got %q", wantKey, target.ObjectKey)
+	}
+	assertQiniuPrivateURL(t, target.ObjectURL, "https://cdn.example.com/"+wantKey)
+	if target.UploadURL != defaultQiniuUploadURL {
+		t.Fatalf("unexpected upload URL: %q", target.UploadURL)
+	}
+
+	policy := decodeUploadPolicy(t, target.UploadToken)
+	if policy.Scope != "asset-bucket:"+wantKey || policy.SaveKey != wantKey || !policy.ForceSaveKey || policy.InsertOnly != 1 {
+		t.Fatalf("token does not restrict the destination: %+v", policy)
+	}
+	if policy.FsizeMin != 128 || policy.FsizeLimit != 128 {
+		t.Fatalf("token does not restrict file size: %+v", policy)
+	}
+	if policy.MimeLimit != "image/png" || policy.DetectMime != 1 {
+		t.Fatalf("token does not restrict MIME type: %+v", policy)
+	}
+	wantDeadline := time.Now().Add(defaultUploadTokenTTL).Unix()
+	if delta := int64(policy.Expires) - wantDeadline; delta < -1 || delta > 1 { //nolint:gosec // Qiniu deadlines use positive Unix timestamps.
+		t.Fatalf("unexpected token deadline: got %d want about %d", policy.Expires, wantDeadline)
+	}
+}
+
+func TestCreateUploadTargetUsesProvidedObjectKey(t *testing.T) {
+	cfg := validQiniuConfig()
+	cfg.UploadURL = "https://upload.example.com/"
+	cfg.UploadTokenExpiry = 10 * time.Minute
+	store, err := NewQiniuStorage(cfg)
 	if err != nil {
 		t.Fatalf("create object store: %v", err)
 	}
 
-	target, err := store.CreateUploadTarget(context.Background(), upload.UploadRequest{
-		ObjectKey:     "users/7/project-previews/uuid",
+	target, err := store.CreateUploadTarget(context.Background(), UploadRequest{
+		ObjectKey:     "projects/7/reference image.png",
 		ContentType:   "image/png",
 		ContentLength: 8,
 	})
 	if err != nil {
 		t.Fatalf("create upload target: %v", err)
 	}
-	if target == nil {
-		t.Fatal("expected a non-nil placeholder target")
+	if target.ObjectKey != "projects/7/reference image.png" {
+		t.Fatalf("unexpected object key: %q", target.ObjectKey)
 	}
-	if target.ObjectKey != "" || target.ObjectURL != "" || target.UploadURL != "" || target.UploadToken != "" {
-		t.Fatalf("expected an empty placeholder target, got %+v", target)
+	assertQiniuPrivateURL(t, target.ObjectURL, "https://cdn.example.com/projects/7/reference%20image.png")
+	if target.UploadURL != "https://upload.example.com" {
+		t.Fatalf("unexpected normalized upload URL: %q", target.UploadURL)
+	}
+}
+
+func TestCreateUploadTargetRejectsUnsafeContentTypes(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
 	}
 
-	metadata, err := store.GetObjectMetadata(context.Background(), "users/7/project-previews/uuid")
+	for _, contentType := range []string{"not-a-mime", "image/*", "!application/json", "image/png; image/jpeg"} {
+		t.Run(contentType, func(t *testing.T) {
+			target, err := store.CreateUploadTarget(context.Background(), UploadRequest{
+				ContentType:   contentType,
+				ContentLength: 1,
+			})
+			if !errors.Is(err, ErrInvalidUploadRequest) {
+				t.Fatalf("expected invalid upload request, got target=%+v err=%v", target, err)
+			}
+		})
+	}
+}
+
+func TestGetObjectMetadataUsesBucketManager(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	manager := &bucketManagerStub{info: qiniustorage.FileInfo{MimeType: "image/webp", Fsize: 42}}
+	store.bucketManager = manager
+
+	metadata, err := store.GetObjectMetadata(context.Background(), "uploads/object.webp")
 	if err != nil {
 		t.Fatalf("get object metadata: %v", err)
 	}
-	if metadata == nil {
-		t.Fatal("expected non-nil placeholder metadata")
+	if manager.statBucket != "asset-bucket" || manager.statKey != "uploads/object.webp" {
+		t.Fatalf("unexpected stat call: bucket=%q key=%q", manager.statBucket, manager.statKey)
 	}
-	if metadata.ObjectKey != "" || metadata.ObjectURL != "" || metadata.ContentType != "" || metadata.ContentLength != 0 {
-		t.Fatalf("expected empty placeholder metadata, got %+v", metadata)
+	if metadata.ObjectKey != "uploads/object.webp" || metadata.ContentType != "image/webp" || metadata.ContentLength != 42 {
+		t.Fatalf("unexpected metadata: %+v", metadata)
 	}
+	assertQiniuPrivateURL(t, metadata.ObjectURL, "https://cdn.example.com/uploads/object.webp")
+}
 
-	if err := store.DeleteObject(context.Background(), "users/7/project-previews/uuid"); err != nil {
-		t.Fatalf("delete object: %v", err)
+func TestReferenceNormalizationAndResolutionCompatibility(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
 	}
+	store.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	ownURL := "https://cdn.example.com/projects/7/reference%20image.png?e=1700001800&token=signed"
+	if got := store.normalizeReference(ownURL); got != "projects/7/reference image.png" {
+		t.Fatalf("expected own URL to normalize to key, got %q", got)
+	}
+	for _, value := range []string{
+		"https://images.example.org/reference.png",
+		"data:image/png;base64,aGVsbG8=",
+	} {
+		if got := store.normalizeReference(value); got != value {
+			t.Fatalf("expected %q to remain unchanged, got %q", value, got)
+		}
+		resolved, resolveErr := store.ResolveReference(context.Background(), value)
+		if resolveErr != nil || resolved != value {
+			t.Fatalf("expected passthrough for %q, got %q err=%v", value, resolved, resolveErr)
+		}
+	}
+	resolved, err := store.ResolveReference(context.Background(), "projects/7/reference image.png")
+	if err != nil {
+		t.Fatalf("resolve object key: %v", err)
+	}
+	assertQiniuPrivateURL(t, resolved, "https://cdn.example.com/projects/7/reference%20image.png")
+}
+
+func TestCreatePrivateURLUsesS3SignatureForQiniuS3Endpoint(t *testing.T) {
+	cfg := validQiniuConfig()
+	cfg.Domain = "https://feijiqilaifeiqilai1.s3.cn-east-1.qiniucs.com"
+	cfg.DownloadURLExpiry = 30 * time.Minute
+	store, err := NewQiniuStorage(cfg)
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	store.now = func() time.Time { return time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC) }
+
+	privateURL, err := store.privateURL(context.Background(), "uploads/reference image.png")
+	if err != nil {
+		t.Fatalf("create private URL: %v", err)
+	}
+	parsed, err := url.Parse(privateURL)
+	if err != nil {
+		t.Fatalf("parse private URL: %v", err)
+	}
+	query := parsed.Query()
+	if query.Get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256" ||
+		!strings.Contains(query.Get("X-Amz-Credential"), "/cn-east-1/s3/aws4_request") ||
+		query.Get("X-Amz-Expires") != "1800" || query.Get("X-Amz-Signature") == "" {
+		t.Fatalf("unexpected S3 signature query: %v", query)
+	}
+	if parsed.EscapedPath() != "/uploads/reference%20image.png" {
+		t.Fatalf("unexpected object path: %q", parsed.EscapedPath())
+	}
+}
+
+func TestNewQiniuStorageRejectsS3DownloadExpiryOverSevenDays(t *testing.T) {
+	cfg := validQiniuConfig()
+	cfg.Domain = "https://asset-bucket.s3.cn-east-1.qiniucs.com"
+	cfg.DownloadURLExpiry = 7*24*time.Hour + time.Second
+	store, err := NewQiniuStorage(cfg)
+	if !errors.Is(err, ErrInvalidStorageConfig) || store != nil {
+		t.Fatalf("expected invalid S3 expiry, got store=%+v err=%v", store, err)
+	}
+}
+
+func TestPersistReferenceUploadsDataURLAndReturnsObjectKey(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	store.random = strings.NewReader("0123456789abcdef")
+	uploader := &formUploaderStub{}
+	store.uploader = uploader
+
+	objectKey, err := store.PersistReference(
+		context.Background(),
+		"data:image/png;base64,aGVsbG8=",
+	)
+	if err != nil {
+		t.Fatalf("persist reference: %v", err)
+	}
+	if objectKey != "uploads/30313233343536373839616263646566.png" {
+		t.Fatalf("unexpected object key: %q", objectKey)
+	}
+	if uploader.key != objectKey || string(uploader.data) != "hello" || uploader.extra.MimeType != "image/png" || uploader.uptoken == "" {
+		t.Fatalf("unexpected upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+}
+
+func assertQiniuPrivateURL(t *testing.T, value string, wantPrefix string) {
+	t.Helper()
+	parsed, err := url.Parse(value)
+	if err != nil {
+		t.Fatalf("parse private URL: %v", err)
+	}
+	if !strings.HasPrefix(value, wantPrefix+"?") || parsed.Query().Get("e") == "" || parsed.Query().Get("token") == "" {
+		t.Fatalf("unexpected private URL: %q", value)
+	}
+}
+
+func TestQiniuStoragePropagatesContextAndSDKErrors(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	wantErr := errors.New("qiniu unavailable")
+	store.bucketManager = &bucketManagerStub{statErr: wantErr}
+
+	if _, err := store.GetObjectMetadata(context.Background(), "uploads/file"); !errors.Is(err, wantErr) {
+		t.Fatalf("expected stat error, got %v", err)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := store.CreateUploadTarget(cancelled, UploadRequest{ContentType: "image/png", ContentLength: 1}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled create, got %v", err)
+	}
+}
+
+func decodeUploadPolicy(t *testing.T, token string) qiniustorage.PutPolicy {
+	t.Helper()
+	parts := strings.Split(token, ":")
+	if len(parts) != 3 {
+		t.Fatalf("unexpected upload token format: %q", token)
+	}
+	encodedPolicy, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode upload policy: %v", err)
+	}
+	var policy qiniustorage.PutPolicy
+	if err := json.Unmarshal(encodedPolicy, &policy); err != nil {
+		t.Fatalf("unmarshal upload policy: %v", err)
+	}
+	return policy
 }

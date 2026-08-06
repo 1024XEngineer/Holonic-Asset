@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 
@@ -11,10 +14,15 @@ import (
 
 type Handler struct {
 	AssetManager domain.Manager
+	references   referenceResolver
 }
 
-func NewHandler(manager domain.Manager) *Handler {
-	return &Handler{AssetManager: manager}
+func NewHandler(manager domain.Manager, references ...referenceResolver) *Handler {
+	var resolver referenceResolver
+	if len(references) > 0 {
+		resolver = references[0]
+	}
+	return &Handler{AssetManager: manager, references: resolver}
 }
 
 func (h *Handler) GetAssets(
@@ -65,6 +73,11 @@ func (h *Handler) Detail(
 		return dto.SuccessResponse[dto.AssetDetailResponse]{}, err
 	}
 
+	content, err := h.resolveAssetContent(x, asset.Content)
+	if err != nil {
+		return dto.SuccessResponse[dto.AssetDetailResponse]{}, err
+	}
+
 	return dto.NewTypedSuccessResponse(dto.AssetDetailResponse{
 		AssetID:     asset.ID,
 		Name:        asset.Name,
@@ -73,7 +86,7 @@ func (h *Handler) Detail(
 		Description: asset.Description,
 		Tags:        asset.Tags,
 		Attributes:  asset.Attributes,
-		Content:     asset.Content,
+		Content:     content,
 		Version:     asset.Version,
 	}), nil
 }
@@ -112,16 +125,140 @@ func (h *Handler) Records(
 	}
 	items := make([]dto.AssetRecordResponse, len(records))
 	for index, record := range records {
+		content, resolveErr := h.resolveAssetContent(x, record.Content)
+		if resolveErr != nil {
+			return dto.SuccessResponse[dto.GetAssetRecordsResponse]{}, resolveErr
+		}
 		items[index] = dto.AssetRecordResponse{
 			RecordID:  record.ID,
 			AssetID:   record.AssetID,
 			Version:   record.Version,
 			ContentID: record.ContentID,
 			CreatedAt: record.CreatedAt,
-			Content:   record.Content,
+			Content:   content,
 		}
 	}
 	return dto.NewTypedSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
+}
+
+func (h *Handler) resolveAssetContent(
+	ctx context.Context,
+	raw json.RawMessage,
+) (json.RawMessage, error) {
+	if h.references == nil || len(raw) == 0 {
+		return raw, nil
+	}
+	var content map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &content); err != nil {
+		return nil, fmt.Errorf("handler: decode asset content: %w", err)
+	}
+	if content == nil {
+		return raw, nil
+	}
+
+	if value, ok := content["prototype"]; ok {
+		resolved, err := h.resolveImageArray(ctx, value, "prototype", "")
+		if err != nil {
+			return nil, err
+		}
+		content["prototype"] = resolved
+	}
+	if value, ok := content["animations"]; ok {
+		resolved, err := h.resolveImageArray(ctx, value, "animations", "frames")
+		if err != nil {
+			return nil, err
+		}
+		content["animations"] = resolved
+	}
+	if value, ok := content["items"]; ok {
+		resolved, err := h.resolveImageArray(ctx, value, "items", "tiles")
+		if err != nil {
+			return nil, err
+		}
+		content["items"] = resolved
+	}
+
+	encoded, err := json.Marshal(content)
+	if err != nil {
+		return nil, fmt.Errorf("handler: encode asset content: %w", err)
+	}
+	return json.RawMessage(encoded), nil
+}
+
+func (h *Handler) resolveImageArray(
+	ctx context.Context,
+	raw json.RawMessage,
+	field string,
+	childField string,
+) (json.RawMessage, error) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return raw, nil
+	}
+	var values []json.RawMessage
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, fmt.Errorf("handler: decode asset content %s: %w", field, err)
+	}
+	for index, value := range values {
+		object, err := decodeJSONObject(value)
+		if err != nil {
+			return nil, fmt.Errorf("handler: decode asset content %s[%d]: %w", field, index, err)
+		}
+		if childField == "" {
+			if err := h.resolveURLField(ctx, object); err != nil {
+				return nil, fmt.Errorf("handler: resolve asset content %s[%d].url: %w", field, index, err)
+			}
+		} else if child, ok := object[childField]; ok {
+			resolved, err := h.resolveImageArray(ctx, child, fmt.Sprintf("%s[%d].%s", field, index, childField), "")
+			if err != nil {
+				return nil, err
+			}
+			object[childField] = resolved
+		}
+		values[index], err = json.Marshal(object)
+		if err != nil {
+			return nil, fmt.Errorf("handler: encode asset content %s[%d]: %w", field, index, err)
+		}
+	}
+	encoded, err := json.Marshal(values)
+	if err != nil {
+		return nil, fmt.Errorf("handler: encode asset content %s: %w", field, err)
+	}
+	return encoded, nil
+}
+
+func decodeJSONObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+		if err == nil {
+			err = fmt.Errorf("expected JSON object")
+		}
+		return nil, err
+	}
+	return object, nil
+}
+
+func (h *Handler) resolveURLField(ctx context.Context, object map[string]json.RawMessage) error {
+	rawURL, ok := object["url"]
+	if !ok || len(rawURL) == 0 || rawURL[0] != '"' {
+		return nil
+	}
+	var reference string
+	if err := json.Unmarshal(rawURL, &reference); err != nil {
+		return err
+	}
+	if reference == "" {
+		return nil
+	}
+	resolved, err := h.references.ResolveReference(ctx, reference)
+	if err != nil {
+		return err
+	}
+	encoded, err := json.Marshal(resolved)
+	if err != nil {
+		return err
+	}
+	object["url"] = encoded
+	return nil
 }
 
 func (h *Handler) CopyAsset(

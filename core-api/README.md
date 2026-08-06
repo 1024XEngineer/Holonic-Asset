@@ -57,3 +57,20 @@ pnpm api:generate
 
 Run `pnpm api:check` to regenerate and type-check the frontend API surface.
 Files under `frontend/src/model/generated/` must not be edited by hand.
+
+## Qiniu Uploads
+
+Configure `qiniu.accessKey`, `qiniu.secretKey`, `qiniu.bucket`, and
+`qiniu.domain` in the selected YAML config. `bucket` is the Kodo bucket/S3
+bucket name, not a URL. `domain` may be a Kodo download domain or a virtual-host
+S3 endpoint such as `https://bucket.s3.cn-east-1.qiniucs.com`.
+`qiniu.uploadURL` defaults to `https://upload.qiniup.com`, the upload token
+defaults to one hour, and private download URLs default to 30 minutes.
+
+`POST /api/v1/uploads` accepts `contentType` and `contentLength`. It returns a
+server-generated object key, temporary private object URL, Qiniu upload
+endpoint, and a short-lived upload token. Upload the file to `uploadURL` as
+multipart form data using `uploadToken` as `token`, `objectKey` as `key`, and
+the file as `file`. The token only permits that object key, MIME type, and exact
+size. Project and asset data persist object keys; API responses resolve those
+keys to temporary URLs without changing their JSON fields.

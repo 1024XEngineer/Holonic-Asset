@@ -32,17 +32,40 @@ type Manager interface {
 type manager struct {
 	store       Store
 	imageClient imageclient.ImageGenerationService
+	references  ReferenceStore
+}
+
+// ReferenceStore is the storage boundary used for persisted image references.
+// Implementations may sign private object URLs and persist generated data URLs.
+type ReferenceStore interface {
+	ResolveReference(context.Context, string) (string, error)
+	PersistReference(context.Context, string) (string, error)
 }
 
 // NewManager constructs project use cases. The image service is optional so
 // CRUD-only callers do not need to initialize the generation provider.
-func NewManager(store Store, imageService imageclient.ImageGenerationService) Manager {
-	return &manager{store: store, imageClient: imageService}
+func NewManager(
+	store Store,
+	imageService imageclient.ImageGenerationService,
+	references ...ReferenceStore,
+) Manager {
+	var referenceStore ReferenceStore
+	if len(references) > 0 {
+		referenceStore = references[0]
+	}
+	return &manager{store: store, imageClient: imageService, references: referenceStore}
 }
 
 func (m *manager) Create(ctx context.Context, project *Project) error {
 	if err := project.ValidateCreate(); err != nil {
 		return err
+	}
+	if m.references != nil && project.Reference != "" {
+		reference, err := m.references.PersistReference(ctx, project.Reference)
+		if err != nil {
+			return fmt.Errorf("project: persist reference: %w", err)
+		}
+		project.Reference = reference
 	}
 	return m.store.Insert(ctx, project)
 }
@@ -64,6 +87,13 @@ func (m *manager) GetDetail(ctx context.Context, projectID uint) (*Project, erro
 func (m *manager) Update(ctx context.Context, update *ProjectUpdate) error {
 	if err := update.Validate(); err != nil {
 		return err
+	}
+	if m.references != nil && update.Reference != nil && *update.Reference != "" {
+		reference, err := m.references.PersistReference(ctx, *update.Reference)
+		if err != nil {
+			return fmt.Errorf("project: persist reference: %w", err)
+		}
+		update.Reference = &reference
 	}
 	return m.store.Update(ctx, update)
 }
@@ -90,7 +120,15 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 			"quality": referenceQuality,
 		},
 	}
-	if reference := referenceForGeneration(project.Reference); reference != "" {
+	reference := project.Reference
+	if m.references != nil && strings.TrimSpace(reference) != "" {
+		resolved, err := m.references.ResolveReference(ctx, reference)
+		if err != nil {
+			return "", fmt.Errorf("project: resolve reference: %w", err)
+		}
+		reference = resolved
+	}
+	if reference = referenceForGeneration(reference); reference != "" {
 		request.ReferenceImages = []string{reference}
 	}
 
@@ -102,7 +140,19 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		return "", ErrReferenceRequired
 	}
 
-	return referenceDataURL(generated.Images[0]), nil
+	result := referenceDataURL(generated.Images[0])
+	if m.references == nil {
+		return result, nil
+	}
+	objectKey, err := m.references.PersistReference(ctx, result)
+	if err != nil {
+		return "", fmt.Errorf("project: persist generated reference: %w", err)
+	}
+	resolved, err := m.references.ResolveReference(ctx, objectKey)
+	if err != nil {
+		return "", fmt.Errorf("project: resolve generated reference: %w", err)
+	}
+	return resolved, nil
 }
 
 func referenceDataURL(image imageclient.GeneratedImage) string {

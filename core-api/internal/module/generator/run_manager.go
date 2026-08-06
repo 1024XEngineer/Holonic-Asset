@@ -30,6 +30,10 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 	if err != nil {
 		return 0, err
 	}
+	payloadValue, err = e.prepareTaskPayload(ctx, request.ProjectID, payloadValue)
+	if err != nil {
+		return 0, err
+	}
 
 	payload, err := json.Marshal(payloadValue)
 	if err != nil {
@@ -42,6 +46,45 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 		Payload: payload,
 	})
 	return RunID(taskID), err
+}
+
+func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload any) (any, error) {
+	prepare := func(reference string) (string, error) {
+		if reference == "" && e.projects != nil && projectID != 0 {
+			project, err := e.projects.GetDetail(ctx, projectID)
+			if err != nil {
+				return "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
+			}
+			if project != nil {
+				reference = project.Reference
+			}
+		}
+		if e.references == nil || reference == "" {
+			return reference, nil
+		}
+		resolved, err := e.references.PersistReference(ctx, reference)
+		if err != nil {
+			return "", fmt.Errorf("generator: persist reference: %w", err)
+		}
+		return resolved, nil
+	}
+
+	switch value := payload.(type) {
+	case CreateCharacterPrototypePayload:
+		var err error
+		value.Reference, err = prepare(value.Reference)
+		return value, err
+	case CreateObjectPrototypePayload:
+		var err error
+		value.Reference, err = prepare(value.Reference)
+		return value, err
+	case CreateTileSetPayload:
+		var err error
+		value.Reference, err = prepare(value.Reference)
+		return value, err
+	default:
+		return payload, nil
+	}
 }
 
 func buildTaskPayload(request *Request) (any, error) {
@@ -57,7 +100,6 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
-		payload.Reference = valueOrFallback(payload.Reference, firstReference(request.ReferenceMediaIDs))
 		return payload, nil
 	case GenerateObjectProtoType:
 		payload := CreateObjectPrototypePayload{}
@@ -66,7 +108,6 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
-		payload.Reference = valueOrFallback(payload.Reference, firstReference(request.ReferenceMediaIDs))
 		return payload, nil
 	case GenerateAnimation:
 		payload := CreateAnimationPayload{}
@@ -86,7 +127,6 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
-		payload.Reference = valueOrFallback(payload.Reference, firstReference(request.ReferenceMediaIDs))
 		if payload.TileNum == 0 {
 			payload.TileNum = uint(len(payload.TileDescriptions))
 		}
@@ -119,13 +159,6 @@ func valueOrFallback(value, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func firstReference(references []string) string {
-	if len(references) == 0 {
-		return ""
-	}
-	return references[0]
 }
 
 func (e *Engine) List(ctx context.Context, query *RunListQuery) (*RunListPage, error) {

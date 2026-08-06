@@ -23,10 +23,6 @@ func (*storeStub) GetObjectMetadata(context.Context, string) (*upload.ObjectMeta
 	return nil, errors.New("unexpected object metadata lookup")
 }
 
-func (*storeStub) DeleteObject(context.Context, string) error {
-	return nil
-}
-
 func TestManagerReturnsPlaceholderTargetWithoutStore(t *testing.T) {
 	manager := upload.NewManager(nil)
 	target, err := manager.CreateUploadTarget(context.Background(), &upload.CreateUploadTargetRequest{
