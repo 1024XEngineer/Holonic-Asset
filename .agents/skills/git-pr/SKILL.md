@@ -1,6 +1,6 @@
 ---
 name: git-pr
-description: Draft concise Git PR titles and descriptions from committed branch diff, verify branch-triggered CI locally, and submit PRs with GitHub CLI after approval. Keep metadata focused on actual changes, motivation, implementation, and verification.
+description: Draft concise Git PR titles and descriptions from a committed branch diff, follow the repository's pull request template and required issue/checklist rules, verify branch-triggered CI locally, and submit with GitHub CLI only after approval. Use whenever the user asks to prepare, review, create, or update PR metadata.
 ---
 
 # Git PR Writing
@@ -13,19 +13,16 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
    - `git status --short`
    - `git branch --show-current`
    - `git log --oneline -20`
-2. Find base branch:
-   - Use user-provided base first.
-   - Else use upstream PR base if tooling exposes it.
-   - Else use `origin/HEAD`, `main`, or `master`.
-   - Ask only if base ambiguity changes diff.
+2. Resolve base: user input > upstream PR > `origin/HEAD` > `main`/`master`; ask only if ambiguity changes diff.
 3. Inspect branch diff:
    - `git diff --stat <base>...HEAD`
    - `git diff --name-status <base>...HEAD`
    - `git diff --find-renames --find-copies <base>...HEAD`
-4. Read relevant commits/files until behavior, implementation, and verification are clear.
-5. Identify PR-triggered CI and run local equivalents where available.
-6. Draft title/body.
-7. Create/edit PR only after explicit approval.
+4. Read `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/`, `CONTRIBUTING.md`, and repository-local instructions. Active template is source of truth.
+5. Read relevant commits/files until behavior, implementation, and verification are clear.
+6. Identify PR-triggered CI and run local equivalents where available.
+7. Draft title/body against the repository rules.
+8. Create/edit PR only after explicit approval.
 
 ## Hard Rules
 
@@ -33,16 +30,18 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
 - Ignore unrelated unstaged/uncommitted work unless user asks for working-tree draft.
 - Do not invent tests, screenshots, issue links, metrics, or outcomes.
 - If verification was not run, write `Not run (reason).`
+- Do not omit or rename a required repository-template section. Preserve its order and checklist items.
+- Strip prompt annotations such as `(Required)` and `(Optional)` from section headings in the final PR body.
+- For a required related-issue field, use only a user-provided or evidence-backed `Closes #123`, `Part of #123`, or `None`.
+- Mark checklist items `[x]` only when the diff or recorded verification supports them; otherwise leave them unchecked and explain why.
 - Keep reviewer-focused. Skip implementation trivia.
 - Do not create, edit, merge, close, or push PR without explicit approval.
 - Use English headings by default unless user requests localization.
 
 ## Local CI Before PR
 
-- Inspect changed files, workflow triggers, path filters, package scripts, and local tool config to identify CI jobs the branch will trigger.
-- Derive and run the closest local equivalents before submitting. Prefer exact commands already defined by workflows or package manager scripts.
-- Do not hardcode repo-specific CI command lists in this skill; CI changes should be discovered from the repository at PR time.
-- Put exact commands and pass/fail results in PR `Testing`. If a local tool is unavailable, write `Not run (reason)`.
+- Identify triggered CI from changed files, workflow filters, scripts, and local config.
+- Run closest available equivalents. Record exact commands/results in `Testing`; otherwise `Not run (reason)`.
 
 ## Submit With GitHub CLI
 
@@ -53,19 +52,13 @@ git push -u origin HEAD
 gh pr create --base <base-branch> --head "$(git branch --show-current)" --title "<type>(<scope>): <subject>" --body-file <body-file>
 ```
 
-- Use `--draft` for draft PRs.
-- Use `--reviewer <handle>` when reviewer requested.
-- Use `--web` only when user wants browser completion.
+Add `--draft`, `--reviewer <handle>`, or `--web` only when requested.
 
 ## Title
-
-Format:
 
 ```text
 <type>(<scope>): <subject>
 ```
-
-Rules:
 
 - Use narrowest type/scope matching branch diff.
 - Imperative subject: `add`, `fix`, `remove`, `optimize`.
@@ -74,32 +67,65 @@ Rules:
 
 Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `style`, `test`, `build`, `ci`, `chore`, `revert`.
 
-## Body
+## Repository Body Template
 
-Default structure:
+Current project template. Active repository template still wins.
 
 ```markdown
-Title: <type>(<scope>): <subject>
+## Change Description (Required)
 
+- <problem solved and observable change>
+
+## Implementation Approach (Required)
+
+- <important implementation details and boundaries>
+
+## Related Issue (Required)
+
+<Closes #123 | Part of #123 | None>
+
+## Testing (Required)
+
+- [x] `<exact command or check>` - <result>
+- [ ] Not run (<reason>)
+
+## Screenshots or Recordings (Optional)
+
+<visual evidence, or Not included.>
+
+## Risks and Follow-ups (Optional)
+
+<known risks or deferred work, or None identified.>
+
+## Checklist (Required)
+
+- [x] The PR is focused and does not include unrelated changes.
+- [x] Asset names, formats, dimensions, and metadata follow project conventions.
+- [x] Licensing and attribution information is included or unchanged as appropriate.
+- [x] Documentation or examples were updated when needed.
+```
+
+If no repository template exists, use the generic fallback below.
+
+## Generic Body Fallback
+
+```markdown
 ## Feature Description
+
 - ...
 
 ## Implementation Approach
+
 - ...
 
 ## Testing
+
 - ...
 ```
 
-Use `## Change Description` instead of `## Feature Description` for fixes, refactors, docs, tests, build, CI, chores, or removals.
+Description: 1-4 bullets: purpose, behavior, observable effect. Implementation: 1-3 bullets: approach, boundaries, reused libs. Testing: only checks run/result; otherwise `Not run (reason)`.
 
-Section rules:
-
-- Description: 1-4 bullets. State purpose, behavior, observable effect.
-- Implementation: 1-3 bullets. Explain core approach, important boundaries, reused libs.
-- Testing: list only checks actually run and result. If none: `Not run (reason).`
-
-Optional sections only when useful:
+Optional:
 
 - `## Why`
 - `## Screenshots`
