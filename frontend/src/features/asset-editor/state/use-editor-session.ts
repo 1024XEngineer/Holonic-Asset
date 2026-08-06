@@ -93,7 +93,7 @@ export function useEditorSession({
     } else if (result.status === "failed") {
       setSaveStateEntry({
         store,
-        state: { phase: "failed", message: "Save failed" },
+        state: { phase: "failed", message: result.message },
       });
     }
     return result;

@@ -44,7 +44,7 @@ export type EditorSessionSnapshot = {
 
 export type EditorSaveResult =
   | { status: "saved" }
-  | { status: "failed" }
+  | { status: "failed"; message: string }
   | { status: "superseded" };
 
 export type EditorSession = {

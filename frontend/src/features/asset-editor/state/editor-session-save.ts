@@ -25,7 +25,17 @@ export async function saveEditorSessionRevision({
 
     markEditorSessionSaved(store, submittedRecord);
     return { status: "saved" };
-  } catch {
-    return isActive() ? { status: "failed" } : { status: "superseded" };
+  } catch (error) {
+    return isActive()
+      ? { status: "failed", message: getSaveErrorMessage(error) }
+      : { status: "superseded" };
   }
+}
+
+function getSaveErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Save failed";
 }
