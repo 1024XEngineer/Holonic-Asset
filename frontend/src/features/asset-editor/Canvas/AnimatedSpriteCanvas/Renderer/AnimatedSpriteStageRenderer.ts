@@ -7,10 +7,11 @@ import {
 } from "pixi.js";
 import type { Viewport } from "pixi-viewport";
 import { normalizeRect } from "@/lib/rect";
+import { getAnimatedSpritePixelScale } from "../animated-sprite-scale";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import { getCanvasNodes } from "../AnimatedSpriteCanvas.constants";
 import {
-  getAnimatedSpritePixelScale,
+  FRAME_SIZE,
   PIXEL_GRID_MAJOR_INTERVAL,
   STAGE_ACCENT,
 } from "../Runtime/AnimatedSpriteStage.constants";
@@ -63,13 +64,13 @@ export class AnimatedSpriteStageRenderer {
     if (!this.grid) return;
     this.grid.setSize(viewport.screenWidth, viewport.screenHeight);
     this.grid.tileScale.set(
-      getAnimatedSpritePixelScale(prototype) * viewport.scale.x,
+      getAnimatedSpritePixelScale(prototype, FRAME_SIZE) * viewport.scale.x,
     );
     this.grid.tilePosition.set(viewport.x, viewport.y);
   }
 
   private drawGrid(prototype: AnimatedSpriteCanvasModel["prototype"]) {
-    const pixelScale = getAnimatedSpritePixelScale(prototype);
+    const pixelScale = getAnimatedSpritePixelScale(prototype, FRAME_SIZE);
     if (this.gridPixelScale === pixelScale && this.grid) return;
     this.gridPixelScale = pixelScale;
     this.grid?.destroy({ texture: true, textureSource: true });

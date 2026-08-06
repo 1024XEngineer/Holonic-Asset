@@ -5,7 +5,11 @@ import { AnimatedSpriteStageRenderer } from "../Renderer/AnimatedSpriteStageRend
 import {
   getAnimatedSpriteMaxScale,
   getAnimatedSpritePixelScale,
+} from "../animated-sprite-scale";
+import {
+  FRAME_SIZE,
   INITIAL_SCALE,
+  MAX_SOURCE_PIXEL_SCREEN_SIZE,
   MIN_SCALE,
 } from "./AnimatedSpriteStage.constants";
 import type {
@@ -50,7 +54,11 @@ export class AnimatedSpriteCanvasRuntime {
       .wheel()
       .clampZoom({
         minScale: MIN_SCALE,
-        maxScale: getAnimatedSpriteMaxScale(this.props.model.prototype),
+        maxScale: getAnimatedSpriteMaxScale(
+          this.props.model.prototype,
+          FRAME_SIZE,
+          MAX_SOURCE_PIXEL_SCREEN_SIZE,
+        ),
       });
     app.stage.addChild(viewport);
     this.viewport = viewport;
@@ -68,7 +76,7 @@ export class AnimatedSpriteCanvasRuntime {
       moveNode: (node, position) => this.scene.moveNode(node, position),
       setMarquee: (marquee) => this.scene.setMarquee(marquee),
       getDragStep: () =>
-        getAnimatedSpritePixelScale(this.props.model.prototype),
+        getAnimatedSpritePixelScale(this.props.model.prototype, FRAME_SIZE),
       toggleExpanded: (node) => this.scene.toggleExpanded(node),
       togglePlaying: (node) => this.scene.togglePlaying(node),
       render: () => this.render(),
