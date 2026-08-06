@@ -2,7 +2,6 @@ export {
   assetApi,
   assetKinds,
   assetKeys,
-  assetRecordModeForKind,
   creatableAssetKinds,
   getDefaultAssetCanvasSize,
   useAddAudioTrackMutation,

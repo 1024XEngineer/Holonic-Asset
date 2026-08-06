@@ -7,11 +7,7 @@ export {
   useDeleteAssetMutation,
 } from "./library";
 export type { AssetGroup, AssetGroupsByProject } from "./library";
-export {
-  assetRecordModeForKind,
-  useRecordQuery,
-  useSaveAssetRevisionMutation,
-} from "./record";
+export { useRecordQuery, useSaveAssetRevisionMutation } from "./record";
 export type {
   AssetCanvasPosition,
   AssetRecord,
