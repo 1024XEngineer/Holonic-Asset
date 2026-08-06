@@ -1,10 +1,11 @@
 import type { components, operations } from "@/model/generated/core-api";
+import type { Perspective } from "./types";
 
 type Schemas = components["schemas"];
 
 export type ProjectResponse = Schemas["ProjectResponse"];
 export type ProjectGameType = ProjectResponse["gameType"];
-export type ProjectPerspective = ProjectResponse["perspective"];
+export type ProjectPerspective = Perspective;
 export type ProjectPlatform = ProjectResponse["targetPlatform"];
 export type CreateProjectRequest =
   operations["createProject"]["requestBody"]["content"]["application/json"];

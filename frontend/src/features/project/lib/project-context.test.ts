@@ -9,7 +9,7 @@ describe("toCreateProjectInput", () => {
       gameType: "Role-playing game",
       platform: "PC",
       description: "  Restore the orchard.  ",
-      perspective: "  Top-down  ",
+      perspective: "Top-Down",
       reference: "https://example.com/game",
       visualDirection: "data:image/png;base64,preview",
     });
@@ -20,8 +20,8 @@ describe("toCreateProjectInput", () => {
       platform: "PC",
       description: "Restore the orchard.",
       reference: "https://example.com/game",
-      style: "Top-down",
-      perspective: "Top-down",
+      style: "Top-Down",
+      perspective: "Top-Down",
       visualDirection: "data:image/png;base64,preview",
     });
     expect(input).not.toHaveProperty("id");
@@ -30,8 +30,8 @@ describe("toCreateProjectInput", () => {
 
   it("limits perspectives to supported game views", () => {
     expect(projectContextOptions.perspectives).toEqual([
-      "Top-down",
-      "Side-on",
+      "Top-Down",
+      "Side-On",
       "Isometric",
     ]);
   });

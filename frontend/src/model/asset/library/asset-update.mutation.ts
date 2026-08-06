@@ -1,21 +1,21 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import type { AssetMetadataUpdate } from "../types";
 import { assetApi } from "./asset.api";
-import type { AssetKind, ProjectAsset } from "../types";
 import { createAssetLibraryCacheSync } from "./asset-library-cache";
 
-type AddAssetInput = {
+type UpdateAssetInput = {
   projectId: string;
-  kind: AssetKind;
-  asset: ProjectAsset;
+  assetId: string;
+  metadata: AssetMetadataUpdate;
 };
 
-export function useAddAssetMutation() {
+export function useUpdateAssetMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, kind, asset }: AddAssetInput) =>
-      assetApi.add(projectId, kind, asset),
+    mutationFn: ({ projectId, assetId, metadata }: UpdateAssetInput) =>
+      assetApi.update(projectId, assetId, metadata),
     onSuccess: createAssetLibraryCacheSync(queryClient),
   });
 }
