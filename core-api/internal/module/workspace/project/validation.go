@@ -1,8 +1,11 @@
 package project
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -57,7 +60,13 @@ func (p *Project) ValidateReferenceGeneration() error {
 	if p == nil {
 		return invalidProject("project is required")
 	}
-	return p.validateDefinition()
+	if err := p.validateDefinition(); err != nil {
+		return err
+	}
+	if !validGenerationReference(p.Reference) {
+		return invalidProject("reference must be an HTTP(S) URL or a base64 image data URI")
+	}
+	return nil
 }
 
 func (p *Project) validateDefinition() error {
@@ -74,6 +83,76 @@ func (p *Project) validateDefinition() error {
 		return invalidProject("targetPlatform is invalid")
 	}
 	return nil
+}
+
+func validGenerationReference(reference string) bool {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(reference), "data:") {
+		return validImageDataURL(reference)
+	}
+
+	parsed, err := url.ParseRequestURI(reference)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")
+}
+
+func validImageDataURL(reference string) bool {
+	comma := strings.IndexByte(reference, ',')
+	if comma < 0 {
+		return false
+	}
+
+	metadata := strings.Split(reference[len("data:"):comma], ";")
+	if len(metadata) < 2 {
+		return false
+	}
+	declaredMediaType := normalizedImageMediaType(metadata[0])
+	if declaredMediaType == "" {
+		return false
+	}
+	hasBase64Encoding := false
+	for _, parameter := range metadata[1:] {
+		if strings.EqualFold(strings.TrimSpace(parameter), "base64") {
+			hasBase64Encoding = true
+			break
+		}
+	}
+	if !hasBase64Encoding {
+		return false
+	}
+
+	payload := strings.TrimSpace(reference[comma+1:])
+	if payload == "" {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(payload)
+	}
+	if err != nil || len(decoded) == 0 {
+		return false
+	}
+
+	detectedMediaType := normalizedImageMediaType(http.DetectContentType(decoded))
+	return detectedMediaType != "" && detectedMediaType == declaredMediaType
+}
+
+func normalizedImageMediaType(value string) string {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.SplitN(value, ";", 2)[0]))
+	if mediaType == "image/jpg" {
+		mediaType = "image/jpeg"
+	}
+	switch mediaType {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return mediaType
+	default:
+		return ""
+	}
 }
 
 func (u *ProjectUpdate) Validate() error {
