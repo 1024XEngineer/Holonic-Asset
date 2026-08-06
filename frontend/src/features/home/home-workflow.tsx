@@ -3,9 +3,9 @@ import { useState } from "react";
 const workflow = [
   {
     number: "01",
-    title: "Project & Visual Direction",
+    title: "Project & Style System",
     description:
-      "Define game type, visual style, and target platform. Generate a master Visual Direction Sheet to seed unified AI context for all assets.",
+      "Define your game type, visual style, and target platform once. Every asset generated in the project follows the same style.",
   },
   {
     number: "02",
@@ -41,7 +41,7 @@ export function HomeWorkflow() {
             id="workflow-heading"
             className="max-w-4xl text-5xl leading-[0.94] font-semibold tracking-[-0.06em] sm:text-6xl lg:text-7xl"
           >
-            One workflow from vision to game-ready pipeline.
+            One workflow from idea to game-ready pipeline.
           </h2>
           <p className="max-w-md text-sm leading-7 text-neutral-700 lg:justify-self-end">
             Holonic Asset connects project visual context, asset prototyping,
