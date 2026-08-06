@@ -27,24 +27,26 @@ export function TilesetAssetFields({
   draft: TilesetAssetCreationDraft<File>;
   onChange: (draft: TilesetAssetCreationDraft<File>) => void;
 }) {
-  const [items, setItems] = useState(draft.tiles);
   const [expandedItems, setExpandedItems] = useState(
     () => new Set(draft.tiles.map((_, index) => index)),
   );
 
-  useEffect(() => setItems(draft.tiles), [draft.tiles]);
   useEffect(
-    () => setExpandedItems(new Set(items.map((_, index) => index))),
-    [items.length],
+    () =>
+      setExpandedItems(
+        new Set(draft.tiles.map((_, index) => index)),
+      ),
+    [draft.tiles.length],
   );
 
-  const updateItems = (nextItems: typeof items) => {
-    setItems(nextItems);
-    onChange({ ...draft, tiles: nextItems });
-  };
-  const updateItem = (index: number, patch: Partial<(typeof items)[number]>) =>
+  const updateItems = (tiles: typeof draft.tiles) =>
+    onChange({ ...draft, tiles });
+  const updateItem = (
+    index: number,
+    patch: Partial<(typeof draft.tiles)[number]>,
+  ) =>
     updateItems(
-      items.map((item, itemIndex) =>
+      draft.tiles.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item,
       ),
     );
@@ -52,18 +54,18 @@ export function TilesetAssetFields({
   return (
     <>
       <CountSelect
-        value={items.length}
+        value={draft.tiles.length}
         onChange={(count) =>
           updateItems(
             Array.from(
               { length: count },
-              (_, index) => items[index] ?? createEmptyItem(),
+              (_, index) => draft.tiles[index] ?? createEmptyItem(),
             ),
           )
         }
       />
       <div className="grid gap-4">
-        {items.map((item, index) => {
+        {draft.tiles.map((item, index) => {
           const expanded = expandedItems.has(index);
 
           return (
