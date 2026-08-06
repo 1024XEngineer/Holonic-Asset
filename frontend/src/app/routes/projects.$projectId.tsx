@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Outlet, useLocation, createFileRoute } from "@tanstack/react-router";
 
 import { ProjectLibraryPage } from "@/pages/projects/project-library-page";
 
@@ -8,6 +8,14 @@ export const Route = createFileRoute("/projects/$projectId")({
 
 function ProjectRoute() {
   const { projectId } = Route.useParams();
+  const { pathname } = useLocation();
+  const isCreateAssetRoute = pathname.startsWith(
+    `/projects/${projectId}/assets/new/`,
+  );
 
-  return <ProjectLibraryPage projectId={projectId} />;
+  return isCreateAssetRoute ? (
+    <Outlet />
+  ) : (
+    <ProjectLibraryPage projectId={projectId} />
+  );
 }

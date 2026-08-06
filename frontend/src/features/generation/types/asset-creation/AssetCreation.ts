@@ -32,7 +32,7 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
-        tiles: [{ description: "", reference: undefined }],
+        tiles: [{ description: "", reference: undefined, shape: [] }],
       };
     case "ui":
       return {

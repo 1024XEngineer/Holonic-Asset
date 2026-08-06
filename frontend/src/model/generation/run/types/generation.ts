@@ -1,6 +1,8 @@
 import type { CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
 
+export type TileShapeCell = [column: number, row: number];
+
 export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
   name: string;
@@ -13,7 +15,11 @@ export type CreationRequest<Reference = unknown> = {
   style?: string;
   aspectRatio?: string;
   layers?: { description: string }[];
-  tiles?: { description: string; reference?: Reference }[];
+  tiles?: {
+    description: string;
+    reference?: Reference;
+    shape: TileShapeCell[];
+  }[];
   components?: { name: string; description: string; isCustom: boolean }[];
 };
 
