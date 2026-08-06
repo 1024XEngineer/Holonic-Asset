@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isPerspective } from "@/model/project";
 import { projectContextOptions } from "../lib/project-context";
 import type { NewProjectController } from "./use-new-project-controller";
 
@@ -73,15 +74,14 @@ export function GuidedProjectFlow({
           </div>
           <newProjectForm.Field name="perspective">
             {(field) => (
-              <label className="grid gap-2 text-sm font-semibold">
-                Perspective
-                <input
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-                  placeholder="Top-down, Side-On, or Isometric"
-                />
-              </label>
+              <DropdownField
+                label="Perspective"
+                value={field.state.value}
+                options={projectContextOptions.perspectives}
+                onChange={(value) => {
+                  if (isPerspective(value)) field.handleChange(value);
+                }}
+              />
             )}
           </newProjectForm.Field>
           <newProjectForm.Field name="description">

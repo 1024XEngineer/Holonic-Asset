@@ -23,11 +23,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import {
   assetCanvasSizeOptions,
-  assetPerspectiveOptions,
-  isAssetPerspective,
   type AssetLibraryItem,
   type AssetMetadataUpdate,
 } from "@/model/asset";
+import {
+  isPerspective,
+  perspectiveOptions,
+  type Perspective,
+} from "@/model/project";
 
 import { AssetPreview } from "./asset-preview";
 
@@ -50,7 +53,9 @@ export function AssetEditDialog({
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [canvasSize, setCanvasSize] = useState("");
-  const [perspective, setPerspective] = useState("");
+  const [perspective, setPerspective] = useState<Perspective>(
+    perspectiveOptions[0],
+  );
   const initializedAssetIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -66,11 +71,7 @@ export function AssetEditDialog({
     setDescription(asset.description);
     setTags(asset.tags);
     setCanvasSize(asset.canvasSize);
-    setPerspective(
-      isAssetPerspective(asset.perspective)
-        ? asset.perspective
-        : assetPerspectiveOptions[0],
-    );
+    setPerspective(asset.perspective);
   }, [asset]);
 
   const tagOptions = Array.from(new Set([...availableTags, ...tags]));
@@ -214,9 +215,9 @@ export function AssetEditDialog({
                         </>
                       }
                       onChange={(value) => {
-                        if (isAssetPerspective(value)) setPerspective(value);
+                        if (isPerspective(value)) setPerspective(value);
                       }}
-                      options={assetPerspectiveOptions}
+                      options={perspectiveOptions}
                       size="compact"
                       value={perspective}
                     />
@@ -259,7 +260,7 @@ const availableTags = [
   "environment",
   "interface",
   "terrain",
-  "top-down",
+  "Top-Down",
 ];
 
 function Field({

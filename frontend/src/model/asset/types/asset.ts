@@ -1,4 +1,5 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
+import type { Perspective } from "../../project/types";
 
 export type CharacterSpriteSheet = {
   format: "png-sprite-sheet";
@@ -67,7 +68,7 @@ export type ProjectAsset = {
   description: string;
   version: string;
   canvasSize: string;
-  perspective: string;
+  perspective: Perspective;
   tags: string[];
   thumbnailUrl?: string;
   previewCrop?: AssetPreviewCrop;

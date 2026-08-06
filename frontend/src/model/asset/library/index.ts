@@ -7,15 +7,10 @@ export { useCopyAssetMutation } from "./asset-copy.mutation";
 export { useDeleteAssetMutation } from "./asset-delete.mutation";
 export { useUpdateAssetMutation } from "./asset-update.mutation";
 export { useAssetLibraryQuery } from "./asset-library.query";
-export {
-  assetCanvasSizeOptions,
-  assetPerspectiveOptions,
-  isAssetPerspective,
-} from "./types";
+export { assetCanvasSizeOptions } from "./types";
 export type {
   AssetCanvasSize,
   AssetGroup,
   AssetGroupsByProject,
   AssetLibraryItem,
-  AssetPerspective,
 } from "./types";

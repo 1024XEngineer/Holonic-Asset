@@ -101,7 +101,7 @@ describe("mock asset library operations", () => {
           description: "",
           tags: [],
           canvasSize: "64 × 64 px",
-          perspective: "Top-down",
+          perspective: "Top-Down",
         }),
     ],
     [

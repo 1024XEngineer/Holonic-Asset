@@ -16,6 +16,7 @@ import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
+import { isPerspective } from "@/model/project";
 import {
   applyProjectSettings,
   createProjectSettingsDraft,
@@ -96,7 +97,9 @@ export function ProjectSettingsDialog({
                   label="Perspective"
                   value={field.state.value}
                   options={projectContextOptions.perspectives}
-                  onChange={field.handleChange}
+                  onChange={(value) => {
+                    if (isPerspective(value)) field.handleChange(value);
+                  }}
                 />
               )}
             </form.Field>

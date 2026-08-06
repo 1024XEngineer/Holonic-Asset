@@ -8,7 +8,7 @@ import {
 } from "./mock";
 import type { AssetListItemResponse, AssetType } from "./asset.contract";
 import { getDefaultAssetCanvasSize } from "./asset-canvas-size";
-import { assetPerspectiveOptions } from "./types";
+import { perspectiveOptions, type Perspective } from "../../project/types";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
@@ -52,7 +52,7 @@ export type AssetAnimationResponse = {
 };
 
 type DirectionalAssetContent = {
-  viewMode: "side_on" | "top_down";
+  perspective: Perspective;
   directionCount: 1 | 2 | 4 | 8;
   prototype: AssetImageResourceResponse[];
   metadata?: AssetContentMetadata;
@@ -137,7 +137,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       description: item.description,
       version: `v${item.version}`,
       canvasSize: getDefaultAssetCanvasSize(kind),
-      perspective: assetPerspectiveOptions[0],
+      perspective: perspectiveOptions[0],
       tags: item.tags ?? [],
       history: [],
       animations: [],

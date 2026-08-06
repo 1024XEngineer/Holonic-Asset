@@ -12,7 +12,7 @@ function asset(overrides: Partial<AssetLibraryItem> = {}): AssetLibraryItem {
     description: "Four-direction character",
     version: "v2",
     canvasSize: "64 x 64 px",
-    perspective: "Top-down",
+    perspective: "Top-Down",
     tags: ["hero", "pixel-art"],
     history: [],
     animations: [],

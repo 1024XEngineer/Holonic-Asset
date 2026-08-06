@@ -15,7 +15,7 @@ function asset(
     description: `${name} description`,
     version: "v1",
     canvasSize: "64 x 64 px",
-    perspective: "Top-down",
+    perspective: "Top-Down",
     tags: [],
     history: [],
     animations: [],

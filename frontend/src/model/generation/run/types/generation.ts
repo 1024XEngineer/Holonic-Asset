@@ -1,11 +1,12 @@
 import type { CreatableAssetKind } from "@/model/asset";
+import type { Perspective } from "@/model/project";
 
 export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
   name: string;
   prompt: string;
   canvasSize: string;
-  perspective?: "top-down" | "side-on" | "isometric";
+  perspective?: Perspective;
   directionCount?: "1" | "4" | "8";
   reference?: Reference;
   useProjectContext: boolean;
