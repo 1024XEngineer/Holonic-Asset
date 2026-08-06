@@ -157,9 +157,6 @@ func (e *Engine) List(ctx context.Context, query *RunListQuery) (*RunListPage, e
 		filter.ExcludeTaskTypes = ProjectLevelTaskTypes()
 	}
 
-	if e.reader == nil {
-		return &RunListPage{Runs: []Run{}}, nil
-	}
 	return e.reader.ListRuns(ctx, filter)
 }
 
@@ -173,28 +170,11 @@ func (e *Engine) Get(ctx context.Context, runID RunID) (*Run, error) {
 		return nil, err
 	}
 
-	var scope struct {
-		ProjectID uint  `json:"project_id"`
-		AssetID   *uint `json:"asset_id"`
-		ParentID  *uint `json:"parent_id"`
-	}
-	if err := json.Unmarshal(message.Payload, &scope); err != nil {
+	run, err := taskToRun(message)
+	if err != nil {
 		return nil, err
 	}
-	assetID := scope.ParentID
-	if assetID == nil {
-		assetID = scope.AssetID
-	}
-
-	return &Run{
-		ID:        RunID(message.ID),
-		ProjectID: scope.ProjectID,
-		AssetID:   assetID,
-		Kind:      TaskType(message.Type),
-		Status:    message.Status,
-		Result:    message.Result,
-		Error:     message.Error,
-	}, nil
+	return &run, nil
 }
 
 func (e *Engine) Cancel(ctx context.Context, runID RunID) error {

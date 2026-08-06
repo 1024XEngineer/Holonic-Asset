@@ -17,6 +17,14 @@ type Task struct {
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
+// ListFilter selects tasks using queue-neutral task envelope fields.
+type ListFilter struct {
+	Statuses []Status
+	Types    []string
+	BeforeID uint
+	Limit    int
+}
+
 type Status uint
 
 const (

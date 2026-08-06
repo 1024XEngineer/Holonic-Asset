@@ -4,20 +4,16 @@ import taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 
 // Engine coordinates Generator runs with the generic Task module.
 type Engine struct {
-	reader   RunReader
+	reader   *RunReader
 	tasks    taskdomain.Manager
 	executor Executor
 }
 
 // NewEngine constructs Generator and binds its handlers to the injected task manager.
 // A nil manager is accepted while the application composition root is incomplete.
-func NewEngine(
-	tasks taskdomain.Manager,
-	reader RunReader,
-	executor Executor,
-) *Engine {
+func NewEngine(tasks taskdomain.Manager, executor Executor) *Engine {
 	engine := &Engine{
-		reader:   reader,
+		reader:   NewRunReader(tasks),
 		tasks:    tasks,
 		executor: executor,
 	}

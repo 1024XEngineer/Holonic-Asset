@@ -84,38 +84,49 @@ func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID uint) (*dom
 	if err != nil {
 		return nil, fmt.Errorf("repo: get task %d: %w", taskID, err)
 	}
-	return &domain.Task{
-		ID:        dt.ID,
-		Type:      dt.Type,
-		Status:    domain.Status(dt.Status),
-		Payload:   json.RawMessage(dt.Payload),
-		Result:    json.RawMessage(dt.Result),
-		Error:     dt.Error,
-		CreatedAt: dt.CreatedAt,
-		UpdatedAt: dt.UpdatedAt,
-	}, nil
+	return taskFromDAO(dt), nil
 }
 
-func (r *TaskRepositoryImpl) ListTasksByStatus(ctx context.Context, status domain.Status) ([]*domain.Task, error) {
-	items, err := r.TaskDao.ListByStatus(ctx, uint(status))
+func (r *TaskRepositoryImpl) ListTasks(
+	ctx context.Context,
+	filter *domain.ListFilter,
+) ([]*domain.Task, error) {
+	if filter == nil {
+		return nil, fmt.Errorf("repo: task list filter is required")
+	}
+
+	statuses := make([]uint, len(filter.Statuses))
+	for i, status := range filter.Statuses {
+		statuses[i] = uint(status)
+	}
+	items, err := r.TaskDao.List(ctx, dao.TaskListFilter{
+		Statuses: statuses,
+		Types:    filter.Types,
+		BeforeID: filter.BeforeID,
+		Limit:    filter.Limit,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("repo: list tasks by status %s: %w", status, err)
+		return nil, fmt.Errorf("repo: list tasks: %w", err)
 	}
 
 	tasks := make([]*domain.Task, 0, len(items))
 	for _, item := range items {
-		tasks = append(tasks, &domain.Task{
-			ID:        item.ID,
-			Type:      item.Type,
-			Status:    domain.Status(item.Status),
-			Payload:   json.RawMessage(item.Payload),
-			Result:    json.RawMessage(item.Result),
-			Error:     item.Error,
-			CreatedAt: item.CreatedAt,
-			UpdatedAt: item.UpdatedAt,
-		})
+		tasks = append(tasks, taskFromDAO(item))
 	}
 	return tasks, nil
+}
+
+func taskFromDAO(item *dao.Task) *domain.Task {
+	return &domain.Task{
+		ID:        item.ID,
+		Type:      item.Type,
+		Status:    domain.Status(item.Status),
+		Payload:   json.RawMessage(item.Payload),
+		Result:    json.RawMessage(item.Result),
+		Error:     item.Error,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+	}
 }
 
 func (r *TaskRepositoryImpl) FetchPendingOutbox(ctx context.Context, limit int) ([]domain.OutboxRecord, error) {

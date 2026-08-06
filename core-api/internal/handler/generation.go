@@ -48,7 +48,8 @@ func (h *GenerationHandler) List(
 		Limit:     request.Limit,
 		Cursor:    request.Cursor,
 	})
-	if errors.Is(err, generator.ErrInvalidRunListStatus) {
+	if errors.Is(err, generator.ErrInvalidRunListStatus) ||
+		errors.Is(err, generator.ErrInvalidRunListCursor) {
 		return dto.SuccessResponse[dto.ListGenerationRunsResponse]{}, echo.ErrBadRequest
 	}
 	if err != nil {

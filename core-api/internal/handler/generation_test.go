@@ -154,6 +154,17 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 	}
 }
 
+func TestListRejectsInvalidCursor(t *testing.T) {
+	stub := &runManagerStub{listErr: generator.ErrInvalidRunListCursor}
+	_, err := handler.NewGenerationHandler(stub).List(
+		context.Background(),
+		dto.ListGenerationRunsRequest{Cursor: "invalid"},
+	)
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request, got %v", err)
+	}
+}
+
 func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	stub := &runManagerStub{}
 	response, err := handler.NewGenerationHandler(stub).Cancel(
