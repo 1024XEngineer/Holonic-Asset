@@ -1,5 +1,6 @@
 import { Container, Rectangle, Sprite, Texture } from "pixi.js";
 import type { CharacterSpriteSheet } from "@/model";
+import { snapToStep } from "@/lib/snap-to-step";
 
 type FrameBounds = { x: number; y: number; width: number; height: number };
 const frameTextures = new Map<string, Texture>();
@@ -24,8 +25,8 @@ export function drawSpriteSheetFrame({
   const centeredX = bounds.x + (bounds.width - renderedWidth) / 2;
   const centeredY = bounds.y + (bounds.height - renderedHeight) / 2;
   sprite.position.set(
-    snapToPixelGrid(container.x + centeredX, pixelScale) - container.x,
-    snapToPixelGrid(container.y + centeredY, pixelScale) - container.y,
+    snapToStep(container.x + centeredX, pixelScale) - container.x,
+    snapToStep(container.y + centeredY, pixelScale) - container.y,
   );
   sprite.scale.set(pixelScale);
   sprite.texture.source.scaleMode = "nearest";
@@ -63,8 +64,4 @@ function getSpriteSheetFrameTexture(
     frameTextures.set(cacheKey, texture);
   }
   return texture;
-}
-
-function snapToPixelGrid(value: number, pixelScale: number) {
-  return pixelScale > 0 ? Math.round(value / pixelScale) * pixelScale : value;
 }

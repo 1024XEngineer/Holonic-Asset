@@ -1,4 +1,5 @@
 import type { CharacterAnimation } from "@/model";
+import { containsPoint } from "@/lib/rect";
 import {
   getCanvasNodes,
   type CanvasPosition,
@@ -204,50 +205,20 @@ export function hitTestAnimatedSpriteScene(
       resolvedAnimations,
     );
     for (let index = layout.frames.length - 1; index >= 0; index -= 1) {
-      if (contains(layout.frames[index], point))
+      if (containsPoint(layout.frames[index], point))
         return { kind: "frame", node, index };
     }
-    if (layout.frameGrid && contains(layout.frameGrid, point))
+    if (layout.frameGrid && containsPoint(layout.frameGrid, point))
       return { kind: "frame-grid", node };
     if (
       layout.playEnabled &&
       layout.playControl &&
-      contains(layout.playControl, point)
+      containsPoint(layout.playControl, point)
     )
       return { kind: "play", node };
-    if (layout.expandControl && contains(layout.expandControl, point))
+    if (layout.expandControl && containsPoint(layout.expandControl, point))
       return { kind: "expand", node };
-    if (contains(layout.bounds, point)) return { kind: "node", node };
+    if (containsPoint(layout.bounds, point)) return { kind: "node", node };
   }
   return null;
-}
-
-function contains(bounds: Bounds, point: CanvasPosition) {
-  return (
-    point.x >= bounds.x &&
-    point.x <= bounds.x + bounds.width &&
-    point.y >= bounds.y &&
-    point.y <= bounds.y + bounds.height
-  );
-}
-
-export function intersects(left: Bounds, right: Bounds) {
-  return (
-    left.x < right.x + right.width &&
-    left.x + left.width > right.x &&
-    left.y < right.y + right.height &&
-    left.y + left.height > right.y
-  );
-}
-
-export function normalizeBounds(
-  start: CanvasPosition,
-  end: CanvasPosition,
-): Bounds {
-  return {
-    x: Math.min(start.x, end.x),
-    y: Math.min(start.y, end.y),
-    width: Math.abs(end.x - start.x),
-    height: Math.abs(end.y - start.y),
-  };
 }

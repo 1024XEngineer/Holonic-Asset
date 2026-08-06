@@ -1,4 +1,6 @@
 import type { NodeId } from "../animated-sprite-node";
+import { intersectsRect, normalizeRect } from "@/lib/rect";
+import { snapToStep } from "@/lib/snap-to-step";
 import {
   getCanvasNodes,
   type CanvasPosition,
@@ -8,8 +10,6 @@ import {
   getFrameCount,
   getNodeBounds,
   hitTestAnimatedSpriteScene,
-  intersects,
-  normalizeBounds,
 } from "./AnimatedSpriteStageGeometry";
 import type { AnimatedSpriteStageContext } from "../Runtime/AnimatedSpriteCanvas.types";
 
@@ -160,11 +160,11 @@ export class AnimatedSpriteStageInteraction {
   }
 
   private completeNodeSelection(start: CanvasPosition, end: CanvasPosition) {
-    const bounds = normalizeBounds(start, end);
+    const bounds = normalizeRect(start, end);
     const scene = this.context.getScene();
     const selected = getCanvasNodes(this.context.getAnimations()).filter(
       (node) =>
-        intersects(
+        intersectsRect(
           bounds,
           getNodeBounds(
             node,
@@ -184,7 +184,7 @@ export class AnimatedSpriteStageInteraction {
     start: CanvasPosition,
     end: CanvasPosition,
   ) {
-    const bounds = normalizeBounds(start, end);
+    const bounds = normalizeRect(start, end);
     const position = this.context.getScene().positions[node];
     const indexes = Array.from(
       {
@@ -195,7 +195,9 @@ export class AnimatedSpriteStageInteraction {
         ),
       },
       (_, index) => index,
-    ).filter((index) => intersects(bounds, getFrameBounds(position, index)));
+    ).filter((index) =>
+      intersectsRect(bounds, getFrameBounds(position, index)),
+    );
     if (indexes.length > 0) this.context.actions.onSelectFrames(node, indexes);
   }
 
@@ -219,8 +221,4 @@ export class AnimatedSpriteStageInteraction {
   private capture(event: PointerEvent) {
     this.canvas.setPointerCapture(event.pointerId);
   }
-}
-
-function snapToStep(value: number, step: number) {
-  return step > 0 ? Math.round(value / step) * step : value;
 }

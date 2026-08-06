@@ -6,9 +6,9 @@ import {
   TilingSprite,
 } from "pixi.js";
 import type { Viewport } from "pixi-viewport";
+import { normalizeRect } from "@/lib/rect";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import { getCanvasNodes } from "../AnimatedSpriteCanvas.constants";
-import { normalizeBounds } from "../Interaction/AnimatedSpriteStageGeometry";
 import {
   getAnimatedSpritePixelScale,
   PIXEL_GRID_MAJOR_INTERVAL,
@@ -82,7 +82,7 @@ export class AnimatedSpriteStageRenderer {
     start: { x: number; y: number },
     end: { x: number; y: number },
   ) {
-    const bounds = normalizeBounds(start, end);
+    const bounds = normalizeRect(start, end);
     this.contentLayer.addChild(
       new Graphics()
         .rect(bounds.x, bounds.y, bounds.width, bounds.height)

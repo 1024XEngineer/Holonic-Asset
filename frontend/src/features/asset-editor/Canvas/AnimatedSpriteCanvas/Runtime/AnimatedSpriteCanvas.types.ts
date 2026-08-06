@@ -1,5 +1,6 @@
 import type { Viewport } from "pixi-viewport";
 import type { CharacterAnimation } from "@/model";
+import type { Rect } from "@/lib/rect";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
 import type { NodeId } from "../animated-sprite-node";
 import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
@@ -18,7 +19,7 @@ export type AnimatedSpriteCanvasRuntimeProps = {
   actions: AnimatedSpriteCanvasActions;
 };
 
-export type Bounds = CanvasPosition & { width: number; height: number };
+export type Bounds = Rect;
 
 export type AnimatedSpriteSceneSnapshot = {
   readonly positions: Readonly<Record<NodeId, Readonly<CanvasPosition>>>;
