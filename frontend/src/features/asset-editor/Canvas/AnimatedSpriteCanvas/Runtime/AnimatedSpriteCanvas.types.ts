@@ -44,7 +44,7 @@ export type AnimatedSpriteStageContext = {
   viewport: Viewport;
   actions: AnimatedSpriteCanvasActions;
   getAnimations: () => CharacterAnimation[];
-  getPrototype?: () => { columns: number; rows: number };
+  getPrototype: () => { columns: number; rows: number };
   getScene: () => AnimatedSpriteSceneSnapshot;
   moveNode: (node: NodeId, position: CanvasPosition) => void;
   setMarquee: (marquee: AnimatedSpriteSceneState["marquee"]) => void;

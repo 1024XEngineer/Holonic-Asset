@@ -35,11 +35,17 @@ describe("AnimatedSpriteStageGeometry", () => {
     ).toBeGreaterThan(300);
   });
 
-  it("keeps the original animation-only call shape usable", () => {
+  it("calculates animation bounds from explicit sprite inputs", () => {
     expect(getAnimatedSpriteFrameCount("idle", undefined, animations)).toBe(8);
-    expect(getNodeBounds("idle", { x: 0, y: 0 }, true, animations).width).toBe(
-      448,
-    );
+    expect(
+      getNodeBounds(
+        "idle",
+        { x: 0, y: 0 },
+        true,
+        { columns: 1, rows: 1 },
+        animations,
+      ).width,
+    ).toBe(448);
   });
 
   it("hit-tests animation frames before the node body", () => {

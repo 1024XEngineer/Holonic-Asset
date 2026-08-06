@@ -31,12 +31,6 @@ const PLAY_CONTROL = { x: 37, width: 68 } as const;
 const EXPAND_CONTROL = { x: 113, width: 84 } as const;
 type SpriteSheetShape = { columns: number; rows: number };
 
-function isAnimationList(
-  value: SpriteSheetShape | readonly CharacterAnimation[] | undefined,
-): value is readonly CharacterAnimation[] {
-  return Array.isArray(value);
-}
-
 export type AnimatedSpriteHitTarget =
   | { kind: "node"; node: NodeId }
   | { kind: "frame"; node: NodeId; index: number }
@@ -55,7 +49,7 @@ export type AnimatedSpriteNodeLayout = {
 
 function getExpandedHeight(
   node: NodeId,
-  prototype: SpriteSheetShape | undefined,
+  prototype: SpriteSheetShape,
   animations: readonly CharacterAnimation[],
 ) {
   return getExpandedNodeHeight(
@@ -67,22 +61,14 @@ export function getNodeBounds(
   node: NodeId,
   position: CanvasPosition,
   expanded: boolean,
-  prototypeOrAnimations?:
-    | { columns: number; rows: number }
-    | readonly CharacterAnimation[],
-  animations: readonly CharacterAnimation[] = [],
+  prototype: SpriteSheetShape,
+  animations: readonly CharacterAnimation[],
 ): Bounds {
-  const prototype = isAnimationList(prototypeOrAnimations)
-    ? undefined
-    : prototypeOrAnimations;
-  const resolvedAnimations = isAnimationList(prototypeOrAnimations)
-    ? prototypeOrAnimations
-    : animations;
   return {
     ...position,
     width: expanded ? EXPANDED_WIDTH : NODE_WIDTH,
     height: expanded
-      ? getExpandedHeight(node, prototype, resolvedAnimations)
+      ? getExpandedHeight(node, prototype, animations)
       : COLLAPSED_HEIGHT,
   };
 }
@@ -91,36 +77,18 @@ export function getAnimatedSpriteNodeLayout(
   node: NodeId,
   position: CanvasPosition,
   expanded: boolean,
-  prototypeOrAnimations?:
-    | { columns: number; rows: number }
-    | readonly CharacterAnimation[],
-  animations: readonly CharacterAnimation[] = [],
+  prototype: SpriteSheetShape,
+  animations: readonly CharacterAnimation[],
 ): AnimatedSpriteNodeLayout {
-  const prototype = isAnimationList(prototypeOrAnimations)
-    ? undefined
-    : prototypeOrAnimations;
-  const resolvedAnimations = isAnimationList(prototypeOrAnimations)
-    ? prototypeOrAnimations
-    : animations;
-  const bounds = getNodeBounds(
-    node,
-    position,
-    expanded,
-    prototype,
-    resolvedAnimations,
-  );
-  const frameCount = getAnimatedSpriteFrameCount(
-    node,
-    prototype,
-    resolvedAnimations,
-  );
+  const bounds = getNodeBounds(node, position, expanded, prototype, animations);
+  const frameCount = getAnimatedSpriteFrameCount(node, prototype, animations);
   const frames = expanded
     ? Array.from({ length: frameCount }, (_, index) =>
         getFrameBounds(position, index),
       )
     : [];
   const controlsY = bounds.y + bounds.height - CONTROL_HEIGHT - CONTROL_BOTTOM;
-  const animation = getAnimatedSpriteAnimation(node, resolvedAnimations);
+  const animation = getAnimatedSpriteAnimation(node, animations);
   const hasControls = Boolean(animation);
   return {
     bounds,
@@ -173,24 +141,16 @@ export function getFrameBounds(
 export function hitTestAnimatedSpriteScene(
   scene: AnimatedSpriteSceneSnapshot,
   point: CanvasPosition,
-  prototypeOrAnimations?:
-    | { columns: number; rows: number }
-    | readonly CharacterAnimation[],
-  animations: readonly CharacterAnimation[] = [],
+  prototype: SpriteSheetShape,
+  animations: readonly CharacterAnimation[],
 ): AnimatedSpriteHitTarget | null {
-  const prototype = Array.isArray(prototypeOrAnimations)
-    ? undefined
-    : prototypeOrAnimations;
-  const resolvedAnimations = Array.isArray(prototypeOrAnimations)
-    ? prototypeOrAnimations
-    : animations;
-  for (const node of getCanvasNodes(resolvedAnimations).reverse()) {
+  for (const node of getCanvasNodes(animations).reverse()) {
     const layout = getAnimatedSpriteNodeLayout(
       node,
       scene.positions[node],
       scene.expanded.has(node),
       prototype,
-      resolvedAnimations,
+      animations,
     );
     for (let index = layout.frames.length - 1; index >= 0; index -= 1) {
       if (containsPoint(layout.frames[index], point))

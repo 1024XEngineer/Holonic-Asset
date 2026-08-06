@@ -132,7 +132,7 @@ export class AnimatedSpriteStageInteraction {
     return hitTestAnimatedSpriteScene(
       model,
       point,
-      this.context.getPrototype?.(),
+      this.context.getPrototype(),
       this.context.getAnimations(),
     );
   }
@@ -170,7 +170,7 @@ export class AnimatedSpriteStageInteraction {
             node,
             scene.positions[node],
             scene.expanded.has(node),
-            this.context.getPrototype?.(),
+            this.context.getPrototype(),
             this.context.getAnimations(),
           ),
         ),
@@ -190,7 +190,7 @@ export class AnimatedSpriteStageInteraction {
       {
         length: getAnimatedSpriteFrameCount(
           node,
-          this.context.getPrototype?.(),
+          this.context.getPrototype(),
           this.context.getAnimations(),
         ),
       },
