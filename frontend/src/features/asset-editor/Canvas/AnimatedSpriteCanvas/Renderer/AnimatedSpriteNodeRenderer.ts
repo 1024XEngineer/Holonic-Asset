@@ -108,17 +108,6 @@ export function drawAnimatedSpriteNode({
       },
       pixelScale,
     });
-  } else {
-    drawPlaceholder(
-      container,
-      {
-        x: (layout.bounds.width - FRAME_SIZE) / 2,
-        y: COLLAPSED_PREVIEW_Y,
-        width: FRAME_SIZE,
-        height: FRAME_SIZE,
-      },
-      previewFrame,
-    );
   }
 
   if (animation?.audio && !expanded) {
@@ -206,7 +195,7 @@ function drawFrame(
   if (
     spriteSheet?.imageUrl &&
     !unavailableTextureUrls?.has(spriteSheet.imageUrl)
-  )
+  ) {
     drawSpriteSheetFrame({
       container,
       frameTextures,
@@ -215,46 +204,7 @@ function drawFrame(
       bounds,
       pixelScale,
     });
-  else drawPlaceholder(container, bounds, index);
-}
-
-function drawPlaceholder(container: Container, bounds: Bounds, frame: number) {
-  const size = Math.floor(Math.min(bounds.width / 12, bounds.height / 17));
-  const pixels = new Graphics();
-  for (let index = 0; index < 12 * 17; index += 1) {
-    const x = index % 12;
-    const y = Math.floor(index / 12);
-    const isHead = y >= 2 && y <= 5 && x >= 3 && x <= 8;
-    const isHair = y >= 1 && y <= 3 && x >= 2 && x <= 9;
-    const isBody = y >= 6 && y <= 11 && x >= 3 && x <= 8;
-    const isLeg =
-      y >= 12 && y <= 15 && ((x >= 3 && x <= 4) || (x >= 7 && x <= 8));
-    const isShadow = y === 16 && x >= 2 && x <= 9;
-    let color: number | undefined;
-    let alpha = 1;
-    if (isHair) color = 0x5a3d32;
-    if (isHead) color = 0xe8aa7d;
-    if (isBody) color = 0x5e7892;
-    if (y === 7 && x >= 2 && x <= 9) color = 0xd58a57;
-    if (isLeg) color = 0x3d4a62;
-    if (isShadow) {
-      color = 0x735d4a;
-      alpha = 0.34;
-    }
-    if (frame % 2 === 1 && y === 12 && x === 4) color = 0xf09b5b;
-    if (frame % 3 === 2 && y === 13 && x === 8) color = 0x91c7a5;
-    if (color !== undefined)
-      pixels
-        .roundRect(
-          bounds.x + (bounds.width - 12 * size) / 2 + x * size,
-          bounds.y + (bounds.height - 17 * size) / 2 + y * size,
-          size - 1,
-          size - 1,
-          1,
-        )
-        .fill({ color, alpha });
   }
-  container.addChild(pixels);
 }
 
 function drawSpriteSheetPreview(
