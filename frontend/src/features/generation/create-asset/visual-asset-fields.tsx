@@ -26,8 +26,6 @@ export function VisualAssetFields({
   draft: VisualAssetCreationDraft<File>;
   onChange: (draft: VisualAssetCreationDraft<File>) => void;
 }) {
-  const isSpriteAsset = draft.kind === "character" || draft.kind === "object";
-
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -51,33 +49,29 @@ export function VisualAssetFields({
         />
       </div>
 
-      {isSpriteAsset ? (
-        <>
-          <OptionSelect
-            label="Direction count"
-            value={draft.directionCount}
-            options={[
-              ["1", "1 direction"],
-              ["4", "4 directions"],
-              ["8", "8 directions"],
-            ]}
-            onChange={(directionCount) =>
-              onChange({
-                ...draft,
-                directionCount,
-              })
-            }
-          />
-          <div className="grid gap-2 text-sm font-medium">
-            <span>Reference</span>
-            <ImageDropzone
-              fileName={draft.reference?.name}
-              onSelect={(reference) => onChange({ ...draft, reference })}
-              onClear={() => onChange({ ...draft, reference: undefined })}
-            />
-          </div>
-        </>
-      ) : null}
+      <OptionSelect
+        label="Direction count"
+        value={draft.directionCount}
+        options={[
+          ["1", "1 direction"],
+          ["4", "4 directions"],
+          ["8", "8 directions"],
+        ]}
+        onChange={(directionCount) =>
+          onChange({
+            ...draft,
+            directionCount,
+          })
+        }
+      />
+      <div className="grid gap-2 text-sm font-medium">
+        <span>Reference</span>
+        <ImageDropzone
+          fileName={draft.reference?.name}
+          onSelect={(reference) => onChange({ ...draft, reference })}
+          onClear={() => onChange({ ...draft, reference: undefined })}
+        />
+      </div>
     </>
   );
 }
