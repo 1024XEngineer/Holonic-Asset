@@ -7,4 +7,10 @@ export {
   removeProjectSelection,
 } from "./project-selection";
 export { useUpdateProjectMutation } from "./project-update.mutation";
-export type { CreateProjectInput, Project, ProjectSummary } from "./types";
+export { isPerspective, perspectiveOptions } from "./types";
+export type {
+  CreateProjectInput,
+  Perspective,
+  Project,
+  ProjectSummary,
+} from "./types";

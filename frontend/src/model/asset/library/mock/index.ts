@@ -5,4 +5,5 @@ export {
   deleteMockProjectAssets,
   listMockAssetGroups,
   saveMockAssetRevision,
+  updateMockAsset,
 } from "./assets.mock";

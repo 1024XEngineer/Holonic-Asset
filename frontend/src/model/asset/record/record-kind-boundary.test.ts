@@ -13,7 +13,7 @@ const asset: ProjectAsset = {
   description: "A test sprite",
   version: "v1",
   canvasSize: "32 x 32 px",
-  perspective: "Top-down",
+  perspective: "Top-Down",
   tags: [],
   history: [],
   animations: [],

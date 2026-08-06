@@ -373,8 +373,11 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
-            /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            /**
+             * @default Top-Down
+             * @enum {string}
+             */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
@@ -451,8 +454,11 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
-            /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            /**
+             * @default Top-Down
+             * @enum {string}
+             */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
@@ -511,7 +517,7 @@ export interface components {
             id: number;
             name: string;
             /** @enum {string} */
-            perspective: "" | "TopDown" | "SideOn" | "Isometric";
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference: string;
             style: string;
             /** @enum {string} */
@@ -772,7 +778,7 @@ export interface components {
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name?: string;
             /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            perspective?: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectID: number;
             reference?: string;

@@ -1,1 +1,9 @@
-export type { AssetGroup, AssetGroupsByProject } from "./asset-library";
+export {
+  assetCanvasSizeOptions,
+  type AssetCanvasSize,
+} from "./asset-canvas-size";
+export type {
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetLibraryItem,
+} from "./asset-library";

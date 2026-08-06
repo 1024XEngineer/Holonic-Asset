@@ -3,6 +3,7 @@ export {
   assetKinds,
   assetKeys,
   creatableAssetKinds,
+  createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
@@ -18,8 +19,13 @@ export {
 export type {
   AddAudioTrackInput,
   AssetAnimation,
+  AssetPreviewCrop,
+  AssetPreviewFrame,
+  AssetPreviewOffset,
   AssetGroup,
   AssetGroupsByProject,
+  AssetLibraryCollection,
+  AssetLibraryItem,
   AssetKind,
   AssetRevision,
   AssetRevisionStatus,
@@ -118,6 +124,8 @@ export type {
   ListGenerationRunsResponse,
 } from "./generation/run/generation.api";
 export {
+  isPerspective,
+  perspectiveOptions,
   reconcileProjectSelection,
   removeProjectSelection,
   useCreateProjectMutation,
@@ -125,7 +133,12 @@ export {
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";
-export type { CreateProjectInput, Project, ProjectSummary } from "./project";
+export type {
+  CreateProjectInput,
+  Perspective,
+  Project,
+  ProjectSummary,
+} from "./project";
 export { coreProjectApi } from "./project/project.api";
 export type {
   CreateProjectRequest,
