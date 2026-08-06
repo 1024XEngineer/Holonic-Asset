@@ -50,12 +50,22 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 brew install lefthook
 ```
 
-### 方式二：pnpm / npm 全局或本地安装
+### 方式二：pnpm / npm 全局安装
 
 ```bash
-# 根目录或全局安装
-pnpm add -D lefthook
+# pnpm 全局安装
+pnpm add -g lefthook
+
+# 或 npm 全局安装
+npm install -g lefthook
 ```
+
+若希望在前端工程 (`frontend/`) 内安装为本地开发依赖：
+
+```bash
+cd frontend && pnpm add -D lefthook
+```
+> 注：若使用前端本地依赖，后续在根目录需运行 `npx lefthook install` 或 `pnpm --filter frontend exec lefthook install`。
 
 ### 方式三：Go install
 

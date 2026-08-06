@@ -50,12 +50,22 @@ Please choose an installation method suitable for your development environment:
 brew install lefthook
 ```
 
-### Method 2: pnpm / npm Global or Local Installation
+### Method 2: pnpm / npm Global Installation
 
 ```bash
-# Root directory or global installation
-pnpm add -D lefthook
+# pnpm global install
+pnpm add -g lefthook
+
+# Or npm global install
+npm install -g lefthook
 ```
+
+If you prefer installing it locally as a development dependency in `frontend/`:
+
+```bash
+cd frontend && pnpm add -D lefthook
+```
+> Note: If installed locally in `frontend/`, run commands from the project root using `npx lefthook install` or `pnpm --filter frontend exec lefthook install`.
 
 ### Method 3: Go install
 
