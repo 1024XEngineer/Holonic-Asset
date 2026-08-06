@@ -95,15 +95,15 @@ export function HomeProjectStory() {
               id="project-story-heading"
               className="mt-6 max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] sm:text-5xl lg:text-6xl"
             >
-              Not a folder of outputs. An asset library with direction.
+              Not a folder of outputs. A complete game asset library.
             </h2>
           </div>
 
           <div className="mt-20 max-w-xl lg:mt-28">
             <p className="text-lg leading-8 text-white/70">
-              Every project records the game type, platform, visual style, and
-              visual direction that guide new generations. Assets stay grouped
-              by type, from characters and objects to scenery, tilesets, and UI.
+              Every project keeps the game type, platform, and visual style in
+              one place so new assets stay consistent. Assets stay grouped by
+              type, from characters and objects to scenery, tilesets, and UI.
             </p>
             <p className="mt-5 text-sm leading-7 text-white/50">
               Keep useful details attached to every asset: canvas size,
