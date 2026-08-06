@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 import type { TileShapeCell } from "@/model/generation";
@@ -12,27 +12,17 @@ export function TileShapePicker({
   cells: TileShapeCell[];
   onChange: (cells: TileShapeCell[]) => void;
 }) {
-  const shapeKey = cells
-    .map(([x, y]) => `${x}:${y}`)
-    .sort()
-    .join(",");
-  const [selected, setSelected] = useState(cells);
   const selectedCells = useMemo(
-    () => new Set(selected.map(([x, y]) => `${x}:${y}`)),
-    [selected],
+    () => new Set(cells.map(([x, y]) => `${x}:${y}`)),
+    [cells],
   );
-
-  useEffect(() => {
-    setSelected(cells);
-  }, [shapeKey]);
 
   const toggleCell = (x: number, y: number) => {
     const isSelected = selectedCells.has(`${x}:${y}`);
     const nextCells = isSelected
-      ? selected.filter(([cellX, cellY]) => cellX !== x || cellY !== y)
-      : [...selected, [x, y] as TileShapeCell];
+      ? cells.filter(([cellX, cellY]) => cellX !== x || cellY !== y)
+      : [...cells, [x, y] as TileShapeCell];
 
-    setSelected(nextCells);
     onChange(nextCells);
   };
 
@@ -43,7 +33,7 @@ export function TileShapePicker({
           Occupied tiles
         </p>
         <span className="font-mono text-xs text-muted-foreground">
-          {selected.length} {selected.length === 1 ? "tile" : "tiles"}
+          {cells.length} {cells.length === 1 ? "tile" : "tiles"}
         </span>
       </div>
       <div

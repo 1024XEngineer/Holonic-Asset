@@ -1,5 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +51,7 @@ export function CreateAssetForm({
       await onCreate(toCreationRequest({ ...value.draft, useProjectContext }));
     },
   });
-  const draft = form.state.values.draft;
+  const draft = useStore(form.store, (state) => state.values.draft);
   const setDraft = (nextDraft: AssetCreationDraft<File>) => {
     if (
       nextDraft.kind === "tileset" &&
