@@ -58,8 +58,8 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 		t.Fatalf("load example config: %v", err)
 	}
 
-	if loaded.QNA.DefaultModel != "openai/gpt-image-2" {
-		t.Fatalf("unexpected qna config: %+v", loaded.QNA)
+	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
+		t.Fatalf("unexpected image config: %+v", loaded.Image)
 	}
 	if loaded.QiNiu.UploadTokenExpiry != time.Hour {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
