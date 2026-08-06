@@ -59,6 +59,33 @@ describe("editor session store", () => {
     expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(false);
   });
 
+  it("ignores object key order when comparing the saved baseline", () => {
+    const record = createCharacterRecord();
+    const store = createEditorSessionStore(record);
+    const reorderedRecord = {
+      prompt: record.prompt,
+      character: {
+        nodePositions: structuredClone(record.character.nodePositions),
+        animations: structuredClone(record.character.animations),
+        prototype: structuredClone(record.character.prototype),
+      },
+      mode: record.mode,
+    } satisfies CharacterAssetRecord;
+
+    markEditorSessionSaved(store, reorderedRecord);
+
+    expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(false);
+  });
+
+  it("recomputes dirty state after an in-place record mutation", () => {
+    const store = createEditorSessionStore(createCharacterRecord());
+    const snapshot = getEditorSessionSnapshot(store, idleSaveState);
+
+    snapshot.record.prompt = "Mutated outside the command API";
+
+    expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(true);
+  });
+
   it("records only effective record changes in temporal history", () => {
     const store = createEditorSessionStore(createCharacterRecord());
 

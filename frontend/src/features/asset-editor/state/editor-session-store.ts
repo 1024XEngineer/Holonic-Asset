@@ -1,3 +1,4 @@
+import deepEqual from "fast-deep-equal";
 import { createStore } from "zustand";
 import { temporal } from "zundo";
 
@@ -251,7 +252,7 @@ export function getEditorSessionSnapshot(
 }
 
 function recordsMatch(left: AssetRecord, right: AssetRecord) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return deepEqual(left, right);
 }
 
 function createCharacterAnimationId(
