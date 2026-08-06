@@ -1,6 +1,7 @@
 import { Container, Rectangle, Sprite, Texture } from "pixi.js";
 import type { CharacterSpriteSheet } from "@/model";
 import { snapToStep } from "@/lib/snap-to-step";
+import { getSpriteSheetFramePosition } from "../sprite-sheet-grid";
 
 type FrameBounds = { x: number; y: number; width: number; height: number };
 const frameTextures = new Map<string, Texture>();
@@ -37,11 +38,7 @@ function getSpriteSheetFrameTexture(
   spriteSheet: CharacterSpriteSheet,
   frame: number,
 ) {
-  const frameCount = Math.max(1, spriteSheet.columns * spriteSheet.rows);
-  const safeFrame = ((frame % frameCount) + frameCount) % frameCount;
-  const column = safeFrame % Math.max(1, spriteSheet.columns);
-  const row =
-    spriteSheet.row ?? Math.floor(safeFrame / Math.max(1, spriteSheet.columns));
+  const { column, row } = getSpriteSheetFramePosition(frame, spriteSheet);
   const cacheKey = [
     spriteSheet.imageUrl,
     column,
