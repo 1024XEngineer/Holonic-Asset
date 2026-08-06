@@ -18,6 +18,6 @@ fi
 while IFS= read -r branch; do
   [ "$branch" = "$main_branch" ] && continue
   git branch -D "$branch"
-done < <(git for-each-ref --format='%(refname:short)' refs/heads)
+done < <(git for-each-ref --format='%(refname:lstrip=2)' refs/heads)
 
 printf 'Deleted every local branch except "%s".\n' "$main_branch"

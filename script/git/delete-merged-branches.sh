@@ -24,6 +24,6 @@ while IFS= read -r branch; do
     git branch -d "$branch"
     deleted=$((deleted + 1))
   fi
-done < <(git for-each-ref --format='%(refname:short)' refs/heads)
+done < <(git for-each-ref --format='%(refname:lstrip=2)' refs/heads)
 
 printf 'Deleted %d branch(es) merged into "%s".\n' "$deleted" "$main_branch"
