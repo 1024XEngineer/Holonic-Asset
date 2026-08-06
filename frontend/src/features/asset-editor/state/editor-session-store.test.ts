@@ -137,6 +137,23 @@ describe("editor session store", () => {
     ).toThrow("Character animations require a character record.");
   });
 
+  it("keeps character commands isolated from object records", () => {
+    const characterRecord = createCharacterRecord();
+    const record: AssetRecord = {
+      mode: "object",
+      prompt: "Crate",
+      object: structuredClone(characterRecord.character),
+    };
+    const store = createEditorSessionStore(record);
+
+    expect(() =>
+      dispatchEditorCommand(store, {
+        type: "character.animation.delete",
+        animationId: "idle",
+      }),
+    ).toThrow("Character animations require a character record.");
+  });
+
   it("resets the draft, baseline, and temporal history", () => {
     const store = createEditorSessionStore(createCharacterRecord());
     dispatchEditorCommand(store, {
