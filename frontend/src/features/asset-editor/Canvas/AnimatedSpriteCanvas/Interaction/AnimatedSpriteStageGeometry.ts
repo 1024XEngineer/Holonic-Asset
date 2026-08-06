@@ -20,6 +20,7 @@ import {
   getAnimatedSpriteAnimation,
   type NodeId,
 } from "../animated-sprite-node";
+import { getGridRowCount } from "../../lib/grid-row-count";
 
 const FRAME_GRID_INSET = 8;
 const FRAME_GRID_TOP = 48;
@@ -144,7 +145,8 @@ export function getAnimatedSpriteNodeLayout(
           y: bounds.y + FRAME_GRID_TOP,
           width: EXPANDED_WIDTH - FRAME_GRID_INSET * 2,
           height:
-            Math.ceil(frameCount / 4) * (FRAME_SIZE + FRAME_GAP) - FRAME_GAP,
+            getGridRowCount(frameCount, 4) * (FRAME_SIZE + FRAME_GAP) -
+            FRAME_GAP,
         }
       : undefined,
     playControl: hasControls

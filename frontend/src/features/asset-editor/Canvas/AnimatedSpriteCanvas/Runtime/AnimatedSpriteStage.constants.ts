@@ -1,4 +1,5 @@
 import type { CharacterSpriteSheet } from "@/model";
+import { getGridRowCount } from "../../lib/grid-row-count";
 
 export const MIN_SCALE = 0.3;
 export const MAX_SOURCE_PIXEL_SCREEN_SIZE = 24;
@@ -13,9 +14,7 @@ export const STAGE_ACCENT = 0xb86b70;
 export const STAGE_BACKGROUND = 0xeeece7;
 
 export function getExpandedNodeHeight(frameCount: number) {
-  return (
-    48 + Math.ceil(Math.max(1, frameCount) / 4) * (FRAME_SIZE + FRAME_GAP) + 48
-  );
+  return 48 + getGridRowCount(frameCount, 4) * (FRAME_SIZE + FRAME_GAP) + 48;
 }
 
 export function getAnimatedSpritePixelScale(

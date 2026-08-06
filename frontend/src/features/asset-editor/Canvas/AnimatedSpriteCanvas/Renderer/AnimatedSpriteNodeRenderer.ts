@@ -1,5 +1,6 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { CharacterAnimation, CharacterSpriteSheet } from "@/model";
+import { getGridRowCount } from "../../lib/grid-row-count";
 import {
   getAnimatedSpriteAnimation,
   getAnimatedSpriteNodeLabel,
@@ -252,7 +253,7 @@ function drawSpriteSheetPreview(
 ) {
   const frameCount = Math.max(1, spriteSheet.columns * spriteSheet.rows);
   const columns = frameCount === 1 ? 1 : 2;
-  const rows = Math.ceil(frameCount / columns);
+  const rows = getGridRowCount(frameCount, columns);
   const gap = 8;
   const width = columns * FRAME_SIZE + (columns - 1) * gap;
   const height = rows * FRAME_SIZE + (rows - 1) * gap;
