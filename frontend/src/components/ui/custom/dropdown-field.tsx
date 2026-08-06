@@ -4,7 +4,7 @@
  */
 
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export function DropdownField({
   label,
@@ -21,29 +22,49 @@ export function DropdownField({
   options,
   onChange,
   className,
+  disabled = false,
+  size = "default",
 }: {
-  label: string;
+  label: ReactNode;
   value: string;
   options: readonly string[];
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
+  size?: "default" | "compact";
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   return (
-    <label className={`grid gap-2 text-sm font-medium ${className ?? ""}`}>
-      {label}
+    <label
+      className={cn(
+        "grid gap-2 font-medium",
+        size === "compact" ? "text-xs text-muted-foreground" : "text-sm",
+        className,
+      )}
+    >
+      <span className={cn(size === "compact" && "flex items-center gap-1.5")}>
+        {label}
+      </span>
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           render={
             <Button
+              disabled={disabled}
               type="button"
               variant="outline"
-              className="h-9 w-full justify-between px-3 font-normal"
+              className={cn(
+                "w-full justify-between font-normal",
+                size === "compact" ? "h-8 px-2.5" : "h-9 px-3",
+              )}
             />
           }
         >
-          {value || "Not specified"}
+          <span className="truncate">{value || "Not specified"}</span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-(--anchor-width)">

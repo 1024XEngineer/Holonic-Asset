@@ -4,10 +4,12 @@ import {
   deleteMockAsset,
   listMockAssetGroups,
   saveMockAssetRevision,
+  updateMockAsset,
 } from "./mock";
 import type { AssetListItemResponse, AssetType } from "./asset.contract";
 import { getDefaultAssetCanvasSize } from "./asset-canvas-size";
-import type { AssetKind, ProjectAsset } from "../types";
+import { perspectiveOptions, type Perspective } from "../../project/types";
+import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
 export type {
@@ -50,7 +52,7 @@ export type AssetAnimationResponse = {
 };
 
 type DirectionalAssetContent = {
-  viewMode: "side_on" | "top_down";
+  perspective: Perspective;
   directionCount: 1 | 2 | 4 | 8;
   prototype: AssetImageResourceResponse[];
   metadata?: AssetContentMetadata;
@@ -112,6 +114,8 @@ export const assetApi = {
     copyMockAsset(projectId, assetId),
   delete: (projectId: string, assetId: string) =>
     deleteMockAsset(projectId, assetId),
+  update: (projectId: string, assetId: string, metadata: AssetMetadataUpdate) =>
+    updateMockAsset(projectId, assetId, metadata),
   saveRevision: <Payload>({
     projectId,
     assetId,
@@ -133,7 +137,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       description: item.description,
       version: `v${item.version}`,
       canvasSize: getDefaultAssetCanvasSize(kind),
-      perspective: "Not specified",
+      perspective: perspectiveOptions[0],
       tags: item.tags ?? [],
       history: [],
       animations: [],

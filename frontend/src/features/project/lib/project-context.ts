@@ -1,3 +1,4 @@
+import { perspectiveOptions } from "@/model/project";
 import type { CreateProjectInput, ProjectSummary } from "@/model/project";
 
 import type {
@@ -13,7 +14,7 @@ export const projectContextOptions = {
     "Strategy",
     "Simulation",
   ],
-  perspectives: ["Top-down", "Side-on", "Isometric"],
+  perspectives: perspectiveOptions,
   platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
 } as const;
 
@@ -35,16 +36,14 @@ export function createNewProjectDraft(): NewProjectDraft {
 export function toCreateProjectInput(
   draft: NewProjectDraft & { visualDirection?: string },
 ): CreateProjectInput {
-  const perspective = draft.perspective.trim();
-
   return {
     name: draft.name.trim(),
     gameType: draft.gameType,
     platform: draft.platform,
     description: draft.description.trim() || "A new game asset workspace.",
     reference: draft.reference.trim(),
-    style: perspective,
-    perspective,
+    style: draft.perspective,
+    perspective: draft.perspective,
     visualDirection: draft.visualDirection ?? "",
   };
 }
@@ -73,16 +72,14 @@ export function applyProjectSettings(
 ): ProjectSummary | undefined {
   const name = draft.name.trim();
   const gameType = resolveEditableOption(draft.gameType, draft.customGameType);
-  const perspective = draft.perspective.trim();
-
-  if (!name || !gameType || !perspective) return undefined;
+  if (!name || !gameType) return undefined;
 
   return {
     ...project,
     name,
     gameType,
-    perspective,
-    style: perspective,
+    perspective: draft.perspective,
+    style: draft.perspective,
     platform: draft.platform,
     description: draft.description,
     visualDirection: draft.visualDirection,

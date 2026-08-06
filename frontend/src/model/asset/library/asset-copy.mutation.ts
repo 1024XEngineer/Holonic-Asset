@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { assetApi } from "./asset.api";
-import { assetKeys } from "./keys";
+import { createAssetLibraryCacheSync } from "./asset-library-cache";
 
 type CopyAssetInput = { projectId: string; assetId: string };
 
@@ -11,8 +11,6 @@ export function useCopyAssetMutation() {
   return useMutation({
     mutationFn: ({ projectId, assetId }: CopyAssetInput) =>
       assetApi.copy(projectId, assetId),
-    onSuccess: (assetGroups, { projectId }) => {
-      queryClient.setQueryData(assetKeys.library(projectId), assetGroups);
-    },
+    onSuccess: createAssetLibraryCacheSync(queryClient),
   });
 }

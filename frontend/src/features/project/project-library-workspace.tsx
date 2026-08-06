@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/layouts/app-header";
 import { ProjectWorkspaceLayout } from "@/components/layouts/project-workspace-layout";
+import { AssetLibrary } from "@/features/assets";
 
 import { ProjectSidebar } from "./project-sidebar";
 import type { ProjectLibraryController } from "./state/use-project-library";
@@ -15,7 +16,7 @@ export function ProjectLibraryWorkspace({
       <ProjectWorkspaceLayout
         sidebar={<ProjectSidebar library={library.project} />}
       >
-        <div className="h-full bg-background" />
+        <AssetLibrary project={library.project.current} />
       </ProjectWorkspaceLayout>
     </div>
   );

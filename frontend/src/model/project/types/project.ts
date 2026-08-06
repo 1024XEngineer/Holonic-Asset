@@ -1,3 +1,5 @@
+import type { Perspective } from "./perspective";
+
 export type Project = {
   id: string;
   name: string;
@@ -9,7 +11,7 @@ export type Project = {
 };
 
 export type ProjectSummary = Project & {
-  perspective: string;
+  perspective: Perspective;
   visualDirection: string;
   assetCount: number;
 };

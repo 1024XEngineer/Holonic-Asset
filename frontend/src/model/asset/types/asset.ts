@@ -1,4 +1,5 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
+import type { Perspective } from "../../project/types";
 
 export type CharacterSpriteSheet = {
   format: "png-sprite-sheet";
@@ -38,15 +39,48 @@ export type SceneryLayer = {
 
 export type SceneryAssetData = { layers: SceneryLayer[] };
 
+export type AssetPreviewFrame = {
+  columns: number;
+  rows: number;
+  column: number;
+  row: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  offsetX?: number;
+  displayWidth?: string;
+};
+
+export type AssetPreviewOffset = { x: string; y: string };
+
+export type AssetPreviewCrop = {
+  sourceWidth: number;
+  sourceHeight: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  displayOffsetY?: string;
+};
+
 export type ProjectAsset = {
   id: string;
   name: string;
   description: string;
   version: string;
   canvasSize: string;
-  perspective: string;
+  perspective: Perspective;
   tags: string[];
+  thumbnailUrl?: string;
+  previewCrop?: AssetPreviewCrop;
+  previewFrame?: AssetPreviewFrame;
+  previewOffset?: AssetPreviewOffset;
+  previewScale?: number;
   history: AssetRevision[];
   animations: AssetAnimation[];
   scenery?: SceneryAssetData;
 };
+
+export type AssetMetadataUpdate = Pick<
+  ProjectAsset,
+  "name" | "description" | "tags" | "canvasSize" | "perspective"
+>;
