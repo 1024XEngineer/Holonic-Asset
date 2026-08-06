@@ -113,7 +113,7 @@ func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 		e,
 		http.MethodPost,
 		"/api/v1/project/create",
-		`{"userID":7,"name":"Prototype","gameType":"RPG","perspective":"SideOn","targetPlatform":"PC"}`,
+		`{"userID":7,"name":"Prototype","gameType":"RPG","perspective":"Side-On","targetPlatform":"PC"}`,
 	)
 
 	if recorder.Code != http.StatusOK {
@@ -141,7 +141,7 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 			name:           "create without name",
 			method:         http.MethodPost,
 			path:           "/api/v1/project/create",
-			body:           `{"userID":7,"gameType":"RPG","perspective":"TopDown","targetPlatform":"PC"}`,
+			body:           `{"userID":7,"gameType":"RPG","perspective":"Top-Down","targetPlatform":"PC"}`,
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{

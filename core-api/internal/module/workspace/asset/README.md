@@ -92,7 +92,7 @@ Character contains `prototype` and `animations`. Direction resources are represe
 
 ```json
 {
-  "viewMode": "top_down",
+  "perspective": "Top-Down",
   "directionCount": 4,
   "prototype": [
     {
@@ -139,7 +139,7 @@ For example, a two-direction asset is represented by two prototype elements:
 
 ```json
 {
-  "viewMode": "side_on",
+  "perspective": "Side-On",
   "directionCount": 2,
   "prototype": [
     {
@@ -156,7 +156,7 @@ For example, a two-direction asset is represented by two prototype elements:
 
 Character conventions:
 
-- `viewMode` represents the asset's perspective mode. Currently includes `side_on` and `top_down`.
+- `perspective` is exactly one of `Top-Down`, `Side-On`, or `Isometric`.
 - `directionCount` is the number of directions to generate for the current asset. Only `1`, `2`, `4`, or `8` are used.
 - `prototype` is a plain array of image resources.
 - `animations[].frames` is a plain array of animation frames.
@@ -170,7 +170,7 @@ Object uses the same content structure as Character. It may have only a prototyp
 
 ```json
 {
-  "viewMode": "side_on",
+  "perspective": "Side-On",
   "directionCount": 2,
   "prototype": [],
   "animations": [

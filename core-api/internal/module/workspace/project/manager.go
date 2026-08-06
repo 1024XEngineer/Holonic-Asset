@@ -129,7 +129,7 @@ func buildReferencePrompt(project *Project) string {
 USER PROJECT
 - Name: %q
 - Game type: %s
-- Camera: %s
+- Perspective: %s
 - Platform: %s
 - Art style: %q
 - User description: %q
@@ -200,13 +200,13 @@ func gameTypePrompt(gameType GameType) string {
 func perspectivePrompt(perspective Perspective) string {
 	switch perspective {
 	case PerspectiveTopDown:
-		return "top-down 2D pixel-art gameplay camera with a readable tile-based playfield, clear paths, interactables, and spatial relationships"
+		return "Top-Down 2D pixel-art gameplay perspective with a readable tile-based playfield, clear paths, interactables, and spatial relationships"
 	case PerspectiveSideOn:
-		return "side-on 2D pixel-art gameplay camera with layered parallax backgrounds, a clear traversal line, readable platforms, and strong sprite silhouettes"
+		return "Side-On 2D pixel-art gameplay perspective with layered parallax backgrounds, a clear traversal line, readable platforms, and strong sprite silhouettes"
 	case PerspectiveIsometric:
-		return "2D isometric pixel-art gameplay camera with a consistent pixel grid, clear depth, walkable tiles, elevation, and tactical readability"
+		return "Isometric 2D pixel-art gameplay perspective with a consistent pixel grid, clear depth, walkable tiles, elevation, and tactical readability"
 	default:
-		return "choose the 2D pixel-art gameplay camera best suited to the brief and keep it consistent with an authentic playable screenshot"
+		return "choose the 2D pixel-art gameplay perspective best suited to the brief and keep it consistent with an authentic playable screenshot"
 	}
 }
 
