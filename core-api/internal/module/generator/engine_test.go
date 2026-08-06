@@ -9,6 +9,7 @@ import (
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
 type taskManagerStub struct {
@@ -81,17 +82,29 @@ func (s *taskManagerStub) dispatch(
 
 var _ taskdomain.Manager = (*taskManagerStub)(nil)
 
+type projectReaderStub struct {
+	project *projectdomain.Project
+	err     error
+	calls   int
+}
+
+func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
+	s.calls++
+	return s.project, s.err
+}
+
+var _ generator.ProjectReader = (*projectReaderStub)(nil)
+
 func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	assetID := uint(9)
 	tasks := &taskManagerStub{createID: 17}
 	engine := generator.NewEngine(tasks, nil)
 	request := &generator.Request{
-		ProjectID:         42,
-		AssetID:           &assetID,
-		Kind:              generator.GenerateAnimation,
-		Prompt:            "walk",
-		ReferenceMediaIDs: []string{"media-1"},
-		Parameters:        json.RawMessage(`{"asset_name":"hero walk"}`),
+		ProjectID:  42,
+		AssetID:    &assetID,
+		Kind:       generator.GenerateAnimation,
+		Prompt:     "walk",
+		Parameters: json.RawMessage(`{"asset_name":"hero walk"}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -121,10 +134,9 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	engine := generator.NewEngine(tasks, nil)
 
 	_, err := engine.Create(context.Background(), &generator.Request{
-		ProjectID:         42,
-		Kind:              generator.GenerateCharacterProtoType,
-		Prompt:            "hero",
-		ReferenceMediaIDs: []string{"media-1"},
+		ProjectID: 42,
+		Kind:      generator.GenerateCharacterProtoType,
+		Prompt:    "hero",
 		Parameters: json.RawMessage(
 			`{"asset_name":"knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4"}`,
 		),
@@ -138,10 +150,78 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
-		payload.CreativeBrief != "hero" || payload.Reference != "media-1" ||
+		payload.CreativeBrief != "hero" || payload.Reference != "" ||
 		payload.CanvasSize != "64x64" || payload.Perspective != "Top-Down" ||
 		payload.DirectionCount != "4" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
+	}
+}
+
+func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42,
+		Kind:      generator.GenerateObjectProtoType,
+		Parameters: json.RawMessage(`{
+			"reference":"https://cdn.example.com/projects/42/reference.png"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("create generation: %v", err)
+	}
+	var payload generator.CreateObjectPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if payload.Reference != "uploads/generated-1.png" || len(references.persisted) != 1 ||
+		references.persisted[0] != "https://cdn.example.com/projects/42/reference.png" {
+		t.Fatalf("reference was not persisted before publish: payload=%+v persisted=%v", payload, references.persisted)
+	}
+}
+
+func TestCreateUsesProjectReferenceWhenPayloadOmitsIt(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42,
+		Kind:      generator.GenerateCharacterProtoType,
+	})
+	if err != nil {
+		t.Fatalf("create generation: %v", err)
+	}
+	var payload generator.CreateCharacterPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if projects.calls != 1 || payload.Reference != "uploads/generated-1.png" ||
+		len(references.persisted) != 1 || references.persisted[0] != "projects/42/reference.png" {
+		t.Fatalf("project reference was not used: calls=%d payload=%+v persisted=%v", projects.calls, payload, references.persisted)
+	}
+}
+
+func TestCreateDoesNotPublishWhenReferencePersistenceFails(t *testing.T) {
+	wantErr := errors.New("storage unavailable")
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{persistErr: wantErr}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		Kind:       generator.GenerateObjectProtoType,
+		Parameters: json.RawMessage(`{"reference":"https://cdn.example.com/reference.png"}`),
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected persistence error, got %v", err)
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task was published after persistence failure: %+v", tasks.createdTask)
 	}
 }
 
