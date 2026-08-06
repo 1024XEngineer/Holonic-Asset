@@ -13,6 +13,8 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
    - `git status --short`
    - `git branch --show-current`
    - `git log --oneline -20`
+   - `git remote -v`
+   - `git branch -vv`
 2. Resolve base: user input > upstream PR > `origin/HEAD` > `main`/`master`; ask only if ambiguity changes diff.
 3. Inspect branch diff:
    - `git diff --stat <base>...HEAD`
@@ -21,8 +23,12 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
 4. Read `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/`, `CONTRIBUTING.md`, and repository-local instructions. Active template is source of truth.
 5. Read relevant commits/files until behavior, implementation, and verification are clear.
 6. Identify PR-triggered CI and run local equivalents where available.
-7. Draft title/body against the repository rules.
-8. Create/edit PR only after explicit approval.
+7. Resolve the fork push target:
+   - Existing PR: inspect head owner/repository/ref, then match its repository to a local remote.
+   - New PR: match remote URL owner to `gh api user --jq .login`; do not trust remote name.
+   - Verify push URL. No matching remote -> ask before creating a fork or adding a remote.
+8. Draft title/body against the repository rules.
+9. Create/edit PR only after explicit approval.
 
 ## Hard Rules
 
@@ -35,6 +41,7 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
 - For a required related-issue field, use only a user-provided or evidence-backed `Closes #123`, `Part of #123`, or `None`.
 - Mark checklist items `[x]` only when the diff or recorded verification supports them; otherwise leave them unchecked and explain why.
 - Keep reviewer-focused. Skip implementation trivia.
+- Treat `origin` as upstream. Push only to verified fork remote; never push the PR branch to `origin`.
 - Do not create, edit, merge, close, or push PR without explicit approval.
 - Use English headings by default unless user requests localization.
 
@@ -48,8 +55,8 @@ Draft PR metadata from committed branch diff. Do not invent context or verificat
 After approval to create PR:
 
 ```bash
-git push -u origin HEAD
-gh pr create --base <base-branch> --head "$(git branch --show-current)" --title "<type>(<scope>): <subject>" --body-file <body-file>
+git push -u <fork-remote> HEAD:<branch>
+gh pr create --repo <upstream-owner/repository> --base <base-branch> --head <fork-owner>:<branch> --title "<type>(<scope>): <subject>" --body-file <body-file>
 ```
 
 Add `--draft`, `--reviewer <handle>`, or `--web` only when requested.
