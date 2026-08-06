@@ -17,10 +17,11 @@ func New(
 	projectStore project.Store,
 	assetStore asset.Store,
 	imageService imageclient.ImageGenerationService,
+	references ...project.ReferenceStore,
 ) *Workspace {
 	workspace := &Workspace{}
 	if projectStore != nil {
-		workspace.Projects = project.NewManager(projectStore, imageService)
+		workspace.Projects = project.NewManager(projectStore, imageService, references...)
 	}
 	if assetStore != nil {
 		workspace.Assets = asset.NewManager(assetStore)
