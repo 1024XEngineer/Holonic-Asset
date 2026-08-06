@@ -102,8 +102,8 @@ export function HomeProjectStory() {
           <div className="mt-20 max-w-xl lg:mt-28">
             <p className="text-lg leading-8 text-white/70">
               Every project keeps the game type, platform, and visual style in
-              one place so new assets stay consistent. Assets stay grouped
-              by type, from characters and objects to scenery, tilesets, and UI.
+              one place so new assets stay consistent. Assets stay grouped by
+              type, from characters and objects to scenery, tilesets, and UI.
             </p>
             <p className="mt-5 text-sm leading-7 text-white/50">
               Keep useful details attached to every asset: canvas size,
