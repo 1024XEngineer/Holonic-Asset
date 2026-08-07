@@ -362,7 +362,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		"creative_brief":"walking cycle",
 		"asset_id":7,
 		"project_id":11,
-		"direction":3,
+		"direction":"back_right",
 		"style":"painted pixel art",
 		"frame_count":8,
 		"columns":4,
@@ -390,7 +390,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		Description:            "silver-haired knight",
 		Style:                  "painted pixel art",
 		Action:                 "walking cycle",
-		ReferenceImage:         "https://cdn.example.com/hero/direction_03-row.png?version=7",
+		ReferenceImage:         "https://cdn.example.com/hero/direction_03-unprocessed.png?version=7",
 		ReferenceImagePrepared: false,
 		FrameCount:             8,
 		Columns:                4,
@@ -464,7 +464,7 @@ func TestExecutorDoesNotMutateAssetsWhenAnimationGenerationFails(t *testing.T) {
 	_, err := executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
-		json.RawMessage(`{"animation_name":"walk","asset_id":7}`),
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"front"}`),
 	)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected animation generation error, got %v", err)
@@ -474,9 +474,59 @@ func TestExecutorDoesNotMutateAssetsWhenAnimationGenerationFails(t *testing.T) {
 	}
 }
 
-func TestExecutorKeepsLegacySingleDirectionPrototypeCompatibility(t *testing.T) {
+func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
 	events := []string{}
-	reference := "data:image/png;base64,legacy-prototype"
+	referenceLeft := "https://cdn.example.com/hero/left.png"
+	referenceRight := "https://cdn.example.com/hero/right.png"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 2
+	prototype := assetdomain.Prototype{
+		{ID: 1, URL: &referenceLeft},
+		{ID: 2, URL: &referenceRight},
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded}
+	animations := &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets)
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"left"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate left animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/hero/left-unprocessed.png" {
+		t.Fatalf("left direction mapped to wrong reference: %+v", animations.request)
+	}
+
+	events = nil
+	animations = &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
+	assets = &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor = generator.NewExecutorWithAnimation(nil, animations, nil, assets)
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"right"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate right animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/hero/right-unprocessed.png" {
+		t.Fatalf("right direction mapped to wrong reference: %+v", animations.request)
+	}
+}
+
+func TestExecutorRejectsUnsupportedSingleDirectionAsset(t *testing.T) {
+	events := []string{}
+	reference := "https://cdn.example.com/hero/front.png"
 	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
 	content.DirectionCount = 1
 	prototype := assetdomain.Prototype{{ID: 1, URL: &reference}}
@@ -486,25 +536,22 @@ func TestExecutorKeepsLegacySingleDirectionPrototypeCompatibility(t *testing.T) 
 		t.Fatal(err)
 	}
 	parent := assetdomain.Asset{
-		ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "legacy hero", Content: encoded,
+		ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded,
 	}
-	animations := &animationGenerationServiceStub{
-		events: &events,
-		result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}},
-	}
+	animations := &animationGenerationServiceStub{events: &events}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets)
 
 	_, err = executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
-		json.RawMessage(`{"animation_name":"idle","asset_id":7}`),
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"front"}`),
 	)
-	if err != nil {
-		t.Fatalf("generate legacy single-direction animation: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "direction count must be one of 2, 4, or 8") {
+		t.Fatalf("expected unsupported direction-count error, got %v", err)
 	}
-	if animations.request.ReferenceImage != reference || animations.request.ReferenceImagePrepared {
-		t.Fatalf("unexpected legacy reference handling: %+v", animations.request)
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start for unsupported direction count: %v", events)
 	}
 }
 
@@ -517,10 +564,10 @@ func TestExecutorRejectsAnimationDirectionOutsidePrototypeOrder(t *testing.T) {
 	_, err := executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
-		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":8}`),
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"up"}`),
 	)
-	if err == nil || !strings.Contains(err.Error(), "direction 8 is out of range") {
-		t.Fatalf("expected out-of-range direction error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), `direction "up" is unavailable`) {
+		t.Fatalf("expected invalid direction error, got %v", err)
 	}
 	if !reflect.DeepEqual(events, []string{"get_asset"}) {
 		t.Fatalf("generation should not start for an invalid direction: %v", events)
@@ -544,9 +591,9 @@ func TestExecutorRejectsMultiDirectionParentWithoutAnimationReference(t *testing
 	_, err = executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
-		json.RawMessage(`{"animation_name":"walk","asset_id":7}`),
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"front"}`),
 	)
-	if err == nil || !strings.Contains(err.Error(), "no prototype for direction 0") {
+	if err == nil || !strings.Contains(err.Error(), `no prototype for direction "front"`) {
 		t.Fatalf("expected missing multi-direction reference error, got %v", err)
 	}
 	if !reflect.DeepEqual(events, []string{"get_asset"}) {

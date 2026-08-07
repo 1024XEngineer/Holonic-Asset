@@ -2,12 +2,15 @@ package generator
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -90,6 +93,20 @@ func (s *animationProcessorStub) SplitImage(
 	return s.splitResult, s.splitErr
 }
 
+type animationReferenceResolverStub struct {
+	resolved string
+	err      error
+	requests []string
+}
+
+func (s *animationReferenceResolverStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.requests = append(s.requests, reference)
+	if s.err != nil {
+		return "", s.err
+	}
+	return s.resolved, nil
+}
+
 type animationExtractorStub struct {
 	results [][]image.Image
 	errors  []error
@@ -106,6 +123,81 @@ func (s *animationExtractorStub) Extract(context.Context, []byte, int) ([]image.
 		return nil, errors.New("unexpected extractor call")
 	}
 	return s.results[index], nil
+}
+
+func TestPrepareAnimationReferenceResolvesAndDownloadsUnprocessedImage(t *testing.T) {
+	foreground := animationTestForeground(t)
+	raw, err := base64.StdEncoding.DecodeString(foreground)
+	if err != nil {
+		t.Fatalf("decode test foreground: %v", err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/hero-unprocessed.png" {
+			t.Errorf("download path = %q, want /hero-unprocessed.png", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(raw)
+	}))
+	defer server.Close()
+
+	resolver := &animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"}
+	processor := &animationProcessorStub{foregroundBase64: foreground}
+	service := newAnimationGenerationServiceWithResolver(
+		&animationVideoServiceStub{},
+		processor,
+		&animationExtractorStub{},
+		resolver,
+	).(*animationGenerationService)
+
+	result, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	if err != nil {
+		t.Fatalf("prepare downloaded reference: %v", err)
+	}
+	if len(resolver.requests) != 1 || resolver.requests[0] != "uploads/hero-unprocessed.png" {
+		t.Fatalf("unexpected resolver requests: %v", resolver.requests)
+	}
+	if len(processor.resizeRequests) != 1 {
+		t.Fatalf("expected one resize request, got %d", len(processor.resizeRequests))
+	}
+	if _, err := imageprocessor.DecodeBase64Image(result); err != nil {
+		t.Fatalf("prepared result is not an image: %v", err)
+	}
+}
+
+func TestPrepareAnimationReferenceRejectsDownloadFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "missing unprocessed image", http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	service := newAnimationGenerationServiceWithResolver(
+		nil,
+		nil,
+		&animationExtractorStub{},
+		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
+	).(*animationGenerationService)
+	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("expected HTTP 404 error, got %v", err)
+	}
+}
+
+func TestPrepareAnimationReferenceRejectsInvalidDownloadedImage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("not an image"))
+	}))
+	defer server.Close()
+
+	service := newAnimationGenerationServiceWithResolver(
+		nil,
+		nil,
+		&animationExtractorStub{},
+		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
+	).(*animationGenerationService)
+	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	if err == nil || !strings.Contains(err.Error(), "decode downloaded animation reference") {
+		t.Fatalf("expected invalid-image error, got %v", err)
+	}
 }
 
 func TestNormalizeAnimationGenerationRequestAppliesDefaults(t *testing.T) {
@@ -250,7 +342,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.resizeRequests[0].ImageBase64 != foreground ||
 		processor.resizeRequests[0].Options.Width != animationReferenceSize ||
 		processor.resizeRequests[0].Options.Height != animationReferenceSize ||
-		processor.resizeRequests[0].Options.Margin != animationReferenceMargin {
+		processor.resizeRequests[0].Options.Margin != imageprocessor.AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
 	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].ReferenceImageBase64)
@@ -265,9 +357,11 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Columns != 2 || processor.splitRequest.Rows != 2 ||
 		processor.splitRequest.FrameCount != 4 ||
 		processor.splitRequest.FrameWidth != 64 || processor.splitRequest.FrameHeight != 64 ||
+		processor.splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
-		!processor.splitRequest.PreserveVerticalMotion {
+		!processor.splitRequest.PreserveVerticalMotion ||
+		!processor.splitRequest.PreserveSourceCellScale {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
 	}
 }

@@ -105,7 +105,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		AssetID:    &assetID,
 		Kind:       generator.GenerateAnimation,
 		Prompt:     "walk",
-		Parameters: json.RawMessage(`{"animation_name":"hero walk","direction":5}`),
+		Parameters: json.RawMessage(`{"animation_name":"hero walk","direction":"back_left"}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -125,7 +125,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != request.ProjectID || payload.AssetID != assetID ||
-		payload.AnimationName != "hero walk" || payload.Direction != 5 || payload.CreativeBrief != request.Prompt {
+		payload.AnimationName != "hero walk" || payload.Direction != generator.AnimationDirectionBackLeft || payload.CreativeBrief != request.Prompt {
 		t.Fatalf("unexpected task payload: %+v", payload)
 	}
 	if strings.Contains(string(tasks.createdTask.Payload), "parent_id") {

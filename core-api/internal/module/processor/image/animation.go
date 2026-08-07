@@ -44,6 +44,7 @@ type normalizeAnimationRequest struct {
 	Anchor                   AnimationAnchor
 	PreserveHorizontalMotion bool
 	PreserveVerticalMotion   bool
+	PreserveSourceCellScale  bool
 	MaxStabilizationShift    int
 	DetectGridBounds         bool
 	AllowEmptyFrames         bool
@@ -209,6 +210,9 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		RegistrationPolicy:      "median_root_anchor_shared_union_crop_single_global_scale_no_per_frame_recentering",
 		BackgroundRemovalReport: extractionReport,
 	}
+	if request.PreserveSourceCellScale {
+		report.RegistrationPolicy = "median_root_anchor_shared_source_cell_canvas_fixed_scale_no_per_frame_recentering"
+	}
 	stabilizeAnimationCells(cells, cellW, cellH, request, &report)
 
 	pad := max(6, int(math.Round(float64(min(cellW, cellH))*.14)))
@@ -244,12 +248,23 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	report.SharedCrop = rectangleToAlphaBoundingBox(shared)
 
 	innerW, innerH := frameWidth-2*margin, frameHeight-2*margin
-	scale := math.Min(float64(innerW)/float64(shared.Dx()), float64(innerH)/float64(shared.Dy()))
+	renderCrop := shared
+	var scale float64
+	if request.PreserveSourceCellScale {
+		// The prepared reference and the prototype both describe one complete
+		// direction cell. Render that same cell into the output frame instead of
+		// fitting the action's union bounds. The latter makes the body shrink
+		// whenever a held weapon reaches farther than the idle pose.
+		renderCrop = image.Rect(pad, pad, pad+cellW, pad+cellH)
+		scale = math.Min(float64(frameWidth)/float64(cellW), float64(frameHeight)/float64(cellH))
+	} else {
+		scale = math.Min(float64(innerW)/float64(shared.Dx()), float64(innerH)/float64(shared.Dy()))
+	}
 	if scale <= 0 {
 		return nil, fmt.Errorf("target frame is too small")
 	}
-	drawW := max(1, int(math.Round(float64(shared.Dx())*scale)))
-	drawH := max(1, int(math.Round(float64(shared.Dy())*scale)))
+	drawW := max(1, int(math.Round(float64(renderCrop.Dx())*scale)))
+	drawH := max(1, int(math.Round(float64(renderCrop.Dy())*scale)))
 	destX, destY := (frameWidth-drawW)/2, (frameHeight-drawH)/2
 	report.Scale = scale
 
@@ -259,7 +274,7 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	for i := range cells {
 		frame := image.NewNRGBA(image.Rect(0, 0, frameWidth, frameHeight))
 		if cells[i].visible {
-			cropped := cloneNRGBA(working[i].SubImage(shared))
+			cropped := cloneNRGBA(working[i].SubImage(renderCrop))
 			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH)
 			draw.Draw(frame, image.Rect(destX, destY, destX+drawW, destY+drawH), resized, image.Point{}, draw.Over)
 		}
@@ -277,8 +292,8 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		if cells[i].visible {
 			sourceValue := cells[i].anchor
 			outputValue := AnimationPoint{
-				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(shared.Min.X))*scale,
-				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(shared.Min.Y))*scale,
+				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(renderCrop.Min.X))*scale,
+				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(renderCrop.Min.Y))*scale,
 			}
 			sourceAnchor, outputAnchor = &sourceValue, &outputValue
 			outputAnchors = append(outputAnchors, outputValue)

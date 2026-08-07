@@ -128,7 +128,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	}
 
 	processor := imageprocessor.NewProcessor()
-	animations := generator.NewAnimationGenerationService(videos, processor)
+	animations := generator.NewAnimationGenerationService(videos, processor, uploadStore)
 	executor := generator.NewExecutorWithAnimation(images, animations, processor, workspaceModule.Assets, uploadStore)
 	generatorEngine := generator.NewEngine(taskManager, executor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,

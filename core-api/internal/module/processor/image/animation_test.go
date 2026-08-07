@@ -3,6 +3,7 @@ package image
 import (
 	"image"
 	"image/color"
+	"math"
 	"testing"
 )
 
@@ -101,4 +102,74 @@ func TestNormalizeAnimationImageRejectsOpaqueSourceWithoutBackgroundOptions(t *t
 	if err == nil {
 		t.Fatal("expected opaque-source error")
 	}
+}
+
+func TestNormalizeAnimationImagePreservesSourceCellScaleWhenActionExtendsProp(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	body := color.NRGBA{R: 220, G: 70, B: 40, A: 255}
+	prop := color.NRGBA{B: 220, A: 255}
+
+	// Both source cells contain the same body at the same canonical scale. The
+	// second pose additionally has a much longer held prop. A union-bounds fit
+	// would scale both bodies down; source-cell scale must not.
+	fillRect(src, image.Rect(12, 8, 20, 34), body)
+	fillRect(src, image.Rect(52, 8, 60, 34), body)
+	fillRect(src, image.Rect(20, 12, 25, 16), prop)
+	fillRect(src, image.Rect(40, 10, 79, 17), prop)
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 64, FrameHeight: 64,
+		Anchor: AnimationAnchorFeet, PreserveSourceCellScale: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize fixed source-cell scale: %v", err)
+	}
+	if got, want := result.Report.Scale, 1.6; math.Abs(got-want) > 0.001 {
+		t.Fatalf("scale = %f, want source-cell scale %f", got, want)
+	}
+	if result.Report.RegistrationPolicy != "median_root_anchor_shared_source_cell_canvas_fixed_scale_no_per_frame_recentering" {
+		t.Fatalf("registration policy = %q", result.Report.RegistrationPolicy)
+	}
+
+	widths, heights := make([]int, 0, len(result.Frames)), make([]int, 0, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		if got := decoded.Bounds().Size(); got != image.Pt(64, 64) {
+			t.Fatalf("frame %d size = %v, want 64x64", index, got)
+		}
+		bounds, ok := solidRedBounds(decoded)
+		if !ok {
+			t.Fatalf("frame %d has no body pixels", index)
+		}
+		widths = append(widths, bounds.Dx())
+		heights = append(heights, bounds.Dy())
+	}
+	if widths[0] != widths[1] || heights[0] != heights[1] {
+		t.Fatalf("body scale changed across prop extension: widths=%v heights=%v", widths, heights)
+	}
+}
+
+func solidRedBounds(input image.Image) (image.Rectangle, bool) {
+	bounds := input.Bounds()
+	result := image.Rectangle{}
+	found := false
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			pixel := color.NRGBAModel.Convert(input.At(x, y)).(color.NRGBA)
+			if pixel.A < 128 || pixel.R < 150 || pixel.G > 130 || pixel.B > 130 {
+				continue
+			}
+			point := image.Pt(x, y)
+			if !found {
+				result = image.Rectangle{Min: point, Max: point.Add(image.Pt(1, 1))}
+				found = true
+				continue
+			}
+			result = result.Union(image.Rectangle{Min: point, Max: point.Add(image.Pt(1, 1))})
+		}
+	}
+	return result, found
 }

@@ -2,12 +2,15 @@ package generator
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
@@ -26,10 +29,7 @@ const (
 	defaultAnimationAspectRatio = "1:1"
 	animationVideoAttempts      = 2
 	animationReferenceSize      = 1024
-	// Keep the original direction-cell canvas instead of cropping tightly to
-	// the silhouette, then reserve the central 50%% for the video model's
-	// motion. Long weapons need substantially more room than an idle sprite.
-	animationReferenceMargin = 256
+	maxAnimationReferenceBytes  = 32 << 20
 )
 
 // AnimationGenerationService turns one asset reference into normalized,
@@ -37,6 +37,14 @@ const (
 // deterministic reference and frame normalization stays in processor/image.
 type AnimationGenerationService interface {
 	Generate(context.Context, *AnimationGenerationRequest) (*AnimationGenerationResult, error)
+}
+
+// AnimationReferenceResolver converts a persisted prototype reference into a
+// short-lived URL that the generator can read. The generator only depends on
+// this small read boundary; upload/storage credentials stay in the upload
+// module.
+type AnimationReferenceResolver interface {
+	ResolveReference(context.Context, string) (string, error)
 }
 
 type AnimationGenerationRequest struct {
@@ -70,9 +78,11 @@ type AnimationGenerationResult struct {
 }
 
 type animationGenerationService struct {
-	videos    videoclient.VideoGenerationService
-	processor imageprocessor.Processor
-	extractor animationFrameExtractor
+	videos              videoclient.VideoGenerationService
+	processor           imageprocessor.Processor
+	extractor           animationFrameExtractor
+	referenceResolver   AnimationReferenceResolver
+	referenceHTTPClient *http.Client
 }
 
 // NewAnimationGenerationService creates the formal image-to-video animation
@@ -80,8 +90,18 @@ type animationGenerationService struct {
 func NewAnimationGenerationService(
 	videos videoclient.VideoGenerationService,
 	processor imageprocessor.Processor,
+	resolvers ...AnimationReferenceResolver,
 ) AnimationGenerationService {
-	return newAnimationGenerationService(videos, processor, ffmpegAnimationFrameExtractor{})
+	var resolver AnimationReferenceResolver
+	if len(resolvers) > 0 {
+		resolver = resolvers[0]
+	}
+	return newAnimationGenerationServiceWithResolver(
+		videos,
+		processor,
+		ffmpegAnimationFrameExtractor{},
+		resolver,
+	)
 }
 
 func newAnimationGenerationService(
@@ -89,8 +109,21 @@ func newAnimationGenerationService(
 	processor imageprocessor.Processor,
 	extractor animationFrameExtractor,
 ) AnimationGenerationService {
+	return newAnimationGenerationServiceWithResolver(videos, processor, extractor, nil)
+}
+
+func newAnimationGenerationServiceWithResolver(
+	videos videoclient.VideoGenerationService,
+	processor imageprocessor.Processor,
+	extractor animationFrameExtractor,
+	resolver AnimationReferenceResolver,
+) AnimationGenerationService {
 	return &animationGenerationService{
-		videos: videos, processor: processor, extractor: extractor,
+		videos:              videos,
+		processor:           processor,
+		extractor:           extractor,
+		referenceResolver:   resolver,
+		referenceHTTPClient: http.DefaultClient,
 	}
 }
 
@@ -242,24 +275,85 @@ func normalizeAnimationGenerationRequest(
 // normalization path.
 func (s *animationGenerationService) prepareAnimationReference(
 	ctx context.Context,
-	referenceBase64 string,
+	reference string,
 	prepared bool,
 ) (string, error) {
-	if strings.HasPrefix(strings.TrimSpace(referenceBase64), "http://") || strings.HasPrefix(strings.TrimSpace(referenceBase64), "https://") {
-		return "", fmt.Errorf("generator: row prototype reference is a URL; TODO: image storage loader is not implemented")
+	reference, err := s.loadAnimationReference(ctx, reference)
+	if err != nil {
+		return "", err
 	}
 	if !prepared {
-		return s.prepareGreenReference(ctx, referenceBase64)
+		return s.prepareGreenReference(ctx, reference)
 	}
-	reference, err := imageprocessor.DecodeBase64Image(referenceBase64)
+	referenceImage, err := imageprocessor.DecodeBase64Image(reference)
 	if err != nil {
 		return "", fmt.Errorf("generator: decode prepared animation reference: %w", err)
 	}
-	encoded, err := imageprocessor.EncodePNGBase64(reference)
+	encoded, err := imageprocessor.EncodePNGBase64(referenceImage)
 	if err != nil {
 		return "", fmt.Errorf("generator: encode prepared animation reference: %w", err)
 	}
 	return encoded, nil
+}
+
+func (s *animationGenerationService) loadAnimationReference(ctx context.Context, reference string) (string, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return "", fmt.Errorf("generator: animation reference image is required")
+	}
+
+	if s.referenceResolver != nil {
+		resolved, err := s.referenceResolver.ResolveReference(ctx, reference)
+		if err != nil {
+			return "", fmt.Errorf("generator: resolve animation reference: %w", err)
+		}
+		reference = strings.TrimSpace(resolved)
+		if reference == "" {
+			return "", fmt.Errorf("generator: resolve animation reference: empty result")
+		}
+	}
+
+	if !strings.HasPrefix(reference, "http://") && !strings.HasPrefix(reference, "https://") {
+		return reference, nil
+	}
+
+	client := s.referenceHTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, reference, nil)
+	if err != nil {
+		return "", fmt.Errorf("generator: create animation reference download request: %w", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("generator: download animation reference: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return "", fmt.Errorf("generator: download animation reference: HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxAnimationReferenceBytes+1))
+	if err != nil {
+		return "", fmt.Errorf("generator: read animation reference: %w", err)
+	}
+	if len(body) > maxAnimationReferenceBytes {
+		return "", fmt.Errorf("generator: animation reference exceeds %d bytes", maxAnimationReferenceBytes)
+	}
+	if len(body) == 0 {
+		return "", fmt.Errorf("generator: download animation reference: empty response")
+	}
+	encoded := base64.StdEncoding.EncodeToString(body)
+	decoded, err := imageprocessor.DecodeBase64Image(encoded)
+	if err != nil {
+		return "", fmt.Errorf("generator: decode downloaded animation reference: %w", err)
+	}
+	canonical, err := imageprocessor.EncodePNGBase64(decoded)
+	if err != nil {
+		return "", fmt.Errorf("generator: encode downloaded animation reference: %w", err)
+	}
+	return canonical, nil
 }
 
 func (s *animationGenerationService) prepareGreenReference(
@@ -285,12 +379,10 @@ func (s *animationGenerationService) prepareGreenReference(
 		foregroundBase64 = removed.ImageBase64
 	}
 
-	resizeOptions := imageprocessor.DefaultResizeOptions(animationReferenceSize, animationReferenceSize)
-	resizeOptions.Margin = animationReferenceMargin
-	// The selected direction image comes from a direction cell. Keeping the
-	// transparent cell canvas preserves its generated padding; cropping to the
-	// visible silhouette would make a sword or tool fill the video reference.
-	resizeOptions.CropContent = false
+	// Use the same padded canonical-frame layout as prototype sprites. The
+	// animation reference must not be made smaller by an extra safety margin;
+	// the margin is part of the shared prototype/animation canvas contract.
+	resizeOptions := imageprocessor.AnimationFrameResizeOptions(animationReferenceSize, animationReferenceSize)
 	resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 		ImageBase64: foregroundBase64,
 		Options:     resizeOptions,
@@ -356,16 +448,18 @@ func (s *animationGenerationService) processVideo(
 		return nil, fmt.Errorf("generator: encode sampled animation sheet: %w", err)
 	}
 	normalized, err := s.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
-		ImageBase64:            encoded,
-		Mode:                   imageprocessor.ImageSplitModeAnimation,
-		Columns:                request.Columns,
-		Rows:                   animationRows(request.FrameCount, request.Columns),
-		FrameCount:             request.FrameCount,
-		FrameWidth:             request.FrameWidth,
-		FrameHeight:            request.FrameHeight,
-		Anchor:                 imageprocessor.AnimationAnchorFeet,
-		ForceProportionalGrid:  true,
-		PreserveVerticalMotion: true,
+		ImageBase64:             encoded,
+		Mode:                    imageprocessor.ImageSplitModeAnimation,
+		Columns:                 request.Columns,
+		Rows:                    animationRows(request.FrameCount, request.Columns),
+		FrameCount:              request.FrameCount,
+		FrameWidth:              request.FrameWidth,
+		FrameHeight:             request.FrameHeight,
+		Margin:                  imageprocessor.AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
+		Anchor:                  imageprocessor.AnimationAnchorFeet,
+		ForceProportionalGrid:   true,
+		PreserveVerticalMotion:  true,
+		PreserveSourceCellScale: true,
 		Background: &imageprocessor.AnimationBackgroundOptions{
 			MatteColor: "#00ff00",
 		},

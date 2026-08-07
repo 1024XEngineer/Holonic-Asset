@@ -14,7 +14,6 @@ import (
 )
 
 // Executor owns generation and any resulting asset creation.
-const animationReferenceMetadataKey = "animation_reference"
 
 type Executor interface {
 	Generate(ctx context.Context, taskType TaskType, payload json.RawMessage) (json.RawMessage, error)
@@ -309,67 +308,47 @@ func (e *executor) generateAnimation(
 	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
 }
 
-func animationReference(asset assetdomain.Asset, direction int) (string, bool, error) {
+func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
 	content, err := asset.DecodeContent()
 	if err != nil {
 		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
 	}
 	directionCount := content.DirectionCount
-	if directionCount == 0 {
-		directionCount = 1
+	directionIndex, err := animationDirectionIndex(direction, directionCount)
+	if err != nil {
+		return "", false, err
 	}
-	if direction < 0 || uint(direction) >= directionCount {
-		return "", false, fmt.Errorf("generator: animation direction %d is out of range for asset %d with %d directions", direction, asset.ID, directionCount)
+	if content.Prototype == nil || directionIndex >= len(*content.Prototype) {
+		return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %q", asset.ID, direction)
 	}
-	if content.DirectionCount > 1 {
-		if content.Prototype == nil || direction >= len(*content.Prototype) {
-			return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %d", asset.ID, direction)
-		}
-		prototype := (*content.Prototype)[direction]
-		if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
-			return "", false, fmt.Errorf("generator: animation asset %d prototype direction %d has no image URL", asset.ID, direction)
-		}
-		rowURL := animationRowImageURL(strings.TrimSpace(*prototype.URL))
-		// TODO: Ask the image-storage module for the uncompressed, background-removed
-		// "-row" variant and pass its bytes to image-to-video. The storage contract
-		// is not implemented in this change, so the URL is kept as the reference
-		// value until that loader is available.
-		return rowURL, false, nil
+	prototype := (*content.Prototype)[directionIndex]
+	if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
+		return "", false, fmt.Errorf("generator: animation asset %d prototype direction %q has no image URL", asset.ID, direction)
 	}
-	if reference := animationReferenceFromMetadata(content.Metadata); reference != "" {
-		return reference, true, nil
-	}
-	if content.Prototype == nil {
-		return "", false, fmt.Errorf("generator: animation asset %d has no prototype", asset.ID)
-	}
-	for _, prototype := range *content.Prototype {
-		if prototype.URL != nil && strings.TrimSpace(*prototype.URL) != "" {
-			return strings.TrimSpace(*prototype.URL), false, nil
-		}
-	}
-	return "", false, fmt.Errorf("generator: animation asset %d has no prototype image", asset.ID)
+	unprocessedURL := animationUnprocessedImageURL(strings.TrimSpace(*prototype.URL))
+	return unprocessedURL, false, nil
 }
 
-func animationRowImageURL(value string) string {
+func animationUnprocessedImageURL(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.HasPrefix(value, "data:") {
 		return value
 	}
 	parsed, err := url.Parse(value)
 	if err != nil {
-		return addAnimationRowSuffix(value)
+		return addAnimationUnprocessedSuffix(value)
 	}
-	parsed.Path = addAnimationRowSuffix(parsed.Path)
+	parsed.Path = addAnimationUnprocessedSuffix(parsed.Path)
 	return parsed.String()
 }
 
-func addAnimationRowSuffix(path string) string {
+func addAnimationUnprocessedSuffix(path string) string {
 	lastSlash := strings.LastIndex(path, "/")
 	lastDot := strings.LastIndex(path, ".")
 	if lastDot <= lastSlash {
-		return path + "-row"
+		return path + "-unprocessed"
 	}
-	return path[:lastDot] + "-row" + path[lastDot:]
+	return path[:lastDot] + "-unprocessed" + path[lastDot:]
 }
 
 func (e *executor) generateImages(
@@ -421,9 +400,16 @@ func (e *executor) generateImages(
 			}
 			imageBase64 = backgroundRemoved.ImageBase64
 		}
+		resizeOptions := imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight)
+		if taskType == GenerateCharacterProtoType {
+			// Character prototypes are the canonical scale contract for later
+			// image-to-video generation. Keep a larger transparent safety area so
+			// held props can move without forcing animation frames to shrink.
+			resizeOptions = imageprocessor.AnimationFrameResizeOptions(resizeWidth, resizeHeight)
+		}
 		resized, resizeErr := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: imageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight),
+			Options:     resizeOptions,
 		})
 		if resizeErr != nil {
 			return nil, fmt.Errorf("generator: resize %s image %d: %w", taskType, index+1, resizeErr)
@@ -512,14 +498,6 @@ func (e *executor) prototypeResources(
 		resources[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &url}
 	}
 	return resources, nil
-}
-
-func animationReferenceFromMetadata(metadata map[string]any) string {
-	if metadata == nil {
-		return ""
-	}
-	reference, _ := metadata[animationReferenceMetadataKey].(string)
-	return strings.TrimSpace(reference)
 }
 
 func animationFrames(result *AnimationGenerationResult) ([]assetdomain.Frame, error) {

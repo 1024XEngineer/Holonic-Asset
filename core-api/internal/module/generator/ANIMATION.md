@@ -8,14 +8,18 @@ Animation belongs to an existing character or object asset; it does not create a
 
 - `assetId`: The existing asset ID, used to look up the prototype and write the animation back to that asset.
 - `animation_name`: The animation clip name, e.g., `idle`, `walk`, `sword_slash`.
-- `direction`: Zero-based index into the `AssetContent.Prototype` array.
+- `direction`: English direction name mapped to the `AssetContent.Prototype` order.
 - `prompt`: Natural language description of the action, which becomes `creative_brief` in the task payload.
 
-Direction semantics are guaranteed by the prototype array ordering. In the current asset conventions:
+Direction semantics are guaranteed by the prototype array ordering. The API never exposes a numeric prototype index. It accepts at most eight English direction names and maps them according to the asset's `direction_count`:
 
-- `direction = 0` is always the front-facing direction;
-- Other directions correspond one-to-one with `Prototype` array positions;
-- The generator does not guess canonical directions, nor does it parse a full multi-direction spritesheet to select a direction.
+| `direction_count` | Accepted direction order |
+| --- | --- |
+| 2 | `left`, `right` |
+| 4 | `front`, `right`, `back`, `left` |
+| 8 | `front`, `front_right`, `right`, `back_right`, `back`, `back_left`, `left`, `front_left` |
+
+Every animation asset requires an explicit `direction`. Animation generation supports only assets with `direction_count` equal to `2`, `4`, or `8`; the generator does not parse the full multi-direction spritesheet to select a direction.
 
 Animation requests do not use `parent_id`, `asset_name`, or frontend-uploaded `reference_image`. The animation name field is `animation_name`, and the target asset field is the outer `assetId`.
 
@@ -36,7 +40,7 @@ Example:
   "prompt": "Raise the longsword and slash forward, follow through with the swing, then return to the initial idle stance",
   "parameters": {
     "animation_name": "sword_slash",
-    "direction": 0,
+    "direction": "front",
     "style": "clean 2D pixel-art game character",
     "frame_count": 16,
     "columns": 4,
@@ -57,7 +61,7 @@ The task payload is normalized to:
   "animation_name": "sword_slash",
   "project_id": 42,
   "asset_id": 123,
-  "direction": 0,
+  "direction": "front",
   "creative_brief": "Raise the longsword and slash forward, follow through with the swing, then return to the initial idle stance",
   "style": "clean 2D pixel-art game character",
   "frame_count": 16,
@@ -79,7 +83,7 @@ The outer `assetId` maps to the internal `asset_id`, and the outer `prompt` maps
 | --- | --- | --- |
 | `assetId` | Existing character or object asset ID | Required, greater than 0 |
 | `animation_name` | Animation clip name | Required |
-| `direction` | Zero-based direction index into the prototype array | Semantically required; `0` is front-facing; must be less than the asset's `direction_count` |
+| `direction` | English direction name | Required; one of the names supported by the asset's 2/4/8-direction layout; maximum eight directions |
 | `prompt` | Full action semantics | Falls back to `idle` internally when empty, but callers should provide an explicit value |
 | `style` | Art style for video generation | Defaults to a production-grade 2D game character style |
 | `frame_count` | Final keyframe count | Default 16, range 1–32 |
@@ -101,47 +105,51 @@ The formal animation pipeline retrieves the reference image according to the fol
 
 1. `AssetWriter.GetDetail(asset_id)` fetches the asset.
 2. Decode `AssetContent`.
-3. Validate that `direction` is within `[0, direction_count)`.
-4. Use `content.Prototype[direction]` only; do not read other directions.
+3. Validate the English `direction` against the asset's 2/4/8-direction layout.
+4. Map the direction name to its internal prototype index and use only that `content.Prototype[index]`; do not read other directions.
 5. Read the URL for that prototype.
-6. Insert `-row` before the file extension to indicate the "uncompressed, background-removed" original image for the same direction in the image hosting service.
+6. Insert `-unprocessed` before the file extension to indicate the "uncompressed, background-removed" original image for the same direction in the image hosting service.
 
 Example:
 
 ```text
 https://cdn.example.com/hero/direction_00.png
-→ https://cdn.example.com/hero/direction_00-row.png
+→ https://cdn.example.com/hero/direction_00-unprocessed.png
 ```
 
 When query parameters are present, only the URL path is modified:
 
 ```text
 https://cdn.example.com/hero/direction_00.png?version=7
-→ https://cdn.example.com/hero/direction_00-row.png?version=7
+→ https://cdn.example.com/hero/direction_00-unprocessed.png?version=7
 ```
 
 This way the video model sees a single character in a single direction, rather than misinterpreting a 2×4 multi-direction spritesheet as a scene containing eight characters.
 
-### Current Image Hosting TODO
+### Image hosting integration
 
-The image hosting service's ability to return the original image via the `-row` URL, as well as the interface to load a URL as image bytes, is not yet implemented. For now, only the following has been completed within the generator:
+The formal generator receives the selected direction's prototype URL, appends the
+`-unprocessed` suffix, and resolves it through the injected read-only reference resolver.
+The configured upload storage (currently Qiniu) signs the object URL; the
+ generator then downloads the original image, validates it as a raster image,
+normalizes it to PNG Base64, and continues through the existing deterministic
+animation preprocessing path.
 
-- Direction index validation;
-- Prototype array selection;
-- `-row` URL construction;
-- Explicit TODO markers and not-implemented errors.
+The storage boundary remains outside `workspace/asset`: the generator only
+requires `AnimationReferenceResolver`:
 
-When the formal pipeline encounters an HTTP/HTTPS `-row` URL, it stops and returns:
-
-```text
-generator: row prototype reference is a URL; TODO: image storage loader is not implemented
+```go
+animations := generator.NewAnimationGenerationService(videos, processor, uploadStore)
 ```
 
-Going forward, an image reference loader should be injected into the generator to download the `-row` URL as base64 and pass it to the existing animation service. Do not push the image hosting download responsibility into `workspace/asset`, and do not fall back to the full multi-direction spritesheet.
+The full multi-direction sheet is never passed to the video model. A missing
+`-unprocessed` object, non-2xx response, oversized response, or invalid image fails the
+animation request instead of silently falling back to a compressed prototype or
+the full direction sheet.
 
 ## 5. Image Preprocessing Semantics
 
-The `-row` image is assumed to be:
+The `-unprocessed` image is assumed to be:
 
 - Single-direction;
 - High-resolution;
@@ -158,24 +166,31 @@ The `false` here does not mean "redraw." The animation service will not call ima
 
 ```text
 Detect transparent background
-→ Resize to 1024×1024 with a safe margin
+→ Resize to 1024×1024 with AnimationFrameResizeOptions (256px safe margin)
 → Composite onto a solid green background
 → Pass to image-to-video
 ```
 
 This preserves the original prototype's character identity while providing the single-character safe canvas that the video model requires.
 
+The final character prototype must use the same proportional canvas contract.
+For example, a 64×64 prototype uses a 16-pixel margin while its 1024×1024
+video reference uses a 256-pixel margin. Both therefore keep the canonical
+standing character in the centre half of the canvas. The unused area is motion
+budget for arms, weapons, and tools; it is not removed during animation frame
+normalization.
+
 ## 6. Complete Processing Pipeline
 
 ```text
 HTTP Request(assetId, direction, prompt, parameters)
 → Engine.buildTaskPayload
-→ CreateAnimationPayload(asset_id, direction, animation_name, creative_brief, ...)
+→ CreateAnimationPayload(asset_id, English direction, animation_name, creative_brief, ...)
 → Task manager publishes generate_animation
 → Executor validates asset_id and animation_name
 → AssetWriter.GetDetail(asset_id)
 → content.Prototype[direction]
-→ Append -row suffix to prototype URL
+→ Append -unprocessed suffix to prototype URL
 → TODO: Image hosting loads uncompressed, background-removed single-direction image
 → processor.Resize to 1024×1024 and composite green-screen safe canvas
 → prompts.BuildAnimationVideo
@@ -184,7 +199,7 @@ HTTP Request(assetId, direction, prompt, parameters)
 → Subject and safe boundary quality checks
 → Search for complete and loopable action intervals
 → Sample frame_count keyframes
-→ processor.SplitImage(animation) performs unified background removal, shared cropping, shared scaling, and foot anchor alignment
+→ processor.SplitImage(animation) removes the background, aligns the foot anchor, and preserves the full source-cell scale
 → Output transparent frames and spritesheet
 → AssetWriter.CreateAnimation(asset_id, animation_name)
 → AssetWriter.UpdateAnimationFrames(asset_id, animation_id, frames)
@@ -198,7 +213,7 @@ The animation record is only created after video generation, download, frame ext
 
 - Fetch the asset by `asset_id`;
 - Select the prototype by `direction`;
-- Construct the `-row` URL;
+- Construct the `-unprocessed` URL;
 - Build the `AnimationGenerationRequest`;
 - Create the animation and write frames on success.
 
@@ -220,7 +235,11 @@ Responsible only for provider communication; does not handle direction selection
 
 ### `processor/image`
 
-Responsible only for deterministic image processing: background removal, resizing, animation shared cropping, anchor normalization, and spritesheet packing.
+Responsible only for deterministic image processing: background removal,
+canonical padded resizing, animation source-cell scale preservation, anchor
+normalization, and spritesheet packing. The animation generator enables
+`PreserveSourceCellScale`; it must not refit the union of all poses because a
+long weapon would shrink the character body in every final frame.
 
 ### `workspace/asset`
 
@@ -228,9 +247,9 @@ This module's data structures and business logic are not modified in this change
 
 ## 8. Compatibility Behavior
 
-- Multi-direction assets always select `Prototype[direction]` by `direction`; the legacy full multi-direction `metadata.animation_reference` is never used.
-- Legacy assets with `direction_count <= 1` retain their original compatibility read logic.
-- Multi-direction assets that are missing a target prototype, have an empty URL, or have an out-of-bounds direction will fail before video generation and asset writing.
+- Animation assets must have `direction_count` equal to `2`, `4`, or `8`.
+- The generator maps the English direction name to the corresponding `Prototype` array index and never uses a full multi-direction `metadata.animation_reference`.
+- Assets that are missing a target prototype, have an empty URL, or provide an unavailable direction fail before video generation and asset writing.
 
 ## 9. Verification
 
@@ -240,7 +259,7 @@ The local example can slice out a specified direction directly from a multi-dire
 go run ./examples/generate_animation \
   -input /absolute/path/to/character_8_directions_green.png \
   -directions 8 \
-  -direction 0 \
+  -direction front \
   -frame-size 64 \
   -prepare-only
 ```

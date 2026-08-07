@@ -18,9 +18,9 @@ type CreateAnimationPayload struct {
 	AnimationName string `json:"animation_name"`
 	ProjectID     uint   `json:"project_id"`
 	AssetID       uint   `json:"asset_id"`
-	// Direction is the zero-based AssetContent.Prototype index. Direction 0 is
-	// the front-facing prototype by the asset ordering contract.
-	Direction     int    `json:"direction"`
+	// Direction is an English name such as "front" or "back_right". The
+	// generator maps it to the prototype ordering for 2, 4, or 8 directions.
+	Direction     string `json:"direction"`
 	CreativeBrief string `json:"creative_brief"`
 	Style         string `json:"style,omitempty"`
 	FrameCount    int    `json:"frame_count,omitempty"`
