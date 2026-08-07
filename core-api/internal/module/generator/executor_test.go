@@ -277,6 +277,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 		"creative_brief":"pixel knight",
 		"canvas_size":"64x64",
 		"perspective":"Top-Down",
+		"direction_count":"4",
 		"reference":"projects/7/reference.png",
 		"project_id":11
 	}`)
@@ -309,6 +310,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"wooden chest",
 		"canvas_size":"128x128",
 		"perspective":"Isometric",
+		"direction_count":"4",
 		"project_id":12
 	}`)
 
@@ -334,8 +336,8 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode object content: %v", err)
 	}
-	if content.Perspective != assetdomain.PerspectiveIsometric {
-		t.Fatalf("unexpected object perspective: %q", content.Perspective)
+	if content.Perspective != assetdomain.PerspectiveIsometric || content.DirectionCount != 4 {
+		t.Fatalf("unexpected object content: %+v", content)
 	}
 	assertPrototypeResources(t, assets.objectAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
@@ -521,6 +523,88 @@ func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
 	}
 	if animations.request.ReferenceImage != "https://cdn.example.com/hero/right-unprocessed.png" {
 		t.Fatalf("right direction mapped to wrong reference: %+v", animations.request)
+	}
+}
+
+func TestExecutorGeneratesObjectAnimationForSelectedDirection(t *testing.T) {
+	events := []string{}
+	prototypeURLs := []string{
+		"https://cdn.example.com/chest/front.png",
+		"https://cdn.example.com/chest/right.png",
+		"https://cdn.example.com/chest/back.png",
+		"https://cdn.example.com/chest/left.png",
+	}
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeObject)
+	content.DirectionCount = 4
+	prototype := assetdomain.Prototype{}
+	for index, value := range prototypeURLs {
+		url := value
+		prototype = append(prototype, assetdomain.ImageResource{ID: uint(index + 1), URL: &url})
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{
+		ID:          8,
+		ProjectID:   11,
+		Type:        assetdomain.AssetTypeObject,
+		Name:        "chest",
+		Description: "wooden treasure chest",
+		Content:     encoded,
+	}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}},
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets)
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"open","asset_id":8,"project_id":11,"direction":"right","creative_brief":"slowly open the chest lid, then close it"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate object animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/chest/right-unprocessed.png" {
+		t.Fatalf("object animation mapped to wrong reference: %+v", animations.request)
+	}
+	if animations.request.Action != "slowly open the chest lid, then close it" {
+		t.Fatalf("unexpected object action: %+v", animations.request)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "create_animation", "update_animation_frames"}) {
+		t.Fatalf("unexpected object animation workflow: %v", events)
+	}
+}
+
+func TestExecutorRejectsObjectAnimationWithoutDirection(t *testing.T) {
+	events := []string{}
+	reference := "https://cdn.example.com/chest/front.png"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeObject)
+	content.DirectionCount = 4
+	prototype := assetdomain.Prototype{{ID: 1, URL: &reference}}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{ID: 8, ProjectID: 11, Type: assetdomain.AssetTypeObject, Name: "chest", Content: encoded}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets)
+
+	_, err = executor.Generate(context.Background(), generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"open","asset_id":8,"direction":""}`))
+	if err == nil || !strings.Contains(err.Error(), "animation direction is required") {
+		t.Fatalf("expected required object direction error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start without direction: %v", events)
 	}
 }
 

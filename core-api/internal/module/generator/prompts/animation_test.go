@@ -23,11 +23,11 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 		"do not map it to a generic motion preset",
 		"maintain at least 15% uninterrupted empty space",
 		"perfectly uniform pure chroma green #00FF00",
-		"exactly ONE isolated canonical character view",
-		"exactly ONE complete character",
+		"exactly ONE isolated canonical subject view",
+		"exactly ONE complete subject",
 		"never show multiple directions, multiple poses",
 		"the system will extract 16 ordered frames later; do not render those frames as a sheet",
-		"extracted by the backend from the high-resolution direction sheet",
+		"from the high-resolution prototype or direction sheet",
 		"never turn, mirror, switch views",
 	} {
 		if !strings.Contains(prompt, expected) {

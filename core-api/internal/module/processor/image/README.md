@@ -186,19 +186,34 @@ This space must be reserved before video generation. `SplitImage` can preserve
 the scale and register the root anchor, but it cannot recover weapon pixels that
 the video provider already rendered outside the source frame.
 
+For a static multi-direction character or object sheet, an image model may draw
+the same subject at different apparent sizes in different cells. Opt in to
+content-scale normalization for that input only:
+
+```go
+NormalizeContentScale: true,
+```
+
+This rescales each visible cell to the median source content height before
+anchor registration, then returns the requested fixed-size canvases. It is not
+intended for action frames, where silhouette changes can be part of the motion.
+`NormalizeContentScale` and `PreserveSourceCellScale` are mutually exclusive.
+
 The animation pipeline:
 
 1. Splits the known grid with fixed proportional source cells by default.
 2. Removes a configured or automatically detected flat background.
-3. Estimates one robust root anchor per frame and translates frames to one
+3. Optionally normalizes static multi-direction subjects to the median visible
+   height when `NormalizeContentScale` is enabled.
+4. Estimates one robust root anchor per frame and translates frames to one
    common integer target. Set `PreserveHorizontalMotion` or
    `PreserveVerticalMotion` when motion on that axis is intentional.
-4. Computes one union bounding box after registration for diagnostics and for
+5. Computes one union bounding box after registration for diagnostics and for
    the legacy shared-union fitting mode.
-5. With `PreserveSourceCellScale`, renders the full source cell using its fixed
+6. With `PreserveSourceCellScale`, renders the full source cell using its fixed
    cell-to-frame scale. Otherwise, applies the legacy shared union crop and one
    global fit scale.
-6. Returns the normalized spritesheet in `ImageBase64`, same-size PNG frames in
+7. Returns the normalized spritesheet in `ImageBase64`, same-size PNG frames in
    `Regions`, and the full measurements in `AnimationReport`.
 
 `CropToContent` is rejected in animation mode because independent tight crops

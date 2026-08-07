@@ -54,7 +54,7 @@ type AnimationGenerationRequest struct {
 	ReferenceImage string
 	// ReferenceImagePrepared marks an original high-resolution green-screen
 	// asset that does not need image-model redrawing. The executor selects one
-	// direction before this service is called.
+	// character or object direction before this service is called.
 	ReferenceImagePrepared bool
 	FrameCount             int
 	Columns                int
@@ -214,7 +214,7 @@ func normalizeAnimationGenerationRequest(
 	value.Resolution = strings.TrimSpace(value.Resolution)
 	value.AspectRatio = strings.TrimSpace(value.AspectRatio)
 	if value.Description == "" {
-		value.Description = "preserve the supplied character exactly"
+		value.Description = "preserve the supplied subject exactly"
 	}
 	if value.Style == "" {
 		value.Style = prompts.DefaultAnimationStyle

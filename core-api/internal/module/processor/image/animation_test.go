@@ -173,3 +173,54 @@ func solidRedBounds(input image.Image) (image.Rectangle, bool) {
 	}
 	return result, found
 }
+
+func TestNormalizeAnimationImageCanNormalizeStaticDirectionContentScale(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 50))
+	colorValue := color.NRGBA{R: 200, G: 90, B: 40, A: 255}
+	// The same static object was generated at two visibly different heights.
+	// It is also placed much higher in the second tall cell. Direction-sheet
+	// normalization should correct both errors before rendering.
+	fillRect(src, image.Rect(12, 10, 28, 40), colorValue)
+	fillRect(src, image.Rect(54, 5, 66, 20), colorValue)
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 64, FrameHeight: 64,
+		Anchor: AnimationAnchorFeet, NormalizeContentScale: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize direction content scale: %v", err)
+	}
+	if !result.Report.ContentScaleNormalized {
+		t.Fatal("content scale normalization was not reported")
+	}
+	if result.Report.ContentHeightMedian != 22.5 {
+		t.Fatalf("median content height = %f, want 22.5", result.Report.ContentHeightMedian)
+	}
+	if result.Report.RegistrationPolicy != "median_content_height_per_cell_scale_median_root_anchor_shared_union_crop" {
+		t.Fatalf("registration policy = %q", result.Report.RegistrationPolicy)
+	}
+	if result.Report.TranslationClamped != 0 {
+		t.Fatalf("static direction registration was clamped: %+v", result.Report)
+	}
+
+	heights := make([]int, 0, len(result.Frames))
+	bottoms := make([]int, 0, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		bounds, ok := alphaBoundsNRGBA(toNRGBA(decoded), defaultImageSplitAlphaThreshold)
+		if !ok {
+			t.Fatalf("frame %d has no visible content", index)
+		}
+		heights = append(heights, bounds.Dy())
+		bottoms = append(bottoms, bounds.Max.Y)
+	}
+	if absInt(heights[0]-heights[1]) > 1 {
+		t.Fatalf("normalized content heights differ: %v", heights)
+	}
+	if absInt(bottoms[0]-bottoms[1]) > 1 {
+		t.Fatalf("normalized baselines differ: %v", bottoms)
+	}
+}

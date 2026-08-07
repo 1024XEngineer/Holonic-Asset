@@ -55,6 +55,12 @@ type SplitImageRequest struct {
 	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
 	PreserveHorizontalMotion bool            `json:"preserve_horizontal_motion,omitempty"`
 	PreserveVerticalMotion   bool            `json:"preserve_vertical_motion,omitempty"`
+	// NormalizeContentScale is intended for static multi-direction sheets, not
+	// action frames. It rescales each visible subject to the median source
+	// content height before anchor registration. This corrects image-model
+	// direction sheets whose cells contain the same subject at inconsistent
+	// apparent sizes while keeping every returned frame on one fixed canvas.
+	NormalizeContentScale bool `json:"normalize_content_scale,omitempty"`
 	// PreserveSourceCellScale keeps the source grid-cell canvas as the
 	// coordinate system for output frames. Without it, animation mode scales
 	// the union of every pose to the target frame, so a sword extending during
@@ -232,6 +238,7 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		AlphaThreshold: request.AlphaThreshold, Anchor: request.Anchor,
 		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
 		PreserveVerticalMotion:   request.PreserveVerticalMotion,
+		NormalizeContentScale:    request.NormalizeContentScale,
 		PreserveSourceCellScale:  request.PreserveSourceCellScale,
 		MaxStabilizationShift:    request.MaxStabilizationShift,
 		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,

@@ -194,6 +194,10 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
+	directionCount, err := parseDirectionCount(payload.DirectionCount)
+	if err != nil {
+		return nil, err
+	}
 	generated, err := e.generateImages(
 		ctx,
 		GenerateObjectProtoType,
@@ -214,7 +218,7 @@ func (e *executor) generateObjectPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		0,
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -313,15 +317,19 @@ func animationReference(asset assetdomain.Asset, direction string) (string, bool
 	if err != nil {
 		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
 	}
-	directionCount := content.DirectionCount
-	directionIndex, err := animationDirectionIndex(direction, directionCount)
+
+	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
+		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
+	}
+	prototypeIndex, err := animationDirectionIndex(direction, content.DirectionCount)
 	if err != nil {
 		return "", false, err
 	}
-	if content.Prototype == nil || directionIndex >= len(*content.Prototype) {
+
+	if content.Prototype == nil || prototypeIndex >= len(*content.Prototype) {
 		return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %q", asset.ID, direction)
 	}
-	prototype := (*content.Prototype)[directionIndex]
+	prototype := (*content.Prototype)[prototypeIndex]
 	if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
 		return "", false, fmt.Errorf("generator: animation asset %d prototype direction %q has no image URL", asset.ID, direction)
 	}
@@ -466,18 +474,19 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 }
 
 func parseDirectionCount(directionCount string) (uint, error) {
+	directionCount = strings.TrimSpace(directionCount)
 	if directionCount == "" {
-		return 0, nil
+		return 0, fmt.Errorf("generator: direction count is required; use 2, 4, or 8")
 	}
 	value, err := strconv.ParseUint(directionCount, 10, 0)
 	if err != nil {
 		return 0, fmt.Errorf("generator: parse direction count %q: %w", directionCount, err)
 	}
 	switch value {
-	case 1, 2, 4, 8:
+	case 2, 4, 8:
 		return uint(value), nil
 	default:
-		return 0, fmt.Errorf("generator: invalid direction count %q", directionCount)
+		return 0, fmt.Errorf("generator: invalid direction count %q; use 2, 4, or 8", directionCount)
 	}
 }
 
