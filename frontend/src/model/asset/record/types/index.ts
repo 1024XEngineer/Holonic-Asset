@@ -7,13 +7,13 @@ export type {
   AssetRecord,
   AssetRecordForKind,
   TilesetItem,
-  UiComponent,
+  UISetComponent,
   SceneryAssetKind,
   SceneryAssetRecord,
   TilesetAssetKind,
   TilesetAssetRecord,
-  UiAssetKind,
-  UiAssetRecord,
+  UISetAssetKind,
+  UISetAssetRecord,
 } from "./asset-record";
 export type {
   AssetWorkspaceAsset,

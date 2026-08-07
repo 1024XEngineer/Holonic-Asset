@@ -11,7 +11,7 @@ type AssetListItemResponse struct {
 	AssetID     uint             `json:"assetId" minimum:"1"`
 	Name        string           `json:"name"`
 	ProjectID   uint             `json:"projectId" minimum:"1"`
-	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string           `json:"description"`
 	Tags        []string         `json:"tags"`
 	Version     uint             `json:"version"`
@@ -25,7 +25,7 @@ type GetAssetsRequest struct {
 	ProjectID uint               `param:"project_id" path:"project_id" json:"-" minimum:"1"`
 	Query     string             `query:"query"`
 	Tags      []string           `query:"tags,explode"`
-	Types     []domain.AssetType `query:"types,explode" enum:"character,object,tileSet,audio,ui,scenery"`
+	Types     []domain.AssetType `query:"types,explode" enum:"character,object,tileSet,audio,uiset,scenery"`
 }
 
 type AssetDetailRequest struct {
@@ -36,7 +36,7 @@ type AssetDetailResponse struct {
 	AssetID     uint             `json:"assetId" minimum:"1"`
 	Name        string           `json:"name"`
 	ProjectID   uint             `json:"projectId" minimum:"1"`
-	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string           `json:"description"`
 	Tags        []string         `json:"tags"`
 	Attributes  json.RawMessage  `json:"attributes"`
@@ -79,7 +79,7 @@ type UpdateAssetRequest struct {
 	AssetID     uint              `json:"assetId" minimum:"1"`
 	Name        *string           `json:"name,omitempty"`
 	ProjectID   *uint             `json:"projectId,omitempty" minimum:"1"`
-	Type        *domain.AssetType `json:"type,omitempty" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        *domain.AssetType `json:"type,omitempty" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description *string           `json:"description,omitempty"`
 	Tags        *[]string         `json:"tags,omitempty"`
 	Attributes  *json.RawMessage  `json:"attributes,omitempty"`
@@ -89,7 +89,7 @@ type UpdateAssetResponse struct {
 	AssetID     uint             `json:"assetId" minimum:"1"`
 	Name        string           `json:"name"`
 	ProjectID   uint             `json:"projectId" minimum:"1"`
-	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string           `json:"description"`
 	Tags        []string         `json:"tags"`
 	Attributes  json.RawMessage  `json:"attributes"`

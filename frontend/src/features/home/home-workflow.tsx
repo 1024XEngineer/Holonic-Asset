@@ -23,7 +23,7 @@ const workflow = [
     number: "04",
     title: "Engine-Ready Export",
     description:
-      "Export structured Spritesheets, Parallax Scenery Layers, Tilemaps, UI components, and audio files ready for Unity or Godot.",
+      "Export structured Spritesheets, Parallax Scenery Layers, Tilemaps, UI Set components, and audio files ready for Unity or Godot.",
   },
 ];
 
