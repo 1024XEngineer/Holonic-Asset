@@ -13,6 +13,7 @@ import type { SpriteEditorModeProps } from "./EditorModes/sprite-editor-mode.typ
 import type { EditorGenerationTask } from "./Header/editor-header";
 import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
 import { buildInspectorGenerationRequest } from "./editor-generation-request";
+import { getEditorStatus } from "./editor-status";
 import { useEditorSession } from "./state";
 
 export function useEditorWorkspace({
@@ -73,19 +74,13 @@ export function useEditorWorkspace({
     setNotice(message);
     scheduleNoticeReset(() => setNotice(null), 2400);
   };
-  const status =
-    snapshot.saveState.phase === "saving"
-      ? "Saving changes"
-      : promptTask
-        ? "Sending prompt"
-        : animationMutation.isPending
-          ? "Generating animation"
-          : (notice ??
-            (snapshot.saveState.phase === "failed"
-              ? snapshot.saveState.message
-              : snapshot.dirty
-                ? "Unsaved changes"
-                : "All changes saved"));
+  const status = getEditorStatus({
+    saveState: snapshot.saveState,
+    isPromptSubmitting: promptTask !== null,
+    isGeneratingAnimation: animationMutation.isPending,
+    notice,
+    isDirty: snapshot.dirty,
+  });
 
   const save = async () => {
     if (!snapshot.dirty) return;
