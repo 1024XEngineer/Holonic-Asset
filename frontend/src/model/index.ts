@@ -56,6 +56,7 @@ export type {
   CharacterAssetRecord,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
   TilesetCell,

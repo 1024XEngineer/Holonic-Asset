@@ -5,8 +5,8 @@ import { temporal } from "zundo";
 import type {
   AssetCanvasPosition,
   AssetRecord,
-  CharacterAssetRecord,
   GeneratedCharacterAnimation,
+  SpriteAssetRecordData,
 } from "@/model";
 
 import type {
@@ -78,7 +78,7 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
                   ...animations,
                   {
                     ...structuredClone(animation),
-                    id: createCharacterAnimationId(normalizedLabel, animations),
+                    id: createSpriteAnimationId(normalizedLabel, animations),
                     label: normalizedLabel,
                   },
                 ],
@@ -197,8 +197,6 @@ export function dispatchEditorCommand(
   }
 }
 
-type SpriteAssetRecordData = CharacterAssetRecord["character"];
-
 function getSpriteRecordData(record: AssetRecord): SpriteAssetRecordData {
   if (record.mode === "character") return record.character;
   if (record.mode === "object") return record.object;
@@ -238,7 +236,7 @@ function recordsMatch(left: AssetRecord, right: AssetRecord) {
   return deepEqual(left, right);
 }
 
-function createCharacterAnimationId(
+function createSpriteAnimationId(
   label: string,
   animations: Array<{ id: string }>,
 ) {

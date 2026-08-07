@@ -2,6 +2,7 @@ import { ArrowLeft, Redo2, Save, Undo2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { SpriteAssetKind } from "@/model";
 
 import {
   GenerationTaskDropdown,
@@ -26,7 +27,7 @@ export function EditorHeader({
   onRedo,
   onSave,
 }: {
-  assetKind: "character" | "object";
+  assetKind: SpriteAssetKind;
   assetName: string;
   version: string;
   projectName: string;
