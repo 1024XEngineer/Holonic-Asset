@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -12,12 +14,14 @@ import (
 )
 
 // Executor owns generation and any resulting asset creation.
+
 type Executor interface {
 	Generate(ctx context.Context, taskType TaskType, payload json.RawMessage) (json.RawMessage, error)
 }
 
 // AssetWriter is the subset of Workspace asset operations used by generation.
 type AssetWriter interface {
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, string) (uint, error)
@@ -34,6 +38,7 @@ type ReferenceStore interface {
 
 type executor struct {
 	images     imageclient.ImageGenerationService
+	animations AnimationGenerationService
 	processor  imageprocessor.Processor
 	assets     AssetWriter
 	references ReferenceStore
@@ -55,6 +60,25 @@ func NewExecutor(
 	}
 }
 
+// NewExecutorWithAnimation creates the complete generation workflow, including
+// image-to-video animation generation. NewExecutor remains available for
+// prototype-only callers and tests that do not need animation generation.
+func NewExecutorWithAnimation(
+	images imageclient.ImageGenerationService,
+	animations AnimationGenerationService,
+	processor imageprocessor.Processor,
+	assets AssetWriter,
+	references ...ReferenceStore,
+) Executor {
+	var referenceStore ReferenceStore
+	if len(references) > 0 {
+		referenceStore = references[0]
+	}
+	return &executor{
+		images: images, animations: animations, processor: processor, assets: assets, references: referenceStore,
+	}
+}
+
 type ExecutionResult struct {
 	AssetID     uint `json:"asset_id"`
 	AnimationID uint `json:"animation_id,omitempty"`
@@ -65,38 +89,53 @@ func (e *executor) Generate(
 	taskType TaskType,
 	payload json.RawMessage,
 ) (json.RawMessage, error) {
-	if e.images == nil {
-		return nil, ErrImageServiceRequired
-	}
-	if e.assets == nil {
-		return nil, ErrAssetWriterRequired
-	}
-	if e.processor == nil && (taskType == GenerateCharacterProtoType || taskType == GenerateObjectProtoType) {
-		return nil, ErrImageProcessorRequired
-	}
-
 	switch taskType {
 	case GenerateCharacterProtoType:
+		if err := e.requirePrototypeDependencies(); err != nil {
+			return nil, err
+		}
 		request := CreateCharacterPrototypePayload{}
 		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
 			return nil, err
 		}
 		return e.generateCharacterPrototype(ctx, request)
 	case GenerateObjectProtoType:
+		if err := e.requirePrototypeDependencies(); err != nil {
+			return nil, err
+		}
 		request := CreateObjectPrototypePayload{}
 		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
 			return nil, err
 		}
 		return e.generateObjectPrototype(ctx, request)
 	case GenerateAnimation:
+		if e.assets == nil {
+			return nil, ErrAssetWriterRequired
+		}
+		if e.animations == nil {
+			return nil, ErrAnimationServiceRequired
+		}
 		request := CreateAnimationPayload{}
 		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
 			return nil, err
 		}
-		return e.generateAnimation(ctx, taskType, request.ParentID, request.AssetName, request.CreativeBrief)
+		return e.generateAnimation(ctx, request)
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, taskType)
 	}
+}
+
+func (e *executor) requirePrototypeDependencies() error {
+	if e.images == nil {
+		return ErrImageServiceRequired
+	}
+	if e.assets == nil {
+		return ErrAssetWriterRequired
+	}
+	if e.processor == nil {
+		return ErrImageProcessorRequired
+	}
+	return nil
 }
 
 func (e *executor) generateCharacterPrototype(
@@ -155,6 +194,10 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
+	directionCount, err := parseDirectionCount(payload.DirectionCount)
+	if err != nil {
+		return nil, err
+	}
 	generated, err := e.generateImages(
 		ctx,
 		GenerateObjectProtoType,
@@ -175,7 +218,7 @@ func (e *executor) generateObjectPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		0,
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -193,36 +236,127 @@ func (e *executor) generateObjectPrototype(
 
 func (e *executor) generateAnimation(
 	ctx context.Context,
-	taskType TaskType,
-	assetID uint,
-	name string,
-	prompt string,
+	payload CreateAnimationPayload,
 ) (json.RawMessage, error) {
-	generated, err := e.generateImages(ctx, taskType, prompt, "", "")
+	if payload.AssetID == 0 {
+		return nil, fmt.Errorf("generator: animation asset is required")
+	}
+	animationName := strings.TrimSpace(payload.AnimationName)
+	if animationName == "" {
+		return nil, fmt.Errorf("generator: animation name is required")
+	}
+	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: get animation asset %d: %w", payload.AssetID, err)
+	}
+	if asset.ID == 0 {
+		return nil, fmt.Errorf("generator: animation asset %d not found", payload.AssetID)
+	}
+	if payload.ProjectID != 0 && asset.ProjectID != payload.ProjectID {
+		return nil, fmt.Errorf(
+			"generator: animation asset %d belongs to project %d, not project %d",
+			payload.AssetID,
+			asset.ProjectID,
+			payload.ProjectID,
+		)
+	}
+	reference, referencePrepared, err := animationReference(asset, payload.Direction)
 	if err != nil {
 		return nil, err
 	}
-	frames, err := e.animationFrames(ctx, generated)
+	description := strings.TrimSpace(asset.Description)
+	if description == "" {
+		description = strings.TrimSpace(asset.Name)
+	}
+	generated, err := e.animations.Generate(ctx, &AnimationGenerationRequest{
+		Description:            description,
+		Style:                  payload.Style,
+		Action:                 payload.CreativeBrief,
+		ReferenceImage:         reference,
+		ReferenceImagePrepared: referencePrepared,
+		FrameCount:             payload.FrameCount,
+		Columns:                payload.Columns,
+		FrameWidth:             payload.FrameWidth,
+		FrameHeight:            payload.FrameHeight,
+		FPS:                    payload.FPS,
+		Resolution:             payload.Resolution,
+		Duration:               payload.Duration,
+		AspectRatio:            payload.AspectRatio,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: generate animation frames: %w", err)
+	}
+	if generated == nil || len(generated.Frames) == 0 {
+		return nil, fmt.Errorf("generator: generate animation frames: empty result")
+	}
+	frames, err := animationFrames(generated)
 	if err != nil {
 		return nil, err
 	}
 
-	animationID, err := e.assets.CreateAnimation(ctx, assetID, name)
+	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, animationName)
 	if err != nil {
-		return nil, fmt.Errorf("generator: create animation for asset %d: %w", assetID, err)
+		return nil, fmt.Errorf("generator: create animation for asset %d: %w", payload.AssetID, err)
 	}
 	if animationID == 0 {
-		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", assetID)
+		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", payload.AssetID)
 	}
-	if err := e.assets.UpdateAnimationFrames(ctx, assetID, animationID, frames); err != nil {
+	if err := e.assets.UpdateAnimationFrames(ctx, payload.AssetID, animationID, frames); err != nil {
 		return nil, fmt.Errorf(
 			"generator: update asset %d animation %d frames: %w",
-			assetID,
+			payload.AssetID,
 			animationID,
 			err,
 		)
 	}
-	return encodeExecutionResult(ExecutionResult{AssetID: assetID, AnimationID: animationID})
+	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
+}
+
+func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
+	}
+
+	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
+		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
+	}
+	prototypeIndex, err := animationDirectionIndex(direction, content.DirectionCount)
+	if err != nil {
+		return "", false, err
+	}
+
+	if content.Prototype == nil || prototypeIndex >= len(*content.Prototype) {
+		return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %q", asset.ID, direction)
+	}
+	prototype := (*content.Prototype)[prototypeIndex]
+	if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
+		return "", false, fmt.Errorf("generator: animation asset %d prototype direction %q has no image URL", asset.ID, direction)
+	}
+	unprocessedURL := animationUnprocessedImageURL(strings.TrimSpace(*prototype.URL))
+	return unprocessedURL, false, nil
+}
+
+func animationUnprocessedImageURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.HasPrefix(value, "data:") {
+		return value
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return addAnimationUnprocessedSuffix(value)
+	}
+	parsed.Path = addAnimationUnprocessedSuffix(parsed.Path)
+	return parsed.String()
+}
+
+func addAnimationUnprocessedSuffix(path string) string {
+	lastSlash := strings.LastIndex(path, "/")
+	lastDot := strings.LastIndex(path, ".")
+	if lastDot <= lastSlash {
+		return path + "-unprocessed"
+	}
+	return path[:lastDot] + "-unprocessed" + path[lastDot:]
 }
 
 func (e *executor) generateImages(
@@ -274,9 +408,16 @@ func (e *executor) generateImages(
 			}
 			imageBase64 = backgroundRemoved.ImageBase64
 		}
+		resizeOptions := imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight)
+		if taskType == GenerateCharacterProtoType {
+			// Character prototypes are the canonical scale contract for later
+			// image-to-video generation. Keep a larger transparent safety area so
+			// held props can move without forcing animation frames to shrink.
+			resizeOptions = imageprocessor.AnimationFrameResizeOptions(resizeWidth, resizeHeight)
+		}
 		resized, resizeErr := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: imageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight),
+			Options:     resizeOptions,
 		})
 		if resizeErr != nil {
 			return nil, fmt.Errorf("generator: resize %s image %d: %w", taskType, index+1, resizeErr)
@@ -333,18 +474,19 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 }
 
 func parseDirectionCount(directionCount string) (uint, error) {
+	directionCount = strings.TrimSpace(directionCount)
 	if directionCount == "" {
-		return 0, nil
+		return 0, fmt.Errorf("generator: direction count is required; use 2, 4, or 8")
 	}
 	value, err := strconv.ParseUint(directionCount, 10, 0)
 	if err != nil {
 		return 0, fmt.Errorf("generator: parse direction count %q: %w", directionCount, err)
 	}
 	switch value {
-	case 1, 2, 4, 8:
+	case 2, 4, 8:
 		return uint(value), nil
 	default:
-		return 0, fmt.Errorf("generator: invalid direction count %q", directionCount)
+		return 0, fmt.Errorf("generator: invalid direction count %q; use 2, 4, or 8", directionCount)
 	}
 }
 
@@ -367,21 +509,24 @@ func (e *executor) prototypeResources(
 	return resources, nil
 }
 
-func (e *executor) animationFrames(
-	ctx context.Context,
-	result *imageclient.GenerateResult,
-) ([]assetdomain.Frame, error) {
-	frames := make([]assetdomain.Frame, len(result.Images))
-	for index, image := range result.Images {
-		url := generatedImageDataURL(image)
-		if e.references != nil {
-			objectKey, err := e.references.PersistReference(ctx, url)
-			if err != nil {
-				return nil, fmt.Errorf("generator: persist animation frame %d: %w", index+1, err)
-			}
-			url = objectKey
+func animationFrames(result *AnimationGenerationResult) ([]assetdomain.Frame, error) {
+	frames := make([]assetdomain.Frame, len(result.Frames))
+	for index, frame := range result.Frames {
+		mediaType := strings.TrimSpace(frame.MIMEType)
+		if mediaType == "" {
+			mediaType = "image/png"
 		}
-		frames[index] = assetdomain.Frame{ID: uint(index + 1), URL: &url}
+		url := "data:" + mediaType + ";base64," + frame.ImageBase64
+		metadata, err := animationFrameMetadata(frame, result)
+		if err != nil {
+			return nil, err
+		}
+		frames[index] = assetdomain.Frame{
+			ID:       uint(index + 1),
+			URL:      &url,
+			Duration: result.FrameDurationMS,
+			Metadata: metadata,
+		}
 	}
 	return frames, nil
 }

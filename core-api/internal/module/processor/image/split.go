@@ -35,28 +35,39 @@ const (
 // Background is nil for opaque input, its matte colour is detected from the
 // source edges automatically.
 type SplitImageRequest struct {
-	ImageBase64              string                      `json:"image_base64"`
-	Mode                     ImageSplitMode              `json:"mode,omitempty"`
-	Columns                  int                         `json:"columns,omitempty"`
-	Rows                     int                         `json:"rows,omitempty"`
-	ForceProportionalGrid    bool                        `json:"force_proportional_grid,omitempty"`
-	DetectGridBounds         bool                        `json:"detect_grid_bounds,omitempty"`
-	AlphaThreshold           uint8                       `json:"alpha_threshold,omitempty"`
-	MinComponentPixels       int                         `json:"min_component_pixels,omitempty"`
-	MinBandSize              int                         `json:"min_band_size,omitempty"`
-	ProjectionMergeGap       int                         `json:"projection_merge_gap,omitempty"`
-	CropToContent            bool                        `json:"crop_to_content,omitempty"`
-	AllowEmptyRegions        bool                        `json:"allow_empty_regions,omitempty"`
-	FrameCount               int                         `json:"frame_count,omitempty"`
-	FrameWidth               int                         `json:"frame_width,omitempty"`
-	FrameHeight              int                         `json:"frame_height,omitempty"`
-	Margin                   int                         `json:"margin,omitempty"`
-	CropPadding              int                         `json:"crop_padding,omitempty"`
-	Anchor                   AnimationAnchor             `json:"anchor,omitempty"`
-	PreserveHorizontalMotion bool                        `json:"preserve_horizontal_motion,omitempty"`
-	PreserveVerticalMotion   bool                        `json:"preserve_vertical_motion,omitempty"`
-	MaxStabilizationShift    int                         `json:"max_stabilization_shift,omitempty"`
-	Background               *AnimationBackgroundOptions `json:"background,omitempty"`
+	ImageBase64              string          `json:"image_base64"`
+	Mode                     ImageSplitMode  `json:"mode,omitempty"`
+	Columns                  int             `json:"columns,omitempty"`
+	Rows                     int             `json:"rows,omitempty"`
+	ForceProportionalGrid    bool            `json:"force_proportional_grid,omitempty"`
+	DetectGridBounds         bool            `json:"detect_grid_bounds,omitempty"`
+	AlphaThreshold           uint8           `json:"alpha_threshold,omitempty"`
+	MinComponentPixels       int             `json:"min_component_pixels,omitempty"`
+	MinBandSize              int             `json:"min_band_size,omitempty"`
+	ProjectionMergeGap       int             `json:"projection_merge_gap,omitempty"`
+	CropToContent            bool            `json:"crop_to_content,omitempty"`
+	AllowEmptyRegions        bool            `json:"allow_empty_regions,omitempty"`
+	FrameCount               int             `json:"frame_count,omitempty"`
+	FrameWidth               int             `json:"frame_width,omitempty"`
+	FrameHeight              int             `json:"frame_height,omitempty"`
+	Margin                   int             `json:"margin,omitempty"`
+	CropPadding              int             `json:"crop_padding,omitempty"`
+	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
+	PreserveHorizontalMotion bool            `json:"preserve_horizontal_motion,omitempty"`
+	PreserveVerticalMotion   bool            `json:"preserve_vertical_motion,omitempty"`
+	// NormalizeContentScale is intended for static multi-direction sheets, not
+	// action frames. It rescales each visible subject to the median source
+	// content height before anchor registration. This corrects image-model
+	// direction sheets whose cells contain the same subject at inconsistent
+	// apparent sizes while keeping every returned frame on one fixed canvas.
+	NormalizeContentScale bool `json:"normalize_content_scale,omitempty"`
+	// PreserveSourceCellScale keeps the source grid-cell canvas as the
+	// coordinate system for output frames. Without it, animation mode scales
+	// the union of every pose to the target frame, so a sword extending during
+	// an action makes the character body appear smaller than its prototype.
+	PreserveSourceCellScale bool                        `json:"preserve_source_cell_scale,omitempty"`
+	MaxStabilizationShift   int                         `json:"max_stabilization_shift,omitempty"`
+	Background              *AnimationBackgroundOptions `json:"background,omitempty"`
 }
 
 // ImageRegion is one independently encoded PNG region. SourceBounds are
@@ -227,6 +238,8 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		AlphaThreshold: request.AlphaThreshold, Anchor: request.Anchor,
 		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
 		PreserveVerticalMotion:   request.PreserveVerticalMotion,
+		NormalizeContentScale:    request.NormalizeContentScale,
+		PreserveSourceCellScale:  request.PreserveSourceCellScale,
 		MaxStabilizationShift:    request.MaxStabilizationShift,
 		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,
 		AllowEmptyFrames:         request.AllowEmptyRegions,
