@@ -68,6 +68,16 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		}
 	}
 
+	var generateReferenceSchema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(document.Components.Schemas["GenerateProjectReferenceRequest"], &generateReferenceSchema); err != nil {
+		t.Fatalf("decode GenerateProjectReferenceRequest schema: %v", err)
+	}
+	if _, ok := generateReferenceSchema.Properties["reference"]; !ok {
+		t.Fatal("GenerateProjectReferenceRequest must expose the optional current reference")
+	}
+
 	expectedMethods := map[string][]string{
 		"/project/create":                        {"post"},
 		"/project/reference/generate":            {"post"},
