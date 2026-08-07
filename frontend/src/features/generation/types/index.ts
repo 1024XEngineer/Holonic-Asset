@@ -6,3 +6,4 @@ export type {
   UiAssetCreationDraft,
   VisualAssetCreationDraft,
 } from "./asset-creation";
+export type { TileShapeCell } from "@/model/generation";

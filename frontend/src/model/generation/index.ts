@@ -4,7 +4,7 @@ export {
   useEnqueueGenerationMutation,
   useGenerationRunsQuery,
 } from "./run";
-export type { CreationRequest, GenerationRun } from "./run";
+export type { CreationRequest, GenerationRun, TileShapeCell } from "./run";
 export {
   useDeleteQuickAssetMutation,
   useGenerateQuickAssetMutation,

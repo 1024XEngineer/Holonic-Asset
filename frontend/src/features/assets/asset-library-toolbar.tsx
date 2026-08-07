@@ -1,7 +1,9 @@
-import { Plus, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CreateAssetToolbar } from "@/features/generation";
+import { creatableAssetKinds } from "@/model/asset";
 
 import { AssetFilters } from "./asset-filters";
 import type { AssetLibraryController } from "./state/use-asset-library-controller";
@@ -12,7 +14,7 @@ export function AssetLibraryToolbar({
   library: AssetLibraryController;
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b pb-5">
+    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 border-b pb-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
       <AssetFilters
         counts={library.counts}
         selectedKinds={library.selectedKinds}
@@ -43,10 +45,12 @@ export function AssetLibraryToolbar({
           </Button>
         ) : null}
       </div>
-      <Button type="button" className="h-9" title="Create a new asset">
-        <Plus data-icon="inline-start" />
-        New asset
-      </Button>
+      {library.project ? (
+        <CreateAssetToolbar
+          assetKinds={creatableAssetKinds}
+          project={library.project}
+        />
+      ) : null}
     </div>
   );
 }
