@@ -61,7 +61,7 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 		{
 			method: http.MethodPost,
 			path:   "/api/v1/projects/42/generation-runs",
-			body:   `{"kind":"generate_character_prototype","prompt":"hero"}`,
+			body:   `{"kind":"generate_character_prototype","creative_brief":"hero"}`,
 		},
 		{
 			method: http.MethodGet,
@@ -122,7 +122,7 @@ func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/projects/42/generation-runs",
-		strings.NewReader(`{"kind":"unsupported","prompt":"hero"}`),
+		strings.NewReader(`{"kind":"unsupported","creative_brief":"hero"}`),
 	)
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	recorder := httptest.NewRecorder()
@@ -134,6 +134,27 @@ func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
 	}
 	if stub.createCalls != 0 {
 		t.Fatalf("expected invalid body not to reach the handler, got %d calls", stub.createCalls)
+	}
+}
+
+func TestGenerationCreateRejectsLegacyPromptField(t *testing.T) {
+	stub := &generationRouterStub{}
+	e := router.Register(nil, nil, stub, nil)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/projects/42/generation-runs",
+		strings.NewReader(`{"kind":"generate_character_prototype","prompt":"hero"}`),
+	)
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recorder := httptest.NewRecorder()
+
+	e.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+	}
+	if stub.createCalls != 0 {
+		t.Fatalf("expected legacy prompt request not to reach the handler, got %d calls", stub.createCalls)
 	}
 }
 
