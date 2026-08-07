@@ -125,7 +125,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 	})
 
 	t.Run("binds asset update", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/asset/update", strings.NewReader(`{
+		request := httptest.NewRequest(http.MethodPut, "/api/v1/asset/update", strings.NewReader(`{
 			"assetId": 7,
 			"name": "hero",
 			"projectId": 42,
@@ -249,7 +249,7 @@ func TestAssetUpdateRejectsInvalidType(t *testing.T) {
 	stub := &assetRouterStub{}
 	e := router.Register(stub, nil, nil, nil)
 	request := httptest.NewRequest(
-		http.MethodPost,
+		http.MethodPut,
 		"/api/v1/asset/update",
 		strings.NewReader(`{"assetId":7,"type":"unsupported"}`),
 	)
