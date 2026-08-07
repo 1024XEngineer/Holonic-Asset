@@ -2,7 +2,6 @@ package dao
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"gorm.io/datatypes"
@@ -16,20 +15,20 @@ type Asset struct {
 	ProjectID   uint `gorm:"index"`
 	Type        string
 	Description string
-	Tags        []string        `json:"tags" gorm:"serializer:json"`
-	Attributes  json.RawMessage `json:"attributes" gorm:"serializer:json"`
-	ContentID   *uint           `gorm:"index"`
-	Content     datatypes.JSON  `json:"content" gorm:"-"`
+	Tags        []string `json:"tags" gorm:"serializer:json"`
+	Perspective string
+	Scale       datatypes.JSON `gorm:"type:jsonb"`
+	ContentID   *uint          `gorm:"index"`
+	Content     datatypes.JSON `json:"content" gorm:"-"`
 	Version     uint
 }
 
 type AssetUpdate struct {
 	Name        *string
-	ProjectID   *uint
-	Type        *string
 	Description *string
 	Tags        *[]string
-	Attributes  *json.RawMessage
+	Perspective *string
+	Scale       *datatypes.JSON
 }
 
 type AssetDao interface {
@@ -58,7 +57,7 @@ func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint)
 	assets := make([]Asset, 0)
 	err := a.DB.WithContext(ctx).
 		Where("project_id = ?", projectID).
-		Select("id, name, project_id, type, description, tags, version").
+		Select("id, name, project_id, type, description, tags, perspective, scale, version").
 		Order("id ASC").
 		Find(&assets).Error
 	return assets, err
@@ -98,20 +97,17 @@ func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUp
 	if update.Name != nil {
 		values["name"] = *update.Name
 	}
-	if update.ProjectID != nil {
-		values["project_id"] = *update.ProjectID
-	}
-	if update.Type != nil {
-		values["type"] = *update.Type
-	}
 	if update.Description != nil {
 		values["description"] = *update.Description
 	}
 	if update.Tags != nil {
 		values["tags"] = *update.Tags
 	}
-	if update.Attributes != nil {
-		values["attributes"] = *update.Attributes
+	if update.Perspective != nil {
+		values["perspective"] = *update.Perspective
+	}
+	if update.Scale != nil {
+		values["scale"] = *update.Scale
 	}
 	query := a.DB.WithContext(ctx).Model(&Asset{}).Where("id = ?", id)
 	if len(values) > 0 {

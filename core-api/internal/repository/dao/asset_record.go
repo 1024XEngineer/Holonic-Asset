@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type AssetRecord struct {
-	ID        uint `gorm:"primaryKey"`
-	AssetID   uint `gorm:"not null;uniqueIndex:idx_asset_record"`
-	Version   uint `gorm:"not null;uniqueIndex:idx_asset_record"`
-	ContentID uint `gorm:"not null;index"`
-	CreatedAt time.Time
+	ID          uint `gorm:"primaryKey"`
+	AssetID     uint `gorm:"not null;uniqueIndex:idx_asset_record"`
+	Version     uint `gorm:"not null;uniqueIndex:idx_asset_record"`
+	ContentID   uint `gorm:"not null;index"`
+	Name        string
+	Description string
+	Perspective string
+	Scale       datatypes.JSON `gorm:"type:jsonb"`
+	CreatedAt   time.Time
 }
 
 type AssetRecordDao interface {

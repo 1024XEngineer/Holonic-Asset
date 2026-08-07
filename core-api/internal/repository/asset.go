@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -202,18 +203,46 @@ func (r *AssetRepositoryImpl) UpdateAsset(
 
 	value := &dao.AssetUpdate{
 		Name:        update.Name,
-		ProjectID:   update.ProjectID,
 		Description: update.Description,
-	}
-	if update.Type != nil {
-		assetType := string(*update.Type)
-		value.Type = &assetType
 	}
 	if update.Tags != nil {
 		value.Tags = update.Tags
 	}
-	if update.Attributes != nil {
-		value.Attributes = update.Attributes
+	var current *dao.Asset
+	loadCurrent := func() error {
+		if current != nil {
+			return nil
+		}
+		asset, err := r.AssetDao.GetAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		current = &asset
+		return nil
+	}
+	if update.Perspective != nil {
+		if err := loadCurrent(); err != nil {
+			return nil, err
+		}
+		if current.Type != string(domain.AssetTypeAudio) {
+			if !update.Perspective.Valid() {
+				return nil, fmt.Errorf("repository: invalid perspective %q", *update.Perspective)
+			}
+			perspective := string(*update.Perspective)
+			value.Perspective = &perspective
+		}
+	}
+	if update.Scale != nil {
+		if err := loadCurrent(); err != nil {
+			return nil, err
+		}
+		if current.Type != string(domain.AssetTypeAudio) {
+			if err := domain.ValidateScale(domain.AssetType(current.Type), *update.Scale); err != nil {
+				return nil, err
+			}
+			scale := datatypes.JSON(append([]byte(nil), (*update.Scale)...))
+			value.Scale = &scale
+		}
 	}
 
 	asset, err := r.AssetDao.UpdateAsset(ctx, id, value)
@@ -232,7 +261,8 @@ func convertAssetToDomain(asset dao.Asset) domain.Asset {
 		Type:        domain.AssetType(asset.Type),
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
-		Attributes:  append([]byte(nil), asset.Attributes...),
+		Perspective: domain.Perspective(asset.Perspective),
+		Scale:       append([]byte(nil), asset.Scale...),
 		Content:     append([]byte(nil), asset.Content...),
 		Version:     asset.Version,
 	}
@@ -253,6 +283,19 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 	if asset == nil {
 		asset = &domain.Asset{}
 	}
+	perspective := asset.Perspective
+	scale := asset.Scale
+	if assetType == domain.AssetTypeAudio {
+		// Audio assets are not visual and therefore do not carry visual metadata.
+		perspective = ""
+		scale = nil
+	}
+	if assetType != domain.AssetTypeAudio && !perspective.Valid() {
+		return nil, fmt.Errorf("repository: invalid perspective %q", asset.Perspective)
+	}
+	if err := domain.ValidateScale(assetType, scale); err != nil {
+		return nil, err
+	}
 	content, err := asset.DecodeContent()
 	if err != nil {
 		return nil, fmt.Errorf("repository: decode asset content: %w", err)
@@ -272,7 +315,8 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 		Type:        string(assetType),
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
-		Attributes:  append([]byte(nil), asset.Attributes...),
+		Perspective: string(perspective),
+		Scale:       datatypes.JSON(append([]byte(nil), scale...)),
 		Content:     datatypes.JSON(encoded),
 		Version:     asset.Version,
 	}, nil
@@ -410,9 +454,13 @@ func (r *AssetRepositoryImpl) createAssetResultInTransaction(ctx context.Context
 		return nil, err
 	}
 	if _, err := r.RecordDao.CreateAssetRecord(ctx, &dao.AssetRecord{
-		AssetID:   created.ID,
-		Version:   currentVersion,
-		ContentID: contentRecord.ID,
+		AssetID:     created.ID,
+		Version:     currentVersion,
+		ContentID:   contentRecord.ID,
+		Name:        created.Name,
+		Description: created.Description,
+		Perspective: created.Perspective,
+		Scale:       append(datatypes.JSON(nil), created.Scale...),
 	}); err != nil {
 		return nil, err
 	}
@@ -518,9 +566,13 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		}
 	}
 	snapshot := &domain.AssetRecord{
-		AssetID: record.AssetID,
-		Version: version,
-		Content: append([]byte(nil), content...),
+		AssetID:     record.AssetID,
+		Version:     version,
+		Name:        asset.Name,
+		Description: asset.Description,
+		Perspective: domain.Perspective(asset.Perspective),
+		Scale:       append([]byte(nil), asset.Scale...),
+		Content:     append([]byte(nil), content...),
 	}
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
 		AssetID: asset.ID,
@@ -530,9 +582,13 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		return nil, err
 	}
 	daoRecord := &dao.AssetRecord{
-		AssetID:   snapshot.AssetID,
-		Version:   snapshot.Version,
-		ContentID: contentRecord.ID,
+		AssetID:     snapshot.AssetID,
+		Version:     snapshot.Version,
+		ContentID:   contentRecord.ID,
+		Name:        snapshot.Name,
+		Description: snapshot.Description,
+		Perspective: string(snapshot.Perspective),
+		Scale:       datatypes.JSON(append([]byte(nil), snapshot.Scale...)),
 	}
 	recordID, err := r.RecordDao.CreateAssetRecord(ctx, daoRecord)
 	if err != nil {
@@ -565,12 +621,16 @@ func (r *AssetRepositoryImpl) GetRecordHistory(ctx context.Context, assetID uint
 			return nil, err
 		}
 		result = append(result, domain.AssetRecord{
-			ID:        record.ID,
-			AssetID:   record.AssetID,
-			Version:   record.Version,
-			ContentID: record.ContentID,
-			CreatedAt: record.CreatedAt,
-			Content:   append([]byte(nil), content.Content...),
+			ID:          record.ID,
+			AssetID:     record.AssetID,
+			Version:     record.Version,
+			ContentID:   record.ContentID,
+			CreatedAt:   record.CreatedAt,
+			Name:        record.Name,
+			Description: record.Description,
+			Perspective: domain.Perspective(record.Perspective),
+			Scale:       append([]byte(nil), record.Scale...),
+			Content:     append([]byte(nil), content.Content...),
 		})
 	}
 	return result, nil
@@ -625,6 +685,27 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 			contentIDsToDelete = appendUniqueUint(contentIDsToDelete, *asset.ContentID)
 		}
 	}
+	name := candidate.Name
+	description := candidate.Description
+	perspective := candidate.Perspective
+	scale := json.RawMessage(candidate.Scale)
+	if name == "" {
+		name = asset.Name
+	}
+	if perspective == "" {
+		perspective = asset.Perspective
+	}
+	if len(scale) == 0 {
+		scale = append([]byte(nil), asset.Scale...)
+	}
+	if _, err := r.AssetDao.UpdateAsset(ctx, assetID, &dao.AssetUpdate{
+		Name:        &name,
+		Description: &description,
+		Perspective: &perspective,
+		Scale:       scaleValue(scale),
+	}); err != nil {
+		return nil, err
+	}
 	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, assetID, version, candidate.ContentID); err != nil {
 		return nil, err
 	}
@@ -635,12 +716,16 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 		return nil, err
 	}
 	return &domain.AssetRecord{
-		ID:        candidate.ID,
-		AssetID:   candidate.AssetID,
-		Version:   candidate.Version,
-		ContentID: candidate.ContentID,
-		CreatedAt: candidate.CreatedAt,
-		Content:   append([]byte(nil), content.Content...),
+		ID:          candidate.ID,
+		AssetID:     candidate.AssetID,
+		Version:     candidate.Version,
+		ContentID:   candidate.ContentID,
+		CreatedAt:   candidate.CreatedAt,
+		Name:        name,
+		Description: description,
+		Perspective: domain.Perspective(perspective),
+		Scale:       append([]byte(nil), scale...),
+		Content:     append([]byte(nil), content.Content...),
 	}, nil
 }
 
@@ -679,7 +764,8 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 		Type:        asset.Type,
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
-		Attributes:  append([]byte(nil), asset.Attributes...),
+		Perspective: asset.Perspective,
+		Scale:       append(datatypes.JSON(nil), asset.Scale...),
 		Version:     asset.Version,
 	}
 	created, err := r.AssetDao.CreateAsset(ctx, copyAsset)
@@ -710,10 +796,14 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 			return 0, fmt.Errorf("repository: content %d for asset record %d/%d not found", record.ContentID, record.AssetID, record.Version)
 		}
 		recordCopies = append(recordCopies, dao.AssetRecord{
-			AssetID:   created.ID,
-			Version:   record.Version,
-			ContentID: contentID,
-			CreatedAt: record.CreatedAt,
+			AssetID:     created.ID,
+			Version:     record.Version,
+			ContentID:   contentID,
+			Name:        record.Name,
+			Description: record.Description,
+			Perspective: record.Perspective,
+			Scale:       append(datatypes.JSON(nil), record.Scale...),
+			CreatedAt:   record.CreatedAt,
 		})
 	}
 	if err := r.RecordDao.CreateAssetRecords(ctx, recordCopies); err != nil {
@@ -747,4 +837,9 @@ func appendUniqueUint(values []uint, value uint) []uint {
 		return values
 	}
 	return append(values, value)
+}
+
+func scaleValue(raw json.RawMessage) *datatypes.JSON {
+	value := datatypes.JSON(append([]byte(nil), raw...))
+	return &value
 }
