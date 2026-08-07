@@ -19,7 +19,7 @@ export type TilesetItem = {
   tiles: TilesetCell[];
 };
 
-export type UiComponent = {
+export type UISetComponent = {
   id: string;
   label: string;
   kind: "panel" | "label" | "button";
@@ -30,7 +30,7 @@ export type CharacterAssetKind = "character";
 type ObjectAssetKind = "object";
 export type SceneryAssetKind = "scenery";
 export type TilesetAssetKind = "tileset";
-export type UiAssetKind = "ui";
+export type UISetAssetKind = "uiset";
 export type AudioAssetKind = "audio";
 
 type AssetRecordBase<K extends AssetKind> = {
@@ -60,8 +60,8 @@ export type TilesetAssetRecord = AssetRecordBase<TilesetAssetKind> & {
   tileset: { gridSize: number; items: TilesetItem[] };
 };
 
-export type UiAssetRecord = AssetRecordBase<UiAssetKind> & {
-  ui: { components: UiComponent[] };
+export type UISetAssetRecord = AssetRecordBase<UISetAssetKind> & {
+  uiset: { components: UISetComponent[] };
 };
 
 export type AudioAssetRecord = AssetRecordBase<AudioAssetKind> & {
@@ -73,7 +73,7 @@ type AssetRecordByKind = {
   object: ObjectAssetRecord;
   scenery: SceneryAssetRecord;
   tileset: TilesetAssetRecord;
-  ui: UiAssetRecord;
+  uiset: UISetAssetRecord;
   audio: AudioAssetRecord;
 };
 

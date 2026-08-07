@@ -38,9 +38,9 @@ export type {
   TilesetAssetRecord,
   TilesetCell,
   TilesetItem,
-  UiAssetKind,
-  UiAssetRecord,
-  UiComponent,
+  UISetAssetKind,
+  UISetAssetRecord,
+  UISetComponent,
 } from "./record";
 export {
   useAddAudioTrackMutation,

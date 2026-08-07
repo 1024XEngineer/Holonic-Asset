@@ -12,7 +12,7 @@ export type {
   AssetRecordSaveResult,
   TilesetCell,
   TilesetItem,
-  UiComponent,
+  UISetComponent,
   AssetWorkspaceAsset,
   AssetWorkspaceData,
   AssetWorkspaceDataForKind,
@@ -22,6 +22,6 @@ export type {
   SceneryAssetRecord,
   TilesetAssetKind,
   TilesetAssetRecord,
-  UiAssetKind,
-  UiAssetRecord,
+  UISetAssetKind,
+  UISetAssetRecord,
 } from "./types";

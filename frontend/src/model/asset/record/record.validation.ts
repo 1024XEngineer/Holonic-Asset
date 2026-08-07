@@ -11,7 +11,7 @@ import type {
   AssetRecordForKind,
   TilesetCell,
   TilesetItem,
-  UiComponent,
+  UISetComponent,
 } from "./types";
 import type { SpriteAssetRecordData } from "./types/asset-record";
 
@@ -41,9 +41,10 @@ function isAssetRecord(value: unknown): value is AssetRecord {
         isFiniteNumber(value.tileset.gridSize) &&
         isArrayOf(value.tileset.items, isTilesetItem)
       );
-    case "ui":
+    case "uiset":
       return (
-        isPlainObject(value.ui) && isArrayOf(value.ui.components, isUiComponent)
+        isPlainObject(value.uiset) &&
+        isArrayOf(value.uiset.components, isUISetComponent)
       );
     case "audio":
       return isPlainObject(value.audio);
@@ -163,7 +164,7 @@ function isTilesetCell(value: unknown): value is TilesetCell {
   );
 }
 
-function isUiComponent(value: unknown): value is UiComponent {
+function isUISetComponent(value: unknown): value is UISetComponent {
   return (
     isPlainObject(value) &&
     typeof value.id === "string" &&
