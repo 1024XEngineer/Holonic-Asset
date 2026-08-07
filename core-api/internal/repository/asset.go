@@ -485,8 +485,8 @@ func (r *AssetRepositoryImpl) CreateTileSetAsset(ctx context.Context, asset *dom
 	return r.createAsset(ctx, asset, domain.AssetTypeTileSet)
 }
 
-func (r *AssetRepositoryImpl) CreateUIAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
-	return r.createAsset(ctx, asset, domain.AssetTypeUI)
+func (r *AssetRepositoryImpl) CreateUISetAsset(ctx context.Context, asset *domain.Asset) (uint, error) {
+	return r.createAsset(ctx, asset, domain.AssetTypeUISet)
 }
 
 func (r *AssetRepositoryImpl) CreateSceneryAsset(ctx context.Context, asset *domain.Asset) (uint, error) {

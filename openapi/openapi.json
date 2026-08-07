@@ -45,7 +45,7 @@
               "object",
               "tileSet",
               "audio",
-              "ui",
+              "uiset",
               "scenery"
             ],
             "type": "string"
@@ -112,7 +112,7 @@
               "object",
               "tileSet",
               "audio",
-              "ui",
+              "uiset",
               "scenery"
             ],
             "type": "string"
@@ -1427,7 +1427,7 @@
               "object",
               "tileSet",
               "audio",
-              "ui",
+              "uiset",
               "scenery"
             ],
             "type": "string"
@@ -2514,7 +2514,7 @@
                   "object",
                   "tileSet",
                   "audio",
-                  "ui",
+                  "uiset",
                   "scenery"
                 ],
                 "type": "string"

@@ -32,7 +32,7 @@ func ValidateScale(assetType AssetType, raw json.RawMessage) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	switch assetType {
-	case AssetTypeCharacter, AssetTypeObject, AssetTypeUI, AssetTypeScenery:
+	case AssetTypeCharacter, AssetTypeObject, AssetTypeUISet, AssetTypeScenery:
 		var size Size
 		if err := decoder.Decode(&size); err != nil {
 			return fmt.Errorf("asset: decode %s scale: %w", assetType, err)

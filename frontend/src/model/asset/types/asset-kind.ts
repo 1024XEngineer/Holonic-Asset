@@ -3,7 +3,7 @@ export const assetKinds = [
   "object",
   "tileset",
   "scenery",
-  "ui",
+  "uiset",
   "audio",
 ] as const;
 

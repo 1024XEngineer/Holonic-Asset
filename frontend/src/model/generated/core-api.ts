@@ -80,9 +80,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /** Update an asset */
-        post: operations["updateAsset"];
+        put: operations["updateAsset"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -183,9 +183,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post?: never;
         /** Delete a project */
-        post: operations["deleteProject"];
-        delete?: never;
+        delete: operations["deleteProject"];
         options?: never;
         head?: never;
         patch?: never;
@@ -250,9 +250,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /** Update a project */
-        post: operations["updateProject"];
+        put: operations["updateProject"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -326,7 +326,7 @@ export interface components {
             projectId: number;
             tags: string[] | null;
             /** @enum {string} */
-            type: "character" | "object" | "tileSet" | "audio" | "ui" | "scenery";
+            type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */
             version: number;
         };
@@ -339,7 +339,7 @@ export interface components {
             projectId: number;
             tags: string[] | null;
             /** @enum {string} */
-            type: "character" | "object" | "tileSet" | "audio" | "ui" | "scenery";
+            type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */
             version: number;
         };
@@ -755,7 +755,7 @@ export interface components {
             projectId?: number;
             tags?: string[];
             /** @enum {string} */
-            type?: "character" | "object" | "tileSet" | "audio" | "ui" | "scenery";
+            type?: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
         };
         UpdateAssetResponse: {
             /** Format: int64 */
@@ -767,7 +767,7 @@ export interface components {
             projectId: number;
             tags: string[] | null;
             /** @enum {string} */
-            type: "character" | "object" | "tileSet" | "audio" | "ui" | "scenery";
+            type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */
             version: number;
         };
@@ -1552,7 +1552,7 @@ export interface operations {
             query?: {
                 query?: string;
                 tags?: string[] | null;
-                types?: ("character" | "object" | "tileSet" | "audio" | "ui" | "scenery")[] | null;
+                types?: ("character" | "object" | "tileSet" | "audio" | "uiset" | "scenery")[] | null;
             };
             header?: never;
             path: {

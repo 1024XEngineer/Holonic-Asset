@@ -14,7 +14,12 @@ import type {
   UpdateAssetRequest,
   UpdateAssetResponse,
 } from "./asset.contract";
-import { deleteEnvelope, getEnvelope, postEnvelope } from "@/model/fetchers";
+import {
+  deleteEnvelope,
+  getEnvelope,
+  postEnvelope,
+  putEnvelope,
+} from "@/model/fetchers";
 
 export const coreAssetApi = {
   list: (projectID: number, query?: ListAssetsQuery) =>
@@ -33,7 +38,7 @@ export const coreAssetApi = {
   rollback: (request: RollBackAssetRequest) =>
     postEnvelope<RollBackAssetResponse>("/asset/rollback", request),
   update: (request: UpdateAssetRequest) =>
-    postEnvelope<UpdateAssetResponse>("/asset/update", request),
+    putEnvelope<UpdateAssetResponse>("/asset/update", request),
   delete: (request: DeleteAssetRequest) =>
     deleteEnvelope<DeleteAssetResponse>("/asset/delete", request),
 };

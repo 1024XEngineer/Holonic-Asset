@@ -34,7 +34,7 @@ export function createAssetCreationDraft<Reference = unknown>(
         kind,
         tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
       };
-    case "ui":
+    case "uiset":
       return {
         ...common,
         kind,
@@ -76,7 +76,7 @@ export function toCreationRequest<Reference>(
       };
     case "tileset":
       return { ...common, tiles: draft.tiles };
-    case "ui":
+    case "uiset":
       return {
         ...common,
         style: draft.style,

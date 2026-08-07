@@ -57,13 +57,13 @@ export type {
   SceneryAssetRecord,
   TilesetAssetKind,
   TilesetAssetRecord,
-  TilesetCell,
   TilesetItem,
-  UiAssetKind,
-  UiAssetRecord,
-  UiComponent,
+  UISetAssetKind,
+  UISetAssetRecord,
+  UISetComponent,
   UpdateAudioTrackInput,
 } from "./asset";
+export type { ItemTile } from "./item-tile";
 export { coreAssetApi } from "./asset/library/asset.api";
 export type {
   AssetAnimationFrameResponse,

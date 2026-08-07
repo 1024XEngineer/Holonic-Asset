@@ -418,7 +418,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 func TestExecutorRejectsAnimationForNonFrameAssetTypes(t *testing.T) {
 	for _, assetType := range []assetdomain.AssetType{
 		assetdomain.AssetTypeTileSet,
-		assetdomain.AssetTypeUI,
+		assetdomain.AssetTypeUISet,
 		assetdomain.AssetTypeScenery,
 		assetdomain.AssetTypeAudio,
 	} {

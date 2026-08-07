@@ -4,11 +4,9 @@ import type {
   CharacterSpriteSheet,
   SceneryLayer,
 } from "../../types";
+import type { ItemTile } from "@/model/item-tile";
 
 export type AssetCanvasPosition = { x: number; y: number };
-
-/** Global [column, row] coordinate in the tileset grid. */
-export type TilesetCell = [column: number, row: number];
 
 export type TilesetItem = {
   id: string;
@@ -16,10 +14,10 @@ export type TilesetItem = {
   /** Complete generated item image; tiles are only a front-end interaction map. */
   imageUrl?: string;
   /** Every tileset tile occupied by this complete item, as [column, row]. */
-  tiles: TilesetCell[];
+  tiles: ItemTile[];
 };
 
-export type UiComponent = {
+export type UISetComponent = {
   id: string;
   label: string;
   kind: "panel" | "label" | "button";
@@ -30,7 +28,7 @@ export type CharacterAssetKind = "character";
 type ObjectAssetKind = "object";
 export type SceneryAssetKind = "scenery";
 export type TilesetAssetKind = "tileset";
-export type UiAssetKind = "ui";
+export type UISetAssetKind = "uiset";
 export type AudioAssetKind = "audio";
 
 type AssetRecordBase<K extends AssetKind> = {
@@ -60,8 +58,8 @@ export type TilesetAssetRecord = AssetRecordBase<TilesetAssetKind> & {
   tileset: { gridSize: number; items: TilesetItem[] };
 };
 
-export type UiAssetRecord = AssetRecordBase<UiAssetKind> & {
-  ui: { components: UiComponent[] };
+export type UISetAssetRecord = AssetRecordBase<UISetAssetKind> & {
+  uiset: { components: UISetComponent[] };
 };
 
 export type AudioAssetRecord = AssetRecordBase<AudioAssetKind> & {
@@ -73,7 +71,7 @@ type AssetRecordByKind = {
   object: ObjectAssetRecord;
   scenery: SceneryAssetRecord;
   tileset: TilesetAssetRecord;
-  ui: UiAssetRecord;
+  uiset: UISetAssetRecord;
   audio: AudioAssetRecord;
 };
 

@@ -18,7 +18,7 @@ import {
 import { TilesetAssetFields } from "./create-asset/tileset-asset-fields";
 import { VisualAssetFields } from "./create-asset/visual-asset-fields";
 import { SceneryAssetFields } from "./create-asset/scenery-asset-fields";
-import { UiAssetFields } from "./create-asset/ui-asset-fields";
+import { UISetAssetFields } from "./create-asset/uiset-asset-fields";
 
 export function CreateAssetForm({
   kind,
@@ -115,8 +115,8 @@ export function CreateAssetForm({
             </p>
           ) : null}
         </>
-      ) : draft.kind === "ui" ? (
-        <UiAssetFields draft={draft} onChange={setDraft} />
+      ) : draft.kind === "uiset" ? (
+        <UISetAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "character" || draft.kind === "object" ? (
         <VisualAssetFields draft={draft} onChange={setDraft} />
       ) : null}

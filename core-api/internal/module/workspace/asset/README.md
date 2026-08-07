@@ -32,7 +32,7 @@ dimensions are rejected.
 | `character` | One frame: `{width,height}` |
 | `object` | One frame: `{width,height}` |
 | `tileSet` | `{tileSize:{width,height},tileAmount:{columns,rows}}` |
-| `ui` | Complete canvas: `{width,height}` |
+| `uiset` | Complete canvas: `{width,height}` |
 | `scenery` | Complete canvas: `{width,height}` |
 | `audio` | `null` |
 
@@ -53,7 +53,7 @@ height = tileSize.height * tileAmount.rows
 
 Character and Object Content contains `directionCount`, `prototype`, and
 `animations`. TileSet Content contains `items`; tile dimensions belong to
-Scale. UI Content contains `components`, including component size and
+Scale. UI Set Content contains `components`, including component size and
 position. Scenery Content contains `layers`, including each layer's resource,
 position, transform, visibility, opacity, and z-order.
 

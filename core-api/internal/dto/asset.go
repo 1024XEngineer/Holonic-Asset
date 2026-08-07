@@ -11,7 +11,7 @@ type AssetListItemResponse struct {
 	AssetID     uint               `json:"assetId" minimum:"1"`
 	Name        string             `json:"name"`
 	ProjectID   uint               `json:"projectId" minimum:"1"`
-	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Scale       json.RawMessage    `json:"scale"`
@@ -38,7 +38,7 @@ type AssetDetailResponse struct {
 	AssetID     uint               `json:"assetId" minimum:"1"`
 	Name        string             `json:"name"`
 	ProjectID   uint               `json:"projectId" minimum:"1"`
-	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Scale       json.RawMessage    `json:"scale"`
@@ -95,7 +95,7 @@ type UpdateAssetResponse struct {
 	AssetID     uint               `json:"assetId" minimum:"1"`
 	Name        string             `json:"name"`
 	ProjectID   uint               `json:"projectId" minimum:"1"`
-	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,ui,scenery"`
+	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Scale       json.RawMessage    `json:"scale"`

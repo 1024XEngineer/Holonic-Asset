@@ -9,10 +9,10 @@ import type {
   AssetCanvasPosition,
   AssetRecord,
   AssetRecordForKind,
-  TilesetCell,
   TilesetItem,
-  UiComponent,
+  UISetComponent,
 } from "./types";
+import type { ItemTile } from "@/model/item-tile";
 import type { SpriteAssetRecordData } from "./types/asset-record";
 
 export function isAssetRecordForKind<K extends AssetKind>(
@@ -41,9 +41,10 @@ function isAssetRecord(value: unknown): value is AssetRecord {
         isFiniteNumber(value.tileset.gridSize) &&
         isArrayOf(value.tileset.items, isTilesetItem)
       );
-    case "ui":
+    case "uiset":
       return (
-        isPlainObject(value.ui) && isArrayOf(value.ui.components, isUiComponent)
+        isPlainObject(value.uiset) &&
+        isArrayOf(value.uiset.components, isUISetComponent)
       );
     case "audio":
       return isPlainObject(value.audio);
@@ -150,11 +151,11 @@ function isTilesetItem(value: unknown): value is TilesetItem {
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
-    isArrayOf(value.tiles, isTilesetCell)
+    isArrayOf(value.tiles, isItemTile)
   );
 }
 
-function isTilesetCell(value: unknown): value is TilesetCell {
+function isItemTile(value: unknown): value is ItemTile {
   return (
     Array.isArray(value) &&
     value.length === 2 &&
@@ -163,7 +164,7 @@ function isTilesetCell(value: unknown): value is TilesetCell {
   );
 }
 
-function isUiComponent(value: unknown): value is UiComponent {
+function isUISetComponent(value: unknown): value is UISetComponent {
   return (
     isPlainObject(value) &&
     typeof value.id === "string" &&

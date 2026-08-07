@@ -3,7 +3,7 @@ const disciplines = [
   { label: "Objects", meta: "Props + states" },
   { label: "Scenery", meta: "Scenes + layers" },
   { label: "Tilesets", meta: "Tiles + maps" },
-  { label: "Interfaces", meta: "Game UI" },
+  { label: "UI Set", meta: "HUD + menus" },
 ];
 
 export function HomeHero() {
@@ -18,8 +18,8 @@ export function HomeHero() {
             <div className="mt-9 max-w-3xl">
               <p className="max-w-xl text-base leading-7 text-neutral-600 sm:text-lg sm:leading-8">
                 Holonic Asset helps you generate characters, objects,
-                environments, tilesets, and game UI—then keep every asset in a
-                library with one consistent visual style.
+                environments, tilesets, and UI Set assets—then keep every asset
+                in a library with one consistent visual style.
               </p>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] font-semibold tracking-[0.13em] text-neutral-600">
@@ -53,8 +53,8 @@ export function HomeHero() {
                     One project. Every asset in sync.
                   </p>
                   <p className="mt-1 max-w-sm text-sm leading-6 text-white/65">
-                    Generate characters, objects, scenery, tilesets and Game UI
-                    in one consistent style, then manage the complete set
+                    Generate characters, objects, scenery, tilesets, and UI Set
+                    assets in one consistent style, then manage the complete set
                     together.
                   </p>
                 </div>

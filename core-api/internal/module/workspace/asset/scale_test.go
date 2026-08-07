@@ -14,7 +14,7 @@ func TestValidateScaleAcceptsTypeSpecificShapes(t *testing.T) {
 	}{
 		{domain.AssetTypeCharacter, `{"width":64,"height":64}`},
 		{domain.AssetTypeObject, `{"width":32,"height":48}`},
-		{domain.AssetTypeUI, `{"width":1024,"height":768}`},
+		{domain.AssetTypeUISet, `{"width":1024,"height":768}`},
 		{domain.AssetTypeScenery, `{"width":1920,"height":1080}`},
 		{domain.AssetTypeTileSet, `{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":10,"rows":8}}`},
 		{domain.AssetTypeAudio, `null`},
@@ -48,7 +48,7 @@ func TestValidateScaleRejectsInvalidOrUnknownFields(t *testing.T) {
 	}{
 		{"missing dimension", domain.AssetTypeCharacter, `{"width":64}`},
 		{"zero dimension", domain.AssetTypeObject, `{"width":0,"height":32}`},
-		{"unknown field", domain.AssetTypeUI, `{"width":64,"height":64,"unit":"px"}`},
+		{"unknown field", domain.AssetTypeUISet, `{"width":64,"height":64,"unit":"px"}`},
 		{"wrong tileset shape", domain.AssetTypeTileSet, `{"width":64,"height":64}`},
 		{"non-null audio", domain.AssetTypeAudio, `{"width":64,"height":64}`},
 		{"trailing data", domain.AssetTypeScenery, `{"width":64,"height":64} {}`},
