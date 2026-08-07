@@ -36,6 +36,12 @@ export async function postEnvelope<T>(
   return unwrapEnvelope(await postJson<ApiResponse<T>>(path, body));
 }
 
+export async function putEnvelope<T>(path: string, body?: unknown): Promise<T> {
+  return unwrapEnvelope(
+    await requestJson<ApiResponse<T>>(path, { method: "PUT" }, body),
+  );
+}
+
 export async function deleteEnvelope<T>(
   path: string,
   body?: unknown,

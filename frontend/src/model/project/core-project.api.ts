@@ -8,7 +8,12 @@ import type {
   UpdateProjectRequest,
   UpdateProjectResponse,
 } from "./project.contract";
-import { getEnvelope, postEnvelope } from "@/model/fetchers";
+import {
+  deleteEnvelope,
+  getEnvelope,
+  postEnvelope,
+  putEnvelope,
+} from "@/model/fetchers";
 
 export const coreProjectApi = {
   create: (request: CreateProjectRequest) =>
@@ -18,7 +23,7 @@ export const coreProjectApi = {
   detail: (projectID: number) =>
     getEnvelope<ProjectDetailResponse>("/project/detail", { projectID }),
   update: (request: UpdateProjectRequest) =>
-    postEnvelope<UpdateProjectResponse>("/project/update", request),
+    putEnvelope<UpdateProjectResponse>("/project/update", request),
   delete: (request: DeleteProjectRequest) =>
-    postEnvelope<DeleteProjectResponse>("/project/delete", request),
+    deleteEnvelope<DeleteProjectResponse>("/project/delete", request),
 };

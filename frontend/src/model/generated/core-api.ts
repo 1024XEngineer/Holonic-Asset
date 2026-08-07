@@ -80,9 +80,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /** Update an asset */
-        post: operations["updateAsset"];
+        put: operations["updateAsset"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -183,9 +183,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post?: never;
         /** Delete a project */
-        post: operations["deleteProject"];
-        delete?: never;
+        delete: operations["deleteProject"];
         options?: never;
         head?: never;
         patch?: never;
@@ -250,9 +250,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /** Update a project */
-        post: operations["updateProject"];
+        put: operations["updateProject"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
