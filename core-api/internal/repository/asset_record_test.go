@@ -41,6 +41,22 @@ func (s *recordAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetI
 	return nil
 }
 
+func (s *recordAssetDaoStub) UpdateAsset(_ context.Context, _ uint, update *dao.AssetUpdate) (dao.Asset, error) {
+	if update.Name != nil {
+		s.asset.Name = *update.Name
+	}
+	if update.Description != nil {
+		s.asset.Description = *update.Description
+	}
+	if update.Perspective != nil {
+		s.asset.Perspective = *update.Perspective
+	}
+	if update.Scale != nil {
+		s.asset.Scale = append(datatypes.JSON(nil), (*update.Scale)...)
+	}
+	return s.asset, nil
+}
+
 type recordDaoStub struct {
 	dao.AssetRecordDao
 	records map[uint]dao.AssetRecord
@@ -147,9 +163,13 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	currentContentID := uint(4)
 	currentContent := datatypes.JSON(`{"prototype":[{"id":1,"url":"https://cdn.example/up.png"}]}`)
 	assetDao := &recordAssetDaoStub{asset: dao.Asset{
-		ID:        7,
-		Version:   2,
-		ContentID: &currentContentID,
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Perspective: "Top-Down",
+		Scale:       datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &currentContentID,
 	}}
 	recordDao := &recordDaoStub{
 		records: map[uint]dao.AssetRecord{
@@ -175,6 +195,9 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	if string(record.Content) != string(currentContent) {
 		t.Fatalf("record content was not copied: %s", record.Content)
 	}
+	if record.Name != "hero" || record.Description != "main character" || record.Perspective != domain.PerspectiveTopDown || string(record.Scale) != `{"width":64,"height":64}` {
+		t.Fatalf("record attributes were not copied: %+v", record)
+	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
 		t.Fatalf("asset current pointer was not updated: %+v", assetDao)
 	}
@@ -183,13 +206,25 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 	targetContentID := uint(3)
 	currentContentID := uint(6)
-	assetDao := &recordAssetDaoStub{asset: dao.Asset{ID: 7, Version: 4, ContentID: &currentContentID}}
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:          7,
+		Name:        "current hero",
+		Description: "current description",
+		Perspective: "Isometric",
+		Scale:       datatypes.JSON(`{"width":128,"height":128}`),
+		Version:     4,
+		ContentID:   &currentContentID,
+	}}
 	recordDao := &recordDaoStub{records: map[uint]dao.AssetRecord{
 		2: {
-			ID:        2,
-			AssetID:   7,
-			Version:   2,
-			ContentID: targetContentID,
+			ID:          2,
+			AssetID:     7,
+			Version:     2,
+			ContentID:   targetContentID,
+			Name:        "saved hero",
+			Description: "saved description",
+			Perspective: "Top-Down",
+			Scale:       datatypes.JSON(`{"width":64,"height":64}`),
 		},
 		3: {
 			ID:        3,
@@ -218,6 +253,9 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 2 || assetDao.updatedContent != targetContentID {
 		t.Fatalf("asset current pointer was not rolled back: %+v", assetDao)
+	}
+	if assetDao.asset.Name != "saved hero" || assetDao.asset.Description != "saved description" || assetDao.asset.Perspective != "Top-Down" || string(assetDao.asset.Scale) != `{"width":64,"height":64}` {
+		t.Fatalf("asset attributes were not rolled back: %+v", assetDao.asset)
 	}
 	if _, ok := recordDao.records[3]; ok {
 		t.Fatal("records after rollback target should be deleted")
@@ -302,7 +340,8 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 		Type:        "character",
 		Description: "main character",
 		Tags:        []string{"hero", "player"},
-		Attributes:  []byte(`{"perspective":"Side-On"}`),
+		Perspective: "Side-On",
+		Scale:       []byte(`{"width":64,"height":64}`),
 		ContentID:   &currentContentID,
 		Version:     2,
 	}}

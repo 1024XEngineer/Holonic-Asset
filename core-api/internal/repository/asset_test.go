@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"gorm.io/datatypes"
+
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
@@ -52,7 +54,7 @@ func (s *assetDaoStub) UpdateAsset(_ context.Context, assetID uint, update *dao.
 }
 
 func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
-	attributes := json.RawMessage(`{"width":128}`)
+	scale := json.RawMessage(`{"width":128,"height":128}`)
 	daoStub := &assetDaoStub{assets: []dao.Asset{{
 		ID:          7,
 		Name:        "hero",
@@ -60,7 +62,8 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 		Type:        "character",
 		Description: "main character",
 		Tags:        []string{"player", "hero"},
-		Attributes:  attributes,
+		Perspective: "Top-Down",
+		Scale:       datatypes.JSON(scale),
 		Version:     3,
 	}}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
@@ -78,7 +81,7 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 	if got[0].ID != 7 || got[0].Type != domain.AssetTypeCharacter || got[0].Version != 3 {
 		t.Fatalf("unexpected mapped asset: %+v", got[0])
 	}
-	if string(got[0].Attributes) != string(attributes) || len(got[0].Tags) != 2 {
+	if string(got[0].Scale) != string(scale) || got[0].Perspective != domain.PerspectiveTopDown || len(got[0].Tags) != 2 {
 		t.Fatalf("asset data was not mapped: %+v", got[0])
 	}
 }
@@ -123,11 +126,12 @@ func TestAssetRepositoryMatchesAssetQueryByNameOrDescription(t *testing.T) {
 
 func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 	name := "updated hero"
-	projectID := uint(99)
-	typeValue := domain.AssetTypeObject
+	projectID := uint(42)
+	typeValue := domain.AssetTypeCharacter
 	description := "updated description"
 	tags := []string{"prop"}
-	attributes := json.RawMessage(`{"scale":2}`)
+	perspective := domain.PerspectiveSideOn
+	scale := json.RawMessage(`{"width":64,"height":64}`)
 	version := uint(4)
 	daoStub := &assetDaoStub{updatedAsset: dao.Asset{
 		ID:          7,
@@ -136,27 +140,41 @@ func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 		Type:        string(typeValue),
 		Description: description,
 		Tags:        tags,
-		Attributes:  attributes,
+		Perspective: string(perspective),
+		Scale:       datatypes.JSON(scale),
 		Version:     version,
 	}}
+	daoStub.asset = dao.Asset{ID: 7, Type: string(typeValue)}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
 
 	got, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{
 		Name:        &name,
-		ProjectID:   &projectID,
-		Type:        &typeValue,
 		Description: &description,
 		Tags:        &tags,
-		Attributes:  &attributes,
+		Perspective: &perspective,
+		Scale:       &scale,
 	})
 	if err != nil {
 		t.Fatalf("update asset basics: %v", err)
 	}
-	if daoStub.updateID != 7 || daoStub.update == nil || daoStub.update.Type == nil || *daoStub.update.Type != string(typeValue) {
+	if daoStub.updateID != 7 || daoStub.update == nil || daoStub.update.Perspective == nil || *daoStub.update.Perspective != string(perspective) {
 		t.Fatalf("unexpected DAO update: %+v", daoStub.update)
 	}
-	if got == nil || got.Name != name || got.ProjectID != projectID || got.Type != typeValue {
+	if got == nil || got.Name != name || got.ProjectID != projectID || got.Type != typeValue || string(got.Scale) != string(scale) {
 		t.Fatalf("unexpected updated asset: %+v", got)
+	}
+}
+
+func TestAssetRepositoryRejectsInvalidScaleBeforeUpdate(t *testing.T) {
+	scale := json.RawMessage(`{"width":64,"height":64,"unexpected":true}`)
+	daoStub := &assetDaoStub{asset: dao.Asset{ID: 7, Type: "character"}}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	if _, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{Scale: &scale}); err == nil {
+		t.Fatal("expected invalid scale to be rejected")
+	}
+	if daoStub.update != nil {
+		t.Fatalf("invalid scale reached DAO update: %+v", daoStub.update)
 	}
 }
 

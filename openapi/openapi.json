@@ -9,7 +9,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "content": {},
           "description": {
             "type": "string"
@@ -17,11 +16,20 @@
           "name": {
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "projectId": {
             "format": "int64",
             "minimum": 1,
             "type": "integer"
           },
+          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -54,8 +62,9 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "scale",
           "tags",
-          "attributes",
           "version"
         ],
         "type": "object"
@@ -74,11 +83,20 @@
           "name": {
             "type": "string"
           },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "projectId": {
             "format": "int64",
             "minimum": 1,
             "type": "integer"
           },
+          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -111,6 +129,8 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "scale",
           "tags",
           "version"
         ],
@@ -769,11 +789,26 @@
             "format": "date-time",
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "recordId": {
             "format": "int64",
             "minimum": 1,
             "type": "integer"
           },
+          "scale": {},
           "version": {
             "format": "int64",
             "minimum": 0,
@@ -785,7 +820,11 @@
           "assetId",
           "version",
           "contentId",
-          "createdAt"
+          "createdAt",
+          "name",
+          "description",
+          "perspective",
+          "scale"
         ],
         "type": "object"
       },
@@ -1318,34 +1357,26 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "description": {
             "type": "string"
           },
           "name": {
             "type": "string"
           },
-          "projectId": {
-            "format": "int64",
-            "minimum": 1,
-            "type": "integer"
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
           },
+          "scale": {},
           "tags": {
             "items": {
               "type": "string"
             },
             "type": "array"
-          },
-          "type": {
-            "enum": [
-              "character",
-              "object",
-              "tileSet",
-              "audio",
-              "ui",
-              "scenery"
-            ],
-            "type": "string"
           }
         },
         "required": [
@@ -1361,11 +1392,18 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "description": {
             "type": "string"
           },
           "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
             "type": "string"
           },
           "projectId": {
@@ -1373,6 +1411,7 @@
             "minimum": 1,
             "type": "integer"
           },
+          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -1405,8 +1444,9 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "scale",
           "tags",
-          "attributes",
           "version"
         ],
         "type": "object"

@@ -22,8 +22,9 @@ type imageGenerationServiceStub struct {
 }
 
 type imageProcessorStub struct {
-	events *[]string
-	err    error
+	events         *[]string
+	resizeRequests []*imageprocessor.ResizeRequest
+	err            error
 }
 
 type referenceStoreStub struct {
@@ -68,6 +69,7 @@ func (s *imageProcessorStub) Resize(
 	request *imageprocessor.ResizeRequest,
 ) (*imageprocessor.ResizeResult, error) {
 	*s.events = append(*s.events, "resize_image")
+	s.resizeRequests = append(s.resizeRequests, request)
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -117,6 +119,22 @@ type generationAssetWriterStub struct {
 	animationID      uint
 	frames           []assetdomain.Frame
 	err              error
+	asset            assetdomain.Asset
+}
+
+func (s *generationAssetWriterStub) GetDetail(_ context.Context, assetID uint) (assetdomain.Asset, error) {
+	if s.err != nil {
+		return assetdomain.Asset{}, s.err
+	}
+	if s.asset.ID != 0 {
+		return s.asset, nil
+	}
+	return assetdomain.Asset{
+		ID:          assetID,
+		Type:        assetdomain.AssetTypeCharacter,
+		Perspective: assetdomain.PerspectiveTopDown,
+		Scale:       json.RawMessage(`{"width":64,"height":64}`),
+	}, nil
 }
 
 func (s *generationAssetWriterStub) CreateCharacterAsset(
@@ -188,11 +206,12 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		result: generatedImages(),
 	}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutor(images, processor, assets)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
-		"canvas_size":"64x64",
+			"scale":{"width":64,"height":64},
 		"perspective":"Top-Down",
 		"direction_count":"4",
 		"reference":"https://cdn.example/reference.png",
@@ -212,9 +231,12 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	if images.request == nil || images.request.Prompt != "pixel knight" ||
-		images.request.Size != "64x64" ||
+		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
+	}
+	if len(processor.resizeRequests) != 2 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
+		t.Fatalf("asset scale was not passed to processor: %+v", processor.resizeRequests)
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -225,11 +247,52 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode character content: %v", err)
 	}
-	if content.Perspective != assetdomain.PerspectiveTopDown || content.DirectionCount != 4 {
+	if assets.characterAsset.Perspective != assetdomain.PerspectiveTopDown || content.DirectionCount != 4 {
 		t.Fatalf("unexpected character content: %+v", content)
+	}
+	if string(assets.characterAsset.Scale) != `{"width":64,"height":64}` {
+		t.Fatalf("unexpected character scale: %s", assets.characterAsset.Scale)
 	}
 	assertPrototypeResources(t, assets.characterAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
+}
+
+func TestExecutorDerivesCharacterDirectionCountFromPerspective(t *testing.T) {
+	for _, test := range []struct {
+		perspective assetdomain.Perspective
+		want        uint
+	}{
+		{perspective: assetdomain.PerspectiveSideOn, want: 2},
+		{perspective: assetdomain.PerspectiveTopDown, want: 4},
+		{perspective: assetdomain.PerspectiveIsometric, want: 8},
+	} {
+		t.Run(string(test.perspective), func(t *testing.T) {
+			events := []string{}
+			assets := &generationAssetWriterStub{events: &events}
+			executor := generator.NewExecutor(
+				&imageGenerationServiceStub{events: &events, result: generatedImages()},
+				&imageProcessorStub{events: &events},
+				assets,
+			)
+
+			payload := json.RawMessage(fmt.Sprintf(`{
+			"asset_name":"hero",
+			"creative_brief":"pixel knight",
+			"scale":{"width":64,"height":64},
+			"perspective":%q
+		}`, test.perspective))
+			if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
+				t.Fatalf("generate character prototype: %v", err)
+			}
+			content, err := assets.characterAsset.DecodeContent()
+			if err != nil {
+				t.Fatalf("decode character content: %v", err)
+			}
+			if content.DirectionCount != test.want {
+				t.Fatalf("expected direction count %d, got %d", test.want, content.DirectionCount)
+			}
+		})
+	}
 }
 
 func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t *testing.T) {
@@ -241,7 +304,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
-		"canvas_size":"64x64",
+			"scale":{"width":64,"height":64},
 		"perspective":"Top-Down",
 		"reference":"projects/7/reference.png",
 		"project_id":11
@@ -273,7 +336,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	payload := json.RawMessage(`{
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
-		"canvas_size":"128x128",
+			"scale":{"width":128,"height":128},
 		"perspective":"Isometric",
 		"project_id":12
 	}`)
@@ -296,12 +359,8 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		assets.objectAsset.ProjectID != 12 || assets.objectAsset.Type != assetdomain.AssetTypeObject {
 		t.Fatalf("unexpected object asset: %+v", assets.objectAsset)
 	}
-	content, err := assets.objectAsset.DecodeContent()
-	if err != nil {
-		t.Fatalf("decode object content: %v", err)
-	}
-	if content.Perspective != assetdomain.PerspectiveIsometric {
-		t.Fatalf("unexpected object perspective: %q", content.Perspective)
+	if assets.objectAsset.Perspective != assetdomain.PerspectiveIsometric {
+		t.Fatalf("unexpected object perspective: %q", assets.objectAsset.Perspective)
 	}
 	assertPrototypeResources(t, assets.objectAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
@@ -330,6 +389,8 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(events, []string{
 				"generate_image",
+				"resize_image",
+				"resize_image",
 				"create_animation",
 				"update_animation_frames",
 			}) {
@@ -346,10 +407,41 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 			if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
 				*assets.frames[0].URL != "data:image/png;base64,first" ||
 				assets.frames[1].ID != 2 || assets.frames[1].URL == nil ||
-				*assets.frames[1].URL != "data:image/webp;base64,second" {
+				*assets.frames[1].URL != "data:image/png;base64,second" {
 				t.Fatalf("unexpected animation frames: %+v", assets.frames)
 			}
 			assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
+		})
+	}
+}
+
+func TestExecutorRejectsAnimationForNonFrameAssetTypes(t *testing.T) {
+	for _, assetType := range []assetdomain.AssetType{
+		assetdomain.AssetTypeTileSet,
+		assetdomain.AssetTypeUI,
+		assetdomain.AssetTypeScenery,
+		assetdomain.AssetTypeAudio,
+	} {
+		t.Run(string(assetType), func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			assets := &generationAssetWriterStub{
+				events: &events,
+				asset: assetdomain.Asset{
+					ID:    7,
+					Type:  assetType,
+					Scale: json.RawMessage(`{"width":64,"height":64}`),
+				},
+			}
+			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateAnimation, json.RawMessage(`{"parent_id":7}`))
+			if err == nil {
+				t.Fatal("expected unsupported asset type error")
+			}
+			if len(events) != 0 {
+				t.Fatalf("animation should stop before image generation: %v", events)
+			}
 		})
 	}
 }
@@ -384,7 +476,7 @@ func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T)
 			payload: json.RawMessage(`{
 				"asset_name":"hero",
 				"creative_brief":"pixel knight",
-				"canvas_size":"64x64",
+					"scale":{"width":64,"height":64},
 				"perspective":"top-down",
 				"direction_count":"4",
 				"project_id":11
@@ -395,7 +487,7 @@ func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T)
 			payload: json.RawMessage(`{
 				"asset_name":"hero",
 				"creative_brief":"pixel knight",
-				"canvas_size":"64x64",
+					"scale":{"width":64,"height":64},
 				"perspective":"Top-Down",
 				"direction_count":"3",
 				"project_id":11
