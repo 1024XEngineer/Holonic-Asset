@@ -10,7 +10,6 @@ export type {
   AssetRecordApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
-  TilesetCell,
   TilesetItem,
   UiComponent,
   AssetWorkspaceAsset,

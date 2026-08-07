@@ -6,7 +6,6 @@ export type {
   AssetCanvasPosition,
   AssetRecord,
   AssetRecordForKind,
-  TilesetCell,
   TilesetItem,
   UiComponent,
   SceneryAssetKind,
