@@ -32,7 +32,7 @@ export type TilesetAssetCreationDraft<Reference = unknown> =
     tiles: {
       description: string;
       reference: Reference | undefined;
-      tiles: TilesetTile[];
+      shape: TilesetTile[];
     }[];
   };
 

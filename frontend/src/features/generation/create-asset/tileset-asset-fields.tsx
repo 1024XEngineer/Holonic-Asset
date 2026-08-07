@@ -12,12 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import type { TilesetAssetCreationDraft } from "../types";
-import { TilesetTilePicker } from "./tileset-tile-picker";
+import { TileShapePicker } from "./tile-shape-picker";
 
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 
 function createEmptyItem(): TilesetAssetCreationDraft<File>["tiles"][number] {
-  return { description: "", reference: undefined, tiles: [[0, 0]] };
+  return { description: "", reference: undefined, shape: [[0, 0]] };
 }
 
 export function TilesetAssetFields({
@@ -107,9 +107,9 @@ export function TilesetAssetFields({
                     />
                   </label>
                   <div className="grid gap-5">
-                    <TilesetTilePicker
-                      tiles={item.tiles}
-                      onChange={(tiles) => updateItem(index, { tiles })}
+                    <TileShapePicker
+                      tiles={item.shape}
+                      onChange={(tiles) => updateItem(index, { shape: tiles })}
                     />
                     <div className="grid gap-2 text-sm font-medium">
                       <span>Reference image</span>

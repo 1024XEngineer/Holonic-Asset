@@ -5,7 +5,7 @@ import type { TilesetTile } from "@/model/asset";
 
 const gridSize = 4;
 
-export function TilesetTilePicker({
+export function TileShapePicker({
   tiles,
   onChange,
 }: {
@@ -39,7 +39,7 @@ export function TilesetTilePicker({
       <div
         className="grid size-32 justify-self-center overflow-hidden border border-primary/70 bg-background"
         role="group"
-        aria-label="Tileset item tiles"
+        aria-label="Tile item shape"
         style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: gridSize * gridSize }, (_, index) => {

@@ -16,7 +16,7 @@ export type CreationRequest<Reference = unknown> = {
   tiles?: {
     description: string;
     reference?: Reference;
-    tiles: TilesetTile[];
+    shape: TilesetTile[];
   }[];
   components?: { name: string; description: string; isCustom: boolean }[];
 };
