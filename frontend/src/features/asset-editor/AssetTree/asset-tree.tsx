@@ -150,10 +150,6 @@ function AnimationNode({
   ) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const frames = Array.from(
-    { length: animation.frameCount },
-    (_, index) => index,
-  );
 
   return (
     <div onContextMenu={(event) => onContextMenu(event, animation)}>
@@ -183,26 +179,53 @@ function AnimationNode({
         </button>
       </div>
       {open ? (
-        <div className="ml-4 mt-1 space-y-0.5 border-l pl-2">
-          {frames.map((index) => {
-            const isSelected = selectedFrames.some(
-              (frame) => frame.nodeId === animation.id && frame.index === index,
-            );
-            return (
-              <button
-                key={`${animation.id}-${index}`}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => onSelectFrame(animation.id, index)}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${isSelected ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-              >
-                <span className="size-1.5 rounded-full bg-current opacity-70" />
-                Frame {index + 1}
-              </button>
-            );
-          })}
-        </div>
+        <AnimationFrames
+          animation={animation}
+          selectedFrames={selectedFrames}
+          onSelectFrame={onSelectFrame}
+        />
       ) : null}
+    </div>
+  );
+}
+
+function AnimationFrames({
+  animation,
+  selectedFrames,
+  onSelectFrame,
+}: {
+  animation: CharacterAnimation;
+  selectedFrames: Array<{
+    nodeId: AnimatedSpriteNodeId;
+    index: number;
+  }>;
+  onSelectFrame: (nodeId: AnimatedSpriteNodeId, index: number) => void;
+}) {
+  const selectedFrameIndexes = new Set(
+    selectedFrames
+      .filter((frame) => frame.nodeId === animation.id)
+      .map((frame) => frame.index),
+  );
+
+  return (
+    <div className="ml-4 mt-1 space-y-0.5 border-l pl-2">
+      {Array.from({ length: animation.frameCount }, (_, index) => index).map(
+        (index) => {
+          const isSelected = selectedFrameIndexes.has(index);
+          return (
+            <button
+              key={`${animation.id}-${index}`}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => onSelectFrame(animation.id, index)}
+              className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${isSelected ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+            >
+              <span className="size-1.5 rounded-full bg-current opacity-70" />
+              Frame {index + 1}
+            </button>
+          );
+        },
+      )}
     </div>
   );
 }
