@@ -1,14 +1,5 @@
 import { useEffect, useState } from "react";
 
-import type {
-  AssetCanvasPosition,
-  AssetRevision,
-  CharacterAnimation,
-  CharacterSpriteSheet,
-  GenerateAnimationRequest,
-  SpriteAssetKind,
-} from "@/model";
-
 import { AssetTree } from "../AssetTree/asset-tree";
 import {
   AnimatedSpriteCanvas,
@@ -16,11 +7,9 @@ import {
   type AnimatedSpriteCanvasSelection,
   type AnimatedSpriteNodeId,
 } from "../Canvas/AnimatedSpriteCanvas";
-import {
-  EditorHeader,
-  type EditorGenerationTask,
-} from "../Header/editor-header";
+import { EditorHeader } from "../Header/editor-header";
 import { Inspector } from "../Inspector/inspector";
+import type { SpriteEditorModeProps } from "./sprite-editor-mode.types";
 
 export function SpriteEditorMode({
   assetKind,
@@ -37,6 +26,8 @@ export function SpriteEditorMode({
   canRedo,
   isDirty,
   isSaving,
+  isPromptSubmitting,
+  promptSubmitError,
   isGeneratingAnimation,
   generationTasks,
   onBack,
@@ -44,37 +35,12 @@ export function SpriteEditorMode({
   onRedo,
   onSave,
   onPromptChange,
+  onPromptSubmit,
   onPositionChange,
   onAnimationGenerate,
   onAnimationRename,
   onAnimationDelete,
-}: {
-  assetKind: SpriteAssetKind;
-  assetName: string;
-  version: string;
-  projectName: string;
-  prototype: CharacterSpriteSheet;
-  animations: CharacterAnimation[];
-  nodePositions: Record<string, AssetCanvasPosition>;
-  prompt: string;
-  history: AssetRevision[];
-  status: string;
-  canUndo: boolean;
-  canRedo: boolean;
-  isDirty: boolean;
-  isSaving: boolean;
-  isGeneratingAnimation: boolean;
-  generationTasks: EditorGenerationTask[];
-  onBack: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onSave: () => void;
-  onPromptChange: (value: string) => void;
-  onPositionChange: (nodeId: string, position: AssetCanvasPosition) => void;
-  onAnimationGenerate: (request: GenerateAnimationRequest) => void;
-  onAnimationRename: (animationId: string, label: string) => void;
-  onAnimationDelete: (animationId: string) => void;
-}) {
+}: SpriteEditorModeProps) {
   const [selection, setSelection] = useState<AnimatedSpriteCanvasSelection>({
     nodeIds: [],
     frames: [],
@@ -109,6 +75,9 @@ export function SpriteEditorMode({
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
     if (event.type === "selection.changed") setSelection(event.selection);
     else onPositionChange(event.nodeId, event.position);
+  };
+  const clearInspectorSelection = () => {
+    setSelection({ nodeIds: [], frames: [] });
   };
 
   return (
@@ -155,6 +124,10 @@ export function SpriteEditorMode({
           selectedFrames={selection.frames}
           prompt={prompt}
           onPromptChange={onPromptChange}
+          onSubmit={onPromptSubmit}
+          onClearSelection={clearInspectorSelection}
+          isSubmitting={isPromptSubmitting}
+          submitError={promptSubmitError}
           history={history}
           animations={animations}
         />
