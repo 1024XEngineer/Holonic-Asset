@@ -12,9 +12,8 @@ export function AssetEditorPage() {
 
   return (
     <AssetEditor
-      projectId={projectId}
       assetId={assetId}
-      onExitEditor={() =>
+      onBack={() =>
         void navigate({
           to: "/projects/$projectId",
           params: { projectId },
