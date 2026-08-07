@@ -178,7 +178,7 @@ func RegisterAssetRoutes(api huma.API, r AssetRouter) {
 
 	huma.Register(api, huma.Operation{
 		OperationID: "updateAsset",
-		Method:      http.MethodPost,
+		Method:      http.MethodPut,
 		Path:        "/asset/update",
 		Summary:     "Update an asset",
 		Tags:        []string{"Assets"},
