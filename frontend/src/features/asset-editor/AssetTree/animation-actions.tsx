@@ -14,6 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import type { CharacterAnimation } from "@/model";
 
+// Keep these in sync with the fixed menu dimensions below.
+const CONTEXT_MENU_WIDTH = 192;
+const CONTEXT_MENU_HEIGHT = 82;
+const CONTEXT_MENU_VIEWPORT_PADDING = 8;
+
 type ContextMenuState = {
   animation: CharacterAnimation;
   x: number;
@@ -53,8 +58,24 @@ export function useAnimationActions({
     event.preventDefault();
     setContextMenu({
       animation,
-      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 208)),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 104)),
+      x: Math.max(
+        CONTEXT_MENU_VIEWPORT_PADDING,
+        Math.min(
+          event.clientX,
+          window.innerWidth -
+            CONTEXT_MENU_WIDTH -
+            CONTEXT_MENU_VIEWPORT_PADDING,
+        ),
+      ),
+      y: Math.max(
+        CONTEXT_MENU_VIEWPORT_PADDING,
+        Math.min(
+          event.clientY,
+          window.innerHeight -
+            CONTEXT_MENU_HEIGHT -
+            CONTEXT_MENU_VIEWPORT_PADDING,
+        ),
+      ),
     });
   };
 
