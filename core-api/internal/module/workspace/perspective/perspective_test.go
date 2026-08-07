@@ -25,3 +25,21 @@ func TestPerspectiveHasExactlyThreeSupportedValues(t *testing.T) {
 		}
 	}
 }
+
+func TestCharacterDirectionCountFollowsPerspective(t *testing.T) {
+	tests := []struct {
+		perspective domain.Perspective
+		want        uint
+	}{
+		{perspective: domain.SideOn, want: 2},
+		{perspective: domain.TopDown, want: 4},
+		{perspective: domain.Isometric, want: 8},
+		{perspective: domain.Perspective("unsupported"), want: 0},
+	}
+
+	for _, test := range tests {
+		if got := test.perspective.CharacterDirectionCount(); got != test.want {
+			t.Fatalf("direction count for %q = %d, want %d", test.perspective, got, test.want)
+		}
+	}
+}
