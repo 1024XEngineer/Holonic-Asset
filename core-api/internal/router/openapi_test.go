@@ -33,8 +33,10 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 			Schemas map[string]json.RawMessage `json:"schemas"`
 		} `json:"components"`
 		Paths map[string]struct {
-			Get  json.RawMessage `json:"get"`
-			Post json.RawMessage `json:"post"`
+			Get    json.RawMessage `json:"get"`
+			Post   json.RawMessage `json:"post"`
+			Put    json.RawMessage `json:"put"`
+			Delete json.RawMessage `json:"delete"`
 		} `json:"paths"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &document); err != nil {
@@ -83,8 +85,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		"/project/reference/generate":            {"post"},
 		"/project/list":                          {"get"},
 		"/project/detail":                        {"get"},
-		"/project/update":                        {"post"},
-		"/project/delete":                        {"post"},
+		"/project/update":                        {"put"},
+		"/project/delete":                        {"delete"},
 		"/projects/{project_id}/generation-runs": {"get", "post"},
 		"/generation-runs/{run_id}":              {"get"},
 		"/generation-runs/{run_id}/cancel":       {"post"},
@@ -95,7 +97,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		"/asset/save":                            {"post"},
 		"/asset/copy":                            {"post"},
 		"/asset/rollback":                        {"post"},
-		"/asset/update":                          {"post"},
+		"/asset/update":                          {"put"},
+		"/asset/delete":                          {"delete"},
 	}
 	for path, methods := range expectedMethods {
 		operation, ok := document.Paths[path]
@@ -109,6 +112,12 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 			}
 			if method == "post" && len(operation.Post) == 0 {
 				t.Errorf("expected POST operation for %q", path)
+			}
+			if method == "put" && len(operation.Put) == 0 {
+				t.Errorf("expected PUT operation for %q", path)
+			}
+			if method == "delete" && len(operation.Delete) == 0 {
+				t.Errorf("expected DELETE operation for %q", path)
 			}
 		}
 	}

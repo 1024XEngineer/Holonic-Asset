@@ -132,7 +132,7 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 
 	huma.Register(api, huma.Operation{
 		OperationID: "updateProject",
-		Method:      http.MethodPost,
+		Method:      http.MethodPut,
 		Path:        "/project/update",
 		Summary:     "Update a project",
 		Tags:        []string{"Projects"},
@@ -144,7 +144,7 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 
 	huma.Register(api, huma.Operation{
 		OperationID: "deleteProject",
-		Method:      http.MethodPost,
+		Method:      http.MethodDelete,
 		Path:        "/project/delete",
 		Summary:     "Delete a project",
 		Tags:        []string{"Projects"},
