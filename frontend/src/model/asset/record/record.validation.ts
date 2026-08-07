@@ -9,10 +9,10 @@ import type {
   AssetCanvasPosition,
   AssetRecord,
   AssetRecordForKind,
-  TilesetTile,
   TilesetItem,
   UiComponent,
 } from "./types";
+import type { ItemTile } from "@/model/item-tile";
 import type { SpriteAssetRecordData } from "./types/asset-record";
 
 export function isAssetRecordForKind<K extends AssetKind>(
@@ -150,11 +150,11 @@ function isTilesetItem(value: unknown): value is TilesetItem {
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
-    isArrayOf(value.tiles, isTilesetTile)
+    isArrayOf(value.tiles, isItemTile)
   );
 }
 
-function isTilesetTile(value: unknown): value is TilesetTile {
+function isItemTile(value: unknown): value is ItemTile {
   return (
     Array.isArray(value) &&
     value.length === 2 &&

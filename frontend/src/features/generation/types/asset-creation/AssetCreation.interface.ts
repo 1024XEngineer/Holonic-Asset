@@ -1,6 +1,7 @@
-import type { CreatableAssetKind, TilesetTile } from "@/model/asset";
+import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import type { Perspective } from "@/model/project";
+import type { ItemTile } from "@/model/item-tile";
 
 type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   kind: K;
@@ -32,7 +33,7 @@ export type TilesetAssetCreationDraft<Reference = unknown> =
     tiles: {
       description: string;
       reference: Reference | undefined;
-      shape: TilesetTile[];
+      shape: ItemTile[];
     }[];
   };
 

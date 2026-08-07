@@ -1,29 +1,29 @@
 import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
-import type { TilesetTile } from "@/model/asset";
+import type { ItemTile } from "@/model/item-tile";
 
 const gridSize = 4;
 
-export function TileShapePicker({
-  tiles,
+export function ItemShapePicker({
+  shape,
   onChange,
 }: {
-  tiles: TilesetTile[];
-  onChange: (tiles: TilesetTile[]) => void;
+  shape: ItemTile[];
+  onChange: (shape: ItemTile[]) => void;
 }) {
   const selectedTiles = useMemo(
-    () => new Set(tiles.map(([x, y]) => `${x}:${y}`)),
-    [tiles],
+    () => new Set(shape.map(([x, y]) => `${x}:${y}`)),
+    [shape],
   );
 
   const toggleTile = (x: number, y: number) => {
     const isSelected = selectedTiles.has(`${x}:${y}`);
-    const nextTiles = isSelected
-      ? tiles.filter(([tileX, tileY]) => tileX !== x || tileY !== y)
-      : [...tiles, [x, y] as TilesetTile];
+    const nextShape = isSelected
+      ? shape.filter(([tileX, tileY]) => tileX !== x || tileY !== y)
+      : [...shape, [x, y] as ItemTile];
 
-    onChange(nextTiles);
+    onChange(nextShape);
   };
 
   return (
@@ -33,13 +33,13 @@ export function TileShapePicker({
           Occupied tiles
         </p>
         <span className="font-mono text-xs text-muted-foreground">
-          {tiles.length} {tiles.length === 1 ? "tile" : "tiles"}
+          {shape.length} {shape.length === 1 ? "tile" : "tiles"}
         </span>
       </div>
       <div
         className="grid size-32 justify-self-center overflow-hidden border border-primary/70 bg-background"
         role="group"
-        aria-label="Tile item shape"
+        aria-label="Item shape"
         style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: gridSize * gridSize }, (_, index) => {

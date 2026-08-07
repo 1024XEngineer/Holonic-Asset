@@ -1,5 +1,6 @@
-import type { CreatableAssetKind, TilesetTile } from "@/model/asset";
+import type { CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
+import type { ItemTile } from "@/model/item-tile";
 
 export type CreationRequest<Reference = unknown> = {
   kind: CreatableAssetKind;
@@ -16,7 +17,7 @@ export type CreationRequest<Reference = unknown> = {
   tiles?: {
     description: string;
     reference?: Reference;
-    shape: TilesetTile[];
+    shape: ItemTile[];
   }[];
   components?: { name: string; description: string; isCustom: boolean }[];
 };
