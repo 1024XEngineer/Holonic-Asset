@@ -34,6 +34,7 @@ export type {
   SaveAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
   TilesetCell,
@@ -42,6 +43,7 @@ export type {
   UiAssetRecord,
   UiComponent,
 } from "./record";
+export { recordQueryOptions } from "./record";
 export {
   useAddAudioTrackMutation,
   useAudioTracksQuery,

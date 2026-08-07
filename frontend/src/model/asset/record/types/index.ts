@@ -11,6 +11,7 @@ export type {
   UiComponent,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
   UiAssetKind,

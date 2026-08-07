@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
-import { AnimatedSpriteScene } from "./AnimatedSpriteScene";
+import {
+  AnimatedSpriteScene,
+  hasAnimatedSpriteCanvasModelChanged,
+} from "./AnimatedSpriteScene";
 
 const model = (
   overrides: Partial<AnimatedSpriteCanvasModel> = {},
@@ -19,6 +22,23 @@ const model = (
 });
 
 describe("AnimatedSpriteScene", () => {
+  it("ignores new model wrappers when scene inputs are unchanged", () => {
+    const previous = model();
+    const next = { ...previous };
+
+    expect(hasAnimatedSpriteCanvasModelChanged(previous, next)).toBe(false);
+  });
+
+  it("detects scene input changes", () => {
+    const previous = model();
+    const next = {
+      ...previous,
+      selection: { nodeIds: ["prototype"], frames: [] },
+    };
+
+    expect(hasAnimatedSpriteCanvasModelChanged(previous, next)).toBe(true);
+  });
+
   it("preserves local positions when model props are synchronized", () => {
     const scene = new AnimatedSpriteScene(
       model({ nodePositions: { idle: { x: 12, y: 18 } } }),

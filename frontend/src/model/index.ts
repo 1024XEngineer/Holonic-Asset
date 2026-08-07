@@ -5,6 +5,7 @@ export {
   creatableAssetKinds,
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
+  recordQueryOptions,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -55,6 +56,7 @@ export type {
   CharacterAssetRecord,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
   TilesetCell,
@@ -152,4 +154,5 @@ export type {
   GenerateAnimationRequest,
   GenerateAnimationResult,
   GeneratedCharacterAnimation,
+  SpriteAssetKind,
 } from "./generation";
