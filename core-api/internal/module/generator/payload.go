@@ -15,10 +15,22 @@ type CreateCharacterPrototypePayload struct {
 // CreateAnimationPayload is the common input consumed by character and object
 // animation generation.
 type CreateAnimationPayload struct {
-	AssetName     string `json:"asset_name"`
+	AnimationName string `json:"animation_name"`
 	ProjectID     uint   `json:"project_id"`
-	ParentID      uint   `json:"parent_id"`
+	AssetID       uint   `json:"asset_id"`
+	// Direction is the zero-based AssetContent.Prototype index. Direction 0 is
+	// the front-facing prototype by the asset ordering contract.
+	Direction     int    `json:"direction"`
 	CreativeBrief string `json:"creative_brief"`
+	Style         string `json:"style,omitempty"`
+	FrameCount    int    `json:"frame_count,omitempty"`
+	Columns       int    `json:"columns,omitempty"`
+	FrameWidth    int    `json:"frame_width,omitempty"`
+	FrameHeight   int    `json:"frame_height,omitempty"`
+	FPS           int    `json:"fps,omitempty"`
+	Resolution    string `json:"resolution,omitempty"`
+	Duration      int    `json:"duration,omitempty"`
+	AspectRatio   string `json:"aspect_ratio,omitempty"`
 }
 
 // CreateObjectPrototypePayload is the complete input consumed by the object

@@ -12,6 +12,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
@@ -94,6 +95,11 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		DefaultModel: cfg.Image.DefaultModel,
 	})
 	images := imageclient.NewImageGenerationService(provider)
+	videoProvider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL: cfg.Video.BaseURL,
+		APIKey:  cfg.Video.APIKey,
+	})
+	videos := videoclient.NewVideoGenerationService(videoProvider)
 	workspaceModule := workspace.New(projectRepository, assetRepository, images)
 
 	uploadStore, err := upload.NewQiniuStorage(cfg.QiNiu)
@@ -110,7 +116,8 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	}
 
 	processor := imageprocessor.NewProcessor()
-	executor := generator.NewExecutor(images, processor, workspaceModule.Assets)
+	animations := generator.NewAnimationGenerationService(videos, processor)
+	executor := generator.NewExecutorWithAnimation(images, animations, processor, workspaceModule.Assets)
 	generatorEngine := generator.NewEngine(taskManager, nil, executor)
 
 	assetHandler := handler.NewHandler(workspaceModule.Assets)

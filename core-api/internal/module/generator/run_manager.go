@@ -75,8 +75,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
-		if payload.ParentID == 0 && request.AssetID != nil {
-			payload.ParentID = *request.AssetID
+		if payload.AssetID == 0 && request.AssetID != nil {
+			payload.AssetID = *request.AssetID
 		}
 		return payload, nil
 	case GenerateTileSet:
@@ -176,20 +176,14 @@ func (e *Engine) Get(ctx context.Context, runID RunID) (*Run, error) {
 	var scope struct {
 		ProjectID uint  `json:"project_id"`
 		AssetID   *uint `json:"asset_id"`
-		ParentID  *uint `json:"parent_id"`
 	}
 	if err := json.Unmarshal(message.Payload, &scope); err != nil {
 		return nil, err
 	}
-	assetID := scope.ParentID
-	if assetID == nil {
-		assetID = scope.AssetID
-	}
-
 	return &Run{
 		ID:        RunID(message.ID),
 		ProjectID: scope.ProjectID,
-		AssetID:   assetID,
+		AssetID:   scope.AssetID,
 		Kind:      TaskType(message.Type),
 		Status:    message.Status,
 		Result:    message.Result,

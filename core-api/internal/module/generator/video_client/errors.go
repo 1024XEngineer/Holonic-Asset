@@ -39,7 +39,13 @@ func (e *ProviderError) Error() string {
 		provider = e.Provider + " provider"
 	}
 	if e.Message != "" {
+		if e.StatusCode > 0 {
+			return fmt.Sprintf("%s: HTTP %d: %s", provider, e.StatusCode, e.Message)
+		}
 		return fmt.Sprintf("%s: %s", provider, e.Message)
+	}
+	if e.StatusCode > 0 {
+		return fmt.Sprintf("%s: HTTP %d: %s", provider, e.StatusCode, e.Kind)
 	}
 	return fmt.Sprintf("%s: %s", provider, e.Kind)
 }

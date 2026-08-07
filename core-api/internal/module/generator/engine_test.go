@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -97,7 +98,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		Kind:              generator.GenerateAnimation,
 		Prompt:            "walk",
 		ReferenceMediaIDs: []string{"media-1"},
-		Parameters:        json.RawMessage(`{"asset_name":"hero walk"}`),
+		Parameters:        json.RawMessage(`{"animation_name":"hero walk","direction":5}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -116,9 +117,12 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode task payload: %v", err)
 	}
-	if payload.ProjectID != request.ProjectID || payload.ParentID != assetID ||
-		payload.AssetName != "hero walk" || payload.CreativeBrief != request.Prompt {
+	if payload.ProjectID != request.ProjectID || payload.AssetID != assetID ||
+		payload.AnimationName != "hero walk" || payload.Direction != 5 || payload.CreativeBrief != request.Prompt {
 		t.Fatalf("unexpected task payload: %+v", payload)
+	}
+	if strings.Contains(string(tasks.createdTask.Payload), "parent_id") {
+		t.Fatalf("animation task payload must not contain parent_id: %s", tasks.createdTask.Payload)
 	}
 }
 
@@ -155,7 +159,7 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 	assetID := uint(9)
 	payload, err := json.Marshal(generator.CreateAnimationPayload{
 		ProjectID: 42,
-		ParentID:  assetID,
+		AssetID:   assetID,
 	})
 	if err != nil {
 		t.Fatalf("encode task payload: %v", err)
@@ -279,7 +283,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		},
 		{
 			taskType: generator.GenerateAnimation,
-			payload:  json.RawMessage(`{"asset_name":"walk","project_id":11,"parent_id":7,"creative_brief":"walking cycle"}`),
+			payload:  json.RawMessage(`{"animation_name":"walk","project_id":11,"asset_id":7,"creative_brief":"walking cycle"}`),
 		},
 		{
 			taskType: generator.GenerateObjectProtoType,
@@ -287,7 +291,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		},
 		{
 			taskType: generator.GenerateAnimation,
-			payload:  json.RawMessage(`{"asset_name":"open chest","project_id":11,"parent_id":8,"creative_brief":"opening animation"}`),
+			payload:  json.RawMessage(`{"animation_name":"open chest","project_id":11,"asset_id":8,"creative_brief":"opening animation"}`),
 		},
 		{
 			taskType: generator.GenerateTileSet,
@@ -395,7 +399,7 @@ func TestImplementedHandlerRequiresExecutor(t *testing.T) {
 	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
 		Type:    string(generator.GenerateAnimation),
-		Payload: json.RawMessage(`{"asset_name":"open","parent_id":8}`),
+		Payload: json.RawMessage(`{"animation_name":"open","asset_id":8}`),
 	})
 	if !errors.Is(err, generator.ErrExecutorRequired) {
 		t.Fatalf("expected executor required error, got %v", err)
