@@ -59,13 +59,12 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 	generationHandler := handler.NewGenerationHandler(stub)
 	parameters := json.RawMessage(`{"size":{"width":64,"height":64}}`)
 	request := dto.CreateGenerationRequest{
-		ProjectID:         2,
-		AssetID:           &assetID,
-		Kind:              generator.GenerateAnimation,
-		Prompt:            "hero",
-		ReferenceMediaIDs: []string{"media-1"},
-		TargetAssetPaths:  []string{"animations.walk.frames"},
-		Parameters:        parameters,
+		ProjectID:        2,
+		AssetID:          &assetID,
+		Kind:             generator.GenerateAnimation,
+		Prompt:           "hero",
+		TargetAssetPaths: []string{"animations.walk.frames"},
+		Parameters:       parameters,
 	}
 
 	response, err := generationHandler.Create(context.Background(), request)
@@ -79,7 +78,6 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 		stub.createRequest.ProjectID != request.ProjectID ||
 		*stub.createRequest.AssetID != assetID || stub.createRequest.Kind != request.Kind ||
 		stub.createRequest.Prompt != request.Prompt ||
-		!reflect.DeepEqual(stub.createRequest.ReferenceMediaIDs, request.ReferenceMediaIDs) ||
 		!reflect.DeepEqual(stub.createRequest.TargetAssetPaths, request.TargetAssetPaths) ||
 		!reflect.DeepEqual(stub.createRequest.Parameters, request.Parameters) {
 		t.Fatalf("unexpected generation request: %+v", stub.createRequest)
@@ -148,6 +146,17 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 	_, err := handler.NewGenerationHandler(stub).List(
 		context.Background(),
 		dto.ListGenerationRunsRequest{Status: "completed"},
+	)
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request, got %v", err)
+	}
+}
+
+func TestListRejectsInvalidCursor(t *testing.T) {
+	stub := &runManagerStub{listErr: generator.ErrInvalidRunListCursor}
+	_, err := handler.NewGenerationHandler(stub).List(
+		context.Background(),
+		dto.ListGenerationRunsRequest{Cursor: "invalid"},
 	)
 	if !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request, got %v", err)

@@ -6,7 +6,7 @@ export const projectSummaries: ProjectSummary[] = [
     name: "Moonlit Orchard",
     style: "Cozy pixel RPG",
     gameType: "Role-playing game",
-    perspective: "Top-down",
+    perspective: "Top-Down",
     platform: "PC",
     description:
       "A quiet orchard world where a young forager restores abandoned gardens by moonlight.",
@@ -19,7 +19,7 @@ export const projectSummaries: ProjectSummary[] = [
     name: "Iron Harbor",
     style: "Industrial platformer",
     gameType: "Platformer",
-    perspective: "Side-on",
+    perspective: "Side-On",
     platform: "PC",
     description:
       "A mechanical harbor city built from cranes, furnaces, and weathered iron walkways.",

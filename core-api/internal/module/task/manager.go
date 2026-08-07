@@ -24,7 +24,7 @@ type Manager interface {
 	Stop() error
 	Publish(ctx context.Context, task *Task) (uint, error)
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
-	ListByStatus(ctx context.Context, status Status) ([]*Task, error)
+	List(ctx context.Context, filter *ListFilter) ([]*Task, error)
 	Cancel(ctx context.Context, taskID uint) error
 }
 
@@ -130,8 +130,8 @@ func (m *manager) GetDetail(ctx context.Context, taskID uint) (*Task, error) {
 	return m.store.GetTaskByID(ctx, taskID)
 }
 
-func (m *manager) ListByStatus(ctx context.Context, status Status) ([]*Task, error) {
-	return m.store.ListTasksByStatus(ctx, status)
+func (m *manager) List(ctx context.Context, filter *ListFilter) ([]*Task, error) {
+	return m.store.ListTasks(ctx, filter)
 }
 
 func (m *manager) Cancel(ctx context.Context, taskID uint) error {
