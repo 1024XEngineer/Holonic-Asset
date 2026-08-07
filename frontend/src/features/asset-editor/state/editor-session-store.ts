@@ -28,6 +28,9 @@ type EditorSessionState = {
   deleteSpriteAnimation: (animationId: string) => void;
 };
 
+const SPRITE_RECORD_REQUIRED_MESSAGE =
+  "Sprite editing requires a character or object record.";
+
 export function createEditorSessionStore(initialRecord: AssetRecord) {
   const record = structuredClone(initialRecord);
 
@@ -200,7 +203,7 @@ export function dispatchEditorCommand(
 function getSpriteRecordData(record: AssetRecord): SpriteAssetRecordData {
   if (record.mode === "character") return record.character;
   if (record.mode === "object") return record.object;
-  throw new Error("Sprite editing requires a character or object record.");
+  throw new Error(SPRITE_RECORD_REQUIRED_MESSAGE);
 }
 
 function updateSpriteRecord(
@@ -213,7 +216,7 @@ function updateSpriteRecord(
   if (record.mode === "object") {
     return { ...record, object: update(record.object) };
   }
-  throw new Error("Sprite editing requires a character or object record.");
+  throw new Error(SPRITE_RECORD_REQUIRED_MESSAGE);
 }
 
 export function getEditorSessionSnapshot(
