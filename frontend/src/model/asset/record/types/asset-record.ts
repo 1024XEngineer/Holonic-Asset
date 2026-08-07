@@ -26,60 +26,57 @@ export type UiComponent = {
   bounds: { x: number; y: number; width: number; height: number };
 };
 
-export type CharacterAssetKind = "character" | "object";
+export type CharacterAssetKind = "character";
+type ObjectAssetKind = "object";
 export type SceneryAssetKind = "scenery";
 export type TilesetAssetKind = "tileset";
 export type UiAssetKind = "ui";
 export type AudioAssetKind = "audio";
 
-export type CharacterAssetRecord = {
-  mode: "character";
+type AssetRecordBase<K extends AssetKind> = {
+  mode: K;
   prompt: string;
-  character: {
-    prototype: CharacterSpriteSheet;
-    animations?: CharacterAnimation[];
-    nodePositions: Record<string, AssetCanvasPosition>;
-  };
 };
 
-export type SceneryAssetRecord = {
-  mode: "scenery";
-  prompt: string;
+export type SpriteAssetRecordData = {
+  prototype: CharacterSpriteSheet;
+  animations?: CharacterAnimation[];
+  nodePositions: Record<string, AssetCanvasPosition>;
+};
+
+export type CharacterAssetRecord = AssetRecordBase<CharacterAssetKind> & {
+  character: SpriteAssetRecordData;
+};
+
+export type ObjectAssetRecord = AssetRecordBase<ObjectAssetKind> & {
+  object: SpriteAssetRecordData;
+};
+
+export type SceneryAssetRecord = AssetRecordBase<SceneryAssetKind> & {
   scenery: { layers: SceneryLayer[] };
 };
 
-export type TilesetAssetRecord = {
-  mode: "tileset";
-  prompt: string;
+export type TilesetAssetRecord = AssetRecordBase<TilesetAssetKind> & {
   tileset: { gridSize: number; items: TilesetItem[] };
 };
 
-export type UiAssetRecord = {
-  mode: "ui";
-  prompt: string;
+export type UiAssetRecord = AssetRecordBase<UiAssetKind> & {
   ui: { components: UiComponent[] };
 };
 
-export type AudioAssetRecord = {
-  mode: "audio";
-  prompt: string;
+export type AudioAssetRecord = AssetRecordBase<AudioAssetKind> & {
   audio: Record<string, never>;
 };
 
-export type AssetRecord =
-  | CharacterAssetRecord
-  | SceneryAssetRecord
-  | TilesetAssetRecord
-  | UiAssetRecord
-  | AudioAssetRecord;
+type AssetRecordByKind = {
+  character: CharacterAssetRecord;
+  object: ObjectAssetRecord;
+  scenery: SceneryAssetRecord;
+  tileset: TilesetAssetRecord;
+  ui: UiAssetRecord;
+  audio: AudioAssetRecord;
+};
 
-export type AssetRecordForKind<K extends AssetKind> =
-  K extends CharacterAssetKind
-    ? CharacterAssetRecord
-    : K extends SceneryAssetKind
-      ? SceneryAssetRecord
-      : K extends TilesetAssetKind
-        ? TilesetAssetRecord
-        : K extends UiAssetKind
-          ? UiAssetRecord
-          : AudioAssetRecord;
+export type AssetRecord = AssetRecordByKind[AssetKind];
+
+export type AssetRecordForKind<K extends AssetKind> = AssetRecordByKind[K];

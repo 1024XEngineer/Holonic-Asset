@@ -57,18 +57,31 @@ func newApp(
 	assetStore assetdomain.Store,
 	imageService imageclient.ImageGenerationService,
 ) *App {
+	return newAppWithServices(projectDao, assetStore, imageService, nil)
+}
+
+func newAppWithServices(
+	projectDao dao.ProjectDao,
+	assetStore assetdomain.Store,
+	imageService imageclient.ImageGenerationService,
+	uploadStore upload.Store,
+) *App {
+	var references upload.ReferenceStore
+	if candidate, ok := uploadStore.(upload.ReferenceStore); ok {
+		references = candidate
+	}
 	projectRepository := repository.NewProjectRepository(projectDao)
-	workspaceModule := workspace.New(projectRepository, assetStore, imageService)
-	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
+	workspaceModule := workspace.New(projectRepository, assetStore, imageService, references)
+	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
 	var assetRouter router.AssetRouter
 	if workspaceModule.Assets != nil {
-		assetRouter = handler.NewHandler(workspaceModule.Assets)
+		assetRouter = handler.NewHandler(workspaceModule.Assets, references)
 	}
 
-	generatorEngine := generator.NewEngine(nil, nil, nil)
+	generatorEngine := generator.NewEngine(nil, nil)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
 
-	uploadManager := upload.NewManager(nil)
+	uploadManager := upload.NewManager(uploadStore)
 	uploadHandler := handler.NewUploadHandler(uploadManager)
 
 	return &App{
@@ -89,6 +102,11 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		&dao.AssetRecordDaoImpl{DB: db},
 	)
 	projectRepository := repository.NewProjectRepository(dao.NewGormProjectDao(db))
+	uploadStore, err := upload.NewQiniuStorage(cfg.QiNiu)
+	if err != nil {
+		closeDatabase(db)
+		return nil, fmt.Errorf("app: initialize upload storage: %w", err)
+	}
 	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
 		BaseURL:      cfg.Image.BaseURL,
 		APIKey:       cfg.Image.APIKey,
@@ -100,13 +118,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		APIKey:  cfg.Video.APIKey,
 	})
 	videos := videoclient.NewVideoGenerationService(videoProvider)
-	workspaceModule := workspace.New(projectRepository, assetRepository, images)
-
-	uploadStore, err := upload.NewQiniuStorage(cfg.QiNiu)
-	if err != nil {
-		closeDatabase(db)
-		return nil, fmt.Errorf("app: initialize upload storage: %w", err)
-	}
+	workspaceModule := workspace.New(projectRepository, assetRepository, images, uploadStore)
 
 	taskRepository := repository.NewTaskRepository(db)
 	taskManager, err := InitTask(ctx, cfg.Queue, taskRepository)
@@ -117,11 +129,14 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 
 	processor := imageprocessor.NewProcessor()
 	animations := generator.NewAnimationGenerationService(videos, processor)
-	executor := generator.NewExecutorWithAnimation(images, animations, processor, workspaceModule.Assets)
-	generatorEngine := generator.NewEngine(taskManager, nil, executor)
+	executor := generator.NewExecutorWithAnimation(images, animations, processor, workspaceModule.Assets, uploadStore)
+	generatorEngine := generator.NewEngine(taskManager, executor, generator.EngineDependencies{
+		Projects:   workspaceModule.Projects,
+		References: uploadStore,
+	})
 
-	assetHandler := handler.NewHandler(workspaceModule.Assets)
-	projectHandler := handler.NewProjectHandler(workspaceModule.Projects)
+	assetHandler := handler.NewHandler(workspaceModule.Assets, uploadStore)
+	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, uploadStore)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
 	uploadManager := upload.NewManager(uploadStore)
 	uploadHandler := handler.NewUploadHandler(uploadManager)

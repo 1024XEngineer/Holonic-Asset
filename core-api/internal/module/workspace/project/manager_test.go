@@ -12,11 +12,13 @@ import (
 
 type projectStoreStub struct {
 	insertCalls int
+	inserted    *domain.Project
 	update      *domain.ProjectUpdate
 }
 
-func (s *projectStoreStub) Insert(context.Context, *domain.Project) error {
+func (s *projectStoreStub) Insert(_ context.Context, project *domain.Project) error {
 	s.insertCalls++
+	s.inserted = project
 	return nil
 }
 
@@ -31,6 +33,31 @@ func (*projectStoreStub) FindByUserID(context.Context, uint) ([]*domain.Project,
 func (s *projectStoreStub) Update(_ context.Context, update *domain.ProjectUpdate) error {
 	s.update = update
 	return nil
+}
+
+type referenceStoreStub struct {
+	resolved     string
+	persisted    string
+	resolveCall  string
+	resolveCalls []string
+	persistCall  string
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.resolveCall = reference
+	s.resolveCalls = append(s.resolveCalls, reference)
+	if s.resolved != "" {
+		return s.resolved, nil
+	}
+	return "signed:" + reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persistCall = reference
+	if s.persisted != "" {
+		return s.persisted, nil
+	}
+	return "key:" + reference, nil
 }
 
 func (*projectStoreStub) Remove(context.Context, uint) error { return nil }
@@ -49,6 +76,47 @@ func TestUpdateForwardsPartialProjectUpdate(t *testing.T) {
 	}
 }
 
+func TestCreatePersistsReferenceAsObjectKey(t *testing.T) {
+	store := &projectStoreStub{}
+	references := &referenceStoreStub{persisted: "projects/7/reference.png"}
+	project := validProject()
+	project.UserID = 101
+	project.Name = "Starbound"
+	project.Reference = "https://cdn.example/reference.png?e=123&token=signed"
+	manager := domain.NewManager(store, nil, references)
+
+	if err := manager.Create(context.Background(), project); err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if references.persistCall != "https://cdn.example/reference.png?e=123&token=signed" || store.inserted == nil || store.inserted.Reference != "projects/7/reference.png" {
+		t.Fatalf("reference was not normalized before persistence: persist=%q project=%+v", references.persistCall, store.inserted)
+	}
+}
+
+func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
+	project := validProject()
+	project.Reference = "https://cdn.example/reference.png?e=123&token=signed"
+	images := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
+		Images: []imageclient.GeneratedImage{{Base64: "generated-image-base64", MediaType: "image/png"}},
+	}}
+	references := &referenceStoreStub{resolved: "https://cdn.example/reference.png?e=456&token=signed", persisted: "projects/7/generated.png"}
+	manager := domain.NewManager(&projectStoreStub{}, images, references)
+
+	generated, err := manager.GenerateReference(context.Background(), project)
+	if err != nil {
+		t.Fatalf("generate reference: %v", err)
+	}
+	if len(references.resolveCalls) != 2 || references.resolveCalls[0] != project.Reference || references.resolveCalls[1] != "projects/7/generated.png" || references.persistCall != "data:image/png;base64,generated-image-base64" {
+		t.Fatalf("unexpected reference storage calls: %+v", references)
+	}
+	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
+		t.Fatalf("expected signed input reference, got %+v", images.request.ReferenceImages)
+	}
+	if generated != references.resolved {
+		t.Fatalf("expected generated reference URL %q, got %q", references.resolved, generated)
+	}
+}
+
 type imageGenerationServiceStub struct {
 	request *imageclient.GenerateRequest
 	result  *imageclient.GenerateResult
@@ -63,8 +131,8 @@ func (s *imageGenerationServiceStub) Generate(
 	return s.result, s.err
 }
 
-func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *testing.T) {
-	const reference = "data:image/png;base64,reference-image"
+func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.T) {
+	const reference = "https://media.example/reference.png"
 	project := &domain.Project{
 		Name:           "Lantern Vale",
 		GameType:       domain.GameTypeRPG,
@@ -80,14 +148,15 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *test
 		},
 	}
 	store := &projectStoreStub{}
-	manager := domain.NewManager(store, images)
+	references := &referenceStoreStub{resolved: "https://cdn.example/generated.png?e=456&token=signed", persisted: "projects/7/generated.png"}
+	manager := domain.NewManager(store, images, references)
 
 	generated, err := manager.GenerateReference(context.Background(), project)
 	if err != nil {
 		t.Fatalf("generate reference: %v", err)
 	}
-	if generated != "data:image/png;base64,generated-image-base64" {
-		t.Fatalf("expected generated reference data URL, got %q", generated)
+	if generated != references.resolved {
+		t.Fatalf("expected generated reference URL %q, got %q", references.resolved, generated)
 	}
 	if project.Reference != reference {
 		t.Fatalf("expected input reference to remain unchanged, got %q", project.Reference)
@@ -104,8 +173,8 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *test
 	if images.request.Params["quality"] != "high" {
 		t.Fatalf("expected high quality generation, got %+v", images.request.Params)
 	}
-	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != reference {
-		t.Fatalf("expected project reference to be forwarded, got %+v", images.request.ReferenceImages)
+	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
+		t.Fatalf("expected resolved project reference to be forwarded, got %+v", images.request.ReferenceImages)
 	}
 
 	for _, fragment := range []string{
@@ -125,6 +194,9 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsDataURL(t *test
 		"NO GENERATED TEXT",
 		"zero generated text or pseudo-text",
 		"REFERENCE IMAGE",
+		"REFERENCE REGENERATION",
+		"user's current result",
+		"clearly new alternative",
 	} {
 		if !strings.Contains(images.request.Prompt, fragment) {
 			t.Errorf("expected prompt to contain %q", fragment)
@@ -232,30 +304,49 @@ func TestGenerateReferenceLetsTheModelFollowExplicitUIRequests(t *testing.T) {
 			t.Errorf("expected UI policy to contain %q", fragment)
 		}
 	}
+	if strings.Contains(images.request.Prompt, "REFERENCE REGENERATION") {
+		t.Fatal("expected regeneration instructions only when a current reference is supplied")
+	}
 }
 
-func TestGenerateReferenceDoesNotReuseGeneratedRawBase64AsStyleReference(t *testing.T) {
-	project := validProject()
-	project.Reference = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
-	images := &imageGenerationServiceStub{
-		result: &imageclient.GenerateResult{
-			Images: []imageclient.GeneratedImage{{Base64: "next-generated-image", MediaType: "image/png"}},
-		},
+func TestGenerateReferenceRejectsInvalidReferenceFormats(t *testing.T) {
+	tests := []struct {
+		name      string
+		reference string
+	}{
+		{name: "bare base64", reference: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"},
+		{name: "malformed data URI", reference: "data:image/png;base64,%%%"},
+		{name: "non-image base64 content", reference: "data:image/png;base64,aGVsbG8="},
+		{name: "non-image data URI", reference: "data:text/plain;base64,aGVsbG8="},
+		{name: "unsupported URL scheme", reference: "ftp://media.example/reference.png"},
+		{name: "URL without host", reference: "https:///reference.png"},
 	}
-	manager := domain.NewManager(&projectStoreStub{}, images)
 
-	if _, err := manager.GenerateReference(context.Background(), project); err != nil {
-		t.Fatalf("generate reference: %v", err)
-	}
-	if len(images.request.ReferenceImages) != 0 {
-		t.Fatalf("expected generated preview base64 not to be reused, got %+v", images.request.ReferenceImages)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			project := validProject()
+			project.Reference = tc.reference
+			images := &imageGenerationServiceStub{}
+			manager := domain.NewManager(&projectStoreStub{}, images)
+
+			generated, err := manager.GenerateReference(context.Background(), project)
+			if !errors.Is(err, domain.ErrInvalidProject) {
+				t.Fatalf("expected invalid project error, got %v", err)
+			}
+			if generated != "" {
+				t.Fatalf("expected no generated reference, got %q", generated)
+			}
+			if images.request != nil {
+				t.Fatalf("expected invalid reference not to reach image service, got %+v", images.request)
+			}
+		})
 	}
 }
 
 func TestGenerateReferenceDoesNotReplaceReferenceWhenGenerationFails(t *testing.T) {
 	wantErr := errors.New("provider unavailable")
 	project := validProject()
-	project.Reference = "existing-reference"
+	project.Reference = "https://media.example/existing-reference.png"
 	images := &imageGenerationServiceStub{err: wantErr}
 	manager := domain.NewManager(&projectStoreStub{}, images)
 
@@ -266,7 +357,7 @@ func TestGenerateReferenceDoesNotReplaceReferenceWhenGenerationFails(t *testing.
 	if generated != "" {
 		t.Fatalf("expected empty reference, got %q", generated)
 	}
-	if project.Reference != "existing-reference" {
+	if project.Reference != "https://media.example/existing-reference.png" {
 		t.Fatalf("expected existing reference to remain unchanged, got %q", project.Reference)
 	}
 }

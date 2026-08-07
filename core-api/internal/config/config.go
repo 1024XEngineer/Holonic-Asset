@@ -36,12 +36,13 @@ type VideoClientConfig struct {
 }
 
 type QiniuConfig struct {
-	AccessKey         string
-	SecretKey         string
-	Bucket            string
-	Domain            string
-	UploadURL         string
-	UploadTokenExpiry time.Duration
+	AccessKey         string        `mapstructure:"accessKey" yaml:"accessKey"`
+	SecretKey         string        `mapstructure:"secretKey" yaml:"secretKey"`
+	Bucket            string        `mapstructure:"bucket" yaml:"bucket"`
+	Domain            string        `mapstructure:"domain" yaml:"domain"`
+	UploadURL         string        `mapstructure:"uploadURL" yaml:"uploadURL"`
+	UploadTokenExpiry time.Duration `mapstructure:"uploadTokenExpiry" yaml:"uploadTokenExpiry"`
+	DownloadURLExpiry time.Duration `mapstructure:"downloadURLExpiry" yaml:"downloadURLExpiry"`
 }
 
 type Config struct {

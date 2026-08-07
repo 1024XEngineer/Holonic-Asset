@@ -10,22 +10,8 @@ import (
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
-
-type generationReaderStub struct {
-	filter *generator.RunListFilter
-	page   *generator.RunListPage
-}
-
-func (s *generationReaderStub) ListRuns(
-	_ context.Context,
-	filter *generator.RunListFilter,
-) (*generator.RunListPage, error) {
-	s.filter = filter
-	return s.page, nil
-}
-
-var _ generator.RunReader = (*generationReaderStub)(nil)
 
 type taskManagerStub struct {
 	createdTask   *taskdomain.Task
@@ -33,6 +19,9 @@ type taskManagerStub struct {
 	detail        *taskdomain.Task
 	statusUpdates []taskStatusUpdate
 	handlers      map[string]taskdomain.Handler
+	listFilter    *taskdomain.ListFilter
+	listedTasks   []*taskdomain.Task
+	listErr       error
 }
 
 type taskStatusUpdate struct {
@@ -60,11 +49,17 @@ func (s *taskManagerStub) GetDetail(context.Context, uint) (*taskdomain.Task, er
 	return s.detail, nil
 }
 
-func (*taskManagerStub) ListByStatus(
-	context.Context,
-	taskdomain.Status,
+func (s *taskManagerStub) List(
+	_ context.Context,
+	filter *taskdomain.ListFilter,
 ) ([]*taskdomain.Task, error) {
-	return nil, nil
+	if filter != nil {
+		copyFilter := *filter
+		copyFilter.Statuses = append([]taskdomain.Status(nil), filter.Statuses...)
+		copyFilter.Types = append([]string(nil), filter.Types...)
+		s.listFilter = &copyFilter
+	}
+	return s.listedTasks, s.listErr
 }
 
 func (s *taskManagerStub) Cancel(_ context.Context, taskID uint) error {
@@ -88,17 +83,29 @@ func (s *taskManagerStub) dispatch(
 
 var _ taskdomain.Manager = (*taskManagerStub)(nil)
 
+type projectReaderStub struct {
+	project *projectdomain.Project
+	err     error
+	calls   int
+}
+
+func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
+	s.calls++
+	return s.project, s.err
+}
+
+var _ generator.ProjectReader = (*projectReaderStub)(nil)
+
 func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	assetID := uint(9)
 	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil)
 	request := &generator.Request{
-		ProjectID:         42,
-		AssetID:           &assetID,
-		Kind:              generator.GenerateAnimation,
-		Prompt:            "walk",
-		ReferenceMediaIDs: []string{"media-1"},
-		Parameters:        json.RawMessage(`{"animation_name":"hero walk","direction":5}`),
+		ProjectID:  42,
+		AssetID:    &assetID,
+		Kind:       generator.GenerateAnimation,
+		Prompt:     "walk",
+		Parameters: json.RawMessage(`{"animation_name":"hero walk","direction":5}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -128,13 +135,12 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 
 func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil)
 
 	_, err := engine.Create(context.Background(), &generator.Request{
-		ProjectID:         42,
-		Kind:              generator.GenerateCharacterProtoType,
-		Prompt:            "hero",
-		ReferenceMediaIDs: []string{"media-1"},
+		ProjectID: 42,
+		Kind:      generator.GenerateCharacterProtoType,
+		Prompt:    "hero",
 		Parameters: json.RawMessage(
 			`{"asset_name":"knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4"}`,
 		),
@@ -148,10 +154,78 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
-		payload.CreativeBrief != "hero" || payload.Reference != "media-1" ||
+		payload.CreativeBrief != "hero" || payload.Reference != "" ||
 		payload.CanvasSize != "64x64" || payload.Perspective != "Top-Down" ||
 		payload.DirectionCount != "4" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
+	}
+}
+
+func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42,
+		Kind:      generator.GenerateObjectProtoType,
+		Parameters: json.RawMessage(`{
+			"reference":"https://cdn.example.com/projects/42/reference.png"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("create generation: %v", err)
+	}
+	var payload generator.CreateObjectPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if payload.Reference != "uploads/generated-1.png" || len(references.persisted) != 1 ||
+		references.persisted[0] != "https://cdn.example.com/projects/42/reference.png" {
+		t.Fatalf("reference was not persisted before publish: payload=%+v persisted=%v", payload, references.persisted)
+	}
+}
+
+func TestCreateUsesProjectReferenceWhenPayloadOmitsIt(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42,
+		Kind:      generator.GenerateCharacterProtoType,
+	})
+	if err != nil {
+		t.Fatalf("create generation: %v", err)
+	}
+	var payload generator.CreateCharacterPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if projects.calls != 1 || payload.Reference != "uploads/generated-1.png" ||
+		len(references.persisted) != 1 || references.persisted[0] != "projects/42/reference.png" {
+		t.Fatalf("project reference was not used: calls=%d payload=%+v persisted=%v", projects.calls, payload, references.persisted)
+	}
+}
+
+func TestCreateDoesNotPublishWhenReferencePersistenceFails(t *testing.T) {
+	wantErr := errors.New("storage unavailable")
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{persistErr: wantErr}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		Kind:       generator.GenerateObjectProtoType,
+		Parameters: json.RawMessage(`{"reference":"https://cdn.example.com/reference.png"}`),
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected persistence error, got %v", err)
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task was published after persistence failure: %+v", tasks.createdTask)
 	}
 }
 
@@ -171,7 +245,7 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 		Payload: payload,
 		Result:  json.RawMessage(`{"asset_id":9}`),
 	}}
-	engine := generator.NewEngine(tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil)
 
 	run, err := engine.Get(context.Background(), 17)
 	if err != nil {
@@ -184,65 +258,124 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 }
 
 func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
-	reader := &generationReaderStub{page: &generator.RunListPage{}}
-	engine := generator.NewEngine(&taskManagerStub{}, reader, nil)
+	tasks := &taskManagerStub{listedTasks: []*taskdomain.Task{
+		{
+			ID:      17,
+			Type:    string(generator.GenerateCharacterProtoType),
+			Status:  taskdomain.StatusPending,
+			Payload: json.RawMessage(`{"project_id":42}`),
+		},
+		{
+			ID:      16,
+			Type:    string(generator.GenerateObjectProtoType),
+			Status:  taskdomain.StatusPending,
+			Payload: json.RawMessage(`{"project_id":99}`),
+		},
+	}}
+	engine := generator.NewEngine(tasks, nil)
 
-	_, err := engine.List(context.Background(), &generator.RunListQuery{
+	page, err := engine.List(context.Background(), &generator.RunListQuery{
 		ProjectID: 42,
 		Status:    generator.RunListStatusActive,
 		Limit:     10,
-		Cursor:    "cursor",
+		Cursor:    "18",
 	})
 	if err != nil {
 		t.Fatalf("list generation runs: %v", err)
 	}
-	if reader.filter == nil || reader.filter.ProjectID != 42 || reader.filter.AssetID != nil ||
-		reader.filter.Limit != 10 || reader.filter.Cursor != "cursor" {
-		t.Fatalf("unexpected filter: %+v", reader.filter)
+	if tasks.listFilter == nil || tasks.listFilter.BeforeID != 18 {
+		t.Fatalf("unexpected task filter: %+v", tasks.listFilter)
 	}
-	if !reflect.DeepEqual(reader.filter.Statuses, generator.ActiveTaskStatuses()) {
-		t.Fatalf("unexpected statuses: %v", reader.filter.Statuses)
+	if !reflect.DeepEqual(tasks.listFilter.Statuses, generator.ActiveTaskStatuses()) {
+		t.Fatalf("unexpected statuses: %v", tasks.listFilter.Statuses)
 	}
-	if !reflect.DeepEqual(reader.filter.IncludeTaskTypes, generator.ProjectLevelTaskTypes()) {
-		t.Fatalf("unexpected project task types: %v", reader.filter.IncludeTaskTypes)
+	wantTypes := make([]string, 0, len(generator.ProjectLevelTaskTypes()))
+	for _, taskType := range generator.ProjectLevelTaskTypes() {
+		wantTypes = append(wantTypes, string(taskType))
+	}
+	if !reflect.DeepEqual(tasks.listFilter.Types, wantTypes) {
+		t.Fatalf("unexpected project task types: %v", tasks.listFilter.Types)
+	}
+	if len(page.Runs) != 1 || page.Runs[0].ID != 17 || page.Runs[0].ProjectID != 42 {
+		t.Fatalf("unexpected project runs: %+v", page)
 	}
 }
 
 func TestListBuildsAssetScopeTaskFilter(t *testing.T) {
 	assetID := uint(9)
-	reader := &generationReaderStub{page: &generator.RunListPage{}}
-	engine := generator.NewEngine(&taskManagerStub{}, reader, nil)
+	tasks := &taskManagerStub{listedTasks: []*taskdomain.Task{
+		{
+			ID:      17,
+			Type:    string(generator.GenerateAnimation),
+			Status:  taskdomain.StatusProcessing,
+			Payload: json.RawMessage(`{"project_id":42,"parent_id":9}`),
+		},
+		{
+			ID:      16,
+			Type:    string(generator.GenerateAnimation),
+			Status:  taskdomain.StatusPending,
+			Payload: json.RawMessage(`{"project_id":42,"parent_id":10}`),
+		},
+	}}
+	engine := generator.NewEngine(tasks, nil)
 
-	_, err := engine.List(context.Background(), &generator.RunListQuery{
+	page, err := engine.List(context.Background(), &generator.RunListQuery{
 		ProjectID: 42,
 		AssetID:   &assetID,
 	})
 	if err != nil {
 		t.Fatalf("list generation runs: %v", err)
 	}
-	if reader.filter == nil || reader.filter.AssetID == nil || *reader.filter.AssetID != assetID {
-		t.Fatalf("unexpected asset filter: %+v", reader.filter)
+	if tasks.listFilter == nil {
+		t.Fatal("expected task list filter")
 	}
-	if len(reader.filter.IncludeTaskTypes) != 0 ||
-		!reflect.DeepEqual(reader.filter.ExcludeTaskTypes, generator.ProjectLevelTaskTypes()) {
-		t.Fatalf("unexpected task type filter: %+v", reader.filter)
+	for _, projectType := range generator.ProjectLevelTaskTypes() {
+		for _, taskType := range tasks.listFilter.Types {
+			if taskType == string(projectType) {
+				t.Fatalf("project task type %q was not excluded", projectType)
+			}
+		}
 	}
-	if reader.filter.Limit != 20 {
-		t.Fatalf("expected default limit 20, got %d", reader.filter.Limit)
+	if len(page.Runs) != 1 || page.Runs[0].AssetID == nil || *page.Runs[0].AssetID != assetID {
+		t.Fatalf("unexpected asset runs: %+v", page)
+	}
+}
+
+func TestListPaginatesTaskBackedRuns(t *testing.T) {
+	tasks := &taskManagerStub{listedTasks: []*taskdomain.Task{
+		{ID: 17, Type: string(generator.GenerateCharacterProtoType), Status: taskdomain.StatusPending, Payload: json.RawMessage(`{"project_id":42}`)},
+		{ID: 16, Type: string(generator.GenerateObjectProtoType), Status: taskdomain.StatusPending, Payload: json.RawMessage(`{"project_id":42}`)},
+	}}
+	engine := generator.NewEngine(tasks, nil)
+
+	page, err := engine.List(context.Background(), &generator.RunListQuery{ProjectID: 42, Limit: 1})
+	if err != nil {
+		t.Fatalf("list generation runs: %v", err)
+	}
+	if len(page.Runs) != 1 || page.Runs[0].ID != 17 || page.NextCursor != "17" {
+		t.Fatalf("unexpected generation page: %+v", page)
 	}
 }
 
 func TestListRejectsUnsupportedStatus(t *testing.T) {
-	engine := generator.NewEngine(&taskManagerStub{}, &generationReaderStub{}, nil)
+	engine := generator.NewEngine(&taskManagerStub{}, nil)
 	_, err := engine.List(context.Background(), &generator.RunListQuery{Status: "completed"})
 	if !errors.Is(err, generator.ErrInvalidRunListStatus) {
 		t.Fatalf("expected invalid status error, got %v", err)
 	}
 }
 
+func TestListRejectsInvalidCursor(t *testing.T) {
+	engine := generator.NewEngine(&taskManagerStub{}, nil)
+	_, err := engine.List(context.Background(), &generator.RunListQuery{Cursor: "invalid"})
+	if !errors.Is(err, generator.ErrInvalidRunListCursor) {
+		t.Fatalf("expected invalid cursor error, got %v", err)
+	}
+}
+
 func TestCancelUpdatesTaskStatus(t *testing.T) {
 	tasks := &taskManagerStub{}
-	engine := generator.NewEngine(tasks, nil, nil)
+	engine := generator.NewEngine(tasks, nil)
 
 	if err := engine.Cancel(context.Background(), 17); err != nil {
 		t.Fatalf("cancel generation: %v", err)
@@ -303,7 +436,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		t.Run(string(tt.taskType), func(t *testing.T) {
 			tasks := &taskManagerStub{}
 			executor := &executorStub{result: json.RawMessage(`{"asset_id":7}`)}
-			generator.NewEngine(tasks, nil, executor)
+			generator.NewEngine(tasks, executor)
 
 			message := &taskdomain.Task{ID: 17, Type: string(tt.taskType), Payload: tt.payload}
 			result, err := tasks.dispatch(context.Background(), message)
@@ -331,7 +464,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
-	generator.NewEngine(tasks, nil, executor)
+	generator.NewEngine(tasks, executor)
 
 	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
@@ -350,7 +483,7 @@ func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
-	generator.NewEngine(tasks, nil, executor)
+	generator.NewEngine(tasks, executor)
 
 	for _, taskType := range generator.TaskTypes() {
 		message := &taskdomain.Task{
@@ -372,7 +505,7 @@ func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
 	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
-	generator.NewEngine(tasks, nil, executor)
+	generator.NewEngine(tasks, executor)
 
 	got, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
@@ -394,7 +527,7 @@ func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
 
 func TestImplementedHandlerRequiresExecutor(t *testing.T) {
 	tasks := &taskManagerStub{}
-	generator.NewEngine(tasks, nil, nil)
+	generator.NewEngine(tasks, nil)
 
 	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,

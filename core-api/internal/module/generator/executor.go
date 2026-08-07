@@ -30,11 +30,19 @@ type AssetWriter interface {
 	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
 }
 
+// ReferenceStore is the object-storage boundary used by the worker. It keeps
+// storage-specific credentials and URL formats out of generation logic.
+type ReferenceStore interface {
+	ResolveReference(context.Context, string) (string, error)
+	PersistReference(context.Context, string) (string, error)
+}
+
 type executor struct {
 	images     imageclient.ImageGenerationService
 	animations AnimationGenerationService
 	processor  imageprocessor.Processor
 	assets     AssetWriter
+	references ReferenceStore
 }
 
 // NewExecutor creates the image-to-asset workflow used by task handlers.
@@ -42,8 +50,15 @@ func NewExecutor(
 	images imageclient.ImageGenerationService,
 	processor imageprocessor.Processor,
 	assets AssetWriter,
+	references ...ReferenceStore,
 ) Executor {
-	return &executor{images: images, processor: processor, assets: assets}
+	var referenceStore ReferenceStore
+	if len(references) > 0 {
+		referenceStore = references[0]
+	}
+	return &executor{
+		images: images, processor: processor, assets: assets, references: referenceStore,
+	}
 }
 
 // NewExecutorWithAnimation creates the complete generation workflow, including
@@ -54,9 +69,14 @@ func NewExecutorWithAnimation(
 	animations AnimationGenerationService,
 	processor imageprocessor.Processor,
 	assets AssetWriter,
+	references ...ReferenceStore,
 ) Executor {
+	var referenceStore ReferenceStore
+	if len(references) > 0 {
+		referenceStore = references[0]
+	}
 	return &executor{
-		images: images, animations: animations, processor: processor, assets: assets,
+		images: images, animations: animations, processor: processor, assets: assets, references: referenceStore,
 	}
 }
 
@@ -141,6 +161,10 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
+	resources, err := e.prototypeResources(ctx, generated)
+	if err != nil {
+		return nil, err
+	}
 	value, err := newPrototypeAsset(
 		assetdomain.AssetTypeCharacter,
 		payload.AssetName,
@@ -148,7 +172,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.CreativeBrief,
 		perspective,
 		directionCount,
-		prototypeResources(generated),
+		resources,
 	)
 	if err != nil {
 		return nil, err
@@ -181,6 +205,10 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
+	resources, err := e.prototypeResources(ctx, generated)
+	if err != nil {
+		return nil, err
+	}
 	value, err := newPrototypeAsset(
 		assetdomain.AssetTypeObject,
 		payload.AssetName,
@@ -188,7 +216,7 @@ func (e *executor) generateObjectPrototype(
 		payload.CreativeBrief,
 		perspective,
 		0,
-		prototypeResources(generated),
+		resources,
 	)
 	if err != nil {
 		return nil, err
@@ -353,6 +381,13 @@ func (e *executor) generateImages(
 ) (*imageclient.GenerateResult, error) {
 	references := []string(nil)
 	if reference != "" {
+		if e.references != nil {
+			resolved, err := e.references.ResolveReference(ctx, reference)
+			if err != nil {
+				return nil, fmt.Errorf("generator: resolve %s reference: %w", taskType, err)
+			}
+			reference = resolved
+		}
 		references = []string{reference}
 	}
 	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
@@ -460,13 +495,23 @@ func parseDirectionCount(directionCount string) (uint, error) {
 	}
 }
 
-func prototypeResources(result *imageclient.GenerateResult) []assetdomain.ImageResource {
+func (e *executor) prototypeResources(
+	ctx context.Context,
+	result *imageclient.GenerateResult,
+) ([]assetdomain.ImageResource, error) {
 	resources := make([]assetdomain.ImageResource, len(result.Images))
 	for index, image := range result.Images {
 		url := generatedImageDataURL(image)
+		if e.references != nil {
+			objectKey, err := e.references.PersistReference(ctx, url)
+			if err != nil {
+				return nil, fmt.Errorf("generator: persist prototype image %d: %w", index+1, err)
+			}
+			url = objectKey
+		}
 		resources[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &url}
 	}
-	return resources
+	return resources, nil
 }
 
 func animationReferenceFromMetadata(metadata map[string]any) string {

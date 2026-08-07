@@ -1,5 +1,6 @@
 import type { CreatableAssetKind } from "@/model/asset";
-import type { CreationRequest } from "@/model/generation";
+import type { CreationRequest, TileShapeCell } from "@/model/generation";
+import type { Perspective } from "@/model/project";
 
 type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   kind: K;
@@ -13,7 +14,7 @@ export type VisualAssetCreationDraft<Reference = unknown> =
   CommonAssetCreationDraft<
     Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "ui">
   > & {
-    perspective: NonNullable<CreationRequest["perspective"]>;
+    perspective: Perspective;
     directionCount: NonNullable<CreationRequest["directionCount"]>;
     reference: Reference | undefined;
   };
@@ -28,7 +29,11 @@ export type SceneryAssetCreationDraft<Reference = unknown> =
 
 export type TilesetAssetCreationDraft<Reference = unknown> =
   CommonAssetCreationDraft<"tileset"> & {
-    tiles: { description: string; reference: Reference | undefined }[];
+    tiles: {
+      description: string;
+      reference: Reference | undefined;
+      shape: TileShapeCell[];
+    }[];
   };
 
 export type UiAssetCreationDraft<Reference = unknown> =

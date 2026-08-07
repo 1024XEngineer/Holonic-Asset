@@ -44,6 +44,29 @@ type imageProcessorStub struct {
 	err    error
 }
 
+type referenceStoreStub struct {
+	resolved   []string
+	persisted  []string
+	resolveErr error
+	persistErr error
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.resolved = append(s.resolved, reference)
+	if s.resolveErr != nil {
+		return "", s.resolveErr
+	}
+	return "signed:" + reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persisted = append(s.persisted, reference)
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
+	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
+}
+
 func (s *imageProcessorStub) RemoveBackground(
 	_ context.Context,
 	request *imageprocessor.RemoveBackgroundRequest,
@@ -241,6 +264,39 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.characterAsset)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
+}
+
+func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{events: &events}
+	references := &referenceStoreStub{}
+	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel knight",
+		"canvas_size":"64x64",
+		"perspective":"Top-Down",
+		"reference":"projects/7/reference.png",
+		"project_id":11
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
+		t.Fatalf("generate prototype: %v", err)
+	}
+	if len(references.resolved) != 1 || references.resolved[0] != "projects/7/reference.png" {
+		t.Fatalf("expected execution-time reference resolution, got %v", references.resolved)
+	}
+	if len(references.persisted) != 2 || references.persisted[0] != "data:image/png;base64,first" || references.persisted[1] != "data:image/png;base64,second" {
+		t.Fatalf("expected generated images to be persisted as data URLs, got %v", references.persisted)
+	}
+	content, err := assets.characterAsset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode generated asset: %v", err)
+	}
+	if *(*content.Prototype)[0].URL != "uploads/generated-1.png" || *(*content.Prototype)[1].URL != "uploads/generated-2.png" {
+		t.Fatalf("expected object keys in generated asset: %+v", content.Prototype)
+	}
 }
 
 func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {

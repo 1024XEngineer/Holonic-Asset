@@ -2,7 +2,6 @@ export {
   assetApi,
   assetKinds,
   assetKeys,
-  assetRecordModeForKind,
   creatableAssetKinds,
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
