@@ -1793,7 +1793,7 @@
       }
     },
     "/asset/update": {
-      "post": {
+      "put": {
         "operationId": "updateAsset",
         "requestBody": {
           "content": {
@@ -2127,7 +2127,7 @@
       }
     },
     "/project/delete": {
-      "post": {
+      "delete": {
         "operationId": "deleteProject",
         "requestBody": {
           "content": {
@@ -2397,7 +2397,7 @@
       }
     },
     "/project/update": {
-      "post": {
+      "put": {
         "operationId": "updateProject",
         "requestBody": {
           "content": {
