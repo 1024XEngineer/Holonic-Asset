@@ -66,7 +66,7 @@ func TestProjectRoutesSupportCRUDLifecycleWithPostgreSQL(t *testing.T) {
 	}
 
 	updateBody := fmt.Sprintf(`{"projectID":%d,"description":"","reference":"new-reference"}`, createResponse.ID)
-	updateRecorder := serveProjectRequest(t, e, http.MethodPost, "/api/v1/project/update", updateBody)
+	updateRecorder := serveProjectRequest(t, e, http.MethodPut, "/api/v1/project/update", updateBody)
 	var updateResponse dto.UpdateProjectResponse
 	decodeProjectResponse(t, updateRecorder, &updateResponse)
 	if !updateResponse.Success {
@@ -83,7 +83,7 @@ func TestProjectRoutesSupportCRUDLifecycleWithPostgreSQL(t *testing.T) {
 	}
 
 	deleteBody := fmt.Sprintf(`{"projectID":%d}`, createResponse.ID)
-	deleteRecorder := serveProjectRequest(t, e, http.MethodPost, "/api/v1/project/delete", deleteBody)
+	deleteRecorder := serveProjectRequest(t, e, http.MethodDelete, "/api/v1/project/delete", deleteBody)
 	var deleteResponse dto.DeleteProjectResponse
 	decodeProjectResponse(t, deleteRecorder, &deleteResponse)
 	if !deleteResponse.Success {
@@ -114,7 +114,7 @@ func TestProjectUpdateRoutePreservesOmittedFieldsInPostgreSQL(t *testing.T) {
 	recorder := serveProjectRequest(
 		t,
 		e,
-		http.MethodPost,
+		http.MethodPut,
 		"/api/v1/project/update",
 		fmt.Sprintf(`{"projectID":%d,"reference":"new-reference"}`, project.ID),
 	)
