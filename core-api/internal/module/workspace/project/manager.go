@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	referenceSize    = "auto"
-	referenceQuality = "high"
+	referenceSize               = "auto"
+	referenceQuality            = "high"
+	referenceRegenerationPrompt = `REFERENCE REGENERATION
+The supplied reference image is the user's current result and they are dissatisfied with it. Generate a clearly new alternative instead of reproducing the same composition. Keep only useful high-level cues such as visual language, palette relationships, sprite scale, and material treatment. Change the composition, layout, staging, silhouettes, and scene details while following the current project brief.`
 )
 
 var (
@@ -113,22 +115,29 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		return "", ErrImageServiceRequired
 	}
 
+	reference := strings.TrimSpace(project.Reference)
+	prompt := buildReferencePrompt(project)
+	if reference != "" {
+		prompt += "\n\n" + referenceRegenerationPrompt
+	}
+
 	request := &imageclient.GenerateRequest{
-		Prompt: buildReferencePrompt(project),
+		Prompt: prompt,
 		Size:   referenceSize,
 		Params: imageclient.Params{
 			"quality": referenceQuality,
 		},
 	}
-	reference := project.Reference
-	if m.references != nil && strings.TrimSpace(reference) != "" {
-		resolved, err := m.references.ResolveReference(ctx, reference)
-		if err != nil {
-			return "", fmt.Errorf("project: resolve reference: %w", err)
+	if reference != "" {
+		// Refresh private URLs before sending them to the image provider so an
+		// expiring frontend URL does not become stale during generation.
+		if m.references != nil {
+			resolved, err := m.references.ResolveReference(ctx, reference)
+			if err != nil {
+				return "", fmt.Errorf("project: resolve reference: %w", err)
+			}
+			reference = resolved
 		}
-		reference = resolved
-	}
-	if reference = referenceForGeneration(reference); reference != "" {
 		request.ReferenceImages = []string{reference}
 	}
 
@@ -225,18 +234,6 @@ func gameplayPlanPrompt(project *Project) string {
 
 func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
-}
-
-// referenceForGeneration only forwards references in formats accepted by the
-// image provider. Bare base64 values do not contain enough format information.
-func referenceForGeneration(reference string) string {
-	reference = strings.TrimSpace(reference)
-	if strings.HasPrefix(reference, "data:image/") ||
-		strings.HasPrefix(reference, "https://") ||
-		strings.HasPrefix(reference, "http://") {
-		return reference
-	}
-	return ""
 }
 
 func gameTypePrompt(gameType GameType) string {
