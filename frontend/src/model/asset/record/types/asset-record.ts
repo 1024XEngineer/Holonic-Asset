@@ -8,7 +8,7 @@ import type {
 export type AssetCanvasPosition = { x: number; y: number };
 
 /** Global [column, row] coordinate in the tileset grid. */
-export type TilesetCell = [column: number, row: number];
+export type TilesetTile = [column: number, row: number];
 
 export type TilesetItem = {
   id: string;
@@ -16,7 +16,7 @@ export type TilesetItem = {
   /** Complete generated item image; tiles are only a front-end interaction map. */
   imageUrl?: string;
   /** Every tileset tile occupied by this complete item, as [column, row]. */
-  tiles: TilesetCell[];
+  tiles: TilesetTile[];
 };
 
 export type UiComponent = {

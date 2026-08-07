@@ -9,7 +9,7 @@ import type {
   AssetCanvasPosition,
   AssetRecord,
   AssetRecordForKind,
-  TilesetCell,
+  TilesetTile,
   TilesetItem,
   UiComponent,
 } from "./types";
@@ -150,11 +150,11 @@ function isTilesetItem(value: unknown): value is TilesetItem {
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
-    isArrayOf(value.tiles, isTilesetCell)
+    isArrayOf(value.tiles, isTilesetTile)
   );
 }
 
-function isTilesetCell(value: unknown): value is TilesetCell {
+function isTilesetTile(value: unknown): value is TilesetTile {
   return (
     Array.isArray(value) &&
     value.length === 2 &&

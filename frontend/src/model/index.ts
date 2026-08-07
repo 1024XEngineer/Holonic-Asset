@@ -57,7 +57,7 @@ export type {
   SceneryAssetRecord,
   TilesetAssetKind,
   TilesetAssetRecord,
-  TilesetCell,
+  TilesetTile,
   TilesetItem,
   UiAssetKind,
   UiAssetRecord,

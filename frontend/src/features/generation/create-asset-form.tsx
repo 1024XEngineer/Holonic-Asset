@@ -42,7 +42,7 @@ export function CreateAssetForm({
     onSubmit: async ({ value }) => {
       if (
         value.draft.kind === "tileset" &&
-        value.draft.tiles.some((tile) => tile.shape.length === 0)
+        value.draft.tiles.some((tile) => tile.tiles.length === 0)
       ) {
         setTilesetShapeError(true);
         return;
@@ -55,7 +55,7 @@ export function CreateAssetForm({
   const setDraft = (nextDraft: AssetCreationDraft<File>) => {
     if (
       nextDraft.kind === "tileset" &&
-      nextDraft.tiles.every((tile) => tile.shape.length > 0)
+      nextDraft.tiles.every((tile) => tile.tiles.length > 0)
     ) {
       setTilesetShapeError(false);
     }
