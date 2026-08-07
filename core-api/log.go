@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -14,7 +16,14 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
-func InitLogger(logConfig *config.LogConfig) logger.Logger {
+func InitLogger(logConfig *config.LogConfig) (logger.Logger, error) {
+	if logConfig == nil {
+		return nil, errors.New("app: log config is nil")
+	}
+	if strings.TrimSpace(logConfig.Path) == "" {
+		return nil, errors.New("app: log path is required")
+	}
+
 	// Use zap's own config struct directly for configuration.
 	// Configure Lumberjack to support log file rotation.
 	lumberjackLogger := &lumberjack.Logger{
@@ -41,7 +50,10 @@ func InitLogger(logConfig *config.LogConfig) logger.Logger {
 	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
 	res := logger.NewLogger(l)
 
-	return res
+	if err := res.Sync(); err != nil {
+		return nil, fmt.Errorf("app: initialize logger: %w", err)
+	}
+	return res, nil
 }
 
 func getZapLevel(levelStr string) zapcore.Level {
