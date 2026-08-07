@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
@@ -30,9 +31,9 @@ func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.D
 	}
 
 	db, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
-		Logger: gormlogger.New(gormLoggerFunc(l.Debug), gormlogger.Config{
-			SlowThreshold: 0,
-			LogLevel:      gormlogger.Info,
+		Logger: gormlogger.New(gormLoggerFunc(l.Warn), gormlogger.Config{
+			SlowThreshold: 200 * time.Millisecond,
+			LogLevel:      gormlogger.Warn,
 		}),
 	})
 	if err != nil {

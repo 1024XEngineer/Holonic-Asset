@@ -33,6 +33,10 @@ func (z *ZapLogger) Error(msg string, args ...Field) {
 	z.l.Error(msg, z.toArgs(args)...)
 }
 
+func (z *ZapLogger) Sync() error {
+	return z.l.Sync()
+}
+
 func (z *ZapLogger) toArgs(args []Field) []zap.Field {
 	res := make([]zap.Field, 0, len(args))
 	for _, arg := range args {
@@ -70,4 +74,8 @@ func (d *DefaultLogger) Warn(msg string, args ...Field) {
 
 func (d *DefaultLogger) Error(msg string, args ...Field) {
 	d.log.Print(msg)
+}
+
+func (d *DefaultLogger) Sync() error {
+	return nil
 }
