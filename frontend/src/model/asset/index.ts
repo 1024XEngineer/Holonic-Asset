@@ -42,6 +42,7 @@ export type {
   UiAssetRecord,
   UiComponent,
 } from "./record";
+export { recordQueryOptions } from "./record";
 export {
   useAddAudioTrackMutation,
   useAudioTracksQuery,

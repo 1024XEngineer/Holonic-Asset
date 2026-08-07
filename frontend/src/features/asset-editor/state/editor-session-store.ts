@@ -5,6 +5,7 @@ import { temporal } from "zundo";
 import type {
   AssetCanvasPosition,
   AssetRecord,
+  CharacterAssetRecord,
   GeneratedCharacterAnimation,
 } from "@/model";
 
@@ -18,15 +19,13 @@ type EditorSessionState = {
   record: AssetRecord;
   savedRecord: AssetRecord;
   setPrompt: (prompt: string) => void;
-  setCharacterNodePosition: (
+  setSpriteNodePosition: (
     nodeId: string,
     position: AssetCanvasPosition,
   ) => void;
-  addGeneratedCharacterAnimation: (
-    animation: GeneratedCharacterAnimation,
-  ) => void;
-  renameCharacterAnimation: (animationId: string, label: string) => void;
-  deleteCharacterAnimation: (animationId: string) => void;
+  addGeneratedSpriteAnimation: (animation: GeneratedCharacterAnimation) => void;
+  renameSpriteAnimation: (animationId: string, label: string) => void;
+  deleteSpriteAnimation: (animationId: string) => void;
 };
 
 export function createEditorSessionStore(initialRecord: AssetRecord) {
@@ -43,15 +42,10 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
               ? state
               : { record: { ...state.record, prompt } },
           ),
-        setCharacterNodePosition: (nodeId, position) =>
+        setSpriteNodePosition: (nodeId, position) =>
           set((state) => {
-            if (state.record.mode !== "character") {
-              throw new Error(
-                "Character node positions require a character record.",
-              );
-            }
-
-            const current = state.record.character.nodePositions[nodeId];
+            const sprite = getSpriteRecordData(state.record);
+            const current = sprite.nodePositions[nodeId];
             if (
               current &&
               current.x === position.x &&
@@ -61,60 +55,41 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
             }
 
             return {
-              record: {
-                ...state.record,
-                character: {
-                  ...state.record.character,
-                  nodePositions: {
-                    ...state.record.character.nodePositions,
-                    [nodeId]: { ...position },
-                  },
+              record: updateSpriteRecord(state.record, (current) => ({
+                ...current,
+                nodePositions: {
+                  ...current.nodePositions,
+                  [nodeId]: { ...position },
                 },
-              },
+              })),
             };
           }),
-        addGeneratedCharacterAnimation: (animation) =>
+        addGeneratedSpriteAnimation: (animation) =>
           set((state) => {
-            if (state.record.mode !== "character") {
-              throw new Error(
-                "Character animations require a character record.",
-              );
-            }
-
+            const sprite = getSpriteRecordData(state.record);
             const normalizedLabel = animation.label.trim();
             if (!normalizedLabel) return state;
 
-            const animations = state.record.character.animations ?? [];
+            const animations = sprite.animations ?? [];
             return {
-              record: {
-                ...state.record,
-                character: {
-                  ...state.record.character,
-                  animations: [
-                    ...animations,
-                    {
-                      ...structuredClone(animation),
-                      id: createCharacterAnimationId(
-                        normalizedLabel,
-                        animations,
-                      ),
-                      label: normalizedLabel,
-                    },
-                  ],
-                },
-              },
+              record: updateSpriteRecord(state.record, (current) => ({
+                ...current,
+                animations: [
+                  ...animations,
+                  {
+                    ...structuredClone(animation),
+                    id: createCharacterAnimationId(normalizedLabel, animations),
+                    label: normalizedLabel,
+                  },
+                ],
+              })),
             };
           }),
-        renameCharacterAnimation: (animationId, label) =>
+        renameSpriteAnimation: (animationId, label) =>
           set((state) => {
-            if (state.record.mode !== "character") {
-              throw new Error(
-                "Character animations require a character record.",
-              );
-            }
-
+            const sprite = getSpriteRecordData(state.record);
             const normalizedLabel = label.trim();
-            const animations = state.record.character.animations ?? [];
+            const animations = sprite.animations ?? [];
             const target = animations.find(
               (animation) => animation.id === animationId,
             );
@@ -127,49 +102,38 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
             }
 
             return {
-              record: {
-                ...state.record,
-                character: {
-                  ...state.record.character,
-                  animations: animations.map((animation) =>
-                    animation.id === animationId
-                      ? { ...animation, label: normalizedLabel }
-                      : animation,
-                  ),
-                },
-              },
+              record: updateSpriteRecord(state.record, (current) => ({
+                ...current,
+                animations: animations.map((animation) =>
+                  animation.id === animationId
+                    ? { ...animation, label: normalizedLabel }
+                    : animation,
+                ),
+              })),
             };
           }),
-        deleteCharacterAnimation: (animationId) =>
+        deleteSpriteAnimation: (animationId) =>
           set((state) => {
-            if (state.record.mode !== "character") {
-              throw new Error(
-                "Character animations require a character record.",
-              );
-            }
-
-            const animations = state.record.character.animations ?? [];
+            const sprite = getSpriteRecordData(state.record);
+            const animations = sprite.animations ?? [];
             if (!animations.some((animation) => animation.id === animationId)) {
               return state;
             }
 
             const nodePositions = Object.fromEntries(
-              Object.entries(state.record.character.nodePositions).filter(
+              Object.entries(sprite.nodePositions).filter(
                 ([nodeId]) => nodeId !== animationId,
               ),
             );
 
             return {
-              record: {
-                ...state.record,
-                character: {
-                  ...state.record.character,
-                  animations: animations.filter(
-                    (animation) => animation.id !== animationId,
-                  ),
-                  nodePositions,
-                },
-              },
+              record: updateSpriteRecord(state.record, (current) => ({
+                ...current,
+                animations: animations.filter(
+                  (animation) => animation.id !== animationId,
+                ),
+                nodePositions,
+              })),
             };
           }),
       }),
@@ -211,21 +175,19 @@ export function dispatchEditorCommand(
     case "prompt.set":
       store.getState().setPrompt(command.value);
       return;
-    case "character.node-position.set":
+    case "sprite.node-position.set":
+      store.getState().setSpriteNodePosition(command.nodeId, command.position);
+      return;
+    case "sprite.animation.generated":
+      store.getState().addGeneratedSpriteAnimation(command.animation);
+      return;
+    case "sprite.animation.rename":
       store
         .getState()
-        .setCharacterNodePosition(command.nodeId, command.position);
+        .renameSpriteAnimation(command.animationId, command.label);
       return;
-    case "character.animation.generated":
-      store.getState().addGeneratedCharacterAnimation(command.animation);
-      return;
-    case "character.animation.rename":
-      store
-        .getState()
-        .renameCharacterAnimation(command.animationId, command.label);
-      return;
-    case "character.animation.delete":
-      store.getState().deleteCharacterAnimation(command.animationId);
+    case "sprite.animation.delete":
+      store.getState().deleteSpriteAnimation(command.animationId);
       return;
     case "history.undo":
       store.temporal.getState().undo();
@@ -233,6 +195,27 @@ export function dispatchEditorCommand(
     case "history.redo":
       store.temporal.getState().redo();
   }
+}
+
+type SpriteAssetRecordData = CharacterAssetRecord["character"];
+
+function getSpriteRecordData(record: AssetRecord): SpriteAssetRecordData {
+  if (record.mode === "character") return record.character;
+  if (record.mode === "object") return record.object;
+  throw new Error("Sprite editing requires a character or object record.");
+}
+
+function updateSpriteRecord(
+  record: AssetRecord,
+  update: (data: SpriteAssetRecordData) => SpriteAssetRecordData,
+): AssetRecord {
+  if (record.mode === "character") {
+    return { ...record, character: update(record.character) };
+  }
+  if (record.mode === "object") {
+    return { ...record, object: update(record.object) };
+  }
+  throw new Error("Sprite editing requires a character or object record.");
 }
 
 export function getEditorSessionSnapshot(

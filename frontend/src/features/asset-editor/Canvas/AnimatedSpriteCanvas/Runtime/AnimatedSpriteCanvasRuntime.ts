@@ -148,8 +148,13 @@ export class AnimatedSpriteCanvasRuntime {
   }
 
   private centerWorld() {
+    const { width, height } = this.runtime.app.screen;
+    const isCompactViewport = width < 640 || height < 420;
     this.viewport?.setZoom(INITIAL_SCALE);
-    this.viewport?.moveCenter(650, 700);
+    this.viewport?.moveCenter(
+      isCompactViewport ? 300 : 650,
+      isCompactViewport ? 300 : 700,
+    );
   }
 
   private render() {

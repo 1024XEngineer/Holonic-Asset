@@ -9,6 +9,7 @@ import {
 import { AlertTriangle, LoaderCircle, MapPinOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 function RouteStatus({
   action,
@@ -92,10 +93,10 @@ function RouteNotFound() {
 
 function RootComponent() {
   return (
-    <>
+    <TooltipProvider>
       <HeadContent />
       <Outlet />
-    </>
+    </TooltipProvider>
   );
 }
 

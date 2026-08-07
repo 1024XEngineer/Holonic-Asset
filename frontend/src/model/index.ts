@@ -5,6 +5,7 @@ export {
   creatableAssetKinds,
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
+  recordQueryOptions,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -152,4 +153,5 @@ export type {
   GenerateAnimationRequest,
   GenerateAnimationResult,
   GeneratedCharacterAnimation,
+  SpriteAssetKind,
 } from "./generation";
