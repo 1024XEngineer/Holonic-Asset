@@ -19,8 +19,13 @@ export function createMockProjectPreview({
 
   const isTopDown = perspective === "Top-Down";
   const palette = isTopDown
-    ? { sky: "#15253e", ground: "#2e704b", detail: "#f0bb52", ui: "#111827" }
-    : { sky: "#30516c", ground: "#537d58", detail: "#e6b968", ui: "#1f2937" };
+    ? { sky: "#15253e", ground: "#2e704b", detail: "#f0bb52", uiset: "#111827" }
+    : {
+        sky: "#30516c",
+        ground: "#537d58",
+        detail: "#e6b968",
+        uiset: "#1f2937",
+      };
   const projectName = name.trim() || "Untitled game";
   const summary = description.trim() || `${gameType} project overview`;
 
@@ -43,7 +48,7 @@ export function createMockProjectPreview({
   context.fillStyle = "#182536";
   context.fillRect(615, 410, 50, 80);
 
-  context.fillStyle = palette.ui;
+  context.fillStyle = palette.uiset;
   context.fillRect(48, 48, 310, 126);
   context.fillStyle = "#ffffff";
   context.font = "600 34px system-ui";

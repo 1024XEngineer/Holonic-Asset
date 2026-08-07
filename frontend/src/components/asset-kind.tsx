@@ -30,7 +30,11 @@ const assetKindConfigs: Record<AssetKind, AssetKindConfig> = {
     accentClassName: "bg-emerald-500",
   },
   scenery: { label: "Scenery", icon: Mountain, accentClassName: "bg-sky-500" },
-  ui: { label: "UI", icon: PanelsTopLeft, accentClassName: "bg-slate-500" },
+  uiset: {
+    label: "UI Set",
+    icon: PanelsTopLeft,
+    accentClassName: "bg-slate-500",
+  },
   audio: { label: "Audio", icon: Volume2, accentClassName: "bg-slate-500" },
 };
 

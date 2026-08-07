@@ -14,7 +14,7 @@ type Manager interface {
 	CreateCharacterAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	CreateObjectAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, error)
-	CreateUIAsset(ctx context.Context, asset *Asset) (uint, error)
+	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
 	CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error)
@@ -78,8 +78,8 @@ func (m *manager) CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, e
 	return m.store.CreateTileSetAsset(ctx, asset)
 }
 
-func (m *manager) CreateUIAsset(ctx context.Context, asset *Asset) (uint, error) {
-	return m.store.CreateUIAsset(ctx, asset)
+func (m *manager) CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error) {
+	return m.store.CreateUISetAsset(ctx, asset)
 }
 
 func (m *manager) CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error) {

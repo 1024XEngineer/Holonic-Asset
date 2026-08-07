@@ -13,7 +13,7 @@ type Store interface {
 	CreateCharacterAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	CreateObjectAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, error)
-	CreateUIAsset(ctx context.Context, asset *Asset) (uint, error)
+	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
 	UpdatePrototypeImages(ctx context.Context, assetID uint, images []ImageResource) error

@@ -12,7 +12,7 @@ const defaultCanvasSizeByAssetKind: Record<AssetKind, AssetCanvasSize> = {
   tileset: "16 × 16 px",
   scenery: defaultAssetCanvasSize,
   audio: defaultAssetCanvasSize,
-  ui: defaultAssetCanvasSize,
+  uiset: defaultAssetCanvasSize,
 };
 
 export function getDefaultAssetCanvasSize(kind: AssetKind) {

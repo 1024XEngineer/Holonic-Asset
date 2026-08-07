@@ -22,7 +22,7 @@ describe("completeMockGeneration", () => {
 
   it("inherits the project perspective when the request omits it", async () => {
     const result = await complete(
-      generationRun({ kind: "ui", projectId: "iron-harbor" }),
+      generationRun({ kind: "uiset", projectId: "iron-harbor" }),
     );
 
     expect(result.asset.perspective).toBe("Side-On");

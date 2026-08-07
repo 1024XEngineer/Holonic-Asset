@@ -3,6 +3,6 @@ export type {
   AssetCreationDraft,
   SceneryAssetCreationDraft,
   TilesetAssetCreationDraft,
-  UiAssetCreationDraft,
+  UISetAssetCreationDraft,
   VisualAssetCreationDraft,
 } from "./asset-creation";

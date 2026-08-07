@@ -82,7 +82,7 @@ The asset's full business content is in `data.content`. `data.type` determines t
 | `content` | `object` | Full business content of the asset |
 | `version` | `number` | Asset business version |
 
-Current asset types: `character`, `object`, `tileSet`, `audio`, `ui`, `scenery`.
+Current asset types: `character`, `object`, `tileSet`, `audio`, `uiset`, `scenery`.
 
 The asset's own metadata goes in `data.attributes`. Extended metadata within the business content goes in `data.content.metadata`. Task IDs, execution status, and error information belong to Tasks and are not nested inside Asset Content. The frontend should query the corresponding Task to determine whether the generation task is complete, then read the written resources from the Asset.
 

@@ -93,7 +93,7 @@ export type AssetContentByType = {
   object: ObjectAssetContent;
   tileSet: TileSetAssetContent;
   audio: UnspecifiedAssetContent;
-  ui: UnspecifiedAssetContent;
+  uiset: UnspecifiedAssetContent;
   scenery: UnspecifiedAssetContent;
 };
 

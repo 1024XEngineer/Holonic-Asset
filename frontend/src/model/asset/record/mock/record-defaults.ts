@@ -11,7 +11,7 @@ import type {
   AssetRecordForKind,
   SceneryAssetRecord,
   TilesetAssetRecord,
-  UiAssetRecord,
+  UISetAssetRecord,
   AudioAssetRecord,
 } from "../types";
 import type {
@@ -313,11 +313,11 @@ export function createDefaultAssetRecord<K extends AssetKind>(
     } as AssetRecordForKind<K>;
   }
 
-  if (kind === "ui") {
+  if (kind === "uiset") {
     return {
-      mode: "ui",
+      mode: "uiset",
       ...base,
-      ui: {
+      uiset: {
         components: [
           {
             id: "panel",
@@ -380,8 +380,10 @@ export function mergeAssetRecord<K extends AssetKind>(
       return mergeTilesetRecord(
         record as TilesetAssetRecord,
       ) as AssetRecordForKind<K>;
-    case "ui":
-      return mergeUiRecord(record as UiAssetRecord) as AssetRecordForKind<K>;
+    case "uiset":
+      return mergeUISetRecord(
+        record as UISetAssetRecord,
+      ) as AssetRecordForKind<K>;
     case "audio":
       return mergeAudioRecord(
         record as AudioAssetRecord,
@@ -497,11 +499,11 @@ function mergeTilesetRecord(saved: TilesetAssetRecord): TilesetAssetRecord {
   };
 }
 
-function mergeUiRecord(saved: UiAssetRecord): UiAssetRecord {
+function mergeUISetRecord(saved: UISetAssetRecord): UISetAssetRecord {
   return {
-    mode: "ui",
+    mode: "uiset",
     prompt: saved.prompt,
-    ui: { components: saved.ui.components },
+    uiset: { components: saved.uiset.components },
   };
 }
 

@@ -6,7 +6,7 @@ const (
 	AssetTypeCharacter AssetType = "character"
 	AssetTypeTileSet   AssetType = "tileSet"
 	AssetTypeAudio     AssetType = "audio"
-	AssetTypeUI        AssetType = "ui"
+	AssetTypeUISet     AssetType = "uiset"
 	AssetTypeObject    AssetType = "object"
 	AssetTypeScenery   AssetType = "scenery"
 )

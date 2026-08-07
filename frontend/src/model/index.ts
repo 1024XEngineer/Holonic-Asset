@@ -58,9 +58,9 @@ export type {
   TilesetAssetKind,
   TilesetAssetRecord,
   TilesetItem,
-  UiAssetKind,
-  UiAssetRecord,
-  UiComponent,
+  UISetAssetKind,
+  UISetAssetRecord,
+  UISetComponent,
   UpdateAudioTrackInput,
 } from "./asset";
 export type { ItemTile } from "./item-tile";
