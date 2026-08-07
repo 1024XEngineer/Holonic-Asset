@@ -22,3 +22,17 @@ func (p Perspective) Valid() bool {
 	}
 	return false
 }
+
+// CharacterDirectionCount returns the fixed sheet size for a character perspective.
+func (p Perspective) CharacterDirectionCount() uint {
+	switch p {
+	case SideOn:
+		return 2
+	case TopDown:
+		return 4
+	case Isometric:
+		return 8
+	default:
+		return 0
+	}
+}
