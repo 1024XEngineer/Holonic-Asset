@@ -208,23 +208,41 @@ func (r *AssetRepositoryImpl) UpdateAsset(
 	if update.Tags != nil {
 		value.Tags = update.Tags
 	}
-	if update.Perspective != nil {
-		if !update.Perspective.Valid() {
-			return nil, fmt.Errorf("repository: invalid perspective %q", *update.Perspective)
+	var current *dao.Asset
+	loadCurrent := func() error {
+		if current != nil {
+			return nil
 		}
-		perspective := string(*update.Perspective)
-		value.Perspective = &perspective
+		asset, err := r.AssetDao.GetAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		current = &asset
+		return nil
+	}
+	if update.Perspective != nil {
+		if err := loadCurrent(); err != nil {
+			return nil, err
+		}
+		if current.Type != string(domain.AssetTypeAudio) {
+			if !update.Perspective.Valid() {
+				return nil, fmt.Errorf("repository: invalid perspective %q", *update.Perspective)
+			}
+			perspective := string(*update.Perspective)
+			value.Perspective = &perspective
+		}
 	}
 	if update.Scale != nil {
-		current, err := r.AssetDao.GetAsset(ctx, id)
-		if err != nil {
+		if err := loadCurrent(); err != nil {
 			return nil, err
 		}
-		if err := domain.ValidateScale(domain.AssetType(current.Type), *update.Scale); err != nil {
-			return nil, err
+		if current.Type != string(domain.AssetTypeAudio) {
+			if err := domain.ValidateScale(domain.AssetType(current.Type), *update.Scale); err != nil {
+				return nil, err
+			}
+			scale := datatypes.JSON(append([]byte(nil), (*update.Scale)...))
+			value.Scale = &scale
 		}
-		scale := datatypes.JSON(append([]byte(nil), (*update.Scale)...))
-		value.Scale = &scale
 	}
 
 	asset, err := r.AssetDao.UpdateAsset(ctx, id, value)
@@ -265,10 +283,17 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 	if asset == nil {
 		asset = &domain.Asset{}
 	}
-	if !asset.Perspective.Valid() {
+	perspective := asset.Perspective
+	scale := asset.Scale
+	if assetType == domain.AssetTypeAudio {
+		// Audio assets are not visual and therefore do not carry visual metadata.
+		perspective = ""
+		scale = nil
+	}
+	if assetType != domain.AssetTypeAudio && !perspective.Valid() {
 		return nil, fmt.Errorf("repository: invalid perspective %q", asset.Perspective)
 	}
-	if err := domain.ValidateScale(assetType, asset.Scale); err != nil {
+	if err := domain.ValidateScale(assetType, scale); err != nil {
 		return nil, err
 	}
 	content, err := asset.DecodeContent()
@@ -290,8 +315,8 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 		Type:        string(assetType),
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
-		Perspective: string(asset.Perspective),
-		Scale:       datatypes.JSON(append([]byte(nil), asset.Scale...)),
+		Perspective: string(perspective),
+		Scale:       datatypes.JSON(append([]byte(nil), scale...)),
 		Content:     datatypes.JSON(encoded),
 		Version:     asset.Version,
 	}, nil

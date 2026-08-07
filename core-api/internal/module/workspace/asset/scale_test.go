@@ -28,6 +28,18 @@ func TestValidateScaleAcceptsTypeSpecificShapes(t *testing.T) {
 	}
 }
 
+func TestValidateScaleAllowsOmittedAudioScale(t *testing.T) {
+	if err := domain.ValidateScale(domain.AssetTypeAudio, nil); err != nil {
+		t.Fatalf("validate omitted audio scale: %v", err)
+	}
+}
+
+func TestValidateScaleStillRequiresVisualScale(t *testing.T) {
+	if err := domain.ValidateScale(domain.AssetTypeCharacter, nil); err == nil {
+		t.Fatal("expected omitted visual scale to be rejected")
+	}
+}
+
 func TestValidateScaleRejectsInvalidOrUnknownFields(t *testing.T) {
 	tests := []struct {
 		name      string

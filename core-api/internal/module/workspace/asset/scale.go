@@ -18,14 +18,15 @@ type TileSetScale struct {
 }
 
 func ValidateScale(assetType AssetType, raw json.RawMessage) error {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return fmt.Errorf("asset: scale is required for %s", assetType)
-	}
+	trimmed := bytes.TrimSpace(raw)
 	if assetType == AssetTypeAudio {
-		if !bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-			return fmt.Errorf("asset: audio scale must be null")
+		if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+			return nil
 		}
-		return nil
+		return fmt.Errorf("asset: audio scale must be null")
+	}
+	if len(trimmed) == 0 {
+		return fmt.Errorf("asset: scale is required for %s", assetType)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(raw))

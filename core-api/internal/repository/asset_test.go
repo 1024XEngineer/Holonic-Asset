@@ -178,6 +178,29 @@ func TestAssetRepositoryRejectsInvalidScaleBeforeUpdate(t *testing.T) {
 	}
 }
 
+func TestAssetRepositoryIgnoresAudioVisualMetadataOnUpdate(t *testing.T) {
+	perspective := domain.PerspectiveTopDown
+	scale := json.RawMessage(`{"width":64,"height":64}`)
+	daoStub := &assetDaoStub{
+		asset:        dao.Asset{ID: 7, Type: string(domain.AssetTypeAudio)},
+		updatedAsset: dao.Asset{ID: 7, Type: string(domain.AssetTypeAudio)},
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	if _, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{
+		Perspective: &perspective,
+		Scale:       &scale,
+	}); err != nil {
+		t.Fatalf("update audio asset: %v", err)
+	}
+	if daoStub.update == nil {
+		t.Fatal("expected DAO update")
+	}
+	if daoStub.update.Perspective != nil || daoStub.update.Scale != nil {
+		t.Fatalf("audio visual metadata reached DAO update: %+v", daoStub.update)
+	}
+}
+
 func TestAssetRepositoryGetDetailMapsDAOResult(t *testing.T) {
 	daoStub := &assetDaoStub{asset: dao.Asset{
 		ID:        7,
