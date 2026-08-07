@@ -42,7 +42,7 @@ func InitTaskStore(db *gorm.DB) task.TaskStore {
 }
 
 // InitImageService creates the external image provider and its application service.
-func InitImageService(cfg config.QNAConfig) imageclient.ImageGenerationService {
+func InitImageService(cfg config.ImageClientConfig) imageclient.ImageGenerationService {
 	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
 		BaseURL:      cfg.BaseURL,
 		APIKey:       cfg.APIKey,
@@ -85,7 +85,7 @@ func InitGeneratorExecutor(
 
 // InitGeneratorEngine creates the generator module and registers its task handlers.
 func InitGeneratorEngine(tasks task.Manager, executor generator.Executor) *generator.Engine {
-	return generator.NewEngine(tasks, nil, executor)
+	return generator.NewEngine(tasks, executor)
 }
 
 // InitUploadManager creates the upload business module.

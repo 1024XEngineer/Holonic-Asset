@@ -361,7 +361,6 @@ export interface components {
             kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
             prompt: string;
-            referenceMediaIds?: string[] | null;
             targetAssetPaths?: string[] | null;
         };
         CreateGenerationResponse: {
@@ -373,8 +372,11 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
-            /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            /**
+             * @default Top-Down
+             * @enum {string}
+             */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
@@ -451,8 +453,11 @@ export interface components {
             /** @enum {string} */
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name: string;
-            /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            /**
+             * @default Top-Down
+             * @enum {string}
+             */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference?: string;
             style?: string;
             /** @enum {string} */
@@ -511,7 +516,7 @@ export interface components {
             id: number;
             name: string;
             /** @enum {string} */
-            perspective: "" | "TopDown" | "SideOn" | "Isometric";
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             reference: string;
             style: string;
             /** @enum {string} */
@@ -772,7 +777,7 @@ export interface components {
             gameType?: "" | "RPG" | "ACT" | "SLG";
             name?: string;
             /** @enum {string} */
-            perspective?: "" | "TopDown" | "SideOn" | "Isometric";
+            perspective?: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectID: number;
             reference?: string;

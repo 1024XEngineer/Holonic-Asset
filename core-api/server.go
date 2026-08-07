@@ -13,9 +13,18 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/viperx"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
+	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
+	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
 
 const defaultShutdownTimeout = 10 * time.Second
@@ -45,13 +54,51 @@ func InitServer(path string) (*App, error) {
 	return InitServerFromConfig(context.Background(), cfg)
 }
 
+// newApp and newAppWithServices provide a lightweight composition root for
+// tests and callers that only need the HTTP dependency graph.
+func newApp(
+	projectDao dao.ProjectDao,
+	assetStore assetdomain.Store,
+	imageService imageclient.ImageGenerationService,
+) *App {
+	return newAppWithServices(projectDao, assetStore, imageService, nil)
+}
+
+func newAppWithServices(
+	projectDao dao.ProjectDao,
+	assetStore assetdomain.Store,
+	imageService imageclient.ImageGenerationService,
+	uploadStore upload.Store,
+) *App {
+	var references upload.ReferenceStore
+	if candidate, ok := uploadStore.(upload.ReferenceStore); ok {
+		references = candidate
+	}
+
+	projectRepository := repository.NewProjectRepository(projectDao)
+	workspaceModule := workspace.New(projectRepository, assetStore, imageService, references)
+	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
+
+	var assetRouter router.AssetRouter
+	if workspaceModule.Assets != nil {
+		assetRouter = handler.NewHandler(workspaceModule.Assets, references)
+	}
+
+	generationHandler := handler.NewGenerationHandler(generator.NewEngine(nil, nil))
+	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
+
+	return &App{
+		engine: router.Register(assetRouter, projectHandler, generationHandler, uploadHandler),
+	}
+}
+
 // InitServerFromConfig assembles dependencies in infrastructure-to-transport order.
 func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) {
 	if ctx == nil {
 		return nil, errors.New("app: initialization context is required")
 	}
 
-	// infrastructure
+	// Infrastructure.
 	appLogger, err := InitLogger(&cfg.Log)
 	if err != nil {
 		return nil, err
@@ -62,17 +109,19 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		return nil, err
 	}
 
-	// repository / DAO
+	// Repositories and external services.
 	projectStore := InitProjectStore(db)
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
-
-	// external clients / queue / outbox
-	imageService := InitImageService(cfg.QNA)
+	imageService := InitImageService(cfg.Image)
 	uploadStore, err := InitUploadStore(cfg.QiNiu)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
 		return nil, err
+	}
+	var references upload.ReferenceStore
+	if candidate, ok := uploadStore.(upload.ReferenceStore); ok {
+		references = candidate
 	}
 	taskManager, err := InitTask(ctx, cfg.Queue, taskStore)
 	if err != nil {
@@ -80,20 +129,27 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		return nil, err
 	}
 
-	// business modules
-	workspaceModule := InitWorkspace(projectStore, assetStore, imageService)
+	// Business modules.
+	workspaceModule := workspace.New(projectStore, assetStore, imageService, references)
 	imageProcessor := InitImageProcessor()
-	generatorExecutor := InitGeneratorExecutor(imageService, imageProcessor, workspaceModule.Assets)
-	generatorEngine := InitGeneratorEngine(taskManager, generatorExecutor)
-	uploadManager := InitUploadManager(uploadStore)
+	generatorExecutor := generator.NewExecutor(
+		imageService,
+		imageProcessor,
+		workspaceModule.Assets,
+		references,
+	)
+	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{
+		Projects:   workspaceModule.Projects,
+		References: references,
+	})
 
-	// handlers
-	handlers := InitHandlers(workspaceModule, generatorEngine, uploadManager)
+	// Transport.
+	assetHandler := handler.NewHandler(workspaceModule.Assets, references)
+	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
+	generationHandler := handler.NewGenerationHandler(generatorEngine)
+	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
+	httpEngine := router.Register(assetHandler, projectHandler, generationHandler, uploadHandler)
 
-	// router
-	httpEngine := InitRouter(handlers)
-
-	// application
 	app := NewApp(httpEngine, taskManager, db, appLogger)
 	appLogger.Info("application initialized")
 	return app, nil

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultConfigPath  = "./internal/config/config.yaml"
+	defaultConfigPath  = "./config.yaml"
 	configPathEnv      = "HOLONIC_ASSET_CONFIG"
 	defaultHTTPAddress = ":8080"
 )

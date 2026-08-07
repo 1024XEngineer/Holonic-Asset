@@ -263,6 +263,91 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 	}
 }
 
+func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
+	prototypeURL := "uploads/prototype.png"
+	frameURL := "uploads/frame.png"
+	tileURL := "uploads/tile.png"
+	content, err := domain.EncodeContent(domain.AssetContent{
+		Prototype:  &domain.Prototype{{ID: 1, URL: &prototypeURL}},
+		Animations: []domain.Animation{{Frames: []domain.Frame{{ID: 2, URL: &frameURL}}}},
+		Items:      []domain.TileSetItem{{Tiles: []domain.Tile{{URL: &tileURL}}}},
+	})
+	if err != nil {
+		t.Fatalf("encode asset content: %v", err)
+	}
+	managerStub := &assetManagerStub{asset: domain.Asset{ID: 7, Type: domain.AssetTypeCharacter, Content: content}}
+	resolver := &referenceResolverStub{}
+	h := handler.NewHandler(managerStub, resolver)
+
+	response, err := h.Detail(context.Background(), dto.AssetDetailRequest{AssetID: 7})
+	if err != nil {
+		t.Fatalf("get asset detail: %v", err)
+	}
+	var decoded domain.AssetContent
+	if err := json.Unmarshal(response.Data.Content, &decoded); err != nil {
+		t.Fatalf("decode resolved content: %v", err)
+	}
+	if *(*decoded.Prototype)[0].URL != "signed:uploads/prototype.png" ||
+		*decoded.Animations[0].Frames[0].URL != "signed:uploads/frame.png" ||
+		*decoded.Items[0].Tiles[0].URL != "signed:uploads/tile.png" {
+		t.Fatalf("unexpected resolved content: %+v", decoded)
+	}
+	var persisted domain.AssetContent
+	if err := json.Unmarshal(managerStub.asset.Content, &persisted); err != nil {
+		t.Fatalf("decode original content: %v", err)
+	}
+	if *(*persisted.Prototype)[0].URL != prototypeURL || *persisted.Animations[0].Frames[0].URL != frameURL || *persisted.Items[0].Tiles[0].URL != tileURL {
+		t.Fatalf("handler mutated persisted content: %+v", persisted)
+	}
+}
+
+func TestAssetHandlerPreservesUnmodeledContentFields(t *testing.T) {
+	raw := json.RawMessage(`{
+		"directionCount":9007199254740993,
+		"prototype":[{"id":1,"url":"uploads/prototype.png","custom":{"keep":true},"futureValue":12345678901234567890}],
+		"animations":null,
+		"items":[{"name":"floor","tiles":null,"customItem":"kept"}],
+		"customTopLevel":{"nested":"kept"}
+	}`)
+	managerStub := &assetManagerStub{asset: domain.Asset{ID: 7, Content: raw}}
+	h := handler.NewHandler(managerStub, &referenceResolverStub{})
+
+	response, err := h.Detail(context.Background(), dto.AssetDetailRequest{AssetID: 7})
+	if err != nil {
+		t.Fatalf("get asset detail: %v", err)
+	}
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(response.Data.Content, &decoded); err != nil {
+		t.Fatalf("decode response content: %v", err)
+	}
+	if string(decoded["directionCount"]) != "9007199254740993" ||
+		string(decoded["customTopLevel"]) != `{"nested":"kept"}` {
+		t.Fatalf("unmodeled top-level fields changed: %s", response.Data.Content)
+	}
+	var prototype []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["prototype"], &prototype); err != nil {
+		t.Fatalf("decode prototype: %v", err)
+	}
+	if string(prototype[0]["custom"]) != `{"keep":true}` ||
+		string(prototype[0]["futureValue"]) != "12345678901234567890" ||
+		string(prototype[0]["url"]) != `"signed:uploads/prototype.png"` {
+		t.Fatalf("prototype fields changed: %s", decoded["prototype"])
+	}
+	if string(decoded["animations"]) != "null" || string(decoded["items"]) == "null" {
+		t.Fatalf("null or item fields were lost: %s", response.Data.Content)
+	}
+	var items []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["items"], &items); err != nil {
+		t.Fatalf("decode items: %v", err)
+	}
+	if string(items[0]["tiles"]) != "null" || string(items[0]["customItem"]) != `"kept"` {
+		t.Fatalf("item fields changed: %s", decoded["items"])
+	}
+	if string(managerStub.asset.Content) != string(raw) {
+		t.Fatalf("handler mutated persisted content: %s", managerStub.asset.Content)
+	}
+}
+
 func TestAssetHandlerRejectsZeroIDs(t *testing.T) {
 	h := handler.NewHandler(&assetManagerStub{})
 	if _, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{}); !errors.Is(err, echo.ErrBadRequest) {

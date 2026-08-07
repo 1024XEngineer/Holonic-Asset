@@ -23,13 +23,12 @@ func (h *GenerationHandler) Create(
 	request dto.CreateGenerationRequest,
 ) (dto.SuccessResponse[dto.CreateGenerationResponse], error) {
 	runID, err := h.runs.Create(ctx, &generator.Request{
-		ProjectID:         request.ProjectID,
-		AssetID:           request.AssetID,
-		Kind:              request.Kind,
-		Prompt:            request.Prompt,
-		ReferenceMediaIDs: request.ReferenceMediaIDs,
-		TargetAssetPaths:  request.TargetAssetPaths,
-		Parameters:        request.Parameters,
+		ProjectID:        request.ProjectID,
+		AssetID:          request.AssetID,
+		Kind:             request.Kind,
+		Prompt:           request.Prompt,
+		TargetAssetPaths: request.TargetAssetPaths,
+		Parameters:       request.Parameters,
 	})
 	if err != nil {
 		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, err
@@ -48,7 +47,8 @@ func (h *GenerationHandler) List(
 		Limit:     request.Limit,
 		Cursor:    request.Cursor,
 	})
-	if errors.Is(err, generator.ErrInvalidRunListStatus) {
+	if errors.Is(err, generator.ErrInvalidRunListStatus) ||
+		errors.Is(err, generator.ErrInvalidRunListCursor) {
 		return dto.SuccessResponse[dto.ListGenerationRunsResponse]{}, echo.ErrBadRequest
 	}
 	if err != nil {

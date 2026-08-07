@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Box,
@@ -35,4 +36,15 @@ const assetKindConfigs: Record<AssetKind, AssetKindConfig> = {
 
 export function getAssetKindConfig(kind: AssetKind) {
   return assetKindConfigs[kind];
+}
+
+export function AssetKindIcon({
+  kind,
+  ...props
+}: { kind: AssetKind } & ComponentProps<
+  ReturnType<typeof getAssetKindConfig>["icon"]
+>) {
+  const Icon = getAssetKindConfig(kind).icon;
+
+  return <Icon {...props} />;
 }

@@ -17,15 +17,24 @@ log:
   maxAge: 14
   compress: true
 
-qna:
+image:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
+
+video:
+  baseURL: "https://api.qnaigc.com"
+  apiKey: ""
 
 qiniu:
   accessKey: ""
   secretKey: ""
   bucket: ""
+  # Kodo domain or virtual-host S3 endpoint. The https:// prefix is optional.
   domain: ""
+  # Leave empty to use https://upload.qiniup.com.
   uploadURL: ""
+  # Leave zero/empty to use 1h.
   uploadTokenExpiry: 1h
+  # Leave zero/empty to use 30m.
+  downloadURLExpiry: 30m

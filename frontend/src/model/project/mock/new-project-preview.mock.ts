@@ -1,3 +1,5 @@
+import type { Perspective } from "../types";
+
 export function createMockProjectPreview({
   description,
   gameType,
@@ -7,7 +9,7 @@ export function createMockProjectPreview({
   description: string;
   gameType: string;
   name: string;
-  perspective: string;
+  perspective: Perspective;
 }) {
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
@@ -15,7 +17,7 @@ export function createMockProjectPreview({
   const context = canvas.getContext("2d");
   if (!context) return "";
 
-  const isTopDown = /top-down/i.test(perspective);
+  const isTopDown = perspective === "Top-Down";
   const palette = isTopDown
     ? { sky: "#15253e", ground: "#2e704b", detail: "#f0bb52", ui: "#111827" }
     : { sky: "#30516c", ground: "#537d58", detail: "#e6b968", ui: "#1f2937" };

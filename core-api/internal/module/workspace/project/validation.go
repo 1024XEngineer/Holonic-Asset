@@ -3,6 +3,7 @@ package project
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -57,7 +58,13 @@ func (p *Project) ValidateReferenceGeneration() error {
 	if p == nil {
 		return invalidProject("project is required")
 	}
-	return p.validateDefinition()
+	if err := p.validateDefinition(); err != nil {
+		return err
+	}
+	if !validGenerationReference(p.Reference) {
+		return invalidProject("reference must be an HTTP(S) URL")
+	}
+	return nil
 }
 
 func (p *Project) validateDefinition() error {
@@ -74,6 +81,19 @@ func (p *Project) validateDefinition() error {
 		return invalidProject("targetPlatform is invalid")
 	}
 	return nil
+}
+
+func validGenerationReference(reference string) bool {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return true
+	}
+
+	parsed, err := url.ParseRequestURI(reference)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")
 }
 
 func (u *ProjectUpdate) Validate() error {

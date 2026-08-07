@@ -1,17 +1,22 @@
 export {
   assetApi,
+  assetCanvasSizeOptions,
   assetKeys,
+  createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
+  useUpdateAssetMutation,
 } from "./library";
-export type { AssetGroup, AssetGroupsByProject } from "./library";
-export {
-  assetRecordModeForKind,
-  useRecordQuery,
-  useSaveAssetRevisionMutation,
-} from "./record";
+export type {
+  AssetCanvasSize,
+  AssetGroup,
+  AssetGroupsByProject,
+  AssetLibraryCollection,
+  AssetLibraryItem,
+} from "./library";
+export { useRecordQuery, useSaveAssetRevisionMutation } from "./record";
 export type {
   AssetCanvasPosition,
   AssetRecord,
@@ -55,6 +60,10 @@ export {
   assetKinds,
   creatableAssetKinds,
   type AssetAnimation,
+  type AssetMetadataUpdate,
+  type AssetPreviewCrop,
+  type AssetPreviewFrame,
+  type AssetPreviewOffset,
   type AssetKind,
   type AssetRevision,
   type AssetRevisionStatus,

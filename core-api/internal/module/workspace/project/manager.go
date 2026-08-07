@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	referenceSize    = "auto"
-	referenceQuality = "high"
+	referenceSize               = "auto"
+	referenceQuality            = "high"
+	referenceRegenerationPrompt = `REFERENCE REGENERATION
+The supplied reference image is the user's current result and they are dissatisfied with it. Generate a clearly new alternative instead of reproducing the same composition. Keep only useful high-level cues such as visual language, palette relationships, sprite scale, and material treatment. Change the composition, layout, staging, silhouettes, and scene details while following the current project brief.`
 )
 
 var (
@@ -32,17 +34,40 @@ type Manager interface {
 type manager struct {
 	store       Store
 	imageClient imageclient.ImageGenerationService
+	references  ReferenceStore
+}
+
+// ReferenceStore is the storage boundary used for persisted image references.
+// Implementations may sign private object URLs and persist generated data URLs.
+type ReferenceStore interface {
+	ResolveReference(context.Context, string) (string, error)
+	PersistReference(context.Context, string) (string, error)
 }
 
 // NewManager constructs project use cases. The image service is optional so
 // CRUD-only callers do not need to initialize the generation provider.
-func NewManager(store Store, imageService imageclient.ImageGenerationService) Manager {
-	return &manager{store: store, imageClient: imageService}
+func NewManager(
+	store Store,
+	imageService imageclient.ImageGenerationService,
+	references ...ReferenceStore,
+) Manager {
+	var referenceStore ReferenceStore
+	if len(references) > 0 {
+		referenceStore = references[0]
+	}
+	return &manager{store: store, imageClient: imageService, references: referenceStore}
 }
 
 func (m *manager) Create(ctx context.Context, project *Project) error {
 	if err := project.ValidateCreate(); err != nil {
 		return err
+	}
+	if m.references != nil && project.Reference != "" {
+		reference, err := m.references.PersistReference(ctx, project.Reference)
+		if err != nil {
+			return fmt.Errorf("project: persist reference: %w", err)
+		}
+		project.Reference = reference
 	}
 	return m.store.Insert(ctx, project)
 }
@@ -65,6 +90,13 @@ func (m *manager) Update(ctx context.Context, update *ProjectUpdate) error {
 	if err := update.Validate(); err != nil {
 		return err
 	}
+	if m.references != nil && update.Reference != nil && *update.Reference != "" {
+		reference, err := m.references.PersistReference(ctx, *update.Reference)
+		if err != nil {
+			return fmt.Errorf("project: persist reference: %w", err)
+		}
+		update.Reference = &reference
+	}
 	return m.store.Update(ctx, update)
 }
 
@@ -83,14 +115,29 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		return "", ErrImageServiceRequired
 	}
 
+	reference := strings.TrimSpace(project.Reference)
+	prompt := buildReferencePrompt(project)
+	if reference != "" {
+		prompt += "\n\n" + referenceRegenerationPrompt
+	}
+
 	request := &imageclient.GenerateRequest{
-		Prompt: buildReferencePrompt(project),
+		Prompt: prompt,
 		Size:   referenceSize,
 		Params: imageclient.Params{
 			"quality": referenceQuality,
 		},
 	}
-	if reference := referenceForGeneration(project.Reference); reference != "" {
+	if reference != "" {
+		// Refresh private URLs before sending them to the image provider so an
+		// expiring frontend URL does not become stale during generation.
+		if m.references != nil {
+			resolved, err := m.references.ResolveReference(ctx, reference)
+			if err != nil {
+				return "", fmt.Errorf("project: resolve reference: %w", err)
+			}
+			reference = resolved
+		}
 		request.ReferenceImages = []string{reference}
 	}
 
@@ -102,7 +149,19 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		return "", ErrReferenceRequired
 	}
 
-	return referenceDataURL(generated.Images[0]), nil
+	result := referenceDataURL(generated.Images[0])
+	if m.references == nil {
+		return result, nil
+	}
+	objectKey, err := m.references.PersistReference(ctx, result)
+	if err != nil {
+		return "", fmt.Errorf("project: persist generated reference: %w", err)
+	}
+	resolved, err := m.references.ResolveReference(ctx, objectKey)
+	if err != nil {
+		return "", fmt.Errorf("project: resolve generated reference: %w", err)
+	}
+	return resolved, nil
 }
 
 func referenceDataURL(image imageclient.GeneratedImage) string {
@@ -175,18 +234,6 @@ func gameplayPlanPrompt(project *Project) string {
 
 func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
-}
-
-// referenceForGeneration only forwards references in formats accepted by the
-// image provider. Bare base64 values do not contain enough format information.
-func referenceForGeneration(reference string) string {
-	reference = strings.TrimSpace(reference)
-	if strings.HasPrefix(reference, "data:image/") ||
-		strings.HasPrefix(reference, "https://") ||
-		strings.HasPrefix(reference, "http://") {
-		return reference
-	}
-	return ""
 }
 
 func gameTypePrompt(gameType GameType) string {

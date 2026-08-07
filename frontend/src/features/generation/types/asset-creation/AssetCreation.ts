@@ -1,6 +1,7 @@
 import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import { getDefaultAssetCanvasSize } from "@/model";
+import { perspectiveOptions } from "@/model/project";
 
 import type { AssetCreationDraft } from "./AssetCreation.interface";
 
@@ -31,7 +32,7 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
-        tiles: [{ description: "", reference: undefined }],
+        tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
       };
     case "ui":
       return {
@@ -45,7 +46,7 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
-        perspective: "top-down",
+        perspective: perspectiveOptions[0],
         directionCount: "4",
         reference: undefined,
       };
