@@ -135,7 +135,7 @@ Character contains `prototype` and `animations`. Direction resources are represe
 
 `directionCount` retains the expected number of directional resources. The arrays do not currently expose names such as `up`, `down`, `left`, or `right`.
 
-For example, a two-direction asset is represented by two prototype elements:
+For example, a side-on character uses two side-facing prototypes:
 
 ```json
 {
@@ -157,7 +157,7 @@ For example, a two-direction asset is represented by two prototype elements:
 Character conventions:
 
 - `perspective` is exactly one of `Top-Down`, `Side-On`, or `Isometric`.
-- `directionCount` is the number of directions to generate for the current asset. Only `1`, `2`, `4`, or `8` are used.
+- `directionCount` is derived from character perspective: `Side-On` uses `2`, `Top-Down` uses `4`, and `Isometric` uses `8`.
 - `prototype` is a plain array of image resources.
 - `animations[].frames` is a plain array of animation frames.
 - Direction names and direction-to-array-index mappings are intentionally not defined at this stage.
@@ -171,7 +171,6 @@ Object uses the same content structure as Character. It may have only a prototyp
 ```json
 {
   "perspective": "Side-On",
-  "directionCount": 2,
   "prototype": [],
   "animations": [
     {

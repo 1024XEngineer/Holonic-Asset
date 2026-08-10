@@ -65,7 +65,13 @@ export function EditorWorkspace({
     );
   }
 
-  return <EditorWorkspaceContent data={recordQuery.data} onBack={onBack} />;
+  return (
+    <EditorWorkspaceContent
+      key={`${projectId}:${assetId}`}
+      data={recordQuery.data}
+      onBack={onBack}
+    />
+  );
 }
 
 function EditorWorkspaceContent({
