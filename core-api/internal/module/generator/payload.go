@@ -3,13 +3,12 @@ package generator
 // CreateCharacterPrototypePayload is the complete input consumed by the
 // character prototype task handler.
 type CreateCharacterPrototypePayload struct {
-	AssetName      string `json:"asset_name"`
-	CreativeBrief  string `json:"creative_brief"`
-	CanvasSize     string `json:"canvas_size"`
-	Perspective    string `json:"perspective"`
-	DirectionCount string `json:"direction_count"`
-	Reference      string `json:"reference"`
-	ProjectID      uint   `json:"project_id"`
+	AssetName     string `json:"asset_name"`
+	CreativeBrief string `json:"creative_brief"`
+	CanvasSize    string `json:"canvas_size"`
+	Perspective   string `json:"perspective"`
+	Reference     string `json:"reference"`
+	ProjectID     uint   `json:"project_id"`
 }
 
 // CreateAnimationPayload is the common input consumed by character and object

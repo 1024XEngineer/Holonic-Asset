@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -107,10 +106,6 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
-	directionCount, err := parseDirectionCount(payload.DirectionCount)
-	if err != nil {
-		return nil, err
-	}
 	generated, err := e.generateImages(
 		ctx,
 		GenerateCharacterProtoType,
@@ -131,7 +126,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		directionCount,
+		perspective.CharacterDirectionCount(),
 		resources,
 	)
 	if err != nil {
@@ -330,22 +325,6 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 		return "", fmt.Errorf("generator: invalid perspective %q", perspective)
 	}
 	return value, nil
-}
-
-func parseDirectionCount(directionCount string) (uint, error) {
-	if directionCount == "" {
-		return 0, nil
-	}
-	value, err := strconv.ParseUint(directionCount, 10, 0)
-	if err != nil {
-		return 0, fmt.Errorf("generator: parse direction count %q: %w", directionCount, err)
-	}
-	switch value {
-	case 1, 2, 4, 8:
-		return uint(value), nil
-	default:
-		return 0, fmt.Errorf("generator: invalid direction count %q", directionCount)
-	}
 }
 
 func (e *executor) prototypeResources(

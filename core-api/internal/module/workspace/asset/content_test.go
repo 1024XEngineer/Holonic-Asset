@@ -117,6 +117,24 @@ func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testin
 	}
 }
 
+func TestCharacterDirectionCountFollowsPerspective(t *testing.T) {
+	tests := []struct {
+		perspective domain.Perspective
+		want        uint
+	}{
+		{perspective: domain.PerspectiveSideOn, want: 2},
+		{perspective: domain.PerspectiveTopDown, want: 4},
+		{perspective: domain.PerspectiveIsometric, want: 8},
+		{perspective: domain.Perspective("unsupported"), want: 0},
+	}
+
+	for _, test := range tests {
+		if got := test.perspective.CharacterDirectionCount(); got != test.want {
+			t.Fatalf("direction count for %q = %d, want %d", test.perspective, got, test.want)
+		}
+	}
+}
+
 func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeTileSet)
 	content.TileSize = &domain.TileSize{Width: 32, Height: 32}
