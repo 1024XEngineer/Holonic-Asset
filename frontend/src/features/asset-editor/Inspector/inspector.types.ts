@@ -32,7 +32,6 @@ export type InspectorProps = {
   onSubmit: (request: InspectorSubmitRequest) => void | Promise<void>;
   onClearSelection: () => void;
   isSubmitting?: boolean;
-  submitError?: string | null;
 };
 
 export type InspectorEditProps = Omit<InspectorProps, "history">;
