@@ -22,22 +22,20 @@ func CORS() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			request := c.Request()
+			headers := c.Response().Header()
+			headers.Add(echo.HeaderVary, echo.HeaderOrigin)
 			if request.Header.Get(echo.HeaderOrigin) == "" {
 				return next(c)
 			}
 
-			headers := c.Response().Header()
 			headers.Set(echo.HeaderAccessControlAllowOrigin, "*")
-			headers.Set(echo.HeaderAccessControlExposeHeaders, "*")
 
 			if request.Method != http.MethodOptions {
 				return next(c)
 			}
 
 			headers.Set(echo.HeaderAccessControlAllowMethods, allowedMethods)
-			if requestedHeaders := request.Header.Get(echo.HeaderAccessControlRequestHeaders); requestedHeaders != "" {
-				headers.Set(echo.HeaderAccessControlAllowHeaders, requestedHeaders)
-			}
+			headers.Set(echo.HeaderAccessControlAllowHeaders, echo.HeaderContentType)
 			return c.NoContent(http.StatusNoContent)
 		}
 	}

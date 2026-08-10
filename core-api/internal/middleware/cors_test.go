@@ -30,6 +30,29 @@ func TestCORSAllowsRequestsFromAnyOrigin(t *testing.T) {
 	if origin := response.Header().Get(echo.HeaderAccessControlAllowOrigin); origin != "*" {
 		t.Fatalf("expected wildcard allowed origin, got %q", origin)
 	}
+	if vary := response.Header().Values(echo.HeaderVary); !contains(vary, echo.HeaderOrigin) {
+		t.Fatalf("expected response to vary by Origin, got %q", vary)
+	}
+	if exposed := response.Header().Get(echo.HeaderAccessControlExposeHeaders); exposed != "" {
+		t.Fatalf("expected no exposed headers, got %q", exposed)
+	}
+}
+
+func TestCORSMarksResponsesWithoutOriginAsVariant(t *testing.T) {
+	e := echo.New()
+	e.Use(appmiddleware.CORS())
+	e.GET("/resource", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/resource", nil)
+	response := httptest.NewRecorder()
+
+	e.ServeHTTP(response, request)
+
+	if vary := response.Header().Values(echo.HeaderVary); !contains(vary, echo.HeaderOrigin) {
+		t.Fatalf("expected response to vary by Origin, got %q", vary)
+	}
 }
 
 func TestCORSAllowsPreflightRequests(t *testing.T) {
@@ -42,7 +65,7 @@ func TestCORSAllowsPreflightRequests(t *testing.T) {
 	request := httptest.NewRequest(http.MethodOptions, "/resource", nil)
 	request.Header.Set(echo.HeaderOrigin, "https://example.com")
 	request.Header.Set(echo.HeaderAccessControlRequestMethod, http.MethodPost)
-	request.Header.Set(echo.HeaderAccessControlRequestHeaders, "Authorization,X-Custom-Header")
+	request.Header.Set(echo.HeaderAccessControlRequestHeaders, "Content-Type,X-Custom-Header")
 	response := httptest.NewRecorder()
 
 	e.ServeHTTP(response, request)
@@ -56,7 +79,16 @@ func TestCORSAllowsPreflightRequests(t *testing.T) {
 	if methods := response.Header().Get(echo.HeaderAccessControlAllowMethods); !strings.Contains(methods, http.MethodPost) {
 		t.Fatalf("expected POST in allowed methods, got %q", methods)
 	}
-	if headers := response.Header().Get(echo.HeaderAccessControlAllowHeaders); headers != "Authorization,X-Custom-Header" {
-		t.Fatalf("expected requested headers to be allowed, got %q", headers)
+	if headers := response.Header().Get(echo.HeaderAccessControlAllowHeaders); headers != echo.HeaderContentType {
+		t.Fatalf("expected only Content-Type to be allowed, got %q", headers)
 	}
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
