@@ -184,6 +184,10 @@
             "minimum": 1,
             "type": "integer"
           },
+          "creative_brief": {
+            "minLength": 1,
+            "type": "string"
+          },
           "kind": {
             "enum": [
               "generate_character_prototype",
@@ -201,9 +205,6 @@
             "type": "string"
           },
           "parameters": {},
-          "prompt": {
-            "type": "string"
-          },
           "targetAssetPaths": {
             "items": {
               "type": "string"
@@ -216,7 +217,7 @@
         },
         "required": [
           "kind",
-          "prompt"
+          "creative_brief"
         ],
         "type": "object"
       },

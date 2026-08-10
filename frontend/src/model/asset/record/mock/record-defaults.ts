@@ -119,11 +119,29 @@ const spriteAnimationsByAssetId: Record<string, CharacterAnimation[]> = {
       128,
     ),
   ],
+  "alchemy-table": [
+    createPngAnimation(
+      "idle",
+      "Idle",
+      "/assets/object/Alchemy_Table_02-Sheet.png",
+      8,
+      48,
+      64,
+    ),
+  ],
 };
 
 const spritePrototypesByAssetId: Record<string, CharacterSpriteSheet> = {
   swordsman: swordsmanPrototype,
   knight: knightPrototype,
+  "alchemy-table": {
+    format: "png-sprite-sheet",
+    imageUrl: "/assets/object/Alchemy_Table_02-Sheet.png",
+    frameWidth: 48,
+    frameHeight: 64,
+    columns: 1,
+    rows: 1,
+  },
 };
 
 function getSpriteDefaultSourceId(assetId: string) {
@@ -131,7 +149,7 @@ function getSpriteDefaultSourceId(assetId: string) {
 }
 
 function createFallbackSpritePrototype(
-  asset: Pick<ProjectAsset, "canvasSize">,
+  asset: Pick<ProjectAsset, "canvasSize" | "thumbnailUrl">,
 ): CharacterSpriteSheet {
   const dimensions = asset.canvasSize.match(/(\d+)\D+(\d+)/);
   const frameWidth = Number(dimensions?.[1]) || 64;
@@ -139,7 +157,7 @@ function createFallbackSpritePrototype(
 
   return {
     format: "png-sprite-sheet",
-    imageUrl: "",
+    imageUrl: asset.thumbnailUrl ?? "",
     frameWidth,
     frameHeight,
     columns: 1,
