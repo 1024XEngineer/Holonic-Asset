@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/riverqueue/river/rivertype"
 )
 
 func TestManagerExecutionPersistsSuccessfulHandlerResult(t *testing.T) {
@@ -70,5 +72,27 @@ func TestManagerExecutionDoesNotInvokeHandlerWhenProcessingTransitionFails(t *te
 	}
 	if store.resultCalls != 0 {
 		t.Fatalf("result must not be persisted, got %d calls", store.resultCalls)
+	}
+}
+
+func TestQueueErrorHandlerMarksTaskFailedAfterFinalAttempt(t *testing.T) {
+	store := &taskStoreStub{}
+	handler := &queueErrorHandler{repo: store}
+	job := &rivertype.JobRow{
+		Kind:        queueTaskKind,
+		Attempt:     1,
+		MaxAttempts: 3,
+		EncodedArgs: []byte(`{"task":{"id":7}}`),
+	}
+
+	handler.markFailed(context.Background(), job)
+	if len(store.statusUpdates) != 0 {
+		t.Fatalf("task must remain processing while River retries: %v", store.statusUpdates)
+	}
+
+	job.Attempt = job.MaxAttempts
+	handler.markFailed(context.Background(), job)
+	if len(store.statusUpdates) != 1 || store.statusUpdates[0] != StatusFailed {
+		t.Fatalf("unexpected final failure status updates: %v", store.statusUpdates)
 	}
 }
