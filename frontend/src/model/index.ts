@@ -70,6 +70,7 @@ export { coreAssetApi } from "./asset/library/asset.api";
 export type {
   AssetAnimationFrameResponse,
   AssetAnimationResponse,
+  AssetContentBase,
   AssetContent,
   AssetContentByType,
   AssetContentMetadata,

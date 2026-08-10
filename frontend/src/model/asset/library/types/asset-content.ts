@@ -1,5 +1,9 @@
 export type AssetContentMetadata = Record<string, unknown>;
 
+export type AssetContentBase = {
+  metadata?: AssetContentMetadata;
+};
+
 export type AssetSizeResponse = {
   width: number;
   height: number;
@@ -26,13 +30,13 @@ export type AssetAnimationResponse = {
   frames: AssetAnimationFrameResponse[];
 };
 
-export type CharacterAssetContent = {
+export type CharacterAssetContent = AssetContentBase & {
   directionCount: 2 | 4 | 8;
   prototype: AssetImageResourceResponse[];
   animations?: AssetAnimationResponse[];
 };
 
-export type ObjectAssetContent = {
+export type ObjectAssetContent = AssetContentBase & {
   prototype: AssetImageResourceResponse[];
   animations?: AssetAnimationResponse[];
 };
@@ -47,7 +51,7 @@ export type TileSetItemResponse = {
   tiles?: TileSetTileResponse[];
 };
 
-export type TileSetAssetContent = {
+export type TileSetAssetContent = AssetContentBase & {
   items?: TileSetItemResponse[];
 };
 
@@ -65,7 +69,7 @@ export type UISetComponentResponse = {
   metadata?: AssetContentMetadata;
 };
 
-export type UISetAssetContent = {
+export type UISetAssetContent = AssetContentBase & {
   components?: UISetComponentResponse[];
 };
 
@@ -81,13 +85,11 @@ export type SceneryLayerResponse = {
   metadata?: AssetContentMetadata;
 };
 
-export type SceneryAssetContent = {
+export type SceneryAssetContent = AssetContentBase & {
   layers?: SceneryLayerResponse[];
 };
 
-export type AudioAssetContent = {
-  metadata?: AssetContentMetadata;
-};
+export type AudioAssetContent = AssetContentBase;
 
 export type AssetContentByType = {
   character: CharacterAssetContent;

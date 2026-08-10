@@ -10,6 +10,7 @@ export type {
 export type {
   AssetAnimationFrameResponse,
   AssetAnimationResponse,
+  AssetContentBase,
   AssetContentByType,
   AssetContentMetadata,
   AssetImageResourceResponse,
