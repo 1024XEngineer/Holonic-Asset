@@ -7,10 +7,13 @@ import (
 )
 
 type taskStoreStub struct {
-	createdTask *Task
-	status      Status
-	result      json.RawMessage
-	listFilter  *ListFilter
+	createdTask   *Task
+	status        Status
+	statusUpdates []Status
+	statusErr     error
+	result        json.RawMessage
+	resultCalls   int
+	listFilter    *ListFilter
 }
 
 func (s *taskStoreStub) CreateWithOutbox(_ context.Context, task *Task) (uint, error) {
@@ -29,11 +32,13 @@ func (s *taskStoreStub) ListTasks(_ context.Context, filter *ListFilter) ([]*Tas
 
 func (s *taskStoreStub) UpdateTaskStatus(_ context.Context, _ uint, status Status) error {
 	s.status = status
-	return nil
+	s.statusUpdates = append(s.statusUpdates, status)
+	return s.statusErr
 }
 
 func (s *taskStoreStub) UpdateTaskResult(_ context.Context, _ uint, result json.RawMessage) error {
 	s.result = result
+	s.resultCalls++
 	return nil
 }
 

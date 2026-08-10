@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	riverqueue "github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 )
@@ -34,10 +36,10 @@ type queue struct {
 	client   *riverqueue.Client[pgx.Tx]
 	dbPool   *pgxpool.Pool
 	registry *registry
-	repo     TaskResultStore
+	repo     TaskExecutionStore
 }
 
-func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore) (*queue, error) {
+func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskExecutionStore) (*queue, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("task: database URL is required")
 	}
@@ -63,7 +65,8 @@ func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore)
 				MaxWorkers: cfg.MaxWorkers,
 			},
 		},
-		Workers: workers,
+		Workers:      workers,
+		ErrorHandler: &queueErrorHandler{repo: repo},
 	}
 	if cfg.JobTimeout > 0 {
 		riverConfig.JobTimeout = cfg.JobTimeout
@@ -117,6 +120,11 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 		return fmt.Errorf("task: cannot dispatch nil task")
 	}
 
+	if err := q.repo.UpdateTaskStatus(ctx, message.ID, StatusProcessing); err != nil {
+		return fmt.Errorf("task: mark task %d as processing: %w", message.ID, err)
+	}
+	message.Status = StatusProcessing
+
 	data, err := q.registry.dispatch(ctx, message)
 	if err != nil {
 		return err
@@ -133,4 +141,39 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	message.Result = result
 	message.Status = StatusCompleted
 	return nil
+}
+
+// queueErrorHandler records a task failure when River has exhausted all retry
+// attempts. Transient failures remain processing while River retries the job.
+type queueErrorHandler struct {
+	repo TaskExecutionStore
+}
+
+func (h *queueErrorHandler) HandleError(ctx context.Context, job *rivertype.JobRow, _ error) *riverqueue.ErrorHandlerResult {
+	h.markFailed(ctx, job)
+	return nil
+}
+
+func (h *queueErrorHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, _ any, _ string) *riverqueue.ErrorHandlerResult {
+	h.markFailed(ctx, job)
+	return nil
+}
+
+func (h *queueErrorHandler) markFailed(ctx context.Context, job *rivertype.JobRow) {
+	if job.Kind != queueTaskKind || job.Attempt < job.MaxAttempts {
+		return
+	}
+
+	var args queueTaskArgs
+	if err := json.Unmarshal(job.EncodedArgs, &args); err != nil {
+		log.Printf("task: decode failed queue job %d: %v", job.ID, err)
+		return
+	}
+	if args.Task.ID == 0 {
+		log.Printf("task: failed queue job %d has no task ID", job.ID)
+		return
+	}
+	if err := h.repo.UpdateTaskStatus(ctx, args.Task.ID, StatusFailed); err != nil {
+		log.Printf("task: mark task %d as failed: %v", args.Task.ID, err)
+	}
 }
