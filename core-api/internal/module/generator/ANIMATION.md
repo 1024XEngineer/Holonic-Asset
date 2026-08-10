@@ -223,11 +223,14 @@ HTTP Request(assetId, direction, prompt, parameters)
 → Sample frame_count keyframes
 → processor.SplitImage(animation) removes the background, aligns the foot anchor, and preserves the full source-cell scale
 → Output transparent frames and spritesheet
-→ AssetWriter.CreateAnimation(asset_id, animation_name)
-→ AssetWriter.UpdateAnimationFrames(asset_id, animation_id, frames)
+→ Persist every frame and keep only its private-storage object key
+→ AssetWriter.CreateAnimation(asset_id, animation_name, frames)
 ```
 
-The animation record is only created after video generation, download, frame extraction, and image processing all succeed, avoiding orphaned animation records when the provider fails.
+The animation is appended to `content.animations` once, after video generation,
+download, frame extraction, image processing, and frame persistence all succeed.
+The stored frame shape stays limited to `id`, object-key `url`, and `duration`;
+temporary signed URLs, image data, and generator diagnostics are not persisted.
 
 ## 7. Module Boundaries
 

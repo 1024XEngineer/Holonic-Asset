@@ -3,7 +3,6 @@ package generator
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -144,7 +143,6 @@ func (s *animationGenerationService) Generate(
 	if err != nil {
 		return nil, err
 	}
-
 	promptOptions := prompts.AnimationOptions{
 		Description: options.Description,
 		Style:       options.Style,
@@ -505,35 +503,6 @@ func packAnimationVideoFrames(frames []image.Image, columns int) (*image.NRGBA, 
 
 func animationRows(frameCount, columns int) int {
 	return (frameCount + columns - 1) / columns
-}
-
-func animationFrameMetadata(
-	frame imageprocessor.ImageRegion,
-	result *AnimationGenerationResult,
-) (json.RawMessage, error) {
-	metadata, err := json.Marshal(struct {
-		Index          int                                          `json:"index"`
-		SourceAnchor   *imageprocessor.AnimationPoint               `json:"source_anchor,omitempty"`
-		OutputAnchor   *imageprocessor.AnimationPoint               `json:"output_anchor,omitempty"`
-		Translation    *imageprocessor.AnimationOffset              `json:"translation,omitempty"`
-		Loop           AnimationLoopSelection                       `json:"loop"`
-		Normalization  *imageprocessor.AnimationNormalizationReport `json:"normalization,omitempty"`
-		VideoRequestID string                                       `json:"video_request_id,omitempty"`
-		VideoAttempts  int                                          `json:"video_attempts"`
-	}{
-		Index:          frame.Index,
-		SourceAnchor:   frame.SourceAnchor,
-		OutputAnchor:   frame.OutputAnchor,
-		Translation:    frame.Translation,
-		Loop:           result.Loop,
-		Normalization:  result.Normalization,
-		VideoRequestID: result.VideoRequestID,
-		VideoAttempts:  result.VideoAttempts,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: encode animation frame metadata: %w", err)
-	}
-	return metadata, nil
 }
 
 var _ AnimationGenerationService = (*animationGenerationService)(nil)

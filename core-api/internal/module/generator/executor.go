@@ -24,9 +24,8 @@ type AssetWriter interface {
 	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
-	CreateAnimation(context.Context, uint, string) (uint, error)
+	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
 	UpdatePrototypeImages(context.Context, uint, []assetdomain.ImageResource) error
-	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
 }
 
 // ReferenceStore is the object-storage boundary used by the worker. It keeps
@@ -114,6 +113,9 @@ func (e *executor) Generate(
 		}
 		if e.animations == nil {
 			return nil, ErrAnimationServiceRequired
+		}
+		if e.references == nil {
+			return nil, ErrAnimationReferenceStoreRequired
 		}
 		request := CreateAnimationPayload{}
 		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
@@ -285,37 +287,29 @@ func (e *executor) generateAnimation(
 	if generated == nil || len(generated.Frames) == 0 {
 		return nil, fmt.Errorf("generator: generate animation frames: empty result")
 	}
-	frames, err := animationFrames(generated)
+	frames, err := e.persistAnimationFrames(ctx, generated)
 	if err != nil {
 		return nil, err
 	}
-
-	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, animationName)
+	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, animationName, frames)
 	if err != nil {
 		return nil, fmt.Errorf("generator: create animation for asset %d: %w", payload.AssetID, err)
 	}
 	if animationID == 0 {
 		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", payload.AssetID)
 	}
-	if err := e.assets.UpdateAnimationFrames(ctx, payload.AssetID, animationID, frames); err != nil {
-		return nil, fmt.Errorf(
-			"generator: update asset %d animation %d frames: %w",
-			payload.AssetID,
-			animationID,
-			err,
-		)
-	}
 	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
 }
 
 func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
+	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
+		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
+	}
+	// Select the requested direction and resolve its -unprocessed image-hosting
+	// reference.
 	content, err := asset.DecodeContent()
 	if err != nil {
 		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
-	}
-
-	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
-		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
 	}
 	prototypeIndex, err := animationDirectionIndex(direction, content.DirectionCount)
 	if err != nil {
@@ -505,23 +499,37 @@ func (e *executor) prototypeResources(
 	return resources, nil
 }
 
-func animationFrames(result *AnimationGenerationResult) ([]assetdomain.Frame, error) {
+func (e *executor) persistAnimationFrames(
+	ctx context.Context,
+	result *AnimationGenerationResult,
+) ([]assetdomain.Frame, error) {
+	if e.references == nil {
+		return nil, ErrAnimationReferenceStoreRequired
+	}
 	frames := make([]assetdomain.Frame, len(result.Frames))
 	for index, frame := range result.Frames {
 		mediaType := strings.TrimSpace(frame.MIMEType)
 		if mediaType == "" {
 			mediaType = "image/png"
 		}
-		url := "data:" + mediaType + ";base64," + frame.ImageBase64
-		metadata, err := animationFrameMetadata(frame, result)
+		dataURL := "data:" + mediaType + ";base64," + frame.ImageBase64
+		objectKey, err := e.references.PersistReference(ctx, dataURL)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("generator: persist animation frame %d: %w", index+1, err)
+		}
+		objectKey = strings.TrimSpace(objectKey)
+		if objectKey == "" {
+			return nil, fmt.Errorf("generator: persist animation frame %d: empty object key", index+1)
+		}
+		if strings.HasPrefix(objectKey, "data:") ||
+			strings.HasPrefix(objectKey, "http://") ||
+			strings.HasPrefix(objectKey, "https://") {
+			return nil, fmt.Errorf("generator: persist animation frame %d: storage returned a non-object-key reference", index+1)
 		}
 		frames[index] = assetdomain.Frame{
 			ID:       uint(index + 1),
-			URL:      &url,
+			URL:      &objectKey,
 			Duration: result.FrameDurationMS,
-			Metadata: metadata,
 		}
 	}
 	return frames, nil

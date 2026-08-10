@@ -14,8 +14,11 @@ var (
 	ErrVideoFrameExtractorRequired = errors.New(
 		"generator: video frame extractor is required",
 	)
-	ErrAnimationServiceRequired = errors.New("generator: animation service is required")
-	ErrImageProcessorRequired   = errors.New("generator: image processor is required")
-	ErrAssetWriterRequired      = errors.New("generator: asset writer is required")
-	ErrImageResultRequired      = errors.New("generator: image result is required")
+	ErrAnimationServiceRequired        = errors.New("generator: animation service is required")
+	ErrAnimationReferenceStoreRequired = errors.New(
+		"generator: animation reference store is required",
+	)
+	ErrImageProcessorRequired = errors.New("generator: image processor is required")
+	ErrAssetWriterRequired    = errors.New("generator: asset writer is required")
+	ErrImageResultRequired    = errors.New("generator: image result is required")
 )
