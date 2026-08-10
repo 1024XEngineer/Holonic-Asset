@@ -8,7 +8,7 @@ type Request struct {
 	ProjectID        uint
 	AssetID          *uint
 	Kind             TaskType
-	Prompt           string
+	CreativeBrief    string
 	TargetAssetPaths []string
 	Parameters       json.RawMessage
 }

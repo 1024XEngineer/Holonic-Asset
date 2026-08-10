@@ -62,7 +62,7 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 		ProjectID:        2,
 		AssetID:          &assetID,
 		Kind:             generator.GenerateAnimation,
-		Prompt:           "hero",
+		CreativeBrief:    "hero",
 		TargetAssetPaths: []string{"animations.walk.frames"},
 		Parameters:       parameters,
 	}
@@ -77,7 +77,7 @@ func TestCreateMapsTransportRequest(t *testing.T) {
 	if stub.createRequest == nil || stub.createRequest.AssetID == nil ||
 		stub.createRequest.ProjectID != request.ProjectID ||
 		*stub.createRequest.AssetID != assetID || stub.createRequest.Kind != request.Kind ||
-		stub.createRequest.Prompt != request.Prompt ||
+		stub.createRequest.CreativeBrief != request.CreativeBrief ||
 		!reflect.DeepEqual(stub.createRequest.TargetAssetPaths, request.TargetAssetPaths) ||
 		!reflect.DeepEqual(stub.createRequest.Parameters, request.Parameters) {
 		t.Fatalf("unexpected generation request: %+v", stub.createRequest)

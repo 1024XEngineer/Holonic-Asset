@@ -357,10 +357,10 @@ export interface components {
         CreateGenerationRequest: {
             /** Format: int64 */
             assetId?: number;
+            creative_brief: string;
             /** @enum {string} */
             kind: "generate_character_prototype" | "edit_character_prototype" | "edit_character_frames" | "generate_object_prototype" | "edit_object_prototype" | "edit_object_frames" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
-            prompt: string;
             targetAssetPaths?: string[] | null;
         };
         CreateGenerationResponse: {

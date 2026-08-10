@@ -7,14 +7,14 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 )
 
-func TestCreateGenerationRequestUsesPromptField(t *testing.T) {
+func TestCreateGenerationRequestUsesCreativeBriefField(t *testing.T) {
 	var request dto.CreateGenerationRequest
-	if err := json.Unmarshal([]byte(`{"prompt":"hero"}`), &request); err != nil {
+	if err := json.Unmarshal([]byte(`{"creative_brief":"hero"}`), &request); err != nil {
 		t.Fatalf("unmarshal generation request: %v", err)
 	}
 
-	if request.Prompt != "hero" {
-		t.Fatalf("expected prompt %q, got %q", "hero", request.Prompt)
+	if request.CreativeBrief != "hero" {
+		t.Fatalf("expected creative brief %q, got %q", "hero", request.CreativeBrief)
 	}
 }
 

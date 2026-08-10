@@ -99,7 +99,7 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
+		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
 	case GenerateObjectProtoType:
 		payload := CreateObjectPrototypePayload{}
@@ -107,7 +107,7 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
+		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
 	case GenerateAnimation:
 		payload := CreateAnimationPayload{}
@@ -115,7 +115,7 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
+		payload.CreativeBrief = request.CreativeBrief
 		if payload.ParentID == 0 && request.AssetID != nil {
 			payload.ParentID = *request.AssetID
 		}
@@ -126,7 +126,7 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = valueOrFallback(payload.CreativeBrief, request.Prompt)
+		payload.CreativeBrief = request.CreativeBrief
 		if payload.TileNum == 0 {
 			payload.TileNum = uint(len(payload.TileDescriptions))
 		}
@@ -152,13 +152,6 @@ func decodeParameters(request *Request, payload any) error {
 		return fmt.Errorf("generator: decode %s parameters: %w", request.Kind, err)
 	}
 	return nil
-}
-
-func valueOrFallback(value, fallback string) string {
-	if value != "" {
-		return value
-	}
-	return fallback
 }
 
 func (e *Engine) List(ctx context.Context, query *RunListQuery) (*RunListPage, error) {

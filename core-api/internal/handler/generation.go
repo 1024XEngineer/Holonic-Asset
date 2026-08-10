@@ -26,7 +26,7 @@ func (h *GenerationHandler) Create(
 		ProjectID:        request.ProjectID,
 		AssetID:          request.AssetID,
 		Kind:             request.Kind,
-		Prompt:           request.Prompt,
+		CreativeBrief:    request.CreativeBrief,
 		TargetAssetPaths: request.TargetAssetPaths,
 		Parameters:       request.Parameters,
 	})
