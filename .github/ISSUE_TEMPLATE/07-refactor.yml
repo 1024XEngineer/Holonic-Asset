@@ -1,0 +1,54 @@
+name: Refactor
+description: Reorganize or simplify code without changing external behavior.
+title: "[Refactor]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Refactoring must preserve existing external behavior, public contracts, and functionality while improving code structure, maintainability, modularity, or testability.
+  - type: textarea
+    id: background
+    attributes:
+      label: Context and motivation
+      description: What code or module needs refactoring, and why? Describe technical debt, code smells, duplication, high complexity, or maintainability bottlenecks.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Refactoring scope and target modules
+      description: Which modules, files, or components are in scope? State explicit exclusions to prevent scope creep.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior_preservation
+    attributes:
+      label: Behavior preservation and invariants
+      description: What external behavior, API contracts, outputs, or non-functional guarantees must remain strictly unchanged?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria and test plan
+      description: Describe testable conditions to verify behavioral equivalence and refactoring success.
+      placeholder: |
+        - All existing tests pass without behavioral changes.
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_approach
+    attributes:
+      label: Proposed strategy or abstraction (optional)
+      description: Describe target design patterns, abstractions, file structure changes, or modularization plans.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and side effects (optional)
+      description: Identify hidden dependencies, internal API breakage, performance impacts, or areas requiring extra regression testing.
+  - type: textarea
+    id: related_context
+    attributes:
+      label: Related issues and references (optional)
+      description: Link related issues, pull requests, technical debt discussions, or architectural references.

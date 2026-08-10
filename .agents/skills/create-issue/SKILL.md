@@ -10,7 +10,7 @@ Create one focused GitHub issue. Draft first, then publish only after explicit u
 ## Scope
 
 - Handle one issue at a time.
-- Support the repository templates for bug, feature, documentation, and experiment work.
+- Support the repository templates for bug, feature, documentation, experiment, proposal, performance, and refactor work.
 - Keep implementation, branch, commit, and pull request work out of this workflow; use `split-issues` for multi-issue plans.
 
 ## Workflow
@@ -34,6 +34,9 @@ Use the narrowest matching template:
 - `02-feature-request.yml`: new capability or behavior improvement.
 - `03-document.yml`: documentation addition, correction, or rewrite.
 - `04-experiment.yml`: bounded validation of a hypothesis or technical approach.
+- `05-proposal.yml`: notable change needing design discussion before implementation.
+- `06-performance.yml`: measurable performance problem, regression, or optimization opportunity.
+- `07-refactor.yml`: reorganization or simplification of code without changing external behavior.
 If the request contains multiple independent outcomes, recommend splitting it instead of hiding them in one issue.
 
 ### 3. Check related work
