@@ -27,7 +27,7 @@ type GetAssetsRequest struct {
 	ProjectID uint               `param:"project_id" path:"project_id" json:"-" minimum:"1"`
 	Query     string             `query:"query"`
 	Tags      []string           `query:"tags,explode"`
-	Types     []domain.AssetType `query:"types,explode" enum:"character,object,tileSet,audio,ui,scenery"`
+	Types     []domain.AssetType `query:"types,explode" enum:"character,object,tileSet,audio,uiset,scenery"`
 }
 
 type AssetDetailRequest struct {
