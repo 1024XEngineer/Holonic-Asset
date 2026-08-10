@@ -17,7 +17,7 @@ type AssetRecord struct {
 	Name        string
 	Description string
 	Perspective string
-	Scale       datatypes.JSON `gorm:"type:jsonb"`
+	Dimensions  datatypes.JSON `gorm:"type:jsonb"`
 	CreatedAt   time.Time
 }
 

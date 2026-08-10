@@ -54,7 +54,7 @@ func (s *assetDaoStub) UpdateAsset(_ context.Context, assetID uint, update *dao.
 }
 
 func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
-	scale := json.RawMessage(`{"width":128,"height":128}`)
+	dimensions := json.RawMessage(`{"width":128,"height":128}`)
 	daoStub := &assetDaoStub{assets: []dao.Asset{{
 		ID:          7,
 		Name:        "hero",
@@ -63,7 +63,7 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 		Description: "main character",
 		Tags:        []string{"player", "hero"},
 		Perspective: "Top-Down",
-		Scale:       datatypes.JSON(scale),
+		Dimensions:  datatypes.JSON(dimensions),
 		Version:     3,
 	}}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
@@ -81,7 +81,7 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 	if got[0].ID != 7 || got[0].Type != domain.AssetTypeCharacter || got[0].Version != 3 {
 		t.Fatalf("unexpected mapped asset: %+v", got[0])
 	}
-	if string(got[0].Scale) != string(scale) || got[0].Perspective != domain.PerspectiveTopDown || len(got[0].Tags) != 2 {
+	if string(got[0].Dimensions) != string(dimensions) || got[0].Perspective != domain.PerspectiveTopDown || len(got[0].Tags) != 2 {
 		t.Fatalf("asset data was not mapped: %+v", got[0])
 	}
 }
@@ -131,7 +131,7 @@ func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 	description := "updated description"
 	tags := []string{"prop"}
 	perspective := domain.PerspectiveSideOn
-	scale := json.RawMessage(`{"width":64,"height":64}`)
+	dimensions := json.RawMessage(`{"width":64,"height":64}`)
 	version := uint(4)
 	daoStub := &assetDaoStub{updatedAsset: dao.Asset{
 		ID:          7,
@@ -141,7 +141,7 @@ func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 		Description: description,
 		Tags:        tags,
 		Perspective: string(perspective),
-		Scale:       datatypes.JSON(scale),
+		Dimensions:  datatypes.JSON(dimensions),
 		Version:     version,
 	}}
 	daoStub.asset = dao.Asset{ID: 7, Type: string(typeValue)}
@@ -152,7 +152,7 @@ func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 		Description: &description,
 		Tags:        &tags,
 		Perspective: &perspective,
-		Scale:       &scale,
+		Dimensions:  &dimensions,
 	})
 	if err != nil {
 		t.Fatalf("update asset basics: %v", err)
@@ -160,27 +160,27 @@ func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 	if daoStub.updateID != 7 || daoStub.update == nil || daoStub.update.Perspective == nil || *daoStub.update.Perspective != string(perspective) {
 		t.Fatalf("unexpected DAO update: %+v", daoStub.update)
 	}
-	if got == nil || got.Name != name || got.ProjectID != projectID || got.Type != typeValue || string(got.Scale) != string(scale) {
+	if got == nil || got.Name != name || got.ProjectID != projectID || got.Type != typeValue || string(got.Dimensions) != string(dimensions) {
 		t.Fatalf("unexpected updated asset: %+v", got)
 	}
 }
 
-func TestAssetRepositoryRejectsInvalidScaleBeforeUpdate(t *testing.T) {
-	scale := json.RawMessage(`{"width":64,"height":64,"unexpected":true}`)
+func TestAssetRepositoryRejectsInvalidDimensionsBeforeUpdate(t *testing.T) {
+	dimensions := json.RawMessage(`{"width":64,"height":64,"unexpected":true}`)
 	daoStub := &assetDaoStub{asset: dao.Asset{ID: 7, Type: "character"}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
 
-	if _, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{Scale: &scale}); err == nil {
-		t.Fatal("expected invalid scale to be rejected")
+	if _, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{Dimensions: &dimensions}); err == nil {
+		t.Fatal("expected invalid dimensions to be rejected")
 	}
 	if daoStub.update != nil {
-		t.Fatalf("invalid scale reached DAO update: %+v", daoStub.update)
+		t.Fatalf("invalid dimensions reached DAO update: %+v", daoStub.update)
 	}
 }
 
 func TestAssetRepositoryIgnoresAudioVisualMetadataOnUpdate(t *testing.T) {
 	perspective := domain.PerspectiveTopDown
-	scale := json.RawMessage(`{"width":64,"height":64}`)
+	dimensions := json.RawMessage(`{"width":64,"height":64}`)
 	daoStub := &assetDaoStub{
 		asset:        dao.Asset{ID: 7, Type: string(domain.AssetTypeAudio)},
 		updatedAsset: dao.Asset{ID: 7, Type: string(domain.AssetTypeAudio)},
@@ -189,14 +189,14 @@ func TestAssetRepositoryIgnoresAudioVisualMetadataOnUpdate(t *testing.T) {
 
 	if _, err := repo.UpdateAsset(context.Background(), 7, &domain.AssetUpdate{
 		Perspective: &perspective,
-		Scale:       &scale,
+		Dimensions:  &dimensions,
 	}); err != nil {
 		t.Fatalf("update audio asset: %v", err)
 	}
 	if daoStub.update == nil {
 		t.Fatal("expected DAO update")
 	}
-	if daoStub.update.Perspective != nil || daoStub.update.Scale != nil {
+	if daoStub.update.Perspective != nil || daoStub.update.Dimensions != nil {
 		t.Fatalf("audio visual metadata reached DAO update: %+v", daoStub.update)
 	}
 }

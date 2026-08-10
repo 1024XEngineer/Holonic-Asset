@@ -232,16 +232,16 @@ func (r *AssetRepositoryImpl) UpdateAsset(
 			value.Perspective = &perspective
 		}
 	}
-	if update.Scale != nil {
+	if update.Dimensions != nil {
 		if err := loadCurrent(); err != nil {
 			return nil, err
 		}
 		if current.Type != string(domain.AssetTypeAudio) {
-			if err := domain.ValidateScale(domain.AssetType(current.Type), *update.Scale); err != nil {
+			if err := domain.ValidateDimensions(domain.AssetType(current.Type), *update.Dimensions); err != nil {
 				return nil, err
 			}
-			scale := datatypes.JSON(append([]byte(nil), (*update.Scale)...))
-			value.Scale = &scale
+			dimensions := datatypes.JSON(append([]byte(nil), (*update.Dimensions)...))
+			value.Dimensions = &dimensions
 		}
 	}
 
@@ -262,7 +262,7 @@ func convertAssetToDomain(asset dao.Asset) domain.Asset {
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
 		Perspective: domain.Perspective(asset.Perspective),
-		Scale:       append([]byte(nil), asset.Scale...),
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Content:     append([]byte(nil), asset.Content...),
 		Version:     asset.Version,
 	}
@@ -284,16 +284,16 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 		asset = &domain.Asset{}
 	}
 	perspective := asset.Perspective
-	scale := asset.Scale
+	dimensions := asset.Dimensions
 	if assetType == domain.AssetTypeAudio {
 		// Audio assets are not visual and therefore do not carry visual metadata.
 		perspective = ""
-		scale = nil
+		dimensions = nil
 	}
 	if assetType != domain.AssetTypeAudio && !perspective.Valid() {
 		return nil, fmt.Errorf("repository: invalid perspective %q", asset.Perspective)
 	}
-	if err := domain.ValidateScale(assetType, scale); err != nil {
+	if err := domain.ValidateDimensions(assetType, dimensions); err != nil {
 		return nil, err
 	}
 	content, err := asset.DecodeContent()
@@ -316,7 +316,7 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
 		Perspective: string(perspective),
-		Scale:       datatypes.JSON(append([]byte(nil), scale...)),
+		Dimensions:  datatypes.JSON(append([]byte(nil), dimensions...)),
 		Content:     datatypes.JSON(encoded),
 		Version:     asset.Version,
 	}, nil
@@ -460,7 +460,7 @@ func (r *AssetRepositoryImpl) createAssetResultInTransaction(ctx context.Context
 		Name:        created.Name,
 		Description: created.Description,
 		Perspective: created.Perspective,
-		Scale:       append(datatypes.JSON(nil), created.Scale...),
+		Dimensions:  append(datatypes.JSON(nil), created.Dimensions...),
 	}); err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		Name:        asset.Name,
 		Description: asset.Description,
 		Perspective: domain.Perspective(asset.Perspective),
-		Scale:       append([]byte(nil), asset.Scale...),
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Content:     append([]byte(nil), content...),
 	}
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
@@ -588,7 +588,7 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		Name:        snapshot.Name,
 		Description: snapshot.Description,
 		Perspective: string(snapshot.Perspective),
-		Scale:       datatypes.JSON(append([]byte(nil), snapshot.Scale...)),
+		Dimensions:  datatypes.JSON(append([]byte(nil), snapshot.Dimensions...)),
 	}
 	recordID, err := r.RecordDao.CreateAssetRecord(ctx, daoRecord)
 	if err != nil {
@@ -629,7 +629,7 @@ func (r *AssetRepositoryImpl) GetRecordHistory(ctx context.Context, assetID uint
 			Name:        record.Name,
 			Description: record.Description,
 			Perspective: domain.Perspective(record.Perspective),
-			Scale:       append([]byte(nil), record.Scale...),
+			Dimensions:  append([]byte(nil), record.Dimensions...),
 			Content:     append([]byte(nil), content.Content...),
 		})
 	}
@@ -688,21 +688,21 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 	name := candidate.Name
 	description := candidate.Description
 	perspective := candidate.Perspective
-	scale := json.RawMessage(candidate.Scale)
+	dimensions := json.RawMessage(candidate.Dimensions)
 	if name == "" {
 		name = asset.Name
 	}
 	if perspective == "" {
 		perspective = asset.Perspective
 	}
-	if len(scale) == 0 {
-		scale = append([]byte(nil), asset.Scale...)
+	if len(dimensions) == 0 {
+		dimensions = append([]byte(nil), asset.Dimensions...)
 	}
 	if _, err := r.AssetDao.UpdateAsset(ctx, assetID, &dao.AssetUpdate{
 		Name:        &name,
 		Description: &description,
 		Perspective: &perspective,
-		Scale:       scaleValue(scale),
+		Dimensions:  dimensionsValue(dimensions),
 	}); err != nil {
 		return nil, err
 	}
@@ -724,7 +724,7 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 		Name:        name,
 		Description: description,
 		Perspective: domain.Perspective(perspective),
-		Scale:       append([]byte(nil), scale...),
+		Dimensions:  append([]byte(nil), dimensions...),
 		Content:     append([]byte(nil), content.Content...),
 	}, nil
 }
@@ -765,7 +765,7 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 		Description: asset.Description,
 		Tags:        append([]string(nil), asset.Tags...),
 		Perspective: asset.Perspective,
-		Scale:       append(datatypes.JSON(nil), asset.Scale...),
+		Dimensions:  append(datatypes.JSON(nil), asset.Dimensions...),
 		Version:     asset.Version,
 	}
 	created, err := r.AssetDao.CreateAsset(ctx, copyAsset)
@@ -802,7 +802,7 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 			Name:        record.Name,
 			Description: record.Description,
 			Perspective: record.Perspective,
-			Scale:       append(datatypes.JSON(nil), record.Scale...),
+			Dimensions:  append(datatypes.JSON(nil), record.Dimensions...),
 			CreatedAt:   record.CreatedAt,
 		})
 	}
@@ -839,7 +839,7 @@ func appendUniqueUint(values []uint, value uint) []uint {
 	return append(values, value)
 }
 
-func scaleValue(raw json.RawMessage) *datatypes.JSON {
+func dimensionsValue(raw json.RawMessage) *datatypes.JSON {
 	value := datatypes.JSON(append([]byte(nil), raw...))
 	return &value
 }

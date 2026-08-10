@@ -318,10 +318,12 @@ export interface components {
         AssetDetailResponse: {
             /** Format: int64 */
             assetId: number;
-            attributes: unknown;
             content?: unknown;
             description: string;
+            dimensions: unknown;
             name: string;
+            /** @enum {string} */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
             tags: string[] | null;
@@ -334,7 +336,10 @@ export interface components {
             /** Format: int64 */
             assetId: number;
             description: string;
+            dimensions: unknown;
             name: string;
+            /** @enum {string} */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
             tags: string[] | null;
@@ -536,6 +541,11 @@ export interface components {
             contentId: number;
             /** Format: date-time */
             createdAt: string;
+            description: string;
+            dimensions: unknown;
+            name: string;
+            /** @enum {string} */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             recordId: number;
             /** Format: int64 */
@@ -748,21 +758,21 @@ export interface components {
         UpdateAssetRequest: {
             /** Format: int64 */
             assetId: number;
-            attributes?: unknown;
             description?: string;
+            dimensions?: unknown;
             name?: string;
-            /** Format: int64 */
-            projectId?: number;
-            tags?: string[];
             /** @enum {string} */
-            type?: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
+            perspective?: "Top-Down" | "Side-On" | "Isometric";
+            tags?: string[];
         };
         UpdateAssetResponse: {
             /** Format: int64 */
             assetId: number;
-            attributes: unknown;
             description: string;
+            dimensions: unknown;
             name: string;
+            /** @enum {string} */
+            perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
             tags: string[] | null;

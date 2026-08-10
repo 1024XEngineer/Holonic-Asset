@@ -163,7 +163,7 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 		Name:        "hero",
 		ProjectID:   42,
 		Perspective: domain.PerspectiveTopDown,
-		Scale:       json.RawMessage(`{"width":64,"height":64}`),
+		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 	})
 	if err != nil {
 		t.Fatalf("create character asset: %v", err)

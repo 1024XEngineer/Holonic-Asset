@@ -13,6 +13,7 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
@@ -29,7 +30,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -63,7 +63,7 @@
           "type",
           "description",
           "perspective",
-          "scale",
+          "dimensions",
           "tags",
           "version"
         ],
@@ -80,6 +80,7 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
@@ -96,7 +97,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -130,7 +130,7 @@
           "type",
           "description",
           "perspective",
-          "scale",
+          "dimensions",
           "tags",
           "version"
         ],
@@ -793,6 +793,7 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
@@ -809,7 +810,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "scale": {},
           "version": {
             "format": "int64",
             "minimum": 0,
@@ -825,7 +825,7 @@
           "name",
           "description",
           "perspective",
-          "scale"
+          "dimensions"
         ],
         "type": "object"
       },
@@ -1361,6 +1361,7 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
@@ -1372,7 +1373,6 @@
             ],
             "type": "string"
           },
-          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -1396,6 +1396,7 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
@@ -1412,7 +1413,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "scale": {},
           "tags": {
             "items": {
               "type": "string"
@@ -1446,7 +1446,7 @@
           "type",
           "description",
           "perspective",
-          "scale",
+          "dimensions",
           "tags",
           "version"
         ],

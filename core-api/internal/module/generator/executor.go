@@ -111,7 +111,7 @@ func (e *executor) generateCharacterPrototype(
 		ctx,
 		GenerateCharacterProtoType,
 		payload.CreativeBrief,
-		payload.Scale,
+		payload.Dimensions,
 		payload.Reference,
 	)
 	if err != nil {
@@ -127,7 +127,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		payload.Scale,
+		payload.Dimensions,
 		perspective.CharacterDirectionCount(),
 		resources,
 	)
@@ -156,7 +156,7 @@ func (e *executor) generateObjectPrototype(
 		ctx,
 		GenerateObjectProtoType,
 		payload.CreativeBrief,
-		payload.Scale,
+		payload.Dimensions,
 		payload.Reference,
 	)
 	if err != nil {
@@ -172,7 +172,7 @@ func (e *executor) generateObjectPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		payload.Scale,
+		payload.Dimensions,
 		0,
 		resources,
 	)
@@ -198,19 +198,19 @@ func (e *executor) generateAnimation(
 ) (json.RawMessage, error) {
 	asset, err := e.assets.GetDetail(ctx, assetID)
 	if err != nil {
-		return nil, fmt.Errorf("generator: load asset %d scale: %w", assetID, err)
+		return nil, fmt.Errorf("generator: load asset %d dimensions: %w", assetID, err)
 	}
 	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
 		return nil, fmt.Errorf("generator: animation is unsupported for asset type %q", asset.Type)
 	}
-	var scale assetdomain.Size
-	if err := json.Unmarshal(asset.Scale, &scale); err != nil {
-		return nil, fmt.Errorf("generator: decode asset %d scale: %w", assetID, err)
+	var dimensions assetdomain.Size
+	if err := json.Unmarshal(asset.Dimensions, &dimensions); err != nil {
+		return nil, fmt.Errorf("generator: decode asset %d dimensions: %w", assetID, err)
 	}
-	if err := assetdomain.ValidateScale(asset.Type, asset.Scale); err != nil {
+	if err := assetdomain.ValidateDimensions(asset.Type, asset.Dimensions); err != nil {
 		return nil, err
 	}
-	generated, err := e.generateImages(ctx, taskType, prompt, scale, "")
+	generated, err := e.generateImages(ctx, taskType, prompt, dimensions, "")
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (e *executor) generateImages(
 	ctx context.Context,
 	taskType TaskType,
 	prompt string,
-	scale assetdomain.Size,
+	dimensions assetdomain.Size,
 	reference string,
 ) (*imageclient.GenerateResult, error) {
 	references := []string(nil)
@@ -268,8 +268,8 @@ func (e *executor) generateImages(
 	if taskType != GenerateCharacterProtoType && taskType != GenerateObjectProtoType && taskType != GenerateAnimation {
 		return result, nil
 	}
-	if scale.Width == 0 || scale.Height == 0 {
-		return nil, fmt.Errorf("generator: process %s images: scale dimensions must be positive", taskType)
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return nil, fmt.Errorf("generator: process %s images: dimensions must be positive", taskType)
 	}
 	processed := &imageclient.GenerateResult{Images: make([]imageclient.GeneratedImage, len(result.Images)), Model: result.Model, Size: result.Size, CreatedAt: result.CreatedAt, Usage: result.Usage}
 	for index, generated := range result.Images {
@@ -286,7 +286,7 @@ func (e *executor) generateImages(
 		}
 		resized, resizeErr := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: imageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(int(scale.Width), int(scale.Height)),
+			Options:     imageprocessor.DefaultResizeOptions(int(dimensions.Width), int(dimensions.Height)),
 		})
 		if resizeErr != nil {
 			return nil, fmt.Errorf("generator: resize %s image %d: %w", taskType, index+1, resizeErr)
@@ -305,7 +305,7 @@ func newPrototypeAsset(
 	projectID uint,
 	description string,
 	perspective assetdomain.Perspective,
-	scale assetdomain.Size,
+	dimensions assetdomain.Size,
 	directionCount uint,
 	prototype []assetdomain.ImageResource,
 ) (*assetdomain.Asset, error) {
@@ -317,9 +317,9 @@ func newPrototypeAsset(
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode prototype asset content: %w", err)
 	}
-	scaleValue, err := json.Marshal(scale)
+	dimensionsValue, err := json.Marshal(dimensions)
 	if err != nil {
-		return nil, fmt.Errorf("generator: encode prototype asset scale: %w", err)
+		return nil, fmt.Errorf("generator: encode prototype asset dimensions: %w", err)
 	}
 	return &assetdomain.Asset{
 		Name:        name,
@@ -327,7 +327,7 @@ func newPrototypeAsset(
 		Type:        assetType,
 		Description: description,
 		Perspective: perspective,
-		Scale:       scaleValue,
+		Dimensions:  dimensionsValue,
 		Content:     encoded,
 	}, nil
 }

@@ -100,7 +100,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if assetStub.projectID != 42 {
 			t.Fatalf("expected project ID 42, got %d", assetStub.projectID)
 		}
-		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"","projectId":42,"type":"","description":"","perspective":"","scale":null,"tags":null,"version":0}]}}`+"\n" {
+		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"","projectId":42,"type":"","description":"","perspective":"","dimensions":null,"tags":null,"version":0}]}}`+"\n" {
 			t.Fatalf("unexpected response: %s", recorder.Body.String())
 		}
 	})
@@ -132,7 +132,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 			"description": "main character",
 			"tags": ["player"],
 			"perspective": "Top-Down",
-			"scale": {"width": 64, "height": 64}
+			"dimensions": {"width": 64, "height": 64}
 		}`))
 		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		recorder := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if assetStub.assetID != 7 {
 			t.Fatalf("expected asset ID 7, got %d", assetStub.assetID)
 		}
-		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assetId":7,"name":"","projectId":0,"type":"","description":"","perspective":"","scale":null,"tags":null,"version":0}}`+"\n" {
+		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assetId":7,"name":"","projectId":0,"type":"","description":"","perspective":"","dimensions":null,"tags":null,"version":0}}`+"\n" {
 			t.Fatalf("unexpected response: %s", recorder.Body.String())
 		}
 	})

@@ -52,7 +52,7 @@ func (h *Handler) GetAssets(
 			Type:        asset.Type,
 			Description: asset.Description,
 			Perspective: asset.Perspective,
-			Scale:       append([]byte(nil), asset.Scale...),
+			Dimensions:  append([]byte(nil), asset.Dimensions...),
 			Tags:        asset.Tags,
 			Version:     asset.Version,
 		}
@@ -87,7 +87,7 @@ func (h *Handler) Detail(
 		Type:        asset.Type,
 		Description: asset.Description,
 		Perspective: asset.Perspective,
-		Scale:       append([]byte(nil), asset.Scale...),
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Tags:        asset.Tags,
 		Content:     content,
 		Version:     asset.Version,
@@ -114,7 +114,7 @@ func (h *Handler) Record(
 		Name:        record.Name,
 		Description: record.Description,
 		Perspective: record.Perspective,
-		Scale:       append([]byte(nil), record.Scale...),
+		Dimensions:  append([]byte(nil), record.Dimensions...),
 	}), nil
 }
 
@@ -145,7 +145,7 @@ func (h *Handler) Records(
 			Name:        record.Name,
 			Description: record.Description,
 			Perspective: record.Perspective,
-			Scale:       append([]byte(nil), record.Scale...),
+			Dimensions:  append([]byte(nil), record.Dimensions...),
 			Content:     content,
 		}
 	}
@@ -330,7 +330,7 @@ func (h *Handler) UpdateAsset(
 		Description: req.Description,
 		Tags:        req.Tags,
 		Perspective: req.Perspective,
-		Scale:       req.Scale,
+		Dimensions:  req.Dimensions,
 	})
 	if err != nil {
 		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, err
@@ -342,7 +342,7 @@ func (h *Handler) UpdateAsset(
 		Type:        asset.Type,
 		Description: asset.Description,
 		Perspective: asset.Perspective,
-		Scale:       append([]byte(nil), asset.Scale...),
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Tags:        asset.Tags,
 		Version:     asset.Version,
 	}), nil

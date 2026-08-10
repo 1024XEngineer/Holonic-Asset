@@ -7,7 +7,7 @@ import assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/works
 type CreateCharacterPrototypePayload struct {
 	AssetName     string           `json:"asset_name"`
 	CreativeBrief string           `json:"creative_brief"`
-	Scale         assetdomain.Size `json:"scale"`
+	Dimensions    assetdomain.Size `json:"dimensions"`
 	Perspective   string           `json:"perspective"`
 	Reference     string           `json:"reference"`
 	ProjectID     uint             `json:"project_id"`
@@ -27,7 +27,7 @@ type CreateAnimationPayload struct {
 type CreateObjectPrototypePayload struct {
 	AssetName     string           `json:"asset_name"`
 	CreativeBrief string           `json:"creative_brief"`
-	Scale         assetdomain.Size `json:"scale"`
+	Dimensions    assetdomain.Size `json:"dimensions"`
 	Perspective   string           `json:"perspective"`
 	Reference     string           `json:"reference"`
 	ProjectID     uint             `json:"project_id"`

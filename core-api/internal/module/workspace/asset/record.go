@@ -14,6 +14,6 @@ type AssetRecord struct {
 	Name        string
 	Description string
 	Perspective Perspective
-	Scale       json.RawMessage
+	Dimensions  json.RawMessage
 	Content     json.RawMessage
 }

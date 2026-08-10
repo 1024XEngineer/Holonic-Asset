@@ -10,7 +10,7 @@ type Asset struct {
 	Description string
 	Tags        []string        `json:"tags"`
 	Perspective Perspective     `json:"perspective"`
-	Scale       json.RawMessage `json:"scale"`
+	Dimensions  json.RawMessage `json:"dimensions"`
 	Content     json.RawMessage `json:"content,omitempty"`
 	Version     uint
 }
@@ -26,5 +26,5 @@ type AssetUpdate struct {
 	Description *string
 	Tags        *[]string
 	Perspective *Perspective
-	Scale       *json.RawMessage
+	Dimensions  *json.RawMessage
 }

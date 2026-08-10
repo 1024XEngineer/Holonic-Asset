@@ -1,6 +1,6 @@
 # Asset Module and API Contract
 
-An Asset stores identity, editable information, a type-specific scale, a
+An Asset stores identity, editable information, type-specific dimensions, a
 pointer to separately stored content, and a version.
 
 ```json
@@ -11,23 +11,23 @@ pointer to separately stored content, and a version.
   "name": "Hero",
   "description": "Main playable character",
   "perspective": "Top-Down",
-  "scale": {"width": 64, "height": 64},
+  "dimensions": {"width": 64, "height": 64},
   "tags": ["player", "hero"],
   "content": {},
   "version": 1
 }
 ```
 
-`name`, `description`, `perspective`, and `scale` are direct Asset fields.
+`name`, `description`, `perspective`, and `dimensions` are direct Asset fields.
 There is no nested `attributes` field, and Content must not duplicate these
 fields. Task state and errors belong to the Task domain, not Asset Content.
 
-## Scale
+## Dimensions
 
-Asset `type` determines the accepted Scale shape. Unknown fields and zero
+Asset `type` determines the accepted Dimensions shape. Unknown fields and zero
 dimensions are rejected.
 
-| Asset type | Scale |
+| Asset type | Dimensions |
 | --- | --- |
 | `character` | One frame: `{width,height}` |
 | `object` | One frame: `{width,height}` |
@@ -36,10 +36,10 @@ dimensions are rejected.
 | `scenery` | Complete canvas: `{width,height}` |
 | `audio` | `null` |
 
-Scale is the final game-asset specification used by the deterministic image
+Dimensions are the final game-asset specifications used by the deterministic image
 Processor. It is not the image provider's generation size. The provider may
 choose its own native output size; generated images are then resized by the
-Processor to the Asset Scale.
+Processor to the Asset Dimensions.
 
 For TileSet, `tileAmount` is grid capacity rather than the number of generated
 Items. Complete canvas dimensions are derived and are not stored:
@@ -55,12 +55,12 @@ Character Content contains `directionCount`, `prototype`, and `animations`.
 `directionCount` is derived from the Asset perspective: `Side-On` uses `2`,
 `Top-Down` uses `4`, and `Isometric` uses `8`. Callers do not provide it.
 Object Content contains `prototype` and `animations`. TileSet Content contains
-`items`; tile dimensions belong to Scale. UI Set Content contains `components`,
+`items`; tile dimensions belong to Dimensions. UI Set Content contains `components`,
 including component size and position. Scenery Content contains `layers`,
 including each layer's resource, position, transform, visibility, opacity, and
 z-order.
 
-Component size and layer transform scale never modify the parent Asset Scale.
+Component size and layer transform scaling never modify the parent Asset Dimensions.
 
 ## API
 
@@ -74,14 +74,14 @@ POST /api/v1/asset/rollback
 ```
 
 Asset Update accepts partial changes to `name`, `description`, `perspective`,
-`scale`, and `tags`. It does not accept `projectId`, `type`, `attributes`, or
-`content`. Updating Scale changes Asset information only; it does not run a
+`dimensions`, and `tags`. It does not accept `projectId`, `type`, `attributes`, or
+`content`. Updating Dimensions changes Asset information only; it does not run a
 Generator or Processor, rewrite Content, create a Record, or increment the
 version.
 
 ## Records
 
-A Record snapshots `name`, `description`, `perspective`, `scale`, `content`,
+A Record snapshots `name`, `description`, `perspective`, `dimensions`, `content`,
 and `version`. Content remains in `asset_contents`, and the Record references
 its immutable content snapshot by `contentId`.
 

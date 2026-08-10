@@ -14,7 +14,7 @@ type AssetListItemResponse struct {
 	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
-	Scale       json.RawMessage    `json:"scale"`
+	Dimensions  json.RawMessage    `json:"dimensions"`
 	Tags        []string           `json:"tags"`
 	Version     uint               `json:"version"`
 }
@@ -41,7 +41,7 @@ type AssetDetailResponse struct {
 	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
-	Scale       json.RawMessage    `json:"scale"`
+	Dimensions  json.RawMessage    `json:"dimensions"`
 	Tags        []string           `json:"tags"`
 	Content     json.RawMessage    `json:"content,omitempty"`
 	Version     uint               `json:"version"`
@@ -60,7 +60,7 @@ type RecordAssetResponse struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
-	Scale       json.RawMessage    `json:"scale"`
+	Dimensions  json.RawMessage    `json:"dimensions"`
 	Content     json.RawMessage    `json:"content,omitempty"`
 }
 
@@ -88,7 +88,7 @@ type UpdateAssetRequest struct {
 	Description *string             `json:"description,omitempty"`
 	Tags        *[]string           `json:"tags,omitempty"`
 	Perspective *domain.Perspective `json:"perspective,omitempty" enum:"Top-Down,Side-On,Isometric"`
-	Scale       *json.RawMessage    `json:"scale,omitempty"`
+	Dimensions  *json.RawMessage    `json:"dimensions,omitempty"`
 }
 
 type UpdateAssetResponse struct {
@@ -98,7 +98,7 @@ type UpdateAssetResponse struct {
 	Type        domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
-	Scale       json.RawMessage    `json:"scale"`
+	Dimensions  json.RawMessage    `json:"dimensions"`
 	Tags        []string           `json:"tags"`
 	Version     uint               `json:"version"`
 }

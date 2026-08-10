@@ -47,7 +47,7 @@ func migrateAssetAttributes(db *gorm.DB) error {
 		       NULLIF((SELECT c.content->>'perspective' FROM asset_contents AS c WHERE c.id = r.content_id), ''),
 		       a.perspective
 		     ),
-		     scale = a.scale
+		     dimensions = a.dimensions
 		 FROM assets AS a
 		 WHERE r.asset_id = a.id`,
 		`UPDATE asset_contents

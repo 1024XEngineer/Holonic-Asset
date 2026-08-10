@@ -7,10 +7,10 @@ import (
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-func TestValidateScaleAcceptsTypeSpecificShapes(t *testing.T) {
+func TestValidateDimensionsAcceptsTypeSpecificShapes(t *testing.T) {
 	tests := []struct {
-		assetType domain.AssetType
-		scale     string
+		assetType  domain.AssetType
+		dimensions string
 	}{
 		{domain.AssetTypeCharacter, `{"width":64,"height":64}`},
 		{domain.AssetTypeObject, `{"width":32,"height":48}`},
@@ -21,30 +21,30 @@ func TestValidateScaleAcceptsTypeSpecificShapes(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(string(test.assetType), func(t *testing.T) {
-			if err := domain.ValidateScale(test.assetType, json.RawMessage(test.scale)); err != nil {
-				t.Fatalf("validate scale: %v", err)
+			if err := domain.ValidateDimensions(test.assetType, json.RawMessage(test.dimensions)); err != nil {
+				t.Fatalf("validate dimensions: %v", err)
 			}
 		})
 	}
 }
 
-func TestValidateScaleAllowsOmittedAudioScale(t *testing.T) {
-	if err := domain.ValidateScale(domain.AssetTypeAudio, nil); err != nil {
-		t.Fatalf("validate omitted audio scale: %v", err)
+func TestValidateDimensionsAllowsOmittedAudioDimensions(t *testing.T) {
+	if err := domain.ValidateDimensions(domain.AssetTypeAudio, nil); err != nil {
+		t.Fatalf("validate omitted audio dimensions: %v", err)
 	}
 }
 
-func TestValidateScaleStillRequiresVisualScale(t *testing.T) {
-	if err := domain.ValidateScale(domain.AssetTypeCharacter, nil); err == nil {
-		t.Fatal("expected omitted visual scale to be rejected")
+func TestValidateDimensionsStillRequiresVisualDimensions(t *testing.T) {
+	if err := domain.ValidateDimensions(domain.AssetTypeCharacter, nil); err == nil {
+		t.Fatal("expected omitted visual dimensions to be rejected")
 	}
 }
 
-func TestValidateScaleRejectsInvalidOrUnknownFields(t *testing.T) {
+func TestValidateDimensionsRejectsInvalidOrUnknownFields(t *testing.T) {
 	tests := []struct {
-		name      string
-		assetType domain.AssetType
-		scale     string
+		name       string
+		assetType  domain.AssetType
+		dimensions string
 	}{
 		{"missing dimension", domain.AssetTypeCharacter, `{"width":64}`},
 		{"zero dimension", domain.AssetTypeObject, `{"width":0,"height":32}`},
@@ -55,8 +55,8 @@ func TestValidateScaleRejectsInvalidOrUnknownFields(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := domain.ValidateScale(test.assetType, json.RawMessage(test.scale)); err == nil {
-				t.Fatal("expected scale validation error")
+			if err := domain.ValidateDimensions(test.assetType, json.RawMessage(test.dimensions)); err == nil {
+				t.Fatal("expected dimensions validation error")
 			}
 		})
 	}

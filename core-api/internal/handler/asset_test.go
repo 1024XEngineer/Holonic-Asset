@@ -84,7 +84,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 		Type:        domain.AssetTypeCharacter,
 		Description: "main character",
 		Perspective: domain.PerspectiveTopDown,
-		Scale:       json.RawMessage(`{"width":64,"height":64}`),
+		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 		Tags:        []string{"player"},
 		Version:     3,
 	}}}
@@ -109,7 +109,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal response: %v", err)
 	}
-	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","scale":{"width":64,"height":64},"tags":["player"],"version":3}]}}` {
+	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"version":3}]}}` {
 		t.Fatalf("unexpected JSON response: %s", payload)
 	}
 }
@@ -139,7 +139,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	description := "updated description"
 	tags := []string{"prop"}
 	perspective := domain.PerspectiveSideOn
-	scale := json.RawMessage(`{"width":64,"height":64}`)
+	dimensions := json.RawMessage(`{"width":64,"height":64}`)
 	version := uint(4)
 	managerStub := &assetManagerStub{updatedAsset: &domain.Asset{
 		ID:          7,
@@ -149,7 +149,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 		Description: description,
 		Tags:        tags,
 		Perspective: perspective,
-		Scale:       scale,
+		Dimensions:  dimensions,
 		Version:     version,
 	}}
 	h := handler.NewHandler(managerStub)
@@ -160,7 +160,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 		Description: &description,
 		Tags:        &tags,
 		Perspective: &perspective,
-		Scale:       &scale,
+		Dimensions:  &dimensions,
 	})
 	if err != nil {
 		t.Fatalf("update asset basics: %v", err)
@@ -169,7 +169,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 		t.Fatalf("unexpected update request: %+v", managerStub.update)
 	}
 	data := response.Data
-	if data.AssetID != 7 || data.Name != name || data.Perspective != perspective || string(data.Scale) != string(scale) {
+	if data.AssetID != 7 || data.Name != name || data.Perspective != perspective || string(data.Dimensions) != string(dimensions) {
 		t.Fatalf("unexpected update response: %+v", response.Data)
 	}
 }
@@ -246,7 +246,7 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 		Description: "prop",
 		Tags:        []string{"scene"},
 		Perspective: domain.PerspectiveTopDown,
-		Scale:       json.RawMessage(`{"width":64,"height":64}`),
+		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 		Version:     2,
 	}}
 	h := handler.NewHandler(managerStub)
@@ -262,7 +262,7 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 		t.Fatalf("expected asset ID 7, got %d", managerStub.assetID)
 	}
 	data := response.Data
-	if data.AssetID != 7 || data.Perspective != domain.PerspectiveTopDown || string(data.Scale) != `{"width":64,"height":64}` {
+	if data.AssetID != 7 || data.Perspective != domain.PerspectiveTopDown || string(data.Dimensions) != `{"width":64,"height":64}` {
 		t.Fatalf("unexpected response data: %+v", data)
 	}
 }

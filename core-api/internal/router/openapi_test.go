@@ -90,8 +90,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		if _, ok := schema.Properties["perspective"]; !ok {
 			t.Fatalf("%s must expose perspective", schemaName)
 		}
-		if _, ok := schema.Properties["scale"]; !ok {
-			t.Fatalf("%s must expose scale", schemaName)
+		if _, ok := schema.Properties["dimensions"]; !ok {
+			t.Fatalf("%s must expose dimensions", schemaName)
 		}
 		if _, ok := schema.Properties["attributes"]; ok {
 			t.Fatalf("%s must not expose attributes", schemaName)

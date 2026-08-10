@@ -51,8 +51,8 @@ func (s *recordAssetDaoStub) UpdateAsset(_ context.Context, _ uint, update *dao.
 	if update.Perspective != nil {
 		s.asset.Perspective = *update.Perspective
 	}
-	if update.Scale != nil {
-		s.asset.Scale = append(datatypes.JSON(nil), (*update.Scale)...)
+	if update.Dimensions != nil {
+		s.asset.Dimensions = append(datatypes.JSON(nil), (*update.Dimensions)...)
 	}
 	return s.asset, nil
 }
@@ -167,7 +167,7 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 		Name:        "hero",
 		Description: "main character",
 		Perspective: "Top-Down",
-		Scale:       datatypes.JSON(`{"width":64,"height":64}`),
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
 		Version:     2,
 		ContentID:   &currentContentID,
 	}}
@@ -195,7 +195,7 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	if string(record.Content) != string(currentContent) {
 		t.Fatalf("record content was not copied: %s", record.Content)
 	}
-	if record.Name != "hero" || record.Description != "main character" || record.Perspective != domain.PerspectiveTopDown || string(record.Scale) != `{"width":64,"height":64}` {
+	if record.Name != "hero" || record.Description != "main character" || record.Perspective != domain.PerspectiveTopDown || string(record.Dimensions) != `{"width":64,"height":64}` {
 		t.Fatalf("record attributes were not copied: %+v", record)
 	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
@@ -211,7 +211,7 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 		Name:        "current hero",
 		Description: "current description",
 		Perspective: "Isometric",
-		Scale:       datatypes.JSON(`{"width":128,"height":128}`),
+		Dimensions:  datatypes.JSON(`{"width":128,"height":128}`),
 		Version:     4,
 		ContentID:   &currentContentID,
 	}}
@@ -224,7 +224,7 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 			Name:        "saved hero",
 			Description: "saved description",
 			Perspective: "Top-Down",
-			Scale:       datatypes.JSON(`{"width":64,"height":64}`),
+			Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
 		},
 		3: {
 			ID:        3,
@@ -254,7 +254,7 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 2 || assetDao.updatedContent != targetContentID {
 		t.Fatalf("asset current pointer was not rolled back: %+v", assetDao)
 	}
-	if assetDao.asset.Name != "saved hero" || assetDao.asset.Description != "saved description" || assetDao.asset.Perspective != "Top-Down" || string(assetDao.asset.Scale) != `{"width":64,"height":64}` {
+	if assetDao.asset.Name != "saved hero" || assetDao.asset.Description != "saved description" || assetDao.asset.Perspective != "Top-Down" || string(assetDao.asset.Dimensions) != `{"width":64,"height":64}` {
 		t.Fatalf("asset attributes were not rolled back: %+v", assetDao.asset)
 	}
 	if _, ok := recordDao.records[3]; ok {
@@ -341,7 +341,7 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 		Description: "main character",
 		Tags:        []string{"hero", "player"},
 		Perspective: "Side-On",
-		Scale:       []byte(`{"width":64,"height":64}`),
+		Dimensions:  []byte(`{"width":64,"height":64}`),
 		ContentID:   &currentContentID,
 		Version:     2,
 	}}

@@ -17,7 +17,7 @@ type Asset struct {
 	Description string
 	Tags        []string `json:"tags" gorm:"serializer:json"`
 	Perspective string
-	Scale       datatypes.JSON `gorm:"type:jsonb"`
+	Dimensions  datatypes.JSON `gorm:"type:jsonb"`
 	ContentID   *uint          `gorm:"index"`
 	Content     datatypes.JSON `json:"content" gorm:"-"`
 	Version     uint
@@ -28,7 +28,7 @@ type AssetUpdate struct {
 	Description *string
 	Tags        *[]string
 	Perspective *string
-	Scale       *datatypes.JSON
+	Dimensions  *datatypes.JSON
 }
 
 type AssetDao interface {
@@ -57,7 +57,7 @@ func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint)
 	assets := make([]Asset, 0)
 	err := a.DB.WithContext(ctx).
 		Where("project_id = ?", projectID).
-		Select("id, name, project_id, type, description, tags, perspective, scale, version").
+		Select("id, name, project_id, type, description, tags, perspective, dimensions, version").
 		Order("id ASC").
 		Find(&assets).Error
 	return assets, err
@@ -106,8 +106,8 @@ func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUp
 	if update.Perspective != nil {
 		values["perspective"] = *update.Perspective
 	}
-	if update.Scale != nil {
-		values["scale"] = *update.Scale
+	if update.Dimensions != nil {
+		values["dimensions"] = *update.Dimensions
 	}
 	query := a.DB.WithContext(ctx).Model(&Asset{}).Where("id = ?", id)
 	if len(values) > 0 {

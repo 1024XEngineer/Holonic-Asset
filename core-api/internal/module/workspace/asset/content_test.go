@@ -115,7 +115,7 @@ func TestCharacterDirectionCountFollowsPerspective(t *testing.T) {
 	}
 }
 
-func TestAssetContentPreservesTileGridPositionWithoutScale(t *testing.T) {
+func TestAssetContentPreservesTileGridPositionWithoutDimensions(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeTileSet)
 	content.Items = []domain.TileSetItem{{
 		Name: "grass",
@@ -148,6 +148,6 @@ func TestAssetContentPreservesTileGridPositionWithoutScale(t *testing.T) {
 		t.Fatalf("decode raw tileset content: %v", err)
 	}
 	if _, exists := raw["tileSize"]; exists {
-		t.Fatalf("tileSize belongs to asset scale: %s", payload)
+		t.Fatalf("tileSize belongs to asset dimensions: %s", payload)
 	}
 }
