@@ -34,19 +34,19 @@ describe("tileset canvas state", () => {
 
     expect(getTilesetCanvasSelection(state, items, 4)).toEqual({
       selectedItems: ["sofa"],
-      selectedCells: [0, 1, 4, 5],
+      selectedCellIndexes: [0, 1, 4, 5],
       selectedLabels: ["Sofa"],
     });
 
     state = reduceTilesetCanvas(
       state,
-      { type: "item-cell.toggle", itemId: "sofa", cellIndex: 1 },
+      { type: "item-cell.toggle", itemId: "sofa", itemCellIndex: 1 },
       items,
       4,
     );
     expect(getTilesetCanvasSelection(state, items, 4)).toEqual({
       selectedItems: [],
-      selectedCells: [0, 4, 5],
+      selectedCellIndexes: [0, 4, 5],
       selectedLabels: ["Sofa / Tile 1", "Sofa / Tile 3", "Sofa / Tile 4"],
     });
   });
@@ -56,7 +56,7 @@ describe("tileset canvas state", () => {
     for (const cellIndex of [0, 1, 4, 5]) {
       state = reduceTilesetCanvas(
         state,
-        { type: "cell.selection.toggled", cellIndex },
+        { type: "cell.selection.toggled", gridCellIndex: cellIndex },
         items,
         4,
       );
@@ -72,7 +72,7 @@ describe("tileset canvas state", () => {
     let state = createInitialTilesetCanvasState(items, 4);
     state = reduceTilesetCanvas(
       state,
-      { type: "cell.selection.toggled", cellIndex: 99 },
+      { type: "cell.selection.toggled", gridCellIndex: 99 },
       items,
       4,
     );
@@ -86,7 +86,29 @@ describe("tileset canvas state", () => {
     );
     expect(getTilesetCanvasSelection(state, [], 8)).toEqual({
       selectedItems: [],
-      selectedCells: [],
+      selectedCellIndexes: [],
+      selectedLabels: [],
+    });
+  });
+
+  it("does not confuse model keys when item ids contain delimiters", () => {
+    const firstModel: TilesetItem[] = [
+      { id: "a", label: "A", tiles: [[0, 0]] },
+      { id: "b", label: "B", tiles: [[1, 0]] },
+    ];
+    const secondModel: TilesetItem[] = [
+      { id: "a:0,0|b", label: "Combined", tiles: [[1, 0]] },
+    ];
+    let state = createInitialTilesetCanvasState(firstModel, 4);
+    state = reduceTilesetCanvas(
+      state,
+      { type: "cell.selection.toggled", gridCellIndex: 0 },
+      firstModel,
+      4,
+    );
+
+    expect(getTilesetCanvasSelection(state, secondModel, 4)).toMatchObject({
+      selectedCellIndexes: [],
       selectedLabels: [],
     });
   });

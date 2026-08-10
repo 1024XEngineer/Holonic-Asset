@@ -8,7 +8,7 @@ export type TilesetCanvasModel = {
 
 export type TilesetCanvasEvent = {
   type: "cell.selection.toggled";
-  cellIndex: number;
+  gridCellIndex: number;
 };
 
 export type TilesetCanvasProps = {

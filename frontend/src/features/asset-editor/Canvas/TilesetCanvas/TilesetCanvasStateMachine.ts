@@ -1,4 +1,4 @@
-import { useReducer } from "react";
+import { useMemo, useReducer } from "react";
 
 import type { ItemTile } from "@/model";
 import type { TilesetItem } from "@/model";
@@ -13,17 +13,12 @@ export type TilesetCanvasState = {
 export type TilesetCanvasStateEvent =
   | TilesetCanvasEvent
   | { type: "item.toggle"; itemId: string }
-  | { type: "item-cell.toggle"; itemId: string; cellIndex: number };
+  | { type: "item-cell.toggle"; itemId: string; itemCellIndex: number };
 
 export type TilesetCanvasSelection = {
   selectedItems: string[];
-  selectedCells: number[];
+  selectedCellIndexes: number[];
   selectedLabels: string[];
-};
-
-export const initialTilesetCanvasState: TilesetCanvasState = {
-  modelKey: "",
-  selectedCellIndexes: [],
 };
 
 export function createInitialTilesetCanvasState(
@@ -42,13 +37,26 @@ export function reduceTilesetCanvas(
   items: readonly TilesetItem[],
   gridSize: number,
 ): TilesetCanvasState {
-  const modelKey = getTilesetModelKey(items, gridSize);
+  return reduceTilesetCanvasWithIndex(
+    state,
+    event,
+    createTilesetCanvasIndex(items, gridSize),
+  );
+}
+
+function reduceTilesetCanvasWithIndex(
+  state: TilesetCanvasState,
+  event: TilesetCanvasStateEvent,
+  index: TilesetCanvasIndex,
+): TilesetCanvasState {
   const current =
-    state.modelKey === modelKey ? state : { modelKey, selectedCellIndexes: [] };
+    state.modelKey === index.modelKey
+      ? state
+      : { modelKey: index.modelKey, selectedCellIndexes: [] };
 
   if (event.type === "item.toggle") {
-    const item = items.find((candidate) => candidate.id === event.itemId);
-    const itemCells = getTilesetItemCellIndexes(item, gridSize);
+    const item = index.itemsById.get(event.itemId);
+    const itemCells = item ? (index.itemCellIndexes.get(item) ?? []) : [];
     if (itemCells.length === 0) return current;
 
     const selected = new Set(current.selectedCellIndexes);
@@ -64,18 +72,18 @@ export function reduceTilesetCanvas(
   }
 
   if (event.type === "item-cell.toggle") {
-    const item = items.find((candidate) => candidate.id === event.itemId);
-    const coordinate = item?.tiles[event.cellIndex];
+    const item = index.itemsById.get(event.itemId);
+    const coordinate = item?.tiles[event.itemCellIndex];
     const cellIndex = coordinate
-      ? getTilesetCellIndex(coordinate, gridSize)
+      ? getTilesetCellIndex(coordinate, index.gridSize)
       : undefined;
     if (cellIndex === undefined) return current;
 
     return toggleCell(current, cellIndex);
   }
 
-  if (!isTilesetCellIndex(event.cellIndex, gridSize)) return current;
-  return toggleCell(current, event.cellIndex);
+  if (!isTilesetCellIndex(event.gridCellIndex, index.gridSize)) return current;
+  return toggleCell(current, event.gridCellIndex);
 }
 
 export function getTilesetCanvasSelection(
@@ -83,19 +91,28 @@ export function getTilesetCanvasSelection(
   items: readonly TilesetItem[],
   gridSize: number,
 ): TilesetCanvasSelection {
-  const modelKey = getTilesetModelKey(items, gridSize);
-  const selectedCells =
-    state.modelKey === modelKey
+  return getTilesetCanvasSelectionWithIndex(
+    state,
+    createTilesetCanvasIndex(items, gridSize),
+  );
+}
+
+function getTilesetCanvasSelectionWithIndex(
+  state: TilesetCanvasState,
+  index: TilesetCanvasIndex,
+): TilesetCanvasSelection {
+  const selectedCellIndexes =
+    state.modelKey === index.modelKey
       ? uniqueSorted(
           state.selectedCellIndexes.filter((cellIndex) =>
-            isTilesetCellIndex(cellIndex, gridSize),
+            isTilesetCellIndex(cellIndex, index.gridSize),
           ),
         )
       : [];
-  const selectedCellSet = new Set(selectedCells);
-  const selectedItems = items
+  const selectedCellSet = new Set(selectedCellIndexes);
+  const selectedItems = index.items
     .filter((item) => {
-      const itemCells = getTilesetItemCellIndexes(item, gridSize);
+      const itemCells = index.itemCellIndexes.get(item) ?? [];
       return (
         itemCells.length > 0 &&
         itemCells.every((cellIndex) => selectedCellSet.has(cellIndex))
@@ -105,17 +122,17 @@ export function getTilesetCanvasSelection(
   const selectedItemSet = new Set(selectedItems);
   const selectedLabels = [
     ...selectedItems.map(
-      (itemId) => items.find((item) => item.id === itemId)?.label ?? itemId,
+      (itemId) => index.itemsById.get(itemId)?.label ?? itemId,
     ),
-    ...selectedCells.flatMap((cellIndex) => {
-      const owner = findCellOwner(cellIndex, items, gridSize);
+    ...selectedCellIndexes.flatMap((cellIndex) => {
+      const owner = index.cellOwnersByIndex.get(cellIndex);
       if (!owner) return [`Tile ${cellIndex + 1}`];
       if (selectedItemSet.has(owner.item.id)) return [];
       return [`${owner.item.label} / Tile ${owner.itemCellIndex + 1}`];
     }),
   ];
 
-  return { selectedItems, selectedCells, selectedLabels };
+  return { selectedItems, selectedCellIndexes, selectedLabels };
 }
 
 export function getTilesetCellIndex([column, row]: ItemTile, gridSize: number) {
@@ -156,27 +173,34 @@ export function useTilesetCanvasStateMachine(
   items: readonly TilesetItem[],
   gridSize: number,
 ) {
+  const index = useMemo(
+    () => createTilesetCanvasIndex(items, gridSize),
+    [items, gridSize],
+  );
   const [state, dispatch] = useReducer(
     (
       current: TilesetCanvasState,
       event: TilesetCanvasStateEvent,
     ): TilesetCanvasState =>
-      reduceTilesetCanvas(current, event, items, gridSize),
+      reduceTilesetCanvasWithIndex(current, event, index),
     undefined,
-    () => createInitialTilesetCanvasState(items, gridSize),
+    () => ({ modelKey: index.modelKey, selectedCellIndexes: [] }),
   );
-  const selection = getTilesetCanvasSelection(state, items, gridSize);
-  const selectedCells = new Set(selection.selectedCells);
+  const selection = useMemo(
+    () => getTilesetCanvasSelectionWithIndex(state, index),
+    [index, state],
+  );
+  const selectedCellSet = new Set(selection.selectedCellIndexes);
 
   return {
     ...selection,
-    isCellSelected: (itemId: string, cellIndex: number) => {
-      const item = items.find((candidate) => candidate.id === itemId);
-      const coordinate = item?.tiles[cellIndex];
+    isCellSelected: (itemId: string, itemCellIndex: number) => {
+      const item = index.itemsById.get(itemId);
+      const coordinate = item?.tiles[itemCellIndex];
       const target = coordinate
-        ? getTilesetCellIndex(coordinate, gridSize)
+        ? getTilesetCellIndex(coordinate, index.gridSize)
         : undefined;
-      return target !== undefined && selectedCells.has(target);
+      return target !== undefined && selectedCellSet.has(target);
     },
     send: dispatch,
   };
@@ -199,21 +223,6 @@ function withSelectedCells(
   };
 }
 
-function findCellOwner(
-  cellIndex: number,
-  items: readonly TilesetItem[],
-  gridSize: number,
-) {
-  for (const item of items) {
-    const itemCellIndex = item.tiles.findIndex(
-      (coordinate) => getTilesetCellIndex(coordinate, gridSize) === cellIndex,
-    );
-    if (itemCellIndex >= 0) return { item, itemCellIndex };
-  }
-
-  return undefined;
-}
-
 function isTilesetCellIndex(cellIndex: number, gridSize: number) {
   return (
     isValidGridSize(gridSize) &&
@@ -223,13 +232,52 @@ function isTilesetCellIndex(cellIndex: number, gridSize: number) {
   );
 }
 
+type TilesetCanvasIndex = {
+  gridSize: number;
+  modelKey: string;
+  items: readonly TilesetItem[];
+  itemsById: Map<string, TilesetItem>;
+  itemCellIndexes: Map<TilesetItem, number[]>;
+  cellOwnersByIndex: Map<number, { item: TilesetItem; itemCellIndex: number }>;
+};
+
+function createTilesetCanvasIndex(
+  items: readonly TilesetItem[],
+  gridSize: number,
+): TilesetCanvasIndex {
+  const itemsById = new Map<string, TilesetItem>();
+  const itemCellIndexes = new Map<TilesetItem, number[]>();
+  const cellOwnersByIndex = new Map<
+    number,
+    { item: TilesetItem; itemCellIndex: number }
+  >();
+
+  for (const item of items) {
+    if (!itemsById.has(item.id)) itemsById.set(item.id, item);
+
+    const cellIndexes = getTilesetItemCellIndexes(item, gridSize);
+    itemCellIndexes.set(item, cellIndexes);
+
+    item.tiles.forEach((coordinate, itemCellIndex) => {
+      const cellIndex = getTilesetCellIndex(coordinate, gridSize);
+      if (cellIndex !== undefined && !cellOwnersByIndex.has(cellIndex)) {
+        cellOwnersByIndex.set(cellIndex, { item, itemCellIndex });
+      }
+    });
+  }
+
+  return {
+    gridSize,
+    modelKey: getTilesetModelKey(items, gridSize),
+    items,
+    itemsById,
+    itemCellIndexes,
+    cellOwnersByIndex,
+  };
+}
+
 function getTilesetModelKey(items: readonly TilesetItem[], gridSize: number) {
-  return `${gridSize}|${items
-    .map(
-      (item) =>
-        `${item.id}:${item.tiles.map(([column, row]) => `${column},${row}`).join(";")}`,
-    )
-    .join("|")}`;
+  return JSON.stringify([gridSize, items.map((item) => [item.id, item.tiles])]);
 }
 
 function uniqueSorted(values: readonly number[]) {

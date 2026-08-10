@@ -33,9 +33,9 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
         ) : (
           <TileSelectionGrid
             gridSize={gridSize}
-            selectedCellIndexes={model.selectedCellIndexes}
-            onToggleCell={(cellIndex) =>
-              onEvent({ type: "cell.selection.toggled", cellIndex })
+            selectedCellIndexes={[...highlightedCells]}
+            onToggleCell={(gridCellIndex) =>
+              onEvent({ type: "cell.selection.toggled", gridCellIndex })
             }
             ariaLabel="Tileset grid"
             className="size-[min(100cqw,100cqh)] border border-[#5dabb0] bg-white shadow-[0_18px_50px_rgb(45_41_35/0.14)]"
