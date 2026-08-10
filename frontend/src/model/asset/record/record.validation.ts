@@ -13,6 +13,7 @@ import type {
   UISetComponent,
 } from "./types";
 import type { ItemTile } from "@/model/item-tile";
+import { isSafeImageUrl } from "@/lib/is-safe-image-url";
 import type { SpriteAssetRecordData } from "./types/asset-record";
 
 export function isAssetRecordForKind<K extends AssetKind>(
@@ -140,7 +141,7 @@ function isSceneryLayer(value: unknown): value is SceneryLayer {
     typeof value.id === "string" &&
     typeof value.label === "string" &&
     typeof value.detail === "string" &&
-    typeof value.imageUrl === "string" &&
+    isSafeImageUrl(value.imageUrl) &&
     (value.blendMode === "normal" || value.blendMode === "multiply")
   );
 }
@@ -150,7 +151,7 @@ function isTilesetItem(value: unknown): value is TilesetItem {
     isPlainObject(value) &&
     typeof value.id === "string" &&
     typeof value.label === "string" &&
-    (value.imageUrl === undefined || typeof value.imageUrl === "string") &&
+    (value.imageUrl === undefined || isSafeImageUrl(value.imageUrl)) &&
     isArrayOf(value.tiles, isItemTile)
   );
 }

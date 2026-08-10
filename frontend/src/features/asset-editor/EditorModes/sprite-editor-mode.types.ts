@@ -4,29 +4,13 @@ import type {
   CharacterAnimation,
   CharacterSpriteSheet,
   GenerateAnimationRequest,
-  SpriteAssetKind,
 } from "@/model";
 
-import type { EditorGenerationTask } from "../Header/editor-header";
+import type { EditorHeaderProps } from "../Header/editor-header";
 import type { InspectorSubmitRequest } from "../Inspector/inspector.types";
 
 export type SpriteEditorModeProps = {
-  header: {
-    assetKind: SpriteAssetKind;
-    assetName: string;
-    version: string;
-    projectName: string;
-    status: string;
-    canUndo: boolean;
-    canRedo: boolean;
-    isDirty: boolean;
-    isSaving: boolean;
-    generationTasks: EditorGenerationTask[];
-    onBack: () => void;
-    onUndo: () => void;
-    onRedo: () => void;
-    onSave: () => void;
-  };
+  header: EditorHeaderProps;
   sprite: {
     prototype: CharacterSpriteSheet;
     animations: CharacterAnimation[];

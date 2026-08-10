@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useRecordQuery } from "@/model";
 import type { AssetWorkspaceData } from "@/model";
 
+import { AssetCanvasEditorMode } from "./EditorModes/asset-canvas-editor-mode";
 import { SpriteEditorMode } from "./EditorModes/sprite-editor-mode";
 import { useEditorWorkspace } from "./use-editor-workspace";
 
@@ -51,15 +52,12 @@ export function EditorWorkspace({
     );
   }
 
-  if (
-    recordQuery.data.record.mode !== "character" &&
-    recordQuery.data.record.mode !== "object"
-  ) {
+  if (recordQuery.data.record.mode === "audio") {
     return (
       <EditorStatus
         icon={<AlertTriangle className="size-5" />}
         title="Editor unavailable"
-        description="This editor currently supports character and object assets."
+        description="Audio assets do not have an editor workspace yet."
         action={<Button onClick={onBack}>Back to library</Button>}
       />
     );
@@ -81,14 +79,26 @@ function EditorWorkspaceContent({
   data: AssetWorkspaceData;
   onBack: () => void;
 }) {
-  const editorProps = useEditorWorkspace({ data, onBack });
-  if (!editorProps) return null;
-
   return (
     <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-muted/30 text-foreground selection:bg-primary/20">
-      <SpriteEditorMode {...editorProps} />
+      {data.record.mode === "character" || data.record.mode === "object" ? (
+        <SpriteEditorWorkspace data={data} onBack={onBack} />
+      ) : (
+        <AssetCanvasEditorMode data={data} onBack={onBack} />
+      )}
     </div>
   );
+}
+
+function SpriteEditorWorkspace({
+  data,
+  onBack,
+}: {
+  data: AssetWorkspaceData;
+  onBack: () => void;
+}) {
+  const editorProps = useEditorWorkspace({ data, onBack });
+  return editorProps ? <SpriteEditorMode {...editorProps} /> : null;
 }
 
 function EditorStatus({
