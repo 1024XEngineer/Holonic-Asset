@@ -2,7 +2,7 @@ import { ArrowLeft, Redo2, Save, Undo2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { SpriteAssetKind } from "@/model";
+import type { AssetKind } from "@/model";
 
 import {
   GenerationTaskDropdown,
@@ -10,6 +10,23 @@ import {
 } from "./generation-task-dropdown";
 
 export type { EditorGenerationTask } from "./generation-task-dropdown";
+
+export type EditorHeaderProps = {
+  assetKind: AssetKind;
+  assetName: string;
+  version: string;
+  projectName: string;
+  onBack: () => void;
+  status: string;
+  canUndo: boolean;
+  canRedo: boolean;
+  isDirty: boolean;
+  isSaving: boolean;
+  generationTasks: EditorGenerationTask[];
+  onUndo: () => void;
+  onRedo: () => void;
+  onSave: () => void;
+};
 
 export function EditorHeader({
   assetKind,
@@ -26,22 +43,7 @@ export function EditorHeader({
   onUndo,
   onRedo,
   onSave,
-}: {
-  assetKind: SpriteAssetKind;
-  assetName: string;
-  version: string;
-  projectName: string;
-  onBack: () => void;
-  status: string;
-  canUndo: boolean;
-  canRedo: boolean;
-  isDirty: boolean;
-  isSaving: boolean;
-  generationTasks: EditorGenerationTask[];
-  onUndo: () => void;
-  onRedo: () => void;
-  onSave: () => void;
-}) {
+}: EditorHeaderProps) {
   return (
     <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-3 sm:px-5">
       <div className="flex min-w-0 items-center gap-3">

@@ -11,7 +11,7 @@ export type AssetCanvasPosition = { x: number; y: number };
 export type TilesetItem = {
   id: string;
   label: string;
-  /** Complete generated item image; tiles are only a front-end interaction map. */
+  /** Complete generated item image; tiles define its grid placement and selection footprint. */
   imageUrl?: string;
   /** Every tileset tile occupied by this complete item, as [column, row]. */
   tiles: ItemTile[];
