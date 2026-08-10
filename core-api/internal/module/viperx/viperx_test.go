@@ -29,6 +29,10 @@ log:
   maxBackups: 7
   maxAge: 14
   compress: true
+llm:
+  baseURL: https://llm.example.test
+  apiKey: test-llm-key
+  defaultModel: vision-model
 qiniu:
   accessKey: test-ak
   secretKey: test-sk
@@ -55,6 +59,9 @@ qiniu:
 	if loaded.Log.Path != "./logs/app.log" || !loaded.Log.Compress {
 		t.Fatalf("unexpected log config: %+v", loaded.Log)
 	}
+	if loaded.LLM.BaseURL != "https://llm.example.test" || loaded.LLM.APIKey != "test-llm-key" || loaded.LLM.DefaultModel != "vision-model" {
+		t.Fatalf("unexpected LLM config: %+v", loaded.LLM)
+	}
 	if loaded.QiNiu.AccessKey != "test-ak" || loaded.QiNiu.SecretKey != "test-sk" || loaded.QiNiu.Bucket != "asset-bucket" || loaded.QiNiu.Domain != "cdn.example.com" || loaded.QiNiu.UploadTokenExpiry != 45*time.Minute || loaded.QiNiu.DownloadURLExpiry != 20*time.Minute {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
 	}
@@ -70,6 +77,9 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
+	}
+	if loaded.LLM.BaseURL != "" || loaded.LLM.APIKey != "" || loaded.LLM.DefaultModel != "" {
+		t.Fatalf("expected example LLM config to be user-supplied: %+v", loaded.LLM)
 	}
 	if loaded.QiNiu.UploadTokenExpiry != time.Hour || loaded.QiNiu.DownloadURLExpiry != 30*time.Minute {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
