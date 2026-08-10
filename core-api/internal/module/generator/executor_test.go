@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -27,9 +28,16 @@ type imageProcessorStub struct {
 	err            error
 }
 
+type referenceUpload struct {
+	key       string
+	reference string
+}
+
 type referenceStoreStub struct {
 	resolved   []string
 	persisted  []string
+	uploads    []referenceUpload
+	events     *[]string
 	resolveErr error
 	persistErr error
 }
@@ -48,6 +56,24 @@ func (s *referenceStoreStub) PersistReference(_ context.Context, reference strin
 		return "", s.persistErr
 	}
 	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
+}
+
+func (s *referenceStoreStub) NewObjectKey(_ string) (string, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "allocate_key")
+	}
+	return "uploads/prototype.png", nil
+}
+
+func (s *referenceStoreStub) PersistReferenceAt(_ context.Context, key, reference string) error {
+	if s.events != nil {
+		*s.events = append(*s.events, "persist:"+key)
+	}
+	s.uploads = append(s.uploads, referenceUpload{key: key, reference: reference})
+	if s.persistErr != nil {
+		return s.persistErr
+	}
+	return nil
 }
 
 func (s *imageProcessorStub) RemoveBackground(
@@ -85,12 +111,22 @@ func (s *imageProcessorStub) Verify(
 
 func (s *imageProcessorStub) SplitImage(
 	_ context.Context,
-	_ *imageprocessor.SplitImageRequest,
+	request *imageprocessor.SplitImageRequest,
 ) (*imageprocessor.SplitImageResult, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "split_image")
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &imageprocessor.SplitImageResult{}, nil
+	regionCount := request.Columns * request.Rows
+	regions := make([]imageprocessor.ImageRegion, regionCount)
+	for index := range regions {
+		regions[index] = imageprocessor.ImageRegion{
+			Index: index, ImageBase64: fmt.Sprintf("direction-%d", index), MIMEType: "image/png",
+		}
+	}
+	return &imageprocessor.SplitImageResult{Regions: regions}, nil
 }
 
 func (s *imageGenerationServiceStub) Generate(
@@ -223,19 +259,24 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
+		"process_image",
+		"split_image",
+		"resize_image",
+		"resize_image",
 		"resize_image",
 		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
-	if images.request == nil || images.request.Prompt != "pixel knight" ||
+	if images.request == nil || !strings.Contains(images.request.Prompt, "pixel knight") ||
+		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
 	}
-	if len(processor.resizeRequests) != 2 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
-		t.Fatalf("asset dimensions was not passed to processor: %+v", processor.resizeRequests)
+	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
+		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -252,11 +293,11 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if string(assets.characterAsset.Dimensions) != `{"width":64,"height":64}` {
 		t.Fatalf("unexpected character dimensions: %s", assets.characterAsset.Dimensions)
 	}
-	assertPrototypeResources(t, assets.characterAsset)
+	assertPrototypeResources(t, assets.characterAsset, 4)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
 }
 
-func TestExecutorDerivesCharacterDirectionCountFromPerspective(t *testing.T) {
+func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyInput(t *testing.T) {
 	for _, test := range []struct {
 		perspective assetdomain.Perspective
 		want        uint
@@ -278,7 +319,8 @@ func TestExecutorDerivesCharacterDirectionCountFromPerspective(t *testing.T) {
 			"asset_name":"hero",
 			"creative_brief":"pixel knight",
 			"dimensions":{"width":64,"height":64},
-			"perspective":%q
+			"perspective":%q,
+			"direction_count":"1"
 		}`, test.perspective))
 			if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
 				t.Fatalf("generate character prototype: %v", err)
@@ -298,7 +340,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	references := &referenceStoreStub{}
+	references := &referenceStoreStub{events: &events}
 	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
@@ -315,15 +357,39 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	if len(references.resolved) != 1 || references.resolved[0] != "projects/7/reference.png" {
 		t.Fatalf("expected execution-time reference resolution, got %v", references.resolved)
 	}
-	if len(references.persisted) != 2 || references.persisted[0] != "data:image/png;base64,first" || references.persisted[1] != "data:image/png;base64,second" {
-		t.Fatalf("expected generated images to be persisted as data URLs, got %v", references.persisted)
+	if len(references.uploads) != 8 {
+		t.Fatalf("expected four unprocessed and four final uploads, got %d: %+v", len(references.uploads), references.uploads)
+	}
+	wantEvents := []string{"generate_image", "process_image", "split_image", "allocate_key"}
+	for index := range 4 {
+		wantEvents = append(wantEvents,
+			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
+			"resize_image",
+			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
+		)
+	}
+	wantEvents = append(wantEvents, "create_character_asset")
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Fatalf("unexpected raw/final upload order: %v", events)
 	}
 	content, err := assets.characterAsset.DecodeContent()
 	if err != nil {
 		t.Fatalf("decode generated asset: %v", err)
 	}
-	if *(*content.Prototype)[0].URL != "uploads/generated-1.png" || *(*content.Prototype)[1].URL != "uploads/generated-2.png" {
+	if *(*content.Prototype)[0].URL != "uploads/prototype-0.png" ||
+		*(*content.Prototype)[1].URL != "uploads/prototype-1.png" ||
+		*(*content.Prototype)[2].URL != "uploads/prototype-2.png" ||
+		*(*content.Prototype)[3].URL != "uploads/prototype-3.png" {
 		t.Fatalf("expected object keys in generated asset: %+v", content.Prototype)
+	}
+	for index := range 4 {
+		uploadOffset := index * 2
+		if references.uploads[uploadOffset].key != fmt.Sprintf("uploads/prototype-%d-unprocessed.png", index) {
+			t.Fatalf("unexpected unprocessed key at %d: %+v", index, references.uploads[uploadOffset])
+		}
+		if references.uploads[uploadOffset+1].key != fmt.Sprintf("uploads/prototype-%d.png", index) {
+			t.Fatalf("unexpected final key at %d: %+v", index, references.uploads[uploadOffset+1])
+		}
 	}
 }
 
@@ -335,8 +401,9 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	payload := json.RawMessage(`{
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
-			"dimensions":{"width":128,"height":128},
+		"dimensions":{"width":128,"height":128},
 		"perspective":"Isometric",
+		"direction_count":"4",
 		"project_id":12
 	}`)
 
@@ -347,8 +414,14 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	if !reflect.DeepEqual(events, []string{
 		"generate_image",
 		"process_image",
+		"split_image",
 		"resize_image",
-		"process_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
 		"resize_image",
 		"create_object_asset",
 	}) {
@@ -361,7 +434,10 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	if assets.objectAsset.Perspective != assetdomain.PerspectiveIsometric {
 		t.Fatalf("unexpected object perspective: %q", assets.objectAsset.Perspective)
 	}
-	assertPrototypeResources(t, assets.objectAsset)
+	if images.request == nil || !strings.Contains(images.request.Prompt, "<direction_count>\n8\n</direction_count>") {
+		t.Fatalf("object prompt did not include derived direction count: %+v", images.request)
+	}
+	assertPrototypeResources(t, assets.objectAsset, 8)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
 }
 
@@ -389,7 +465,6 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 			if !reflect.DeepEqual(events, []string{
 				"generate_image",
 				"resize_image",
-				"resize_image",
 				"create_animation",
 				"update_animation_frames",
 			}) {
@@ -400,13 +475,11 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 				t.Fatalf("unexpected image request: %+v", images.request)
 			}
 			if assets.animationAssetID != 7 || assets.animationID != 3 ||
-				assets.animationName != "walk" || len(assets.frames) != 2 {
+				assets.animationName != "walk" || len(assets.frames) != 1 {
 				t.Fatalf("unexpected animation update: %+v", assets)
 			}
 			if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
-				*assets.frames[0].URL != "data:image/png;base64,first" ||
-				assets.frames[1].ID != 2 || assets.frames[1].URL == nil ||
-				*assets.frames[1].URL != "data:image/png;base64,second" {
+				*assets.frames[0].URL != "data:image/png;base64,sheet" {
 				t.Fatalf("unexpected animation frames: %+v", assets.frames)
 			}
 			assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
@@ -514,12 +587,11 @@ func TestExecutorRequiresDependencies(t *testing.T) {
 
 func generatedImages() *imageclient.GenerateResult {
 	return &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{
-		{Base64: "first", MediaType: "image/png"},
-		{Base64: "second", MediaType: "image/webp"},
+		{Base64: "sheet", MediaType: "image/png"},
 	}}
 }
 
-func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset) {
+func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset, wantCount int) {
 	t.Helper()
 	if asset == nil {
 		t.Fatal("expected created asset")
@@ -528,15 +600,15 @@ func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset) {
 	if err != nil {
 		t.Fatalf("decode asset content: %v", err)
 	}
-	if content.Prototype == nil || len(*content.Prototype) != 2 {
+	if content.Prototype == nil || len(*content.Prototype) != wantCount {
 		t.Fatalf("unexpected prototype: %+v", content.Prototype)
 	}
 	prototype := *content.Prototype
-	if prototype[0].ID != 1 || prototype[0].URL == nil ||
-		*prototype[0].URL != "data:image/png;base64,first" ||
-		prototype[1].ID != 2 || prototype[1].URL == nil ||
-		*prototype[1].URL != "data:image/png;base64,second" {
-		t.Fatalf("unexpected prototype resources: %+v", prototype)
+	for index, resource := range prototype {
+		if resource.ID != uint(index+1) || resource.URL == nil ||
+			*resource.URL != fmt.Sprintf("data:image/png;base64,direction-%d", index) {
+			t.Fatalf("unexpected prototype resource at %d: %+v", index, resource)
+		}
 	}
 }
 

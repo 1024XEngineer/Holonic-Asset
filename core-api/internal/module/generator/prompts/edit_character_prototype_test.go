@@ -18,7 +18,7 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 		"Reference image 1, the first supplied image, is always the original character prototype",
 		"Reference image 2 and every later supplied image are project reference images",
 		"Minor edit",
-		"exactly 2 full-body direction views",
+		"exactly 2 direction views",
 		"1 row x 2 column sheet",
 		"perspective-derived direction count and grid override",
 		"rebuild the output sheet with the required perspective mapping",
@@ -46,19 +46,19 @@ func TestEditCharacterPrototypeDerivesDirectionLayoutFromPerspective(t *testing.
 			name:        "side on",
 			perspective: "Side-On",
 			direction:   "2",
-			expected:    []string{"Side-on perspective", "exactly 2 full-body direction views", "1 row x 2 column sheet", "left-facing and right-facing views in that order"},
+			expected:    []string{"Side-on perspective", "exactly 2 direction views", "1 row x 2 column sheet"},
 		},
 		{
 			name:        "top down",
 			perspective: "Top-Down",
 			direction:   "4",
-			expected:    []string{"Top-down perspective", "exactly 4 full-body direction views", "2 row x 2 column sheet", "front, right, back, and left views in that order"},
+			expected:    []string{"Top-down perspective", "exactly 4 direction views", "2 row x 2 column sheet"},
 		},
 		{
 			name:        "isometric",
 			perspective: "Isometric",
 			direction:   "8",
-			expected:    []string{"Isometric perspective", "exactly 8 full-body direction views", "2 row x 4 column sheet", "front, front-right, right, back-right, back, back-left, left, and front-left views in that order"},
+			expected:    []string{"Isometric perspective", "exactly 8 direction views", "2 row x 4 column sheet"},
 		},
 	}
 

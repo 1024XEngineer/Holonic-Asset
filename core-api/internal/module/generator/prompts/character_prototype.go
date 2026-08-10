@@ -7,10 +7,11 @@ import (
 )
 
 const characterDirectionSheetRules = `- Treat the selected perspective as authoritative. Use its backend-derived direction count and layout exactly as defined below.
-- Side-on perspective: render exactly 2 full-body direction views in a 1 row x 2 column sheet, with one view in each equal-sized cell. Place the left-facing and right-facing views in that order.
-- Top-down perspective: render exactly 4 full-body direction views in a 2 row x 2 column sheet, with one view in each equal-sized cell. Place the front, right, back, and left views in that order.
-- Isometric perspective: render exactly 8 full-body direction views in a 2 row x 4 column sheet, with one view in each equal-sized cell. Place the front, front-right, right, back-right, back, back-left, left, and front-left views in that order.
+- Side-on perspective: render exactly 2 direction views in a 1 row x 2 column sheet, with one view in each equal-sized cell.
+- Top-down perspective: render exactly 4 direction views in a 2 row x 2 column sheet, with one view in each equal-sized cell.
+- Isometric perspective: render exactly 8 direction views in a 2 row x 4 column sheet, with one view in each equal-sized cell.
 - Fill cells in normal reading order: left to right across the first row, then left to right across each following row. Complete the first row before starting the second row.
+- Keep the direction sequence internally consistent, but do not add direction names or labels inside the image. The pipeline identifies directions only by their reading-order indexes.
 - Each perspective intentionally produces one regular output sheet containing all required views. This is not a collage: do not add labels, separators, frames, scenery, or unrelated content.`
 
 const characterPrototypeTemplate = `Create one production-ready game character prototype based on the user requirements.

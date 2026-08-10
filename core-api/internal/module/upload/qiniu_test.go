@@ -293,6 +293,27 @@ func TestPersistReferenceUploadsDataURLAndReturnsObjectKey(t *testing.T) {
 	}
 }
 
+func TestPersistReferenceAtUploadsToProvidedObjectKey(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	uploader := &formUploaderStub{}
+	store.uploader = uploader
+
+	if err := store.PersistReferenceAt(
+		context.Background(),
+		"uploads/prototype-2-unprocessed.png",
+		"data:image/png;base64,aGVsbG8=",
+	); err != nil {
+		t.Fatalf("persist reference at key: %v", err)
+	}
+	if uploader.key != "uploads/prototype-2-unprocessed.png" ||
+		string(uploader.data) != "hello" || uploader.extra.MimeType != "image/png" {
+		t.Fatalf("unexpected exact-key upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+}
+
 func assertQiniuPrivateURL(t *testing.T, value string, wantPrefix string) {
 	t.Helper()
 	parsed, err := url.Parse(value)

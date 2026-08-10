@@ -16,8 +16,13 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 		"uniform, solid #00FF00 colour",
 		"Do not output transparency or a checkerboard",
 		"strictly follow their art style",
+		"exactly 4 direction views",
+		"2 row x 2 column sheet",
+		"normal reading order",
+		"reading-order indexes",
 		"a wooden chest with two locks",
 		"Top-Down",
+		"<direction_count>\n4\n</direction_count>",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)

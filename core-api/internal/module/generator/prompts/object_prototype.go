@@ -1,6 +1,10 @@
 package prompts
 
-import "fmt"
+import (
+	"fmt"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+)
 
 const objectPrototypeTemplate = `Create one production-ready game object asset based on the user requirements.
 
@@ -20,17 +24,22 @@ Default production guidelines:
 - Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional colour palette.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbour scaling. Never turn it into a high-definition illustration.
-- Generate one object as the only subject.
-- Show the entire object fully inside the canvas.
-- Center the object with balanced spacing around all edges.
+- Generate direction views of one consistent object as the only subject. Every cell must depict the same object.
+- Show the entire object fully inside every assigned grid cell.
+- Center each view with balanced spacing around all cell edges.
 - Use the specified camera perspective exactly.
-- Keep the object's shape, proportions, materials, and details visually coherent.
+- Keep the object's shape, proportions, materials, details, scale, and lighting visually coherent across all cells.
 - If project reference images are supplied, strictly follow their art style, visual language, rendering technique, and form of expression without copying recognizable content.
 - Do not include characters, people, hands, creatures, scenery, ground planes, frames, borders, text, labels, logos, watermarks, UI elements, or unrelated objects.
-- Do not create a collage, contact sheet, turnaround sheet, multiple variants, or multiple viewing angles.
+- Do not create variants beyond the required direction views.
 - Do not crop, cut off, obscure, or overlap any part of the object.
 - Preserve the requested visual style without introducing an unrelated art style.
 - Make the result suitable for direct isolation and use as a game asset.
+
+Direction sheet layout rules:
+%s
+- Keep equal gutters and equal margins on all four sides of every cell.
+- Do not allow any object pixel, attachment, shadow, or outline to cross a cell boundary. Keep the background uniform in every cell so the processor can split the sheet by its regular grid.
 
 User creative brief:
 <creative_brief>
@@ -40,12 +49,18 @@ User creative brief:
 User-selected perspective:
 <perspective>
 %s
-</perspective>`
+</perspective>
+
+Backend-derived direction count:
+<direction_count>
+%d
+</direction_count>`
 
 // ObjectPrototype combines the user requirements with the source project's
 // production constraints for one game object.
 func ObjectPrototype(creativeBrief string, perspective string, backgroundConstraint string) string {
-	return fmt.Sprintf(objectPrototypeTemplate, backgroundConstraint, creativeBrief, perspective)
+	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
+	return fmt.Sprintf(objectPrototypeTemplate, backgroundConstraint, characterDirectionSheetRules, creativeBrief, perspective, directionCount)
 }
 
 // SolidMatteBackground requires a deterministic chroma-key input for the
