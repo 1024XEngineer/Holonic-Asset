@@ -9,12 +9,20 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "content": {},
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
             "type": "string"
           },
           "projectId": {
@@ -54,8 +62,9 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "dimensions",
           "tags",
-          "attributes",
           "version"
         ],
         "type": "object"
@@ -71,7 +80,16 @@
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
             "type": "string"
           },
           "projectId": {
@@ -111,6 +129,8 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "dimensions",
           "tags",
           "version"
         ],
@@ -770,6 +790,21 @@
             "format": "date-time",
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
+          "dimensions": {},
+          "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
+          },
           "recordId": {
             "format": "int64",
             "minimum": 1,
@@ -786,7 +821,11 @@
           "assetId",
           "version",
           "contentId",
-          "createdAt"
+          "createdAt",
+          "name",
+          "description",
+          "perspective",
+          "dimensions"
         ],
         "type": "object"
       },
@@ -1319,34 +1358,26 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
             "type": "string"
           },
-          "projectId": {
-            "format": "int64",
-            "minimum": 1,
-            "type": "integer"
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
+            "type": "string"
           },
           "tags": {
             "items": {
               "type": "string"
             },
             "type": "array"
-          },
-          "type": {
-            "enum": [
-              "character",
-              "object",
-              "tileSet",
-              "audio",
-              "uiset",
-              "scenery"
-            ],
-            "type": "string"
           }
         },
         "required": [
@@ -1362,11 +1393,19 @@
             "minimum": 1,
             "type": "integer"
           },
-          "attributes": {},
           "description": {
             "type": "string"
           },
+          "dimensions": {},
           "name": {
+            "type": "string"
+          },
+          "perspective": {
+            "enum": [
+              "Top-Down",
+              "Side-On",
+              "Isometric"
+            ],
             "type": "string"
           },
           "projectId": {
@@ -1406,8 +1445,9 @@
           "projectId",
           "type",
           "description",
+          "perspective",
+          "dimensions",
           "tags",
-          "attributes",
           "version"
         ],
         "type": "object"

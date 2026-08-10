@@ -65,25 +65,8 @@ func TestAssetDecodeContentInitializesMissingContent(t *testing.T) {
 	}
 }
 
-func TestAssetContentRejectsUnsupportedPerspective(t *testing.T) {
-	content := domain.NewAssetContent(domain.AssetTypeCharacter)
-	content.Perspective = "side_on"
-	if _, err := domain.EncodeContent(content); err == nil {
-		t.Fatal("expected legacy perspective to be rejected when encoding content")
-	}
-
-	asset := domain.Asset{
-		Type:    domain.AssetTypeCharacter,
-		Content: json.RawMessage(`{"perspective":"side_on"}`),
-	}
-	if _, err := asset.DecodeContent(); err == nil {
-		t.Fatal("expected legacy perspective to be rejected when decoding content")
-	}
-}
-
 func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
-	content.Perspective = domain.PerspectiveSideOn
 	content.DirectionCount = 2
 	prototype := domain.Prototype{{ID: 1}, {ID: 2}, {ID: 3}}
 	content.Prototype = &prototype
@@ -99,9 +82,6 @@ func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testin
 	if decoded.DirectionCount != 2 {
 		t.Fatalf("unexpected direction count: %d", decoded.DirectionCount)
 	}
-	if decoded.Perspective != domain.PerspectiveSideOn {
-		t.Fatalf("unexpected perspective: %q", decoded.Perspective)
-	}
 	if decoded.Prototype == nil || len(*decoded.Prototype) != 3 {
 		t.Fatalf("prototype images should be preserved independently: %+v", decoded.Prototype)
 	}
@@ -109,8 +89,8 @@ func TestAssetContentKeepsDirectionCountIndependentFromPrototypeImages(t *testin
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		t.Fatalf("decode raw asset content: %v", err)
 	}
-	if raw["perspective"] != "Side-On" {
-		t.Fatalf("expected perspective field: %s", payload)
+	if _, exists := raw["perspective"]; exists {
+		t.Fatalf("perspective belongs to the asset, not content: %s", payload)
 	}
 	if _, exists := raw["viewMode"]; exists {
 		t.Fatalf("legacy viewMode field must not be encoded: %s", payload)
@@ -135,9 +115,8 @@ func TestCharacterDirectionCountFollowsPerspective(t *testing.T) {
 	}
 }
 
-func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
+func TestAssetContentPreservesTileGridPositionWithoutDimensions(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeTileSet)
-	content.TileSize = &domain.TileSize{Width: 32, Height: 32}
 	content.Items = []domain.TileSetItem{{
 		Name: "grass",
 		Tiles: []domain.Tile{{
@@ -155,9 +134,6 @@ func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
 	if err := json.Unmarshal(payload, &decoded); err != nil {
 		t.Fatalf("decode asset content: %v", err)
 	}
-	if decoded.TileSize == nil || decoded.TileSize.Width != 32 || decoded.TileSize.Height != 32 {
-		t.Fatalf("unexpected fixed tile size: %+v", decoded.TileSize)
-	}
 	if len(decoded.Items) != 1 || len(decoded.Items[0].Tiles) != 1 {
 		t.Fatalf("unexpected tileset items: %+v", decoded.Items)
 	}
@@ -166,5 +142,12 @@ func TestAssetContentPreservesTileGridPositionAndFixedSize(t *testing.T) {
 	}
 	if decoded.Items[0].Tiles[0].URL == nil || *decoded.Items[0].Tiles[0].URL != "https://cdn.example.com/tileset/grass/center.png" {
 		t.Fatalf("unexpected tile URL: %+v", decoded.Items[0].Tiles[0].URL)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		t.Fatalf("decode raw tileset content: %v", err)
+	}
+	if _, exists := raw["tileSize"]; exists {
+		t.Fatalf("tileSize belongs to asset dimensions: %s", payload)
 	}
 }

@@ -160,8 +160,10 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub, ContentDao: contentDao, RecordDao: recordDao}
 
 	created, err := repo.CreateCharacterAsset(context.Background(), &domain.Asset{
-		Name:      "hero",
-		ProjectID: 42,
+		Name:        "hero",
+		ProjectID:   42,
+		Perspective: domain.PerspectiveTopDown,
+		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 	})
 	if err != nil {
 		t.Fatalf("create character asset: %v", err)
