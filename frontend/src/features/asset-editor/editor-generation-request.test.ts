@@ -23,7 +23,7 @@ describe("buildInspectorGenerationRequest", () => {
     ).toEqual({
       assetId: 12,
       kind: "edit_character_frames",
-      prompt: "Make the stride longer",
+      creative_brief: "Make the stride longer",
       targetAssetPaths: [
         "animations.walk.frames.0",
         "animations.walk.frames.2",
@@ -45,7 +45,7 @@ describe("buildInspectorGenerationRequest", () => {
     ).toEqual({
       assetId: 4,
       kind: "edit_object_prototype",
-      prompt: "Add stronger highlights",
+      creative_brief: "Add stronger highlights",
       targetAssetPaths: undefined,
       parameters: undefined,
     });
