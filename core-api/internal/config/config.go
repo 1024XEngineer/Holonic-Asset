@@ -30,6 +30,12 @@ type ImageClientConfig struct {
 	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
 }
 
+type LLMClientConfig struct {
+	BaseURL      string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey       string `mapstructure:"apiKey" yaml:"apiKey"`
+	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
+}
+
 type VideoClientConfig struct {
 	BaseURL string `mapstructure:"baseURL" yaml:"baseURL"`
 	APIKey  string `mapstructure:"apiKey" yaml:"apiKey"`
@@ -50,6 +56,7 @@ type Config struct {
 	Queue QueueConfig       `mapstructure:"queue" yaml:"queue"`
 	Log   LogConfig         `mapstructure:"log" yaml:"log"`
 	Image ImageClientConfig `mapstructure:"image" yaml:"image"`
+	LLM   LLMClientConfig   `mapstructure:"llm" yaml:"llm"`
 	Video VideoClientConfig `mapstructure:"video" yaml:"video"`
 	QiNiu QiniuConfig       `mapstructure:"qiniu" yaml:"qiniu"`
 }
