@@ -7,3 +7,22 @@ export type {
   AssetGroupsByProject,
   AssetLibraryItem,
 } from "./asset-library";
+export type {
+  AssetAnimationFrameResponse,
+  AssetAnimationResponse,
+  AssetContentByType,
+  AssetContentMetadata,
+  AssetImageResourceResponse,
+  AssetPositionResponse,
+  AssetSizeResponse,
+  AudioAssetContent,
+  CharacterAssetContent,
+  ObjectAssetContent,
+  SceneryAssetContent,
+  SceneryLayerResponse,
+  TileSetAssetContent,
+  TileSetItemResponse,
+  TileSetTileResponse,
+  UISetAssetContent,
+  UISetComponentResponse,
+} from "./asset-content";

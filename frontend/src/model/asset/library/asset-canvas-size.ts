@@ -1,4 +1,8 @@
 import type { AssetKind } from "../types";
+import type {
+  AssetListItemResponse,
+  AssetSizeResponse,
+} from "./asset.contract";
 import {
   assetCanvasSizeOptions,
   type AssetCanvasSize,
@@ -17,4 +21,19 @@ const defaultCanvasSizeByAssetKind: Record<AssetKind, AssetCanvasSize> = {
 
 export function getDefaultAssetCanvasSize(kind: AssetKind) {
   return defaultCanvasSizeByAssetKind[kind];
+}
+
+export function resolveAssetCanvasSize(item: AssetListItemResponse) {
+  switch (item.type) {
+    case "audio":
+      return getDefaultAssetCanvasSize("audio");
+    case "tileSet":
+      return formatAssetSize(item.dimensions.tileSize);
+    default:
+      return formatAssetSize(item.dimensions);
+  }
+}
+
+function formatAssetSize({ width, height }: AssetSizeResponse) {
+  return `${width} × ${height} px`;
 }
