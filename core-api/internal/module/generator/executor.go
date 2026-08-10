@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -30,6 +32,8 @@ type AssetWriter interface {
 type ReferenceStore interface {
 	ResolveReference(context.Context, string) (string, error)
 	PersistReference(context.Context, string) (string, error)
+	NewObjectKey(string) (string, error)
+	PersistReferenceAt(context.Context, string, string) error
 }
 
 type executor struct {
@@ -107,17 +111,19 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
-	generated, err := e.generateImages(
+	directionCount := perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateCharacterProtoType,
-		payload.CreativeBrief,
+		prompts.CharacterPrototype(
+			payload.CreativeBrief,
+			payload.Perspective,
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
 		payload.Dimensions,
+		directionCount,
 		payload.Reference,
 	)
-	if err != nil {
-		return nil, err
-	}
-	resources, err := e.prototypeResources(ctx, generated)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +134,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.CreativeBrief,
 		perspective,
 		payload.Dimensions,
-		perspective.CharacterDirectionCount(),
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -152,17 +158,19 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
-	generated, err := e.generateImages(
+	directionCount := perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateObjectProtoType,
-		payload.CreativeBrief,
+		prompts.ObjectPrototype(
+			payload.CreativeBrief,
+			payload.Perspective,
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
 		payload.Dimensions,
+		directionCount,
 		payload.Reference,
 	)
-	if err != nil {
-		return nil, err
-	}
-	resources, err := e.prototypeResources(ctx, generated)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +181,7 @@ func (e *executor) generateObjectPrototype(
 		payload.CreativeBrief,
 		perspective,
 		payload.Dimensions,
-		0,
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -299,6 +307,156 @@ func (e *executor) generateImages(
 	return processed, nil
 }
 
+func (e *executor) generatePrototypeResources(
+	ctx context.Context,
+	taskType TaskType,
+	prompt string,
+	dimensions assetdomain.Size,
+	directionCount uint,
+	reference string,
+) ([]assetdomain.ImageResource, error) {
+	if directionCount == 0 {
+		return nil, fmt.Errorf("generator: prototype direction count must be positive")
+	}
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return nil, fmt.Errorf("generator: process %s images: dimensions must be positive", taskType)
+	}
+	columns, rows, err := directionGrid(directionCount)
+	if err != nil {
+		return nil, err
+	}
+	references := []string(nil)
+	if reference != "" {
+		if e.references != nil {
+			resolved, resolveErr := e.references.ResolveReference(ctx, reference)
+			if resolveErr != nil {
+				return nil, fmt.Errorf("generator: resolve %s reference: %w", taskType, resolveErr)
+			}
+			reference = resolved
+		}
+		references = []string{reference}
+	}
+	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
+		Prompt:          prompt,
+		ReferenceImages: references,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
+	}
+	if result == nil || len(result.Images) == 0 {
+		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
+	}
+	if len(result.Images) != 1 {
+		return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
+	}
+
+	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
+		ImageBase64: result.Images[0].Base64,
+		MatteColor:  imageprocessor.DefaultMatteColor,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: remove %s background: %w", taskType, err)
+	}
+	if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
+		return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
+	}
+	split, err := e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
+		ImageBase64:           backgroundRemoved.ImageBase64,
+		Mode:                  imageprocessor.ImageSplitModeGrid,
+		Columns:               columns,
+		Rows:                  rows,
+		ForceProportionalGrid: true,
+		CropToContent:         true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: split %s direction sheet: %w", taskType, err)
+	}
+	if split == nil || len(split.Regions) != int(directionCount) {
+		got := 0
+		if split != nil {
+			got = len(split.Regions)
+		}
+		return nil, fmt.Errorf("generator: split %s direction sheet: got %d regions, want %d", taskType, got, directionCount)
+	}
+
+	var baseKey string
+	if e.references != nil {
+		baseKey, err = e.references.NewObjectKey("image/png")
+		if err != nil {
+			return nil, fmt.Errorf("generator: allocate %s image key: %w", taskType, err)
+		}
+	}
+	resources := make([]assetdomain.ImageResource, 0, len(split.Regions))
+	for index, region := range split.Regions {
+		if region.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: split %s direction %d is empty", taskType, index)
+		}
+		unprocessedURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    region.ImageBase64,
+			MediaType: region.MIMEType,
+		})
+		finalKey := ""
+		if e.references != nil {
+			finalKey = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
+			if err := e.references.PersistReferenceAt(
+				ctx,
+				addObjectKeySuffix(finalKey, "-unprocessed"),
+				unprocessedURL,
+			); err != nil {
+				return nil, fmt.Errorf("generator: persist %s direction %d unprocessed image: %w", taskType, index, err)
+			}
+		}
+
+		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+			ImageBase64: region.ImageBase64,
+			Options:     imageprocessor.DefaultResizeOptions(int(dimensions.Width), int(dimensions.Height)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generator: resize %s direction %d image: %w", taskType, index, err)
+		}
+		if resized == nil || resized.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: resize %s direction %d image: empty result", taskType, index)
+		}
+		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    resized.ImageBase64,
+			MediaType: resized.MIMEType,
+		})
+		if e.references != nil {
+			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
+				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
+			}
+			finalURL = finalKey
+		}
+		resources = append(resources, assetdomain.ImageResource{
+			ID:  uint(index + 1),
+			URL: &finalURL,
+		})
+	}
+	return resources, nil
+}
+
+func directionGrid(directionCount uint) (int, int, error) {
+	switch directionCount {
+	case 2:
+		return 2, 1, nil
+	case 4:
+		return 2, 2, nil
+	case 8:
+		return 4, 2, nil
+	default:
+		return 0, 0, fmt.Errorf("generator: unsupported prototype direction count %d", directionCount)
+	}
+}
+
+func addObjectKeySuffix(objectKey, suffix string) string {
+	lastSlash := strings.LastIndex(objectKey, "/")
+	lastDot := strings.LastIndex(objectKey, ".")
+	if lastDot <= lastSlash {
+		return objectKey + suffix
+	}
+	return objectKey[:lastDot] + suffix + objectKey[lastDot:]
+}
+
 func newPrototypeAsset(
 	assetType assetdomain.AssetType,
 	name string,
@@ -338,25 +496,6 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 		return "", fmt.Errorf("generator: invalid perspective %q", perspective)
 	}
 	return value, nil
-}
-
-func (e *executor) prototypeResources(
-	ctx context.Context,
-	result *imageclient.GenerateResult,
-) ([]assetdomain.ImageResource, error) {
-	resources := make([]assetdomain.ImageResource, len(result.Images))
-	for index, image := range result.Images {
-		url := generatedImageDataURL(image)
-		if e.references != nil {
-			objectKey, err := e.references.PersistReference(ctx, url)
-			if err != nil {
-				return nil, fmt.Errorf("generator: persist prototype image %d: %w", index+1, err)
-			}
-			url = objectKey
-		}
-		resources[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &url}
-	}
-	return resources, nil
 }
 
 func (e *executor) animationFrames(
