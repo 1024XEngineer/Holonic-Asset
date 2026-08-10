@@ -205,12 +205,12 @@ AUTHENTIC PIXEL ART
 - Use a restrained palette of about 24-32 colours. Do not use smooth gradients, sub-pixel detail, anti-aliasing, 3D, vector-smooth shapes, painterly brushwork, glossy CGI, bloom, fog, lens effects, or depth-of-field.
 - Keep characters and entities at normal gameplay sprite scale. Do not turn the player into a large illustration. Prefer a few clearly readable sprites and props over many tiny muddled objects. Leave quiet space so the playfield reads immediately.
 
-GAMEPLAY SCREEN UI
+GAMEPLAY SCREEN UI SET
 %s
 
 NO GENERATED TEXT
 - Do not draw any words, letters, numerals, names, dialogue, tooltips, button labels, item labels, signs, logos, watermarks, or pseudo-text anywhere in the image. The project name is metadata and must not appear in the picture.
-- Never imitate text with broken glyphs or decorative gibberish. Use icon-only indicators, simple bars, empty slots, and pictograms when interface feedback is necessary. Any real UI text and numbers will be rendered later by the game's UI layer with a real pixel font.
+- Never imitate text with broken glyphs or decorative gibberish. Use icon-only indicators, simple bars, empty slots, and pictograms when interface feedback is necessary. Any real UI Set text and numbers will be rendered later by the game's interface layer with a real pixel font.
 
 FINAL CHECK
 Return one coherent playable screen with clear walkable or interactable spaces, consistent pixel scale, and a calm useful gameplay state. Remove anything that does not support the user's described game. The final image must contain zero generated text or pseudo-text.

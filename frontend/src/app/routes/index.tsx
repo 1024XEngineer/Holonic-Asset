@@ -3,9 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HomePage } from "@/pages/home/home-page";
 
 const title =
-  "Holonic Asset — AI Game Asset Generator for Characters, Tilesets & UI";
+  "Holonic Asset — AI Game Asset Generator for Characters, Tilesets & UI Set";
 const description =
-  "Generate game characters, objects, environments, tilesets, and UI with Holonic Asset, then organize every asset in a consistent project library.";
+  "Generate game characters, objects, environments, tilesets, and UI Set assets with Holonic Asset, then organize every asset in a consistent project library.";
 
 export const Route = createFileRoute("/")({
   component: HomePage,

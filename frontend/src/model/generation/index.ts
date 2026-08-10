@@ -4,7 +4,7 @@ export {
   useEnqueueGenerationMutation,
   useGenerationRunsQuery,
 } from "./run";
-export type { CreationRequest, GenerationRun, TileShapeCell } from "./run";
+export type { CreationRequest, GenerationRun } from "./run";
 export {
   useDeleteQuickAssetMutation,
   useGenerateQuickAssetMutation,
@@ -17,4 +17,5 @@ export type {
   GenerateAnimationRequest,
   GenerateAnimationResult,
   GeneratedCharacterAnimation,
+  SpriteAssetKind,
 } from "./animation";

@@ -101,11 +101,11 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	engine := generator.NewEngine(tasks, nil)
 	request := &generator.Request{
-		ProjectID:  42,
-		AssetID:    &assetID,
-		Kind:       generator.GenerateAnimation,
-		Prompt:     "walk",
-		Parameters: json.RawMessage(`{"animation_name":"hero walk","direction":"back_left"}`),
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.GenerateAnimation,
+		CreativeBrief: "walk",
+		Parameters:    json.RawMessage(`{"animation_name":"hero walk","direction":"back_left"}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -125,7 +125,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != request.ProjectID || payload.AssetID != assetID ||
-		payload.AnimationName != "hero walk" || payload.Direction != generator.AnimationDirectionBackLeft || payload.CreativeBrief != request.Prompt {
+		payload.AnimationName != "hero walk" || payload.Direction != generator.AnimationDirectionBackLeft || payload.CreativeBrief != request.CreativeBrief {
 		t.Fatalf("unexpected task payload: %+v", payload)
 	}
 	if strings.Contains(string(tasks.createdTask.Payload), "parent_id") {
@@ -138,11 +138,11 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	engine := generator.NewEngine(tasks, nil)
 
 	_, err := engine.Create(context.Background(), &generator.Request{
-		ProjectID: 42,
-		Kind:      generator.GenerateCharacterProtoType,
-		Prompt:    "hero",
+		ProjectID:     42,
+		Kind:          generator.GenerateCharacterProtoType,
+		CreativeBrief: "hero",
 		Parameters: json.RawMessage(
-			`{"asset_name":"knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4"}`,
+			`{"asset_name":"knight","creative_brief":"incorrect parameter brief","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4"}`,
 		),
 	})
 	if err != nil {

@@ -5,6 +5,7 @@ export {
   creatableAssetKinds,
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
+  recordQueryOptions,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -55,15 +56,16 @@ export type {
   CharacterAssetRecord,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
-  TilesetCell,
   TilesetItem,
-  UiAssetKind,
-  UiAssetRecord,
-  UiComponent,
+  UISetAssetKind,
+  UISetAssetRecord,
+  UISetComponent,
   UpdateAudioTrackInput,
 } from "./asset";
+export type { ItemTile } from "./item-tile";
 export { coreAssetApi } from "./asset/library/asset.api";
 export type {
   AssetAnimationFrameResponse,
@@ -152,4 +154,5 @@ export type {
   GenerateAnimationRequest,
   GenerateAnimationResult,
   GeneratedCharacterAnimation,
+  SpriteAssetKind,
 } from "./generation";
