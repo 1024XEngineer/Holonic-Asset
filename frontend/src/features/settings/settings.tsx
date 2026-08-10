@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 import { useTimeout } from "@/hooks/use-timeout";
@@ -33,8 +32,6 @@ export function Settings() {
   const [avatarUrl, setAvatarUrl] = useState<string>();
   const [profileSaved, setProfileSaved] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
-  const [language, setLanguage] = useState("English");
-  const [defaultPage, setDefaultPage] = useState("Projects");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schedule } = useTimeout();
 
@@ -191,30 +188,6 @@ export function Settings() {
                     <Moon />
                   </ThemeButton>
                 </div>
-              </PreferenceRow>
-              <PreferenceRow
-                description="Set the language used in application controls."
-                label="Language"
-              >
-                <DropdownField
-                  label={<span className="sr-only">Language</span>}
-                  className="w-32"
-                  options={["English", "Chinese"]}
-                  value={language}
-                  onChange={setLanguage}
-                />
-              </PreferenceRow>
-              <PreferenceRow
-                description="Choose where you begin after signing in."
-                label="Default page"
-              >
-                <DropdownField
-                  label={<span className="sr-only">Default page</span>}
-                  className="w-32"
-                  options={["Home", "Projects"]}
-                  value={defaultPage}
-                  onChange={setDefaultPage}
-                />
               </PreferenceRow>
             </div>
           </SettingsSection>
