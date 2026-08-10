@@ -34,10 +34,10 @@ type queue struct {
 	client   *riverqueue.Client[pgx.Tx]
 	dbPool   *pgxpool.Pool
 	registry *registry
-	repo     TaskResultStore
+	repo     TaskExecutionStore
 }
 
-func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskResultStore) (*queue, error) {
+func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskExecutionStore) (*queue, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("task: database URL is required")
 	}
@@ -116,6 +116,11 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	if message == nil {
 		return fmt.Errorf("task: cannot dispatch nil task")
 	}
+
+	if err := q.repo.UpdateTaskStatus(ctx, message.ID, StatusProcessing); err != nil {
+		return fmt.Errorf("task: mark task %d as processing: %w", message.ID, err)
+	}
+	message.Status = StatusProcessing
 
 	data, err := q.registry.dispatch(ctx, message)
 	if err != nil {
