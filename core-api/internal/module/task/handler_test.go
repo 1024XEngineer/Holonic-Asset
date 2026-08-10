@@ -54,7 +54,7 @@ func TestManagerExecutionDoesNotInvokeHandlerWhenProcessingTransitionFails(t *te
 	handlerCalled := false
 	queue.Register("example.v1", HandlerFunc(func(context.Context, *Task) (any, error) {
 		handlerCalled = true
-		return nil, nil
+		return struct{}{}, nil
 	}))
 
 	message := &Task{ID: 7, Type: "example.v1", Status: StatusPending}
