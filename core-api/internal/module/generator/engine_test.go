@@ -155,8 +155,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
 		payload.CreativeBrief != "hero" || payload.Reference != "" ||
-		payload.CanvasSize != "64x64" || payload.Perspective != "Top-Down" ||
-		payload.DirectionCount != "4" {
+		payload.CanvasSize != "64x64" || payload.Perspective != "Top-Down" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
 	}
 }
@@ -412,7 +411,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	}{
 		{
 			taskType: generator.GenerateCharacterProtoType,
-			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4","reference":"media-1","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"Top-Down","reference":"media-1","project_id":11}`),
 		},
 		{
 			taskType: generator.GenerateAnimation,
@@ -502,7 +501,7 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 }
 
 func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
-	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"Top-Down","direction_count":"4","reference":"media-1","project_id":42}`)
+	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","canvas_size":"64x64","perspective":"Top-Down","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
 	generator.NewEngine(tasks, executor)

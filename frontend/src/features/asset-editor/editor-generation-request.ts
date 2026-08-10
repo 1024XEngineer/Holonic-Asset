@@ -31,7 +31,7 @@ export function buildInspectorGenerationRequest(
   return {
     assetId,
     kind,
-    prompt: request.prompt,
+    creative_brief: request.prompt,
     targetAssetPaths,
     parameters: request.reference
       ? {

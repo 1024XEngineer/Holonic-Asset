@@ -12,35 +12,12 @@ import { Inspector } from "../Inspector/inspector";
 import type { SpriteEditorModeProps } from "./sprite-editor-mode.types";
 
 export function SpriteEditorMode({
-  assetKind,
-  assetName,
-  version,
-  projectName,
-  prototype,
-  animations,
-  nodePositions,
-  prompt,
-  history,
-  status,
-  canUndo,
-  canRedo,
-  isDirty,
-  isSaving,
-  isPromptSubmitting,
-  promptSubmitError,
-  isGeneratingAnimation,
-  generationTasks,
-  onBack,
-  onUndo,
-  onRedo,
-  onSave,
-  onPromptChange,
-  onPromptSubmit,
-  onPositionChange,
-  onAnimationGenerate,
-  onAnimationRename,
-  onAnimationDelete,
+  header,
+  sprite,
+  tree,
+  inspector,
 }: SpriteEditorModeProps) {
+  const { animations } = sprite;
   const [selection, setSelection] = useState<AnimatedSpriteCanvasSelection>({
     nodeIds: [],
     frames: [],
@@ -74,7 +51,7 @@ export function SpriteEditorMode({
   };
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
     if (event.type === "selection.changed") setSelection(event.selection);
-    else onPositionChange(event.nodeId, event.position);
+    else sprite.onPositionChange(event.nodeId, event.position);
   };
   const clearInspectorSelection = () => {
     setSelection({ nodeIds: [], frames: [] });
@@ -82,22 +59,7 @@ export function SpriteEditorMode({
 
   return (
     <>
-      <EditorHeader
-        assetKind={assetKind}
-        assetName={assetName}
-        version={version}
-        projectName={projectName}
-        status={status}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        isDirty={isDirty}
-        isSaving={isSaving}
-        generationTasks={generationTasks}
-        onBack={onBack}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        onSave={onSave}
-      />
+      <EditorHeader {...header} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <AssetTree
           animations={animations}
@@ -105,30 +67,25 @@ export function SpriteEditorMode({
           selectedFrames={selection.frames}
           onSelect={selectNode}
           onSelectFrame={selectFrame}
-          onGenerateAnimation={onAnimationGenerate}
-          onRenameAnimation={onAnimationRename}
-          onDeleteAnimation={onAnimationDelete}
-          isGeneratingAnimation={isGeneratingAnimation}
+          onGenerateAnimation={tree.onAnimationGenerate}
+          onRenameAnimation={tree.onAnimationRename}
+          onDeleteAnimation={tree.onAnimationDelete}
+          isGeneratingAnimation={tree.isGeneratingAnimation}
         />
         <AnimatedSpriteCanvas
           model={{
-            prototype,
+            prototype: sprite.prototype,
             animations,
-            nodePositions,
+            nodePositions: sprite.nodePositions,
             selection,
           }}
           onEvent={handleCanvasEvent}
         />
         <Inspector
+          {...inspector}
           selectedNodes={selection.nodeIds}
           selectedFrames={selection.frames}
-          prompt={prompt}
-          onPromptChange={onPromptChange}
-          onSubmit={onPromptSubmit}
           onClearSelection={clearInspectorSelection}
-          isSubmitting={isPromptSubmitting}
-          submitError={promptSubmitError}
-          history={history}
           animations={animations}
         />
       </div>

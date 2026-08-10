@@ -146,10 +146,6 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
-	directionCount, err := parseDirectionCount(payload.DirectionCount)
-	if err != nil {
-		return nil, err
-	}
 	generated, err := e.generateImages(
 		ctx,
 		GenerateCharacterProtoType,
@@ -170,7 +166,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
-		directionCount,
+		perspective.CharacterDirectionCount(),
 		resources,
 	)
 	if err != nil {
