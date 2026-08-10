@@ -89,12 +89,8 @@ export function useInspectorEdit({
       });
       setReference(null);
       setReferenceError(null);
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : "Unable to send the prompt.",
-      );
+    } catch {
+      setSubmitError("Unable to send the prompt.");
     }
   };
 
