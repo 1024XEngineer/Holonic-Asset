@@ -1,6 +1,10 @@
 package router
 
-import "github.com/labstack/echo/v4"
+import (
+	"github.com/labstack/echo/v4"
+
+	"github.com/1024XEngineer/Holonic-Asset/internal/middleware"
+)
 
 // Register assembles and returns all routes.
 func Register(
@@ -10,6 +14,7 @@ func Register(
 	ur UploadRouter,
 ) *echo.Echo {
 	e := echo.New()
+	e.Use(middleware.CORS())
 	api := e.Group(apiBasePath)
 	openAPI := newOpenAPI(e, api)
 	if as != nil {
