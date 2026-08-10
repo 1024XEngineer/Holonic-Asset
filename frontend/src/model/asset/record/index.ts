@@ -1,4 +1,4 @@
-export { useRecordQuery } from "./record.query";
+export { recordQueryOptions, useRecordQuery } from "./record.query";
 export { useSaveAssetRevisionMutation } from "./revision.mutation";
 export type {
   AudioAssetKind,
@@ -19,6 +19,7 @@ export type {
   SaveAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
   UISetAssetKind,

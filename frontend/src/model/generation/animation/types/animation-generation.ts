@@ -3,6 +3,8 @@ import type {
   CharacterSpriteSheet,
 } from "@/model/asset";
 
+export type SpriteAssetKind = "character" | "object";
+
 export type GenerateAnimationRequest = {
   label: string;
   prompt: string;
@@ -11,6 +13,7 @@ export type GenerateAnimationRequest = {
 export type GenerateAnimationInput = GenerateAnimationRequest & {
   projectId: string;
   assetId: string;
+  assetKind: SpriteAssetKind;
   prototype: CharacterSpriteSheet;
 };
 
