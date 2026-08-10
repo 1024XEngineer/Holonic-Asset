@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Camera,
   Check,
@@ -15,13 +15,11 @@ import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 import { useTimeout } from "@/hooks/use-timeout";
 import { readAccountProfile, saveAccountProfile } from "@/lib/account-profile";
-
-type ThemePreference = "light" | "dark";
-
-function readThemePreference(): ThemePreference {
-  const savedTheme = window.localStorage.getItem("holonic-theme");
-  return savedTheme === "dark" ? "dark" : "light";
-}
+import {
+  readThemePreference,
+  saveThemePreference,
+  type ThemePreference,
+} from "@/lib/theme-preference";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -39,11 +37,6 @@ export function Settings() {
   const [defaultPage, setDefaultPage] = useState("Projects");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schedule } = useTimeout();
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("holonic-theme", theme);
-  }, [theme]);
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -180,14 +173,20 @@ export function Settings() {
                   <ThemeButton
                     active={theme === "light"}
                     label="Light"
-                    onClick={() => setTheme("light")}
+                    onClick={() => {
+                      setTheme("light");
+                      saveThemePreference("light");
+                    }}
                   >
                     <Sun />
                   </ThemeButton>
                   <ThemeButton
                     active={theme === "dark"}
                     label="Dark"
-                    onClick={() => setTheme("dark")}
+                    onClick={() => {
+                      setTheme("dark");
+                      saveThemePreference("dark");
+                    }}
                   >
                     <Moon />
                   </ThemeButton>
