@@ -3,6 +3,7 @@ package middleware_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestCORSAllowsRequestsFromAnyOrigin(t *testing.T) {
 	if origin := response.Header().Get(echo.HeaderAccessControlAllowOrigin); origin != "*" {
 		t.Fatalf("expected wildcard allowed origin, got %q", origin)
 	}
-	if vary := response.Header().Values(echo.HeaderVary); !contains(vary, echo.HeaderOrigin) {
+	if vary := response.Header().Values(echo.HeaderVary); !slices.Contains(vary, echo.HeaderOrigin) {
 		t.Fatalf("expected response to vary by Origin, got %q", vary)
 	}
 	if exposed := response.Header().Get(echo.HeaderAccessControlExposeHeaders); exposed != "" {
@@ -50,7 +51,7 @@ func TestCORSMarksResponsesWithoutOriginAsVariant(t *testing.T) {
 
 	e.ServeHTTP(response, request)
 
-	if vary := response.Header().Values(echo.HeaderVary); !contains(vary, echo.HeaderOrigin) {
+	if vary := response.Header().Values(echo.HeaderVary); !slices.Contains(vary, echo.HeaderOrigin) {
 		t.Fatalf("expected response to vary by Origin, got %q", vary)
 	}
 }
@@ -82,13 +83,4 @@ func TestCORSAllowsPreflightRequests(t *testing.T) {
 	if headers := response.Header().Get(echo.HeaderAccessControlAllowHeaders); headers != echo.HeaderContentType {
 		t.Fatalf("expected only Content-Type to be allowed, got %q", headers)
 	}
-}
-
-func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
