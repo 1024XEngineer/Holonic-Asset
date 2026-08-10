@@ -138,7 +138,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		Kind:          generator.GenerateCharacterProtoType,
 		CreativeBrief: "hero",
 		Parameters: json.RawMessage(
-			`{"asset_name":"knight","creative_brief":"incorrect parameter brief","scale":{"width":64,"height":64},"perspective":"Top-Down","direction_count":"4"}`,
+			`{"asset_name":"knight","creative_brief":"incorrect parameter brief","scale":{"width":64,"height":64},"perspective":"Top-Down"}`,
 		),
 	})
 	if err != nil {
@@ -151,8 +151,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
 		payload.CreativeBrief != "hero" || payload.Reference != "" ||
-		payload.Scale.Width != 64 || payload.Scale.Height != 64 || payload.Perspective != "Top-Down" ||
-		payload.DirectionCount != "4" {
+		payload.Scale.Width != 64 || payload.Scale.Height != 64 || payload.Perspective != "Top-Down" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
 	}
 }
@@ -408,7 +407,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	}{
 		{
 			taskType: generator.GenerateCharacterProtoType,
-			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","scale":{"width":64,"height":64},"perspective":"Top-Down","direction_count":"4","reference":"media-1","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","scale":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":11}`),
 		},
 		{
 			taskType: generator.GenerateAnimation,
@@ -498,7 +497,7 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 }
 
 func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
-	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","scale":{"width":64,"height":64},"perspective":"Top-Down","direction_count":"4","reference":"media-1","project_id":42}`)
+	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","scale":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
 	generator.NewEngine(tasks, executor)

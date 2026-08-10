@@ -5,13 +5,12 @@ import assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/works
 // CreateCharacterPrototypePayload is the complete input consumed by the
 // character prototype task handler.
 type CreateCharacterPrototypePayload struct {
-	AssetName      string           `json:"asset_name"`
-	CreativeBrief  string           `json:"creative_brief"`
-	Scale          assetdomain.Size `json:"scale"`
-	Perspective    string           `json:"perspective"`
-	DirectionCount string           `json:"direction_count"`
-	Reference      string           `json:"reference"`
-	ProjectID      uint             `json:"project_id"`
+	AssetName     string           `json:"asset_name"`
+	CreativeBrief string           `json:"creative_brief"`
+	Scale         assetdomain.Size `json:"scale"`
+	Perspective   string           `json:"perspective"`
+	Reference     string           `json:"reference"`
+	ProjectID     uint             `json:"project_id"`
 }
 
 // CreateAnimationPayload is the common input consumed by character and object

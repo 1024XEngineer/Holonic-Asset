@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -108,20 +107,6 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
-	directionCount, err := parseDirectionCount(payload.DirectionCount)
-	if err != nil {
-		return nil, err
-	}
-	expectedDirectionCount := directionCountForPerspective(perspective)
-	if directionCount != 0 && directionCount != expectedDirectionCount {
-		return nil, fmt.Errorf(
-			"generator: direction count %d does not match perspective %q (expected %d)",
-			directionCount,
-			perspective,
-			expectedDirectionCount,
-		)
-	}
-	directionCount = expectedDirectionCount
 	generated, err := e.generateImages(
 		ctx,
 		GenerateCharacterProtoType,
@@ -143,7 +128,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.CreativeBrief,
 		perspective,
 		payload.Scale,
-		directionCount,
+		perspective.CharacterDirectionCount(),
 		resources,
 	)
 	if err != nil {
@@ -353,33 +338,6 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 		return "", fmt.Errorf("generator: invalid perspective %q", perspective)
 	}
 	return value, nil
-}
-
-func parseDirectionCount(directionCount string) (uint, error) {
-	if directionCount == "" {
-		return 0, nil
-	}
-	value, err := strconv.ParseUint(directionCount, 10, 0)
-	if err != nil {
-		return 0, fmt.Errorf("generator: parse direction count %q: %w", directionCount, err)
-	}
-	switch value {
-	case 1, 2, 4, 8:
-		return uint(value), nil
-	default:
-		return 0, fmt.Errorf("generator: invalid direction count %q", directionCount)
-	}
-}
-
-func directionCountForPerspective(perspective assetdomain.Perspective) uint {
-	switch perspective {
-	case assetdomain.PerspectiveSideOn:
-		return 2
-	case assetdomain.PerspectiveIsometric:
-		return 8
-	default:
-		return 4
-	}
 }
 
 func (e *executor) prototypeResources(

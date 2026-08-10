@@ -51,11 +51,14 @@ height = tileSize.height * tileAmount.rows
 
 ## Content
 
-Character and Object Content contains `directionCount`, `prototype`, and
-`animations`. TileSet Content contains `items`; tile dimensions belong to
-Scale. UI Set Content contains `components`, including component size and
-position. Scenery Content contains `layers`, including each layer's resource,
-position, transform, visibility, opacity, and z-order.
+Character Content contains `directionCount`, `prototype`, and `animations`.
+`directionCount` is derived from the Asset perspective: `Side-On` uses `2`,
+`Top-Down` uses `4`, and `Isometric` uses `8`. Callers do not provide it.
+Object Content contains `prototype` and `animations`. TileSet Content contains
+`items`; tile dimensions belong to Scale. UI Set Content contains `components`,
+including component size and position. Scenery Content contains `layers`,
+including each layer's resource, position, transform, visibility, opacity, and
+z-order.
 
 Component size and layer transform scale never modify the parent Asset Scale.
 

@@ -213,7 +213,6 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"pixel knight",
 			"scale":{"width":64,"height":64},
 		"perspective":"Top-Down",
-		"direction_count":"4",
 		"reference":"https://cdn.example/reference.png",
 		"project_id":11
 	}`)
@@ -288,8 +287,8 @@ func TestExecutorDerivesCharacterDirectionCountFromPerspective(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode character content: %v", err)
 			}
-			if content.DirectionCount != test.want {
-				t.Fatalf("expected direction count %d, got %d", test.want, content.DirectionCount)
+			if assets.characterAsset.Perspective != test.perspective || content.DirectionCount != test.want {
+				t.Fatalf("unexpected character asset: %+v content=%+v", assets.characterAsset, content)
 			}
 		})
 	}
@@ -466,49 +465,25 @@ func TestExecutorDoesNotMutateAssetsWhenImageGenerationFails(t *testing.T) {
 	}
 }
 
-func TestExecutorRejectsInvalidPrototypeEnumsBeforeImageGeneration(t *testing.T) {
-	tests := []struct {
-		name    string
-		payload json.RawMessage
-	}{
-		{
-			name: "perspective",
-			payload: json.RawMessage(`{
-				"asset_name":"hero",
-				"creative_brief":"pixel knight",
-					"scale":{"width":64,"height":64},
-				"perspective":"top-down",
-				"direction_count":"4",
-				"project_id":11
-			}`),
-		},
-		{
-			name: "direction_count",
-			payload: json.RawMessage(`{
-				"asset_name":"hero",
-				"creative_brief":"pixel knight",
-					"scale":{"width":64,"height":64},
-				"perspective":"Top-Down",
-				"direction_count":"3",
-				"project_id":11
-			}`),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			events := []string{}
-			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
-			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{events: &events}
+	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel knight",
+		"scale":{"width":64,"height":64},
+		"perspective":"top-down",
+		"project_id":11
+	}`)
 
-			_, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, tt.payload)
-			if err == nil {
-				t.Fatal("expected validation error")
-			}
-			if len(events) != 0 {
-				t.Fatalf("workflow should stop before side effects: %v", events)
-			}
-		})
+	_, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if len(events) != 0 {
+		t.Fatalf("workflow should stop before side effects: %v", events)
 	}
 }
 
