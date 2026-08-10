@@ -114,6 +114,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
 	imageService := InitImageService(cfg.Image)
+	llmService := InitLLMService(cfg.LLM)
 	uploadStore, err := InitUploadStore(cfg.QiNiu)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
@@ -132,11 +133,14 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	// Business modules.
 	workspaceModule := workspace.New(projectStore, assetStore, imageService, references)
 	imageProcessor := InitImageProcessor()
-	generatorExecutor := generator.NewExecutor(
+	generatorExecutor := generator.NewExecutorWithDependencies(
 		imageService,
 		imageProcessor,
 		workspaceModule.Assets,
-		references,
+		generator.ExecutorDependencies{
+			References: references,
+			LLM:        llmService,
+		},
 	)
 	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,

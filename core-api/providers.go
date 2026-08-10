@@ -10,6 +10,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
@@ -51,6 +52,16 @@ func InitImageService(cfg config.ImageClientConfig) imageclient.ImageGenerationS
 	return imageclient.NewImageGenerationService(provider)
 }
 
+// InitLLMService creates the external multimodal provider and its application service.
+func InitLLMService(cfg config.LLMClientConfig) llmclient.LLMService {
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      cfg.BaseURL,
+		APIKey:       cfg.APIKey,
+		DefaultModel: cfg.DefaultModel,
+	})
+	return llmclient.NewLLMService(provider)
+}
+
 // InitUploadStore creates the configured object storage adapter.
 func InitUploadStore(cfg config.QiniuConfig) (upload.Store, error) {
 	store, err := upload.NewQiniuStorage(cfg)
@@ -77,10 +88,13 @@ func InitImageProcessor() imageprocessor.Processor {
 // InitGeneratorExecutor creates the generation workflow executor.
 func InitGeneratorExecutor(
 	images imageclient.ImageGenerationService,
+	llm llmclient.LLMService,
 	processor imageprocessor.Processor,
 	assets generator.AssetWriter,
 ) generator.Executor {
-	return generator.NewExecutor(images, processor, assets)
+	return generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
+		LLM: llm,
+	})
 }
 
 // InitGeneratorEngine creates the generator module and registers its task handlers.

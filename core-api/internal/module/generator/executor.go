@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -34,6 +35,7 @@ type ReferenceStore interface {
 
 type executor struct {
 	images     imageclient.ImageGenerationService
+	llm        llmclient.LLMService
 	processor  imageprocessor.Processor
 	assets     AssetWriter
 	references ReferenceStore
@@ -50,8 +52,31 @@ func NewExecutor(
 	if len(references) > 0 {
 		referenceStore = references[0]
 	}
+	return NewExecutorWithDependencies(images, processor, assets, ExecutorDependencies{
+		References: referenceStore,
+	})
+}
+
+// ExecutorDependencies contains optional workflow integrations.
+type ExecutorDependencies struct {
+	References ReferenceStore
+	LLM        llmclient.LLMService
+}
+
+// NewExecutorWithDependencies creates an executor with explicit optional
+// dependencies while preserving NewExecutor for existing callers.
+func NewExecutorWithDependencies(
+	images imageclient.ImageGenerationService,
+	processor imageprocessor.Processor,
+	assets AssetWriter,
+	dependencies ExecutorDependencies,
+) Executor {
 	return &executor{
-		images: images, processor: processor, assets: assets, references: referenceStore,
+		images:     images,
+		llm:        dependencies.LLM,
+		processor:  processor,
+		assets:     assets,
+		references: dependencies.References,
 	}
 }
 
