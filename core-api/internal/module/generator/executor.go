@@ -22,6 +22,7 @@ type AssetWriter interface {
 	CreateAnimation(context.Context, uint, string) (uint, error)
 	UpdatePrototypeImages(context.Context, uint, []assetdomain.ImageResource) error
 	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 }
 
 // ReferenceStore is the object-storage boundary used by the worker. It keeps
@@ -70,7 +71,7 @@ func (e *executor) Generate(
 	if e.assets == nil {
 		return nil, ErrAssetWriterRequired
 	}
-	if e.processor == nil && (taskType == GenerateCharacterProtoType || taskType == GenerateObjectProtoType) {
+	if e.processor == nil && (taskType == GenerateCharacterProtoType || taskType == GenerateObjectProtoType || taskType == GenerateAnimation) {
 		return nil, ErrImageProcessorRequired
 	}
 
@@ -110,7 +111,7 @@ func (e *executor) generateCharacterPrototype(
 		ctx,
 		GenerateCharacterProtoType,
 		payload.CreativeBrief,
-		payload.CanvasSize,
+		payload.Dimensions,
 		payload.Reference,
 	)
 	if err != nil {
@@ -126,6 +127,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
+		payload.Dimensions,
 		perspective.CharacterDirectionCount(),
 		resources,
 	)
@@ -154,7 +156,7 @@ func (e *executor) generateObjectPrototype(
 		ctx,
 		GenerateObjectProtoType,
 		payload.CreativeBrief,
-		payload.CanvasSize,
+		payload.Dimensions,
 		payload.Reference,
 	)
 	if err != nil {
@@ -170,6 +172,7 @@ func (e *executor) generateObjectPrototype(
 		payload.ProjectID,
 		payload.CreativeBrief,
 		perspective,
+		payload.Dimensions,
 		0,
 		resources,
 	)
@@ -193,7 +196,21 @@ func (e *executor) generateAnimation(
 	name string,
 	prompt string,
 ) (json.RawMessage, error) {
-	generated, err := e.generateImages(ctx, taskType, prompt, "", "")
+	asset, err := e.assets.GetDetail(ctx, assetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: load asset %d dimensions: %w", assetID, err)
+	}
+	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
+		return nil, fmt.Errorf("generator: animation is unsupported for asset type %q", asset.Type)
+	}
+	var dimensions assetdomain.Size
+	if err := json.Unmarshal(asset.Dimensions, &dimensions); err != nil {
+		return nil, fmt.Errorf("generator: decode asset %d dimensions: %w", assetID, err)
+	}
+	if err := assetdomain.ValidateDimensions(asset.Type, asset.Dimensions); err != nil {
+		return nil, err
+	}
+	generated, err := e.generateImages(ctx, taskType, prompt, dimensions, "")
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +241,7 @@ func (e *executor) generateImages(
 	ctx context.Context,
 	taskType TaskType,
 	prompt string,
-	size string,
+	dimensions assetdomain.Size,
 	reference string,
 ) (*imageclient.GenerateResult, error) {
 	references := []string(nil)
@@ -241,7 +258,6 @@ func (e *executor) generateImages(
 	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
 		Prompt:          prompt,
 		ReferenceImages: references,
-		Size:            size,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
@@ -249,12 +265,11 @@ func (e *executor) generateImages(
 	if result == nil || len(result.Images) == 0 {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
 	}
-	if taskType != GenerateCharacterProtoType && taskType != GenerateObjectProtoType {
+	if taskType != GenerateCharacterProtoType && taskType != GenerateObjectProtoType && taskType != GenerateAnimation {
 		return result, nil
 	}
-	resizeWidth, resizeHeight, err := parseCanvasSize(size)
-	if err != nil {
-		return nil, fmt.Errorf("generator: process %s images: %w", taskType, err)
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return nil, fmt.Errorf("generator: process %s images: dimensions must be positive", taskType)
 	}
 	processed := &imageclient.GenerateResult{Images: make([]imageclient.GeneratedImage, len(result.Images)), Model: result.Model, Size: result.Size, CreatedAt: result.CreatedAt, Usage: result.Usage}
 	for index, generated := range result.Images {
@@ -271,7 +286,7 @@ func (e *executor) generateImages(
 		}
 		resized, resizeErr := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: imageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(resizeWidth, resizeHeight),
+			Options:     imageprocessor.DefaultResizeOptions(int(dimensions.Width), int(dimensions.Height)),
 		})
 		if resizeErr != nil {
 			return nil, fmt.Errorf("generator: resize %s image %d: %w", taskType, index+1, resizeErr)
@@ -284,25 +299,17 @@ func (e *executor) generateImages(
 	return processed, nil
 }
 
-func parseCanvasSize(size string) (int, int, error) {
-	var width, height int
-	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width <= 0 || height <= 0 {
-		return 0, 0, fmt.Errorf("invalid canvas size %q", size)
-	}
-	return width, height, nil
-}
-
 func newPrototypeAsset(
 	assetType assetdomain.AssetType,
 	name string,
 	projectID uint,
 	description string,
 	perspective assetdomain.Perspective,
+	dimensions assetdomain.Size,
 	directionCount uint,
 	prototype []assetdomain.ImageResource,
 ) (*assetdomain.Asset, error) {
 	content := assetdomain.NewAssetContent(assetType)
-	content.Perspective = perspective
 	prototypeValue := assetdomain.Prototype(prototype)
 	content.Prototype = &prototypeValue
 	content.DirectionCount = directionCount
@@ -310,11 +317,17 @@ func newPrototypeAsset(
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode prototype asset content: %w", err)
 	}
+	dimensionsValue, err := json.Marshal(dimensions)
+	if err != nil {
+		return nil, fmt.Errorf("generator: encode prototype asset dimensions: %w", err)
+	}
 	return &assetdomain.Asset{
 		Name:        name,
 		ProjectID:   projectID,
 		Type:        assetType,
 		Description: description,
+		Perspective: perspective,
+		Dimensions:  dimensionsValue,
 		Content:     encoded,
 	}, nil
 }

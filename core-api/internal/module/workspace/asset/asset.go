@@ -9,7 +9,8 @@ type Asset struct {
 	Type        AssetType
 	Description string
 	Tags        []string        `json:"tags"`
-	Attributes  json.RawMessage `json:"attributes,omitempty"`
+	Perspective Perspective     `json:"perspective"`
+	Dimensions  json.RawMessage `json:"dimensions"`
 	Content     json.RawMessage `json:"content,omitempty"`
 	Version     uint
 }
@@ -22,9 +23,8 @@ type AssetListFilter struct {
 
 type AssetUpdate struct {
 	Name        *string
-	ProjectID   *uint
-	Type        *AssetType
 	Description *string
 	Tags        *[]string
-	Attributes  *json.RawMessage
+	Perspective *Perspective
+	Dimensions  *json.RawMessage
 }
