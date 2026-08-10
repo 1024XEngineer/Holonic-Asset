@@ -37,8 +37,8 @@ describe("scenery canvas state", () => {
       layerId: "sky",
     });
 
-    expect(state.selectedLayers).toEqual(["trees"]);
-    expect(state.visibleLayers).toEqual(["trees"]);
+    expect(state.selectedLayerIds).toEqual(["trees"]);
+    expect(state.visibleLayerIds).toEqual(["trees"]);
   });
 
   it("preserves existing visibility while reconciling changed layers", () => {
@@ -59,8 +59,8 @@ describe("scenery canvas state", () => {
 
     expect(state).toEqual({
       layerIds: ["sky", "mist"],
-      selectedLayers: [],
-      visibleLayers: ["mist"],
+      selectedLayerIds: [],
+      visibleLayerIds: ["mist"],
     });
   });
 

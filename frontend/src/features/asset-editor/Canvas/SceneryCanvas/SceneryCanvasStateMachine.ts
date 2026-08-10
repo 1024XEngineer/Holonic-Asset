@@ -6,14 +6,18 @@ import type { SceneryCanvasEvent } from "./SceneryCanvas.interface";
 
 export type SceneryCanvasState = {
   layerIds: string[];
-  selectedLayers: string[];
-  visibleLayers: string[];
+  selectedLayerIds: string[];
+  visibleLayerIds: string[];
 };
 
 export type SceneryCanvasStateEvent =
   | SceneryCanvasEvent
   | { type: "layer.visibility.toggled"; layerId: string }
   | { type: "layers.synced"; layerIds: string[] };
+
+type SceneryCanvasPublicEvent =
+  | SceneryCanvasEvent
+  | { type: "layer.visibility.toggled"; layerId: string };
 
 export function createInitialSceneryCanvasState(
   layers: readonly SceneryLayer[],
@@ -22,8 +26,8 @@ export function createInitialSceneryCanvasState(
 
   return {
     layerIds,
-    selectedLayers: [],
-    visibleLayers: [...layerIds],
+    selectedLayerIds: [],
+    visibleLayerIds: [...layerIds],
   };
 }
 
@@ -40,13 +44,13 @@ export function reduceSceneryCanvas(
   if (event.type === "layer.selection.toggled") {
     return {
       ...state,
-      selectedLayers: toggle(state.selectedLayers, event.layerId),
+      selectedLayerIds: toggle(state.selectedLayerIds, event.layerId),
     };
   }
 
   return {
     ...state,
-    visibleLayers: toggle(state.visibleLayers, event.layerId),
+    visibleLayerIds: toggle(state.visibleLayerIds, event.layerId),
   };
 }
 
@@ -63,9 +67,9 @@ export function useSceneryCanvasStateMachine(layers: readonly SceneryLayer[]) {
   }, [layerIds]);
 
   return {
-    selectedLayers: state.selectedLayers,
-    visibleLayers: state.visibleLayers,
-    send: dispatch,
+    selectedLayerIds: state.selectedLayerIds,
+    visibleLayerIds: state.visibleLayerIds,
+    send: (event: SceneryCanvasPublicEvent) => dispatch(event),
   };
 }
 
@@ -74,22 +78,22 @@ function reconcileLayers(
   layerIds: string[],
 ): SceneryCanvasState {
   const currentLayerIds = new Set(state.layerIds);
-  const selectedLayers = layerIds.filter((id) =>
-    state.selectedLayers.includes(id),
+  const selectedLayerIds = layerIds.filter((id) =>
+    state.selectedLayerIds.includes(id),
   );
-  const visibleLayers = layerIds.filter(
-    (id) => !currentLayerIds.has(id) || state.visibleLayers.includes(id),
+  const visibleLayerIds = layerIds.filter(
+    (id) => !currentLayerIds.has(id) || state.visibleLayerIds.includes(id),
   );
 
   if (
     sameValues(state.layerIds, layerIds) &&
-    sameValues(state.selectedLayers, selectedLayers) &&
-    sameValues(state.visibleLayers, visibleLayers)
+    sameValues(state.selectedLayerIds, selectedLayerIds) &&
+    sameValues(state.visibleLayerIds, visibleLayerIds)
   ) {
     return state;
   }
 
-  return { layerIds, selectedLayers, visibleLayers };
+  return { layerIds, selectedLayerIds, visibleLayerIds };
 }
 
 function getUniqueLayerIds(layers: readonly SceneryLayer[]) {
