@@ -14,6 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import type { AssetLibraryItem } from "@/model/asset";
 
@@ -26,6 +31,7 @@ export function AssetCard({
   onCopy,
   onDelete,
   onEdit,
+  onOpenEditor,
   projectId,
 }: {
   asset: AssetLibraryItem;
@@ -34,6 +40,7 @@ export function AssetCard({
   onCopy: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onOpenEditor?: () => void;
   projectId?: string;
 }) {
   const kindConfig = getAssetKindConfig(asset.kind);
@@ -43,7 +50,28 @@ export function AssetCard({
       className="group relative gap-0 overflow-hidden rounded-lg py-0 shadow-xs transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-md has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/40"
       size="sm"
     >
-      {/* TODO: Link the card to its asset editor when the editor route is implemented. */}
+      {onOpenEditor ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div
+                role="link"
+                tabIndex={0}
+                aria-label={`Open ${asset.name} editor`}
+                className="absolute inset-0 z-10 cursor-pointer focus-visible:outline-none"
+                onClick={onOpenEditor}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onOpenEditor();
+                  }
+                }}
+              />
+            }
+          />
+          <TooltipContent side="bottom">Open asset editor</TooltipContent>
+        </Tooltip>
+      ) : null}
       <div className="min-w-0">
         <AssetPreview asset={asset} projectId={projectId} />
         <div className="space-y-3 p-3.5">
@@ -82,48 +110,64 @@ export function AssetCard({
       </div>
 
       <div className="absolute left-2 top-2 z-30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <Button
-          type="button"
-          aria-label={`Copy ${asset.name}`}
-          title="Copy asset"
-          variant="outline"
-          size="icon-sm"
-          className="bg-background/90 shadow-xs backdrop-blur-sm"
-          disabled={isCopying || isDeleting}
-          onClick={onCopy}
-        >
-          {isCopying ? <LoaderCircle className="animate-spin" /> : <Copy />}
-        </Button>
-      </div>
-
-      <div className="absolute right-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <Button
-          type="button"
-          aria-label={`Edit ${asset.name}`}
-          title="Edit asset"
-          variant="outline"
-          size="icon-sm"
-          className="bg-background/90 shadow-xs backdrop-blur-sm"
-          disabled={isCopying || isDeleting}
-          onClick={onEdit}
-        >
-          <Pencil />
-        </Button>
-        <AlertDialog>
-          <AlertDialogTrigger
+        <Tooltip>
+          <TooltipTrigger
             render={
               <Button
-                aria-label={`Delete ${asset.name}`}
-                title="Delete asset"
+                type="button"
+                aria-label={`Copy ${asset.name}`}
                 variant="outline"
                 size="icon-sm"
-                className="bg-background/90 text-muted-foreground shadow-xs backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive"
+                className="bg-background/90 shadow-xs backdrop-blur-sm"
                 disabled={isCopying || isDeleting}
+                onClick={onCopy}
               />
             }
           >
-            <Trash2 />
-          </AlertDialogTrigger>
+            {isCopying ? <LoaderCircle className="animate-spin" /> : <Copy />}
+          </TooltipTrigger>
+          <TooltipContent>Copy asset</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <div className="absolute right-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                aria-label={`Edit ${asset.name} details`}
+                variant="outline"
+                size="icon-sm"
+                className="bg-background/90 shadow-xs backdrop-blur-sm"
+                disabled={isCopying || isDeleting}
+                onClick={onEdit}
+              />
+            }
+          >
+            <Pencil />
+          </TooltipTrigger>
+          <TooltipContent>Edit asset details</TooltipContent>
+        </Tooltip>
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              <AlertDialogTrigger
+                render={
+                  <Button
+                    aria-label={`Delete ${asset.name}`}
+                    variant="outline"
+                    size="icon-sm"
+                    className="bg-background/90 text-muted-foreground shadow-xs backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isCopying || isDeleting}
+                  />
+                }
+              >
+                <Trash2 />
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Delete asset</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {asset.name}?</AlertDialogTitle>

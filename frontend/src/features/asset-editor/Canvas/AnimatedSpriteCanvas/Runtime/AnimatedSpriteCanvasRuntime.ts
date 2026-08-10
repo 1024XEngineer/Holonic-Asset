@@ -13,10 +13,14 @@ import {
   MIN_SCALE,
 } from "./AnimatedSpriteStage.constants";
 import type {
+  AnimatedSpriteCanvasActions,
   AnimatedSpriteCanvasRuntimeProps,
   AnimatedSpriteStageContext,
 } from "./AnimatedSpriteCanvas.types";
-import { AnimatedSpriteScene } from "./AnimatedSpriteScene";
+import {
+  AnimatedSpriteScene,
+  hasAnimatedSpriteCanvasModelChanged,
+} from "./AnimatedSpriteScene";
 import { StageRuntime } from "./StageRuntime";
 
 export class AnimatedSpriteCanvasRuntime {
@@ -30,6 +34,17 @@ export class AnimatedSpriteCanvasRuntime {
   private readonly unavailableTextureUrls = new Set<string>();
   private readonly scene: AnimatedSpriteScene;
   private destroyed = false;
+  private readonly actions: AnimatedSpriteCanvasActions = {
+    onSelect: (node) => this.props.actions.onSelect(node),
+    onSelectFrame: (node, index) =>
+      this.props.actions.onSelectFrame(node, index),
+    onSelectFrames: (node, indexes) =>
+      this.props.actions.onSelectFrames(node, indexes),
+    onSelectNodes: (nodes) => this.props.actions.onSelectNodes(nodes),
+    onClearSelection: () => this.props.actions.onClearSelection(),
+    onNodePositionChange: (node, position) =>
+      this.props.actions.onNodePositionChange(node, position),
+  };
 
   constructor(props: AnimatedSpriteCanvasRuntimeProps) {
     this.props = props;
@@ -69,7 +84,7 @@ export class AnimatedSpriteCanvasRuntime {
     viewport.on("zoomed", this.syncViewportGrid);
     const context: AnimatedSpriteStageContext = {
       viewport,
-      actions: this.props.actions,
+      actions: this.actions,
       getAnimations: () => this.props.model.animations,
       getPrototype: () => this.props.model.prototype,
       getScene: () => this.scene.getSnapshot(),
@@ -89,11 +104,17 @@ export class AnimatedSpriteCanvasRuntime {
     this.resizeObserver.observe(host);
     app.ticker.add(this.updateAnimation);
     this.centerWorld();
-    this.syncProps(this.props);
+    void this.preloadAnimatedSpriteTextures(this.props.model);
+    this.render();
   }
 
   syncProps(props: AnimatedSpriteCanvasRuntimeProps) {
+    const modelChanged = hasAnimatedSpriteCanvasModelChanged(
+      this.props.model,
+      props.model,
+    );
     this.props = props;
+    if (!modelChanged) return;
     this.scene.synchronize(props.model);
     if (this.viewport && this.renderer)
       void this.preloadAnimatedSpriteTextures(props.model);
@@ -148,8 +169,13 @@ export class AnimatedSpriteCanvasRuntime {
   }
 
   private centerWorld() {
+    const { width, height } = this.runtime.app.screen;
+    const isCompactViewport = width < 640 || height < 420;
     this.viewport?.setZoom(INITIAL_SCALE);
-    this.viewport?.moveCenter(650, 700);
+    this.viewport?.moveCenter(
+      isCompactViewport ? 300 : 650,
+      isCompactViewport ? 300 : 700,
+    );
   }
 
   private render() {

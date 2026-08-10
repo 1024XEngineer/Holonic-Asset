@@ -94,7 +94,7 @@ describe("editor session store", () => {
       value: "A knight",
     });
     dispatchEditorCommand(store, {
-      type: "character.animation.rename",
+      type: "sprite.animation.rename",
       animationId: "missing",
       label: "Run",
     });
@@ -115,16 +115,16 @@ describe("editor session store", () => {
     const store = createEditorSessionStore(createCharacterRecord());
 
     dispatchEditorCommand(store, {
-      type: "character.animation.generated",
+      type: "sprite.animation.generated",
       animation: { kind: "clip", label: " Idle ", frameCount: 8 },
     });
     dispatchEditorCommand(store, {
-      type: "character.animation.rename",
+      type: "sprite.animation.rename",
       animationId: "idle-2",
       label: "Run",
     });
     dispatchEditorCommand(store, {
-      type: "character.node-position.set",
+      type: "sprite.node-position.set",
       nodeId: "idle-2",
       position: { x: 30, y: 40 },
     });
@@ -138,7 +138,7 @@ describe("editor session store", () => {
     });
 
     dispatchEditorCommand(store, {
-      type: "character.animation.delete",
+      type: "sprite.animation.delete",
       animationId: "idle-2",
     });
     record = store.getState().record;
@@ -148,7 +148,7 @@ describe("editor session store", () => {
     expect(record.character.nodePositions["idle-2"]).toBeUndefined();
   });
 
-  it("rejects character-only commands for other asset records", () => {
+  it("rejects sprite commands for non-sprite asset records", () => {
     const record: AssetRecord = {
       mode: "scenery",
       prompt: "Forest",
@@ -158,13 +158,13 @@ describe("editor session store", () => {
 
     expect(() =>
       dispatchEditorCommand(store, {
-        type: "character.animation.delete",
+        type: "sprite.animation.delete",
         animationId: "idle",
       }),
-    ).toThrow("Character animations require a character record.");
+    ).toThrow("Sprite editing requires a character or object record.");
   });
 
-  it("keeps character commands isolated from object records", () => {
+  it("applies sprite commands to object records", () => {
     const characterRecord = createCharacterRecord();
     const record: AssetRecord = {
       mode: "object",
@@ -173,12 +173,14 @@ describe("editor session store", () => {
     };
     const store = createEditorSessionStore(record);
 
-    expect(() =>
-      dispatchEditorCommand(store, {
-        type: "character.animation.delete",
-        animationId: "idle",
-      }),
-    ).toThrow("Character animations require a character record.");
+    dispatchEditorCommand(store, {
+      type: "sprite.animation.delete",
+      animationId: "idle",
+    });
+    expect(store.getState().record).toMatchObject({
+      mode: "object",
+      object: { animations: [] },
+    });
   });
 
   it("resets the draft, baseline, and temporal history", () => {

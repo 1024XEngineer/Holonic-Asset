@@ -12,20 +12,20 @@ export type EditorTarget = {
 export type EditorCommand =
   | { type: "prompt.set"; value: string }
   | {
-      type: "character.node-position.set";
+      type: "sprite.node-position.set";
       nodeId: string;
       position: AssetCanvasPosition;
     }
   | {
-      type: "character.animation.generated";
+      type: "sprite.animation.generated";
       animation: GeneratedCharacterAnimation;
     }
   | {
-      type: "character.animation.rename";
+      type: "sprite.animation.rename";
       animationId: string;
       label: string;
     }
-  | { type: "character.animation.delete"; animationId: string }
+  | { type: "sprite.animation.delete"; animationId: string }
   | { type: "history.undo" }
   | { type: "history.redo" };
 
