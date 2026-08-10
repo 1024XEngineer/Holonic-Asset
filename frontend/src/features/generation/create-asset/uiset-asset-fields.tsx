@@ -2,18 +2,18 @@ import { Button } from "@/components/ui/button";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { UiAssetCreationDraft } from "../types";
+import type { UISetAssetCreationDraft } from "../types";
 
-export function UiAssetFields({
+export function UISetAssetFields({
   draft,
   onChange,
 }: {
-  draft: UiAssetCreationDraft<File>;
-  onChange: (draft: UiAssetCreationDraft<File>) => void;
+  draft: UISetAssetCreationDraft<File>;
+  onChange: (draft: UISetAssetCreationDraft<File>) => void;
 }) {
   const updateComponent = (
     index: number,
-    patch: Partial<UiAssetCreationDraft<File>["components"][number]>,
+    patch: Partial<UISetAssetCreationDraft<File>["components"][number]>,
   ) =>
     onChange({
       ...draft,
@@ -85,7 +85,7 @@ export function UiAssetFields({
         <Textarea
           required
           className="min-h-20 resize-none"
-          placeholder="Describe the overall UI style..."
+          placeholder="Describe the overall UI Set style..."
           value={draft.style}
           onChange={(event) =>
             onChange({ ...draft, style: event.target.value })

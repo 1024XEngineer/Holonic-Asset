@@ -19,7 +19,7 @@
   <rect class="node" x="75" y="300" width="210" height="66" rx="15"/>
   <text class="title" x="180" y="333">Character / Object</text>
   <rect class="node" x="345" y="300" width="210" height="66" rx="15"/>
-  <text class="title" x="450" y="333">UI</text>
+  <text class="title" x="450" y="333">UI Set</text>
   <rect class="node" x="615" y="300" width="210" height="66" rx="15"/>
   <text class="title" x="720" y="333">Scenery</text>
   <rect class="node" x="885" y="300" width="210" height="66" rx="15"/>
@@ -32,7 +32,7 @@
   <rect class="node" x="195" y="459" width="130" height="57" rx="15"/>
   <text class="label" x="260" y="488">Animation</text>
 
-  <!-- UI -->
+  <!-- UI Set -->
   <path class="edge" d="M450 366V459"/>
   <rect class="node" x="345" y="459" width="210" height="57" rx="15"/>
   <text class="label" x="450" y="488">Component</text>

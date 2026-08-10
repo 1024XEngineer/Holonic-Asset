@@ -59,7 +59,7 @@ describe("createAssetLibraryCollection", () => {
       object: 1,
       tileset: 0,
       scenery: 0,
-      ui: 0,
+      uiset: 0,
       audio: 0,
     });
     expect(collection.totalAssets).toBe(2);

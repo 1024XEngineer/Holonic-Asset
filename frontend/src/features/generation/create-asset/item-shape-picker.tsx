@@ -1,29 +1,29 @@
 import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
-import type { TileShapeCell } from "@/model/generation";
+import type { ItemTile } from "@/model/item-tile";
 
 const gridSize = 4;
 
-export function TileShapePicker({
-  cells,
+export function ItemShapePicker({
+  shape,
   onChange,
 }: {
-  cells: TileShapeCell[];
-  onChange: (cells: TileShapeCell[]) => void;
+  shape: ItemTile[];
+  onChange: (shape: ItemTile[]) => void;
 }) {
-  const selectedCells = useMemo(
-    () => new Set(cells.map(([x, y]) => `${x}:${y}`)),
-    [cells],
+  const selectedTiles = useMemo(
+    () => new Set(shape.map(([x, y]) => `${x}:${y}`)),
+    [shape],
   );
 
-  const toggleCell = (x: number, y: number) => {
-    const isSelected = selectedCells.has(`${x}:${y}`);
-    const nextCells = isSelected
-      ? cells.filter(([cellX, cellY]) => cellX !== x || cellY !== y)
-      : [...cells, [x, y] as TileShapeCell];
+  const toggleTile = (x: number, y: number) => {
+    const isSelected = selectedTiles.has(`${x}:${y}`);
+    const nextShape = isSelected
+      ? shape.filter(([tileX, tileY]) => tileX !== x || tileY !== y)
+      : [...shape, [x, y] as ItemTile];
 
-    onChange(nextCells);
+    onChange(nextShape);
   };
 
   return (
@@ -33,19 +33,19 @@ export function TileShapePicker({
           Occupied tiles
         </p>
         <span className="font-mono text-xs text-muted-foreground">
-          {cells.length} {cells.length === 1 ? "tile" : "tiles"}
+          {shape.length} {shape.length === 1 ? "tile" : "tiles"}
         </span>
       </div>
       <div
         className="grid size-32 justify-self-center overflow-hidden border border-primary/70 bg-background"
         role="group"
-        aria-label="Tile item shape"
+        aria-label="Item shape"
         style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: gridSize * gridSize }, (_, index) => {
           const x = index % gridSize;
           const y = Math.floor(index / gridSize);
-          const isSelected = selectedCells.has(`${x}:${y}`);
+          const isSelected = selectedTiles.has(`${x}:${y}`);
 
           return (
             <button
@@ -53,7 +53,7 @@ export function TileShapePicker({
               type="button"
               aria-label={`Tile column ${x + 1}, row ${y + 1}`}
               aria-pressed={isSelected}
-              onClick={() => toggleCell(x, y)}
+              onClick={() => toggleTile(x, y)}
               className={cn(
                 "aspect-square border-r border-b border-primary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isSelected ? "bg-primary/35" : "hover:bg-muted",
@@ -63,7 +63,7 @@ export function TileShapePicker({
         })}
       </div>
       <p className="text-center text-xs leading-4 text-muted-foreground">
-        Click cells to define the item footprint.
+        Click tiles to define the item footprint.
       </p>
     </div>
   );

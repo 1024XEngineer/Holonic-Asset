@@ -97,3 +97,15 @@ export class AnimatedSpriteScene {
     }
   }
 }
+
+export function hasAnimatedSpriteCanvasModelChanged(
+  previous: AnimatedSpriteCanvasModel,
+  next: AnimatedSpriteCanvasModel,
+) {
+  return (
+    previous.prototype !== next.prototype ||
+    previous.animations !== next.animations ||
+    previous.nodePositions !== next.nodePositions ||
+    previous.selection !== next.selection
+  );
+}

@@ -264,7 +264,7 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 			for _, fragment := range []string{
 				"SCENE DECISION",
 				"AUTHENTIC PIXEL ART",
-				"GAMEPLAY SCREEN UI",
+				"GAMEPLAY SCREEN UI SET",
 				"no permanent side panel",
 				"NO GENERATED TEXT",
 				"Do not draw counters, labels, dialogue, or interaction text",
@@ -282,7 +282,7 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 	}
 }
 
-func TestGenerateReferenceLetsTheModelFollowExplicitUIRequests(t *testing.T) {
+func TestGenerateReferenceLetsTheModelFollowExplicitUISetRequests(t *testing.T) {
 	project := validProject()
 	project.Description = "玩家打开背包整理采集到的物品。"
 	images := &imageGenerationServiceStub{
@@ -301,7 +301,7 @@ func TestGenerateReferenceLetsTheModelFollowExplicitUIRequests(t *testing.T) {
 		"use iconography or empty slots instead of readable words",
 	} {
 		if !strings.Contains(images.request.Prompt, fragment) {
-			t.Errorf("expected UI policy to contain %q", fragment)
+			t.Errorf("expected UI Set policy to contain %q", fragment)
 		}
 	}
 	if strings.Contains(images.request.Prompt, "REFERENCE REGENERATION") {

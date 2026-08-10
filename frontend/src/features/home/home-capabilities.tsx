@@ -55,15 +55,15 @@ const capabilities = [
     },
   },
   {
-    title: "Game UI",
+    title: "UI Set",
     description:
-      "Design cohesive health bars, inventory panels, skill icon frames, system menus, and UI interaction sounds.",
+      "Design cohesive health bars, inventory panels, skill icon frames, system menus, and UI Set interaction sounds.",
     detail: "HUD, Controls & System Menus",
     to: "/projects",
     icon: FolderKanban,
     preview: {
-      src: "/assets/ui/ui.png",
-      alt: "Pixel-art game UI preview",
+      src: "/assets/uiset/uiset.png",
+      alt: "Pixel-art UI Set preview",
     },
   },
   {

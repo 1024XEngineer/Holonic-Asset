@@ -1,11 +1,11 @@
+import { EditorWorkspace } from "./editor-workspace";
+
 export function AssetEditor({
   assetId,
-  onExitEditor,
+  onBack,
 }: {
   assetId: string;
-  onExitEditor: () => void;
+  onBack: () => void;
 }) {
-  void assetId;
-  void onExitEditor;
-  return null;
+  return <EditorWorkspace assetId={assetId} onBack={onBack} />;
 }

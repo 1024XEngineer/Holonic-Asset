@@ -1,4 +1,5 @@
 import { AlertCircle, FolderOpen, SearchX } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,6 +16,7 @@ export function AssetLibraryWorkspace({
   library: AssetLibraryController;
 }) {
   const project = library.project;
+  const navigate = useNavigate();
 
   if (!project) {
     return (
@@ -67,6 +69,18 @@ export function AssetLibraryWorkspace({
                     onCopy={() => library.copyAsset(asset.id)}
                     onDelete={() => library.deleteAsset(asset.id)}
                     onEdit={() => library.openAssetEditor(asset.id)}
+                    onOpenEditor={
+                      asset.kind === "character" || asset.kind === "object"
+                        ? () =>
+                            void navigate({
+                              to: "/projects/$projectId/assets/$assetId",
+                              params: {
+                                projectId: project.id,
+                                assetId: asset.id,
+                              },
+                            })
+                        : undefined
+                    }
                     projectId={project.id}
                   />
                 ))}

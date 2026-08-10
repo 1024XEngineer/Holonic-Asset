@@ -11,7 +11,7 @@ import type {
   AssetRecordForKind,
   SceneryAssetRecord,
   TilesetAssetRecord,
-  UiAssetRecord,
+  UISetAssetRecord,
   AudioAssetRecord,
 } from "../types";
 import type {
@@ -119,11 +119,29 @@ const spriteAnimationsByAssetId: Record<string, CharacterAnimation[]> = {
       128,
     ),
   ],
+  "alchemy-table": [
+    createPngAnimation(
+      "idle",
+      "Idle",
+      "/assets/object/Alchemy_Table_02-Sheet.png",
+      8,
+      48,
+      64,
+    ),
+  ],
 };
 
 const spritePrototypesByAssetId: Record<string, CharacterSpriteSheet> = {
   swordsman: swordsmanPrototype,
   knight: knightPrototype,
+  "alchemy-table": {
+    format: "png-sprite-sheet",
+    imageUrl: "/assets/object/Alchemy_Table_02-Sheet.png",
+    frameWidth: 48,
+    frameHeight: 64,
+    columns: 1,
+    rows: 1,
+  },
 };
 
 function getSpriteDefaultSourceId(assetId: string) {
@@ -131,7 +149,7 @@ function getSpriteDefaultSourceId(assetId: string) {
 }
 
 function createFallbackSpritePrototype(
-  asset: Pick<ProjectAsset, "canvasSize">,
+  asset: Pick<ProjectAsset, "canvasSize" | "thumbnailUrl">,
 ): CharacterSpriteSheet {
   const dimensions = asset.canvasSize.match(/(\d+)\D+(\d+)/);
   const frameWidth = Number(dimensions?.[1]) || 64;
@@ -139,7 +157,7 @@ function createFallbackSpritePrototype(
 
   return {
     format: "png-sprite-sheet",
-    imageUrl: "",
+    imageUrl: asset.thumbnailUrl ?? "",
     frameWidth,
     frameHeight,
     columns: 1,
@@ -313,11 +331,11 @@ export function createDefaultAssetRecord<K extends AssetKind>(
     } as AssetRecordForKind<K>;
   }
 
-  if (kind === "ui") {
+  if (kind === "uiset") {
     return {
-      mode: "ui",
+      mode: "uiset",
       ...base,
-      ui: {
+      uiset: {
         components: [
           {
             id: "panel",
@@ -380,8 +398,10 @@ export function mergeAssetRecord<K extends AssetKind>(
       return mergeTilesetRecord(
         record as TilesetAssetRecord,
       ) as AssetRecordForKind<K>;
-    case "ui":
-      return mergeUiRecord(record as UiAssetRecord) as AssetRecordForKind<K>;
+    case "uiset":
+      return mergeUISetRecord(
+        record as UISetAssetRecord,
+      ) as AssetRecordForKind<K>;
     case "audio":
       return mergeAudioRecord(
         record as AudioAssetRecord,
@@ -497,11 +517,11 @@ function mergeTilesetRecord(saved: TilesetAssetRecord): TilesetAssetRecord {
   };
 }
 
-function mergeUiRecord(saved: UiAssetRecord): UiAssetRecord {
+function mergeUISetRecord(saved: UISetAssetRecord): UISetAssetRecord {
   return {
-    mode: "ui",
+    mode: "uiset",
     prompt: saved.prompt,
-    ui: { components: saved.ui.components },
+    uiset: { components: saved.uiset.components },
   };
 }
 
