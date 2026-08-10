@@ -21,13 +21,13 @@ export function InspectorEdit(props: InspectorEditProps) {
     onSubmit,
     onClearSelection,
     isSubmitting = false,
-    submitError,
   } = props;
   const controller = useInspectorEdit({
     selectedNodes,
     selectedFrames,
     prompt,
     animations,
+    onPromptChange,
     onSubmit,
     isSubmitting,
   });
@@ -84,7 +84,7 @@ export function InspectorEdit(props: InspectorEditProps) {
           className="mt-4 min-h-28 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0"
           placeholder="What would you like to change?"
           value={prompt}
-          onChange={(event) => onPromptChange(event.target.value)}
+          onChange={(event) => controller.changePrompt(event.target.value)}
           onKeyDown={controller.handlePromptKeyDown}
         />
 
@@ -101,9 +101,9 @@ export function InspectorEdit(props: InspectorEditProps) {
         ) : null}
       </div>
 
-      {controller.referenceError || submitError ? (
+      {controller.referenceError || controller.submitError ? (
         <p className="border-t px-3 py-2 text-xs text-destructive" role="alert">
-          {controller.referenceError ?? submitError}
+          {controller.referenceError ?? controller.submitError}
         </p>
       ) : null}
 

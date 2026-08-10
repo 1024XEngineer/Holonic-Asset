@@ -23,6 +23,7 @@ export function useInspectorEdit({
   selectedFrames,
   prompt,
   animations,
+  onPromptChange,
   onSubmit,
   isSubmitting = false,
 }: Pick<
@@ -31,12 +32,14 @@ export function useInspectorEdit({
   | "selectedFrames"
   | "prompt"
   | "animations"
+  | "onPromptChange"
   | "onSubmit"
   | "isSubmitting"
 >) {
   const [reference, setReference] = useState<InspectorReference | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [isReadingReference, setIsReadingReference] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const referenceReadController = useRef<AbortController | null>(null);
 
   useEffect(
@@ -77,6 +80,7 @@ export function useInspectorEdit({
     const normalizedPrompt = prompt.trim();
     if (!normalizedPrompt || isSubmitting || isReadingReference) return;
 
+    setSubmitError(null);
     try {
       await onSubmit({
         prompt: normalizedPrompt,
@@ -85,9 +89,18 @@ export function useInspectorEdit({
       });
       setReference(null);
       setReferenceError(null);
-    } catch {
-      // The workspace owns submission errors so the draft remains retryable.
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Unable to send the prompt.",
+      );
     }
+  };
+
+  const changePrompt = (value: string) => {
+    setSubmitError(null);
+    onPromptChange(value);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -118,6 +131,7 @@ export function useInspectorEdit({
   return {
     canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
     canSubmit: Boolean(prompt.trim()) && !isReadingReference && !isSubmitting,
+    changePrompt,
     clearReference,
     dropzone,
     handlePromptKeyDown,
@@ -125,6 +139,7 @@ export function useInspectorEdit({
     isReadingReference,
     reference,
     referenceError,
+    submitError,
     target: getInspectorTargetSummary(
       selectedNodes,
       selectedFrames,

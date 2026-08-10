@@ -36,9 +36,6 @@ export function useEditorWorkspace({
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
     null,
   );
-  const [promptSubmissionError, setPromptSubmissionError] = useState<
-    string | null
-  >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { schedule: scheduleNoticeReset } = useTimeout();
   const { schedule: schedulePromptTaskReset } = useTimeout();
@@ -47,7 +44,6 @@ export function useEditorWorkspace({
     setNotice(null);
     setAnimationTask(null);
     setPromptTask(null);
-    setPromptSubmissionError(null);
   }, [asset.id, asset.projectId]);
 
   const generationTasks = useMemo<EditorGenerationTask[]>(
@@ -137,7 +133,6 @@ export function useEditorWorkspace({
     if (!prompt || promptTask) return;
 
     const taskId = `prompt-${crypto.randomUUID()}`;
-    setPromptSubmissionError(null);
     setPromptTask({
       id: taskId,
       name: `Edit ${asset.name}`,
@@ -160,59 +155,62 @@ export function useEditorWorkspace({
         setPromptTask((current) => (current?.id === taskId ? null : current));
       }, 1800);
     } catch (error) {
-      const message =
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : "Unable to send the prompt.";
       setPromptTask((current) => (current?.id === taskId ? null : current));
-      setPromptSubmissionError(message);
       reportAction("Prompt submission failed");
       throw error;
     }
   };
 
   return {
-    assetKind,
-    assetName: asset.name,
-    version: asset.version,
-    projectName,
-    prototype: sprite.prototype,
-    animations: sprite.animations ?? [],
-    nodePositions: sprite.nodePositions,
-    prompt: snapshot.record.prompt,
-    history: asset.history,
-    status,
-    canUndo: snapshot.canUndo,
-    canRedo: snapshot.canRedo,
-    isDirty: snapshot.dirty,
-    isSaving: snapshot.saveState.phase === "saving",
-    isPromptSubmitting: promptTask !== null,
-    promptSubmitError: promptSubmissionError,
-    isGeneratingAnimation: animationMutation.isPending,
-    generationTasks,
-    onBack,
-    onUndo: () => session.dispatch({ type: "history.undo" }),
-    onRedo: () => session.dispatch({ type: "history.redo" }),
-    onSave: () => void save(),
-    onPromptChange: (value) => session.dispatch({ type: "prompt.set", value }),
-    onPromptSubmit: submitInspectorPrompt,
-    onPositionChange: (nodeId, position) =>
-      session.dispatch({
-        type: "sprite.node-position.set",
-        nodeId,
-        position,
-      }),
-    onAnimationGenerate: (request) => void generateAnimation(request),
-    onAnimationRename: (animationId, label) =>
-      session.dispatch({
-        type: "sprite.animation.rename",
-        animationId,
-        label,
-      }),
-    onAnimationDelete: (animationId) =>
-      session.dispatch({
-        type: "sprite.animation.delete",
-        animationId,
-      }),
+    header: {
+      assetKind,
+      assetName: asset.name,
+      version: asset.version,
+      projectName,
+      status,
+      canUndo: snapshot.canUndo,
+      canRedo: snapshot.canRedo,
+      isDirty: snapshot.dirty,
+      isSaving: snapshot.saveState.phase === "saving",
+      generationTasks,
+      onBack,
+      onUndo: () => session.dispatch({ type: "history.undo" }),
+      onRedo: () => session.dispatch({ type: "history.redo" }),
+      onSave: () => void save(),
+    },
+    sprite: {
+      prototype: sprite.prototype,
+      animations: sprite.animations ?? [],
+      nodePositions: sprite.nodePositions,
+      onPositionChange: (nodeId, position) =>
+        session.dispatch({
+          type: "sprite.node-position.set",
+          nodeId,
+          position,
+        }),
+    },
+    tree: {
+      isGeneratingAnimation: animationMutation.isPending,
+      onAnimationGenerate: (request) => void generateAnimation(request),
+      onAnimationRename: (animationId, label) =>
+        session.dispatch({
+          type: "sprite.animation.rename",
+          animationId,
+          label,
+        }),
+      onAnimationDelete: (animationId) =>
+        session.dispatch({
+          type: "sprite.animation.delete",
+          animationId,
+        }),
+    },
+    inspector: {
+      prompt: snapshot.record.prompt,
+      history: asset.history,
+      isSubmitting: promptTask !== null,
+      onPromptChange: (value) =>
+        session.dispatch({ type: "prompt.set", value }),
+      onSubmit: submitInspectorPrompt,
+    },
   };
 }
