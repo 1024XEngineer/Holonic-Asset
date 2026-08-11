@@ -1,5 +1,6 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
-import type { Perspective } from "../../project/types";
+import { perspectiveSchema, type Perspective } from "../../project/types";
+import { z } from "zod";
 
 export type CharacterSpriteSheet = {
   format: "png-sprite-sheet";
@@ -19,7 +20,6 @@ export type CharacterAnimationClip = {
   spriteSheet?: CharacterSpriteSheet;
   audio?: { label: string; time: string };
 };
-
 export type CharacterAnimation = CharacterAnimationClip;
 
 export type AssetAnimation = {
@@ -80,7 +80,12 @@ export type ProjectAsset = {
   scenery?: SceneryAssetData;
 };
 
-export type AssetMetadataUpdate = Pick<
-  ProjectAsset,
-  "name" | "description" | "tags" | "canvasSize" | "perspective"
->;
+export const assetMetadataUpdateSchema = z.object({
+  name: z.string().trim().min(1, "Asset name is required."),
+  description: z.string(),
+  tags: z.array(z.string()),
+  canvasSize: z.string().trim().min(1, "Canvas size is required."),
+  perspective: perspectiveSchema,
+});
+
+export type AssetMetadataUpdate = z.infer<typeof assetMetadataUpdateSchema>;

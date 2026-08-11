@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const assetKinds = [
   "character",
   "object",
@@ -7,7 +9,9 @@ export const assetKinds = [
   "audio",
 ] as const;
 
-export type AssetKind = (typeof assetKinds)[number];
+export const assetKindSchema = z.enum(assetKinds);
+
+export type AssetKind = z.infer<typeof assetKindSchema>;
 
 export type CreatableAssetKind = AssetKind;
 

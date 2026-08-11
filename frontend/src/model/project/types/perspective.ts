@@ -1,19 +1,20 @@
 import type { components } from "@/model/generated/core-api";
+import { z } from "zod";
 
 type CorePerspective = components["schemas"]["ProjectResponse"]["perspective"];
 
-const perspectiveValues = {
-  "Top-Down": true,
-  "Side-On": true,
-  Isometric: true,
-} as const satisfies Record<CorePerspective, true>;
+const perspectiveValues = [
+  "Top-Down",
+  "Side-On",
+  "Isometric",
+] as const satisfies readonly CorePerspective[];
 
-export type Perspective = keyof typeof perspectiveValues;
+export const perspectiveSchema = z.enum(perspectiveValues);
 
-export const perspectiveOptions = Object.freeze(
-  Object.keys(perspectiveValues) as Perspective[],
-);
+export type Perspective = z.infer<typeof perspectiveSchema>;
 
-export function isPerspective(value: string): value is Perspective {
-  return Object.hasOwn(perspectiveValues, value);
+export const perspectiveOptions = Object.freeze([...perspectiveValues]);
+
+export function isPerspective(value: unknown): value is Perspective {
+  return perspectiveSchema.safeParse(value).success;
 }

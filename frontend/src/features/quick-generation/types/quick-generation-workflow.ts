@@ -2,6 +2,7 @@ import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,
 } from "@/model/generation";
+import { generateQuickAssetInputSchema } from "@/model/generation";
 
 export const quickGenerationSizes = [
   "32 × 32 px",
@@ -37,14 +38,12 @@ export function createQuickGenerationDraft<Reference = unknown>(
 export function toGenerateQuickAssetInput(
   draft: QuickGenerationDraft,
 ): GenerateQuickAssetInput | undefined {
-  const prompt = draft.prompt.trim();
-  const size = draft.size.trim();
-  if (!prompt || !size) return undefined;
-
-  return {
+  const result = generateQuickAssetInputSchema.safeParse({
     assetId: draft.assetId,
-    prompt,
-    size,
+    prompt: draft.prompt,
+    size: draft.size,
     referenceFileName: draft.referenceFileName,
-  };
+  });
+
+  return result.success ? result.data : undefined;
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { projectContextOptions, toCreateProjectInput } from "./project-context";
+import {
+  applyProjectSettings,
+  projectContextOptions,
+  toCreateProjectInput,
+} from "./project-context";
 
 describe("toCreateProjectInput", () => {
   it("creates an API input without assigning project identity", () => {
@@ -34,5 +38,45 @@ describe("toCreateProjectInput", () => {
       "Side-On",
       "Isometric",
     ]);
+  });
+
+  it("rejects unsupported project options", () => {
+    expect(() =>
+      toCreateProjectInput({
+        name: "Test",
+        gameType: "Unknown",
+        platform: "PC",
+        description: "",
+        perspective: "Top-Down",
+        reference: "",
+      } as never),
+    ).toThrow();
+  });
+
+  it("does not apply settings with a blank custom game type", () => {
+    const project = {
+      id: "project-1",
+      name: "Current",
+      style: "Top-Down",
+      gameType: "Puzzle",
+      platform: "PC",
+      description: "",
+      reference: "",
+      perspective: "Top-Down" as const,
+      visualDirection: "",
+      assetCount: 0,
+    };
+
+    expect(
+      applyProjectSettings(project, {
+        name: "Updated",
+        gameType: "Other",
+        customGameType: "   ",
+        perspective: "Top-Down",
+        platform: "PC",
+        description: "",
+        visualDirection: "",
+      }),
+    ).toBeUndefined();
   });
 });
