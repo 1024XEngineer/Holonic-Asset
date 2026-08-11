@@ -12,4 +12,4 @@ coverage:
           - backend
         target: auto
         threshold: 0%
-        informational: true
+        informational: false
