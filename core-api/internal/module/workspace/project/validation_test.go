@@ -2,6 +2,7 @@ package project_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
@@ -59,7 +60,7 @@ func TestProjectPerspectiveRequiresSupportedValue(t *testing.T) {
 		t.Fatalf("expected empty perspective to be rejected when generating a reference: %v", err)
 	}
 
-	customGameType := "Cozy farming simulator"
+	customGameType := "  Cozy farming simulator  "
 	emptyPlatformType := domain.PlatformType("")
 	validUpdate := &domain.ProjectUpdate{
 		ID:             42,
@@ -69,11 +70,45 @@ func TestProjectPerspectiveRequiresSupportedValue(t *testing.T) {
 	if err := validUpdate.Validate(); err != nil {
 		t.Fatalf("expected frontend-provided game type to be valid: %v", err)
 	}
+	if *validUpdate.GameType != "Cozy farming simulator" {
+		t.Fatalf("expected game type to be trimmed, got %q", *validUpdate.GameType)
+	}
 
 	emptyPerspective := domain.Perspective("")
 	invalidUpdate := &domain.ProjectUpdate{ID: 42, Perspective: &emptyPerspective}
 	if err := invalidUpdate.Validate(); !errors.Is(err, domain.ErrInvalidProject) {
 		t.Fatalf("expected explicit empty perspective to be rejected: %v", err)
+	}
+}
+
+func TestProjectValidateGameTypeRejectsBlankOversizedAndControlInput(t *testing.T) {
+	oversized := strings.Repeat("a", 101)
+	control := "action\nroguelike"
+	tests := map[string]string{
+		"blank":     "   ",
+		"oversized": oversized,
+		"control":   control,
+	}
+
+	for name, gameType := range tests {
+		t.Run(name, func(t *testing.T) {
+			project := &domain.Project{
+				UserID:         7,
+				Name:           "Prototype",
+				GameType:       gameType,
+				Perspective:    domain.PerspectiveTopDown,
+				TargetPlatform: domain.PlatformTypePC,
+			}
+			if err := project.ValidateCreate(); !errors.Is(err, domain.ErrInvalidProject) {
+				t.Fatalf("expected invalid game type error, got %v", err)
+			}
+		})
+	}
+
+	empty := "   "
+	update := &domain.ProjectUpdate{ID: 42, GameType: &empty}
+	if err := update.Validate(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected blank game type update to be rejected, got %v", err)
 	}
 }
 

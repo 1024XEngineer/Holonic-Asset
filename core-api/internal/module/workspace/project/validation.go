@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 var (
 	ErrInvalidProject  = errors.New("invalid project")
 	ErrProjectNotFound = errors.New("project not found")
 )
+
+const maxGameTypeLength = 100
 
 func (t PlatformType) Valid() bool {
 	switch t {
@@ -62,6 +66,11 @@ func (p *Project) validateDefinition() error {
 	if strings.TrimSpace(p.Name) == "" {
 		return invalidProject("name is required")
 	}
+	normalizedGameType, err := normalizeGameType(p.GameType)
+	if err != nil {
+		return err
+	}
+	p.GameType = normalizedGameType
 	if !p.Perspective.Valid() {
 		return invalidProject("perspective is invalid")
 	}
@@ -69,6 +78,22 @@ func (p *Project) validateDefinition() error {
 		return invalidProject("targetPlatform is invalid")
 	}
 	return nil
+}
+
+func normalizeGameType(gameType string) (string, error) {
+	normalized := strings.TrimSpace(gameType)
+	if gameType != "" && normalized == "" {
+		return "", invalidProject("gameType must not be blank")
+	}
+	if utf8.RuneCountInString(normalized) > maxGameTypeLength {
+		return "", invalidProject("gameType exceeds maximum length of 100 characters")
+	}
+	for _, r := range normalized {
+		if unicode.IsControl(r) {
+			return "", invalidProject("gameType contains invalid control characters")
+		}
+	}
+	return normalized, nil
 }
 
 func validGenerationReference(reference string) bool {
@@ -96,6 +121,13 @@ func (u *ProjectUpdate) Validate() error {
 	}
 	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
 		return invalidProject("name is required")
+	}
+	if u.GameType != nil {
+		normalizedGameType, err := normalizeGameType(*u.GameType)
+		if err != nil {
+			return err
+		}
+		*u.GameType = normalizedGameType
 	}
 	if u.Perspective != nil && !u.Perspective.Valid() {
 		return invalidProject("perspective is invalid")

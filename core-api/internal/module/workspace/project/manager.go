@@ -229,16 +229,25 @@ If a reference image is supplied, use it only for visual language, palette relat
 }
 
 func gameplayPlanPrompt(project *Project) string {
-	return fmt.Sprintf(`Interpret this as a %q game. Pick one concrete moment from the user's description, show the smallest set of game entities needed to understand the moment, and make the player's goal readable through placement and interaction. Do not replace the described loop with a more familiar genre and do not add extra mechanics to make the frame busy.`, project.GameType)
+	gameType := gameTypeLabel(project.GameType)
+	return fmt.Sprintf(`Interpret this as a %q game. Pick one concrete moment from the user's description, show the smallest set of game entities needed to understand the moment, and make the player's goal readable through placement and interaction. Do not replace the described loop with a more familiar genre and do not add extra mechanics to make the frame busy.`, gameType)
 }
 
 func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
 }
 
-func gameTypePrompt(gameType string) string {
+func gameTypeLabel(gameType string) string {
 	label := strings.TrimSpace(gameType)
 	if label == "" {
+		return "unspecified"
+	}
+	return label
+}
+
+func gameTypePrompt(gameType string) string {
+	label := gameTypeLabel(gameType)
+	if label == "unspecified" {
 		return "an unspecified game type; rely on the user description"
 	}
 	return fmt.Sprintf("the user-described game type %q; rely on the user description for its actual activity", label)

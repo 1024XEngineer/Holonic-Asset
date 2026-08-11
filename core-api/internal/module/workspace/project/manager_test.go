@@ -262,6 +262,7 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 				t.Fatalf("expected raw user description in prompt")
 			}
 			for _, fragment := range []string{
+				`Interpret this as a "unspecified" game`,
 				"SCENE DECISION",
 				"AUTHENTIC PIXEL ART",
 				"GAMEPLAY SCREEN UI SET",
@@ -272,6 +273,9 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 				if !strings.Contains(prompt, fragment) {
 					t.Errorf("expected generic prompt to contain %q", fragment)
 				}
+			}
+			if strings.Contains(prompt, `Interpret this as a "" game`) {
+				t.Fatal("prompt must not contain an empty game type")
 			}
 			for _, fragment := range tc.forbidden {
 				if strings.Contains(strings.ToLower(prompt), strings.ToLower(fragment)) {
