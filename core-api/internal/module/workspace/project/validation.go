@@ -12,15 +12,6 @@ var (
 	ErrProjectNotFound = errors.New("project not found")
 )
 
-func (t GameType) Valid() bool {
-	switch t {
-	case "", GameTypeRPG, GameTypeACT, GameTypeSLG:
-		return true
-	default:
-		return false
-	}
-}
-
 func (t PlatformType) Valid() bool {
 	switch t {
 	case "", PlatformTypePC, PlatformTypeMobile, PlatformTypeWeb:
@@ -71,9 +62,6 @@ func (p *Project) validateDefinition() error {
 	if strings.TrimSpace(p.Name) == "" {
 		return invalidProject("name is required")
 	}
-	if !p.GameType.Valid() {
-		return invalidProject("gameType is invalid")
-	}
 	if !p.Perspective.Valid() {
 		return invalidProject("perspective is invalid")
 	}
@@ -108,9 +96,6 @@ func (u *ProjectUpdate) Validate() error {
 	}
 	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
 		return invalidProject("name is required")
-	}
-	if u.GameType != nil && !u.GameType.Valid() {
-		return invalidProject("gameType is invalid")
 	}
 	if u.Perspective != nil && !u.Perspective.Valid() {
 		return invalidProject("perspective is invalid")

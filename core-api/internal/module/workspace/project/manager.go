@@ -236,8 +236,8 @@ func hudPlanPrompt(*Project) string {
 	return `Treat the interface as part of the described gameplay, not as a showcase overlay. Do not add a menu, inventory, equipment, loadout, or permanent side panel unless the user explicitly asks for it. If the user asks for a specific interface, show only that requested interface in a compact active-gameplay state, keep the playfield visible, and use iconography or empty slots instead of readable words, letters, numbers, or fake glyphs. Otherwise keep menus closed with no permanent side panel and use only small icon-only indicators that the described moment actually needs, such as a selected-object icon or an unlabeled health/resource bar. Do not draw counters, labels, dialogue, or interaction text. Keep the HUD small and subordinate to the playfield; if the game does not need it, show no HUD.`
 }
 
-func gameTypePrompt(gameType GameType) string {
-	label := strings.TrimSpace(string(gameType))
+func gameTypePrompt(gameType string) string {
+	label := strings.TrimSpace(gameType)
 	if label == "" {
 		return "an unspecified game type; rely on the user description"
 	}
