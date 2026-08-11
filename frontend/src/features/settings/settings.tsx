@@ -19,10 +19,9 @@ import {
   saveThemePreference,
   type ThemePreference,
 } from "@/lib/theme-preference";
+import { z } from "zod";
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+const emailSchema = z.string().trim().email();
 
 export function Settings() {
   const [profile] = useState(readAccountProfile);
@@ -34,6 +33,7 @@ export function Settings() {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schedule } = useTimeout();
+  const hasValidEmail = emailSchema.safeParse(email).success;
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -51,7 +51,7 @@ export function Settings() {
               onSubmit={(event) => {
                 event.preventDefault();
                 setEmailTouched(true);
-                if (!isValidEmail(email)) return;
+                if (!hasValidEmail) return;
                 saveAccountProfile({ name: name.trim(), email, avatarUrl });
                 setProfileSaved(true);
                 schedule(() => setProfileSaved(false), 1800);
@@ -117,11 +117,11 @@ export function Settings() {
                   <Input
                     id="settings-email"
                     aria-describedby={
-                      emailTouched && !isValidEmail(email)
+                      emailTouched && !hasValidEmail
                         ? "settings-email-error"
                         : undefined
                     }
-                    aria-invalid={emailTouched && !isValidEmail(email)}
+                    aria-invalid={emailTouched && !hasValidEmail}
                     type="email"
                     value={email}
                     onBlur={() => setEmailTouched(true)}
@@ -130,7 +130,7 @@ export function Settings() {
                       setProfileSaved(false);
                     }}
                   />
-                  {emailTouched && !isValidEmail(email) ? (
+                  {emailTouched && !hasValidEmail ? (
                     <p
                       id="settings-email-error"
                       className="text-sm text-destructive"
@@ -145,10 +145,7 @@ export function Settings() {
                 <p className="text-sm text-muted-foreground" aria-live="polite">
                   {profileSaved ? "Profile saved." : ""}
                 </p>
-                <Button
-                  type="submit"
-                  disabled={!name.trim() || !isValidEmail(email)}
-                >
+                <Button type="submit" disabled={!name.trim() || !hasValidEmail}>
                   {profileSaved ? <Check /> : null}
                   Save profile
                 </Button>
