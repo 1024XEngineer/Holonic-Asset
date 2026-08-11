@@ -15,7 +15,7 @@ type Store interface {
 	CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
-	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
+	CreateAnimation(ctx context.Context, assetID uint, name string, frames []Frame) (uint, error)
 	UpdatePrototypeImages(ctx context.Context, assetID uint, images []ImageResource) error
 	CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error)
 	GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error)

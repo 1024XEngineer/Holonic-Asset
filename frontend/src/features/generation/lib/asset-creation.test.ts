@@ -36,13 +36,14 @@ describe("asset creation", () => {
       return draft;
     });
 
-    expect(drafts.map(toCreationRequest)).toEqual([
+    const requests = drafts.map(toCreationRequest);
+
+    expect(requests).toEqual([
       expect.objectContaining({
         kind: "character",
         name: "Asset name",
         prompt: "Asset prompt",
         perspective: "Top-Down",
-        directionCount: "4",
         reference,
       }),
       expect.objectContaining({
@@ -67,5 +68,7 @@ describe("asset creation", () => {
       }),
       expect.objectContaining({ kind: "audio" }),
     ]);
+    expect(requests[0]).not.toHaveProperty("directionCount");
+    expect(requests[1]).not.toHaveProperty("directionCount");
   });
 });
