@@ -231,6 +231,11 @@ func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 
 func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	content.DirectionCount = 4
+	content.Metadata = map[string]any{"source": "prototype"}
+	prototypeURL := "uploads/hero/prototype.png"
+	prototype := domain.Prototype{{ID: 21, URL: &prototypeURL}}
+	content.Prototype = &prototype
 	payload, err := domain.EncodeContent(content)
 	if err != nil {
 		t.Fatalf("encode content: %v", err)
@@ -251,7 +256,13 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
 	}
 
-	animationID, err := repo.CreateAnimation(context.Background(), 7, "walk")
+	frameURL := "uploads/hero/walk/001.png"
+	animationID, err := repo.CreateAnimation(
+		context.Background(),
+		7,
+		"walk",
+		[]domain.Frame{{ID: 1, URL: &frameURL, Duration: 100}},
+	)
 	if err != nil {
 		t.Fatalf("create animation: %v", err)
 	}
@@ -262,8 +273,18 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode updated content: %v", err)
 	}
-	if len(updated.Animations) != 1 || updated.Animations[0].Name != "walk" {
+	if len(updated.Animations) != 1 || updated.Animations[0].Name != "walk" ||
+		len(updated.Animations[0].Frames) != 1 || updated.Animations[0].Frames[0].URL == nil ||
+		*updated.Animations[0].Frames[0].URL != frameURL {
 		t.Fatalf("unexpected animation content: %+v", updated.Animations)
+	}
+	if updated.DirectionCount != content.DirectionCount || updated.Prototype == nil ||
+		len(*updated.Prototype) != 1 || (*updated.Prototype)[0].URL == nil ||
+		*(*updated.Prototype)[0].URL != prototypeURL || updated.Metadata["source"] != "prototype" {
+		t.Fatalf("non-animation content changed: %+v", updated)
+	}
+	if len(contentDao.contents) != 2 {
+		t.Fatalf("expected one content write, got %d content records", len(contentDao.contents))
 	}
 }
 

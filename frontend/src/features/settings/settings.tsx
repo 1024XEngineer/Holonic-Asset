@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 import { useTimeout } from "@/hooks/use-timeout";
-import { readAccountProfile, saveAccountProfile } from "@/lib/account-profile";
+import { readAccountProfile, saveAccountProfile } from "@/model/account";
 import {
   readThemePreference,
   saveThemePreference,

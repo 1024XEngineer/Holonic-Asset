@@ -1,6 +1,6 @@
 import { assetApi } from "../../library/asset.api";
 import { createAssetLibraryCollection } from "../../library/asset-library-collection";
-import { listMockProjects } from "../../../project/mock";
+import { listMockProjects } from "@/model/project";
 import { DataApiError } from "@/lib/data-api-error";
 import { createDefaultAssetRecord, mergeAssetRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";

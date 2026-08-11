@@ -7,6 +7,7 @@ export {
   removeProjectSelection,
 } from "./project-selection";
 export { useUpdateProjectMutation } from "./project-update.mutation";
+export { listMockProjects } from "./mock";
 export { isPerspective, perspectiveOptions, perspectiveSchema } from "./types";
 export type {
   CreateProjectInput,

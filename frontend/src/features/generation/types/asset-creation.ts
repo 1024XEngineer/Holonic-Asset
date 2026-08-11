@@ -1,5 +1,4 @@
 import type { CreatableAssetKind } from "@/model/asset";
-import type { CreationRequest } from "@/model/generation";
 import type { Perspective } from "@/model/project";
 import type { ItemTile } from "@/model/item-tile";
 
@@ -16,7 +15,6 @@ export type VisualAssetCreationDraft<Reference = unknown> =
     Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "uiset">
   > & {
     perspective: Perspective;
-    directionCount: NonNullable<CreationRequest["directionCount"]>;
     reference: Reference | undefined;
   };
 
