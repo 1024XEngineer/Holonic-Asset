@@ -1,3 +1,5 @@
+import type { Perspective } from "@/model/project";
+
 export type AssetContentMetadata = Record<string, unknown>;
 
 export type AssetContentBase = {
@@ -30,16 +32,27 @@ export type AssetAnimationResponse = {
   frames: AssetAnimationFrameResponse[];
 };
 
-export type CharacterAssetContent = AssetContentBase & {
-  directionCount: 2 | 4 | 8;
+export type DirectionCountByPerspective = {
+  "Side-On": 2;
+  "Top-Down": 4;
+  Isometric: 8;
+};
+
+export type DirectionCountForPerspective<
+  View extends Perspective = Perspective,
+> = DirectionCountByPerspective[View];
+
+type DirectionalAssetContent<View extends Perspective> = AssetContentBase & {
+  directionCount: DirectionCountForPerspective<View>;
   prototype: AssetImageResourceResponse[];
   animations?: AssetAnimationResponse[];
 };
 
-export type ObjectAssetContent = AssetContentBase & {
-  prototype: AssetImageResourceResponse[];
-  animations?: AssetAnimationResponse[];
-};
+export type CharacterAssetContent<View extends Perspective = Perspective> =
+  DirectionalAssetContent<View>;
+
+export type ObjectAssetContent<View extends Perspective = Perspective> =
+  DirectionalAssetContent<View>;
 
 export type TileSetTileResponse = {
   url?: string;
@@ -91,9 +104,9 @@ export type SceneryAssetContent = AssetContentBase & {
 
 export type AudioAssetContent = AssetContentBase;
 
-export type AssetContentByType = {
-  character: CharacterAssetContent;
-  object: ObjectAssetContent;
+export type AssetContentByType<View extends Perspective = Perspective> = {
+  character: CharacterAssetContent<View>;
+  object: ObjectAssetContent<View>;
   tileSet: TileSetAssetContent;
   audio: AudioAssetContent;
   uiset: UISetAssetContent;

@@ -1,4 +1,5 @@
 import type { components, operations } from "@/model/generated/core-api";
+import type { Perspective } from "@/model/project";
 import type {
   AssetContentByType,
   AssetSizeResponse,
@@ -15,6 +16,8 @@ export type {
   AssetSizeResponse,
   AudioAssetContent,
   CharacterAssetContent,
+  DirectionCountByPerspective,
+  DirectionCountForPerspective,
   ObjectAssetContent,
   SceneryAssetContent,
   SceneryLayerResponse,
@@ -47,8 +50,12 @@ export type AssetDimensionsByType = {
 export type AssetDimensions<Type extends AssetType = AssetType> =
   AssetDimensionsByType[Type];
 
-export type AssetContent<Type extends AssetType = AssetType> =
-  AssetContentByType[Type & keyof AssetContentByType];
+export type AssetContent<
+  Type extends AssetType = AssetType,
+  View extends Perspective = Perspective,
+> = AssetContentByType<View>[Type & keyof AssetContentByType];
+
+type DirectionalAssetType = Extract<AssetType, "character" | "object">;
 
 type AssetListItemFields = Omit<
   GeneratedAssetListItemResponse,
@@ -66,15 +73,27 @@ type GeneratedAssetDetailResponse =
   operations["getAsset"]["responses"][200]["content"]["application/json"]["data"];
 type AssetDetailFields = Omit<
   GeneratedAssetDetailResponse,
-  "type" | "dimensions" | "content"
+  "type" | "perspective" | "dimensions" | "content"
 >;
 
+type AssetDetailResponseFor<
+  Type extends AssetType,
+  View extends Perspective = Perspective,
+> = AssetDetailFields & {
+  type: Type;
+  perspective: View;
+  dimensions: AssetDimensions<Type>;
+  content?: AssetContent<Type, View>;
+};
+
+type DirectionalAssetDetailResponse<Type extends DirectionalAssetType> = {
+  [View in Perspective]: AssetDetailResponseFor<Type, View>;
+}[Perspective];
+
 export type AssetDetailResponse = {
-  [Type in AssetType]: AssetDetailFields & {
-    type: Type;
-    dimensions: AssetDimensions<Type>;
-    content?: AssetContent<Type>;
-  };
+  [Type in AssetType]: Type extends DirectionalAssetType
+    ? DirectionalAssetDetailResponse<Type>
+    : AssetDetailResponseFor<Type>;
 }[AssetType];
 
 export type ListAssetsQuery = NonNullable<
@@ -90,13 +109,28 @@ export type GetAssetsResponse = Omit<GeneratedGetAssetsResponse, "assets"> & {
 
 type GeneratedAssetRecordResponse = Schemas["RecordAssetResponse"];
 
-export type AssetRecordResponse<Type extends AssetType = AssetType> = Omit<
+type AssetRecordFields = Omit<
   GeneratedAssetRecordResponse,
-  "dimensions" | "content"
-> & {
+  "perspective" | "dimensions" | "content"
+>;
+
+type AssetRecordResponseFor<
+  Type extends AssetType,
+  View extends Perspective = Perspective,
+> = AssetRecordFields & {
+  perspective: View;
   dimensions: AssetDimensions<Type>;
-  content?: AssetContent<Type>;
+  content?: AssetContent<Type, View>;
 };
+
+type DirectionalAssetRecordResponse<Type extends DirectionalAssetType> = {
+  [View in Perspective]: AssetRecordResponseFor<Type, View>;
+}[Perspective];
+
+export type AssetRecordResponse<Type extends AssetType = AssetType> =
+  Type extends DirectionalAssetType
+    ? DirectionalAssetRecordResponse<Type>
+    : AssetRecordResponseFor<Type>;
 
 type GeneratedGetAssetRecordsResponse =
   operations["listAssetRecords"]["responses"][200]["content"]["application/json"]["data"];

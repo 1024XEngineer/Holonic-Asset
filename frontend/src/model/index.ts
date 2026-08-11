@@ -88,6 +88,8 @@ export type {
   CharacterAssetContent,
   CopyAssetRequest,
   CopyAssetResponse,
+  DirectionCountByPerspective,
+  DirectionCountForPerspective,
   GetAssetRecordsResponse,
   GetAssetsResponse,
   ListAssetsQuery,
