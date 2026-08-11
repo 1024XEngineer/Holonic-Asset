@@ -198,6 +198,7 @@
               "edit_object_frames",
               "generate_animation",
               "edit_animation",
+              "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
               "edit_tiles"
@@ -508,6 +509,22 @@
         ],
         "type": "object"
       },
+      "GenerationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "animation_id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "asset_id": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "GenerationRunListItemResponse": {
         "additionalProperties": false,
         "properties": {
@@ -531,6 +548,7 @@
               "edit_object_frames",
               "generate_animation",
               "edit_animation",
+              "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
               "edit_tiles"
@@ -617,6 +635,7 @@
               "edit_object_frames",
               "generate_animation",
               "edit_animation",
+              "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
               "edit_tiles"
@@ -628,7 +647,9 @@
             "minimum": 1,
             "type": "integer"
           },
-          "result": {},
+          "result": {
+            "$ref": "#/components/schemas/GenerationResult"
+          },
           "status": {
             "enum": [
               "pending",
