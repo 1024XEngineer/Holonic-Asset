@@ -59,7 +59,6 @@ export function ImageDropzone({
         <input {...getInputProps()} />
         {previewUrl ? (
           <div className="relative size-full overflow-hidden rounded-[inherit]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewUrl}
               alt="Selected reference"

@@ -226,7 +226,6 @@ export function ProjectSettingsDialog({
                         Project reference
                       </DialogTitle>
                       {field.state.value ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={field.state.value}
                           alt="Project reference"
