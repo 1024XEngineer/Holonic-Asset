@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 
@@ -30,6 +32,9 @@ func (h *GenerationHandler) Create(
 		TargetAssetPaths: request.TargetAssetPaths,
 		Parameters:       request.Parameters,
 	})
+	if errors.Is(err, generator.ErrInvalidSceneryPayload) {
+		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, echo.ErrBadRequest
+	}
 	if err != nil {
 		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, err
 	}
@@ -84,6 +89,13 @@ func (h *GenerationHandler) Get(
 	if err != nil {
 		return dto.SuccessResponse[dto.GetGenerationResponse]{}, err
 	}
+	var result *dto.GenerationResult
+	if len(run.Result) > 0 && string(run.Result) != "null" {
+		result = &dto.GenerationResult{}
+		if err := json.Unmarshal(run.Result, result); err != nil {
+			return dto.SuccessResponse[dto.GetGenerationResponse]{}, fmt.Errorf("handler: decode generation result: %w", err)
+		}
+	}
 
 	return dto.NewTypedSuccessResponse(dto.GetGenerationResponse{
 		ID:        run.ID,
@@ -91,7 +103,7 @@ func (h *GenerationHandler) Get(
 		AssetID:   run.AssetID,
 		Kind:      run.Kind,
 		Status:    dto.GenerationStatus(run.Status.String()),
-		Result:    run.Result,
+		Result:    result,
 		Error:     run.Error,
 	}), nil
 }
