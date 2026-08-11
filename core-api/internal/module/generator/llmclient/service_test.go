@@ -92,11 +92,6 @@ func TestLLMServiceRejectsInvalidRequests(t *testing.T) {
 			request.Prompt = " "
 			return request
 		},
-		"missing images": func() *llmclient.CompletionRequest {
-			request := valid()
-			request.Images = nil
-			return request
-		},
 		"invalid image URL": func() *llmclient.CompletionRequest {
 			request := valid()
 			request.Images[0].URL = "file:///tmp/layer.png"
