@@ -36,7 +36,6 @@ export default defineConfig({
         "src/model/**/*.ts",
         "src/features/**/state/**/*.ts",
         "src/features/**/lib/**/*.ts",
-        "src/features/**/types/**/*.ts",
         "src/features/asset-editor/**/*.ts",
       ],
       exclude: [

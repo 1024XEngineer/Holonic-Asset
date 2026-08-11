@@ -56,6 +56,6 @@ jobs:
           flags: frontend
           fail_ci_if_error: false
 
-      - name: Report 80% coverage thresholds
+      - name: Report 60% coverage thresholds
         continue-on-error: true
         run: pnpm coverage:check

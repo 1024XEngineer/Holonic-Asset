@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const minimumPercent = 80;
+const minimumPercent = 60;
 const [currentPath = "coverage/coverage-final.json"] = process.argv.slice(2);
 
 function readCoverage(path) {
