@@ -1,13 +1,5 @@
-export type AccountProfile = {
-  name: string;
-  email: string;
-  avatarUrl?: string;
-};
-
-export const defaultAccountProfile: AccountProfile = {
-  email: "demo@holonicasset.app",
-  name: "Demo User",
-};
+import { defaultAccountProfile } from "./mock";
+import type { AccountProfile } from "./types";
 
 const profileStorageKey = "holonic-account-profile";
 export const accountProfileUpdatedEvent = "holonic-account-profile-updated";
