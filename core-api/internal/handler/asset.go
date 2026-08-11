@@ -51,6 +51,8 @@ func (h *Handler) GetAssets(
 			ProjectID:   asset.ProjectID,
 			Type:        asset.Type,
 			Description: asset.Description,
+			Perspective: asset.Perspective,
+			Dimensions:  append([]byte(nil), asset.Dimensions...),
 			Tags:        asset.Tags,
 			Version:     asset.Version,
 		}
@@ -84,8 +86,9 @@ func (h *Handler) Detail(
 		ProjectID:   asset.ProjectID,
 		Type:        asset.Type,
 		Description: asset.Description,
+		Perspective: asset.Perspective,
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Tags:        asset.Tags,
-		Attributes:  asset.Attributes,
 		Content:     content,
 		Version:     asset.Version,
 	}), nil
@@ -103,11 +106,15 @@ func (h *Handler) Record(
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}
 	return dto.NewTypedSuccessResponse(dto.RecordAssetResponse{
-		RecordID:  record.ID,
-		AssetID:   record.AssetID,
-		Version:   record.Version,
-		ContentID: record.ContentID,
-		CreatedAt: record.CreatedAt,
+		RecordID:    record.ID,
+		AssetID:     record.AssetID,
+		Version:     record.Version,
+		ContentID:   record.ContentID,
+		CreatedAt:   record.CreatedAt,
+		Name:        record.Name,
+		Description: record.Description,
+		Perspective: record.Perspective,
+		Dimensions:  append([]byte(nil), record.Dimensions...),
 	}), nil
 }
 
@@ -130,12 +137,16 @@ func (h *Handler) Records(
 			return dto.SuccessResponse[dto.GetAssetRecordsResponse]{}, resolveErr
 		}
 		items[index] = dto.AssetRecordResponse{
-			RecordID:  record.ID,
-			AssetID:   record.AssetID,
-			Version:   record.Version,
-			ContentID: record.ContentID,
-			CreatedAt: record.CreatedAt,
-			Content:   content,
+			RecordID:    record.ID,
+			AssetID:     record.AssetID,
+			Version:     record.Version,
+			ContentID:   record.ContentID,
+			CreatedAt:   record.CreatedAt,
+			Name:        record.Name,
+			Description: record.Description,
+			Perspective: record.Perspective,
+			Dimensions:  append([]byte(nil), record.Dimensions...),
+			Content:     content,
 		}
 	}
 	return dto.NewTypedSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
@@ -316,11 +327,10 @@ func (h *Handler) UpdateAsset(
 
 	asset, err := h.AssetManager.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
 		Name:        req.Name,
-		ProjectID:   req.ProjectID,
-		Type:        req.Type,
 		Description: req.Description,
 		Tags:        req.Tags,
-		Attributes:  req.Attributes,
+		Perspective: req.Perspective,
+		Dimensions:  req.Dimensions,
 	})
 	if err != nil {
 		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, err
@@ -331,8 +341,9 @@ func (h *Handler) UpdateAsset(
 		ProjectID:   asset.ProjectID,
 		Type:        asset.Type,
 		Description: asset.Description,
+		Perspective: asset.Perspective,
+		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Tags:        asset.Tags,
-		Attributes:  asset.Attributes,
 		Version:     asset.Version,
 	}), nil
 }

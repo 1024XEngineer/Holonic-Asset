@@ -6,10 +6,14 @@ import (
 )
 
 type AssetRecord struct {
-	ID        uint
-	AssetID   uint
-	Version   uint
-	ContentID uint
-	CreatedAt time.Time
-	Content   json.RawMessage
+	ID          uint
+	AssetID     uint
+	Version     uint
+	ContentID   uint
+	CreatedAt   time.Time
+	Name        string
+	Description string
+	Perspective Perspective
+	Dimensions  json.RawMessage
+	Content     json.RawMessage
 }

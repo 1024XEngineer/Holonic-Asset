@@ -10,7 +10,12 @@ import { useDropzone } from "react-dropzone";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 
 import { getInspectorTargetSummary } from "./inspector-target";
-import type { InspectorEditProps, InspectorReference } from "./inspector.types";
+import {
+  inspectorPromptSchema,
+  inspectorSubmitRequestSchema,
+  type InspectorEditProps,
+  type InspectorReference,
+} from "./inspector.types";
 
 const imageAccept = {
   "image/jpeg": [".jpg", ".jpeg"],
@@ -23,6 +28,7 @@ export function useInspectorEdit({
   selectedFrames,
   prompt,
   animations,
+  onPromptChange,
   onSubmit,
   isSubmitting = false,
 }: Pick<
@@ -31,12 +37,14 @@ export function useInspectorEdit({
   | "selectedFrames"
   | "prompt"
   | "animations"
+  | "onPromptChange"
   | "onSubmit"
   | "isSubmitting"
 >) {
   const [reference, setReference] = useState<InspectorReference | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [isReadingReference, setIsReadingReference] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const referenceReadController = useRef<AbortController | null>(null);
 
   useEffect(
@@ -74,20 +82,26 @@ export function useInspectorEdit({
   };
 
   const submit = async () => {
-    const normalizedPrompt = prompt.trim();
-    if (!normalizedPrompt || isSubmitting || isReadingReference) return;
+    const result = inspectorSubmitRequestSchema.safeParse({
+      prompt,
+      reference: reference ?? undefined,
+      target: { nodeIds: selectedNodes, frames: selectedFrames },
+    });
+    if (!result.success || isSubmitting || isReadingReference) return;
 
+    setSubmitError(null);
     try {
-      await onSubmit({
-        prompt: normalizedPrompt,
-        reference: reference ?? undefined,
-        target: { nodeIds: selectedNodes, frames: selectedFrames },
-      });
+      await onSubmit(result.data);
       setReference(null);
       setReferenceError(null);
     } catch {
-      // The workspace owns submission errors so the draft remains retryable.
+      setSubmitError("Unable to send the prompt.");
     }
+  };
+
+  const changePrompt = (value: string) => {
+    setSubmitError(null);
+    onPromptChange(value);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -117,7 +131,11 @@ export function useInspectorEdit({
 
   return {
     canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
-    canSubmit: Boolean(prompt.trim()) && !isReadingReference && !isSubmitting,
+    canSubmit:
+      inspectorPromptSchema.safeParse(prompt).success &&
+      !isReadingReference &&
+      !isSubmitting,
+    changePrompt,
     clearReference,
     dropzone,
     handlePromptKeyDown,
@@ -125,6 +143,7 @@ export function useInspectorEdit({
     isReadingReference,
     reference,
     referenceError,
+    submitError,
     target: getInspectorTargetSummary(
       selectedNodes,
       selectedFrames,

@@ -3,4 +3,8 @@ export {
   useGenerateQuickAssetMutation,
 } from "./quick-asset.mutations";
 export { useQuickAssetsQuery } from "./quick-assets.query";
-export type { GenerateQuickAssetInput, QuickGenerationAsset } from "./types";
+export {
+  generateQuickAssetInputSchema,
+  type GenerateQuickAssetInput,
+  type QuickGenerationAsset,
+} from "./types";

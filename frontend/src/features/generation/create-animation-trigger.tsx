@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { GenerateAnimationRequest } from "@/model";
+import {
+  generateAnimationRequestSchema,
+  type GenerateAnimationRequest,
+} from "@/model";
 
 type CreateAnimationTriggerProps = {
   children: (openDialog: () => void) => React.ReactNode;
@@ -38,12 +41,13 @@ export function CreateAnimationTrigger({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const label = animationName.trim();
-    const prompt = generationPrompt.trim();
+    const result = generateAnimationRequestSchema.safeParse({
+      label: animationName,
+      prompt: generationPrompt,
+    });
+    if (!result.success || isGenerating) return;
 
-    if (!label || !prompt || isGenerating) return;
-
-    onGenerate({ label, prompt });
+    onGenerate(result.data);
     setOpen(false);
   };
 
@@ -94,8 +98,10 @@ export function CreateAnimationTrigger({
               type="submit"
               disabled={
                 isGenerating ||
-                !animationName.trim() ||
-                !generationPrompt.trim()
+                !generateAnimationRequestSchema.safeParse({
+                  label: animationName,
+                  prompt: generationPrompt,
+                }).success
               }
             >
               <Sparkles />

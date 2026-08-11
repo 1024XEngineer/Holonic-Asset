@@ -1,15 +1,16 @@
 package generator
 
+import assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+
 // CreateCharacterPrototypePayload is the complete input consumed by the
 // character prototype task handler.
 type CreateCharacterPrototypePayload struct {
-	AssetName      string `json:"asset_name"`
-	CreativeBrief  string `json:"creative_brief"`
-	CanvasSize     string `json:"canvas_size"`
-	Perspective    string `json:"perspective"`
-	DirectionCount string `json:"direction_count"`
-	Reference      string `json:"reference"`
-	ProjectID      uint   `json:"project_id"`
+	AssetName     string           `json:"asset_name"`
+	CreativeBrief string           `json:"creative_brief"`
+	Dimensions    assetdomain.Size `json:"dimensions"`
+	Perspective   string           `json:"perspective"`
+	Reference     string           `json:"reference"`
+	ProjectID     uint             `json:"project_id"`
 }
 
 // CreateAnimationPayload is the common input consumed by character and object
@@ -24,12 +25,12 @@ type CreateAnimationPayload struct {
 // CreateObjectPrototypePayload is the complete input consumed by the object
 // prototype task handler.
 type CreateObjectPrototypePayload struct {
-	AssetName     string `json:"asset_name"`
-	CreativeBrief string `json:"creative_brief"`
-	CanvasSize    string `json:"canvas_size"`
-	Perspective   string `json:"perspective"`
-	Reference     string `json:"reference"`
-	ProjectID     uint   `json:"project_id"`
+	AssetName     string           `json:"asset_name"`
+	CreativeBrief string           `json:"creative_brief"`
+	Dimensions    assetdomain.Size `json:"dimensions"`
+	Perspective   string           `json:"perspective"`
+	Reference     string           `json:"reference"`
+	ProjectID     uint             `json:"project_id"`
 }
 
 // CreateTileSetPayload is the complete input consumed by the tileset task

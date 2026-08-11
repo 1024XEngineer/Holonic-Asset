@@ -80,6 +80,35 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		t.Fatal("GenerateProjectReferenceRequest must expose the optional current reference")
 	}
 
+	for _, schemaName := range []string{"AssetDetailResponse", "AssetListItemResponse", "UpdateAssetResponse", "RecordAssetResponse"} {
+		var schema struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		}
+		if err := json.Unmarshal(document.Components.Schemas[schemaName], &schema); err != nil {
+			t.Fatalf("decode %s schema: %v", schemaName, err)
+		}
+		if _, ok := schema.Properties["perspective"]; !ok {
+			t.Fatalf("%s must expose perspective", schemaName)
+		}
+		if _, ok := schema.Properties["dimensions"]; !ok {
+			t.Fatalf("%s must expose dimensions", schemaName)
+		}
+		if _, ok := schema.Properties["attributes"]; ok {
+			t.Fatalf("%s must not expose attributes", schemaName)
+		}
+	}
+	var updateSchema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(document.Components.Schemas["UpdateAssetRequest"], &updateSchema); err != nil {
+		t.Fatalf("decode UpdateAssetRequest schema: %v", err)
+	}
+	for _, field := range []string{"projectId", "type", "attributes", "content"} {
+		if _, ok := updateSchema.Properties[field]; ok {
+			t.Fatalf("UpdateAssetRequest must not accept %s", field)
+		}
+	}
+
 	expectedMethods := map[string][]string{
 		"/project/create":                        {"post"},
 		"/project/reference/generate":            {"post"},

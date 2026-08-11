@@ -19,8 +19,9 @@ type OutboxStore interface {
 	MarkOutboxPublished(ctx context.Context, outboxID uint, queueID int64) error
 }
 
-// TaskResultStore persists a completed task result and its completed status.
-type TaskResultStore interface {
+// TaskExecutionStore persists status transitions owned by queue execution.
+type TaskExecutionStore interface {
+	UpdateTaskStatus(ctx context.Context, taskID uint, status Status) error
 	UpdateTaskResult(ctx context.Context, taskID uint, result json.RawMessage) error
 }
 
@@ -29,7 +30,6 @@ type TaskStore interface {
 	CreateWithOutbox(ctx context.Context, task *Task) (uint, error)
 	GetTaskByID(ctx context.Context, taskID uint) (*Task, error)
 	ListTasks(ctx context.Context, filter *ListFilter) ([]*Task, error)
-	UpdateTaskStatus(ctx context.Context, taskID uint, status Status) error
-	TaskResultStore
+	TaskExecutionStore
 	OutboxStore
 }

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { cn } from "@/lib/utils";
+import { TileSelectionGrid } from "@/components/tile-selection-grid";
 import type { ItemTile } from "@/model/item-tile";
 
 const gridSize = 4;
@@ -36,31 +36,18 @@ export function ItemShapePicker({
           {shape.length} {shape.length === 1 ? "tile" : "tiles"}
         </span>
       </div>
-      <div
-        className="grid size-32 justify-self-center overflow-hidden border border-primary/70 bg-background"
-        role="group"
-        aria-label="Item shape"
-        style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: gridSize * gridSize }, (_, index) => {
-          const x = index % gridSize;
-          const y = Math.floor(index / gridSize);
-          const isSelected = selectedTiles.has(`${x}:${y}`);
-
-          return (
-            <button
-              key={`${x}:${y}`}
-              type="button"
-              aria-label={`Tile column ${x + 1}, row ${y + 1}`}
-              aria-pressed={isSelected}
-              onClick={() => toggleTile(x, y)}
-              className={cn(
-                "aspect-square border-r border-b border-primary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                isSelected ? "bg-primary/35" : "hover:bg-muted",
-              )}
-            />
-          );
-        })}
+      <div className="size-32 justify-self-center border border-primary/70 bg-background">
+        <TileSelectionGrid
+          gridSize={gridSize}
+          selectedCellIndexes={shape.map(([x, y]) => y * gridSize + x)}
+          onToggleCell={(index) =>
+            toggleTile(index % gridSize, Math.floor(index / gridSize))
+          }
+          ariaLabel="Item shape"
+          className="size-full"
+          cellClassName="border-primary/70"
+          getCellAriaLabel={(_, x, y) => `Tile column ${x + 1}, row ${y + 1}`}
+        />
       </div>
       <p className="text-center text-xs leading-4 text-muted-foreground">
         Click tiles to define the item footprint.
