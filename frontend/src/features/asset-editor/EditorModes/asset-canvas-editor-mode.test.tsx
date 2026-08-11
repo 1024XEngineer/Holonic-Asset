@@ -49,6 +49,21 @@ describe("AssetCanvasEditorMode", () => {
       expect(html).toContain("Preview ready");
     },
   );
+
+  it("renders no canvas for unsupported record modes", () => {
+    const html = renderToStaticMarkup(
+      <AssetCanvasEditorMode
+        data={workspaceData("audio", {
+          mode: "audio",
+          prompt: "Theme",
+          audio: {},
+        })}
+        onBack={() => undefined}
+      />,
+    );
+
+    expect(html).toBe("");
+  });
 });
 
 function workspaceData(

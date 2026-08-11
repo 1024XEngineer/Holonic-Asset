@@ -27,6 +27,7 @@ lerna-debug.log*
 # Frontend
 /frontend/**/*.local
 /frontend/.tanstack/tmp/
+/frontend/coverage/
 
 # Go backend
 /core-api/bin/

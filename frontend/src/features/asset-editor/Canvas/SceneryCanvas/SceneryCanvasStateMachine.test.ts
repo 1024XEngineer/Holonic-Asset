@@ -74,4 +74,32 @@ describe("scenery canvas state", () => {
       }),
     ).toBe(state);
   });
+
+  it("deduplicates layers and returns the same state for a no-op sync", () => {
+    const state = createInitialSceneryCanvasState([layers[0], layers[0]]);
+
+    expect(state.layerIds).toEqual(["sky"]);
+    expect(
+      reduceSceneryCanvas(state, {
+        type: "layers.synced",
+        layerIds: ["sky", "sky"],
+      }),
+    ).toBe(state);
+  });
+
+  it("toggles selected and visible layers off and back on", () => {
+    let state = createInitialSceneryCanvasState(layers);
+
+    for (const type of [
+      "layer.selection.toggled",
+      "layer.selection.toggled",
+      "layer.visibility.toggled",
+      "layer.visibility.toggled",
+    ] as const) {
+      state = reduceSceneryCanvas(state, { type, layerId: "sky" });
+    }
+
+    expect(state.selectedLayerIds).toEqual([]);
+    expect(state.visibleLayerIds).toEqual(["trees", "sky"]);
+  });
 });

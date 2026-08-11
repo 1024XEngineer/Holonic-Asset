@@ -4,6 +4,8 @@ import type {
 } from "@/model/generation";
 import { generateQuickAssetInputSchema } from "@/model/generation";
 
+import type { QuickGenerationDraft } from "../types";
+
 export const quickGenerationSizes = [
   "32 × 32 px",
   "64 × 64 px",
@@ -13,14 +15,6 @@ export const quickGenerationSizes = [
 ] as const;
 
 export const defaultQuickGenerationSize = quickGenerationSizes[1];
-
-export type QuickGenerationDraft<Reference = unknown> = {
-  assetId?: string;
-  prompt: string;
-  size: string;
-  reference?: Reference;
-  referenceFileName?: string;
-};
 
 export function createQuickGenerationDraft<Reference = unknown>(
   asset?: QuickGenerationAsset,
