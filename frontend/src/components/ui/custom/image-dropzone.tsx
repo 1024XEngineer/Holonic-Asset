@@ -4,95 +4,124 @@
  */
 
 import { ImagePlus, LoaderCircle, RefreshCw, Upload, X } from "lucide-react";
-import { useDropzone } from "react-dropzone";
+import { useId, type ReactNode } from "react";
+import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const imageAccept = {
+const IMAGE_ACCEPT = {
   "image/jpeg": [".jpg", ".jpeg"],
   "image/png": [".png"],
   "image/webp": [".webp"],
-};
+} satisfies Accept;
 
-export function ImageDropzone({
-  className,
-  fileName,
-  error,
-  label = "Upload a reference image",
-  onClear,
-  onPreview,
-  onRegenerate,
-  onSelect,
-  isRegenerating = false,
-  previewUrl,
-}: {
+const INVALID_IMAGE_MESSAGE = "Use a PNG, JPEG, or WebP image.";
+
+export type ImageDropzoneValue = File | string;
+
+export interface ImageDropzoneActions {
+  loading?: boolean;
+  preview?: () => void;
+  regenerate?: () => void;
+}
+
+export interface ImageDropzoneProps {
+  actions?: ImageDropzoneActions;
   className?: string;
-  fileName?: string;
   error?: string;
   label?: string;
-  onClear?: () => void;
-  onPreview?: () => void;
-  onRegenerate?: () => void;
-  onSelect: (file: File) => void;
-  isRegenerating?: boolean;
-  previewUrl?: string;
-}) {
+  onChange: (value: File | undefined) => void;
+  value?: ImageDropzoneValue;
+}
+
+export function ImageDropzone({
+  actions,
+  className,
+  error,
+  label = "Upload a reference image",
+  onChange,
+  value,
+}: ImageDropzoneProps) {
+  const {
+    loading = false,
+    preview: onPreview,
+    regenerate: onRegenerate,
+  } = actions ?? {};
+  const errorId = useId();
+  const previewUrl = typeof value === "string" ? value : undefined;
+  const fileName = value instanceof File ? value.name : undefined;
+  const hasSelection = Boolean(value);
   const { fileRejections, getInputProps, getRootProps, isDragActive, open } =
     useDropzone({
-      accept: imageAccept,
+      accept: IMAGE_ACCEPT,
+      disabled: loading,
       maxFiles: 1,
       multiple: false,
-      onDropAccepted: ([file]) => file && onSelect(file),
+      onDropAccepted: ([file]) => file && onChange(file),
+      noClick: hasSelection,
+      noKeyboard: hasSelection,
     });
+  const message = getRejectionMessage(fileRejections) ?? error;
 
   return (
     <div className="grid gap-2">
       <div
-        {...getRootProps()}
+        {...getRootProps({
+          "aria-describedby": message ? errorId : undefined,
+          "aria-invalid": message ? true : undefined,
+          "aria-label": hasSelection ? "Reference image" : label,
+          role: hasSelection ? "group" : "button",
+          tabIndex: hasSelection ? -1 : 0,
+        })}
         className={cn(
-          "group relative flex min-h-28 cursor-pointer items-center justify-center overflow-visible rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "group relative flex min-h-28 items-center justify-center overflow-visible rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground transition-colors aria-invalid:border-destructive",
+          hasSelection ? "cursor-default" : "cursor-pointer hover:bg-muted/60",
           isDragActive && "border-ring bg-muted",
+          !hasSelection &&
+            "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           className,
         )}
       >
-        <input {...getInputProps()} />
+        <input
+          {...getInputProps({
+            "aria-describedby": message ? errorId : undefined,
+            "aria-invalid": message ? true : undefined,
+          })}
+        />
         {previewUrl ? (
           <div className="relative size-full overflow-hidden rounded-[inherit]">
-            <img
-              src={previewUrl}
-              alt="Selected reference"
-              className={cn(
-                "size-full object-cover",
-                onPreview && "cursor-zoom-in",
-                isRegenerating && "scale-105 opacity-45 blur-md",
-              )}
-              onClick={
-                onPreview
-                  ? (event) => {
-                      event.stopPropagation();
-                      onPreview();
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                onPreview
-                  ? (event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onPreview();
-                      }
-                    }
-                  : undefined
-              }
-              role={onPreview ? "button" : undefined}
-              tabIndex={onPreview ? 0 : undefined}
-              aria-label={onPreview ? "Preview reference image" : undefined}
-            />
-            {isRegenerating ? (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center bg-background/25">
-                <LoaderCircle className="size-8 animate-spin text-foreground" />
+            {onPreview ? (
+              <button
+                type="button"
+                className="size-full cursor-zoom-in outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:cursor-wait"
+                aria-label="Preview reference image"
+                disabled={loading}
+                onClick={onPreview}
+              >
+                <PreviewImage
+                  previewUrl={previewUrl}
+                  isRegenerating={loading}
+                />
+              </button>
+            ) : (
+              <PreviewImage previewUrl={previewUrl} isRegenerating={loading} />
+            )}
+            {loading ? (
+              <div
+                className="pointer-events-none absolute inset-0 grid place-items-center bg-background/25"
+                role="status"
+              >
+                <LoaderCircle
+                  className="size-8 animate-spin text-foreground"
+                  aria-hidden="true"
+                />
+                <span className="sr-only">Regenerating reference image</span>
               </div>
             ) : null}
           </div>
@@ -104,69 +133,113 @@ export function ImageDropzone({
             {isDragActive ? "Drop image to attach" : label}
           </span>
         )}
-        {previewUrl && onRegenerate && !isRegenerating ? (
-          <div className="absolute top-2 right-2 flex gap-1">
-            <div className="group/action relative">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="bg-background/90"
-                aria-label="Regenerate reference"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRegenerate();
-                }}
+        {hasSelection ? (
+          <div className="absolute right-2 top-2 z-10 flex gap-1">
+            {previewUrl && onRegenerate ? (
+              <DropzoneAction
+                label="Regenerate reference"
+                disabled={loading}
+                onClick={onRegenerate}
               >
                 <RefreshCw />
-              </Button>
-              <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-black px-2.5 py-1.5 text-xs text-white opacity-0 shadow-md transition-opacity group-hover/action:opacity-100">
-                Regenerate reference
-              </span>
-            </div>
-            <div className="group/action relative">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="bg-background/90"
-                aria-label="Upload reference image"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  open();
-                }}
-              >
-                <Upload />
-              </Button>
-              <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-black px-2.5 py-1.5 text-xs text-white opacity-0 shadow-md transition-opacity group-hover/action:opacity-100">
-                Upload reference image
-              </span>
-            </div>
+              </DropzoneAction>
+            ) : null}
+            <DropzoneAction
+              label="Upload reference image"
+              disabled={loading}
+              onClick={open}
+            >
+              <Upload />
+            </DropzoneAction>
           </div>
         ) : null}
-        {onClear && (previewUrl || fileName) ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            className="absolute top-2 left-2 bg-background/90"
-            aria-label="Remove reference image"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClear();
-            }}
+        {hasSelection ? (
+          <DropzoneAction
+            className="absolute left-2 top-2 z-10"
+            label="Remove reference image"
+            disabled={loading}
+            onClick={() => onChange(undefined)}
           >
             <X />
-          </Button>
+          </DropzoneAction>
         ) : null}
       </div>
-      {fileRejections.length > 0 ? (
-        <p className="text-xs text-destructive">
-          Use a PNG, JPEG, or WebP image.
+      {message ? (
+        <p id={errorId} className="text-xs text-destructive" role="alert">
+          {message}
         </p>
-      ) : error ? (
-        <p className="text-xs text-destructive">{error}</p>
       ) : null}
     </div>
   );
+}
+
+function PreviewImage({
+  isRegenerating,
+  previewUrl,
+}: {
+  isRegenerating: boolean;
+  previewUrl: string;
+}) {
+  return (
+    <img
+      src={previewUrl}
+      alt="Selected reference"
+      className={cn(
+        "size-full object-cover transition-[filter,opacity,transform]",
+        isRegenerating && "scale-105 opacity-45 blur-md",
+      )}
+    />
+  );
+}
+
+function DropzoneAction({
+  children,
+  className,
+  disabled,
+  label,
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className={className}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="bg-background/90 shadow-xs backdrop-blur-sm"
+              aria-label={label}
+              disabled={disabled}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClick();
+              }}
+            />
+          }
+        >
+          {children}
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+function getRejectionMessage(fileRejections: readonly FileRejection[]) {
+  if (fileRejections.length === 0) return undefined;
+
+  const hasTooManyFiles = fileRejections.some(({ errors }) =>
+    errors.some(({ code }) => code === "too-many-files"),
+  );
+
+  return hasTooManyFiles
+    ? "Upload one image at a time."
+    : INVALID_IMAGE_MESSAGE;
 }

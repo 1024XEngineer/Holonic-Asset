@@ -67,9 +67,8 @@ export function VisualAssetFields({
       <div className="grid gap-2 text-sm font-medium">
         <span>Reference</span>
         <ImageDropzone
-          fileName={draft.reference?.name}
-          onSelect={(reference) => onChange({ ...draft, reference })}
-          onClear={() => onChange({ ...draft, reference: undefined })}
+          value={draft.reference}
+          onChange={(reference) => onChange({ ...draft, reference })}
         />
       </div>
     </>

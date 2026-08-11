@@ -160,37 +160,43 @@ export function ProjectSettingsDialog({
                   <p className="text-sm font-medium">Reference</p>
                   <ImageDropzone
                     className="mt-2 aspect-[16/9] min-h-48 min-w-0 max-w-full"
-                    previewUrl={field.state.value || undefined}
-                    isRegenerating={isRegeneratingReference}
-                    onPreview={() => setIsReferencePreviewOpen(true)}
-                    onRegenerate={() => {
-                      if (isRegeneratingReference) return;
-                      const updatedProject = applyProjectSettings(
-                        project,
-                        form.state.values,
-                      );
-                      if (!updatedProject) {
-                        setImageError("Complete the project details first.");
+                    value={field.state.value || undefined}
+                    error={imageError}
+                    actions={{
+                      loading: isRegeneratingReference,
+                      preview: () => setIsReferencePreviewOpen(true),
+                      regenerate: () => {
+                        if (isRegeneratingReference) return;
+                        const updatedProject = applyProjectSettings(
+                          project,
+                          form.state.values,
+                        );
+                        if (!updatedProject) {
+                          setImageError("Complete the project details first.");
+                          return;
+                        }
+                        setIsRegeneratingReference(true);
+                        setImageError(undefined);
+                        void projectApi
+                          .regenerateReference(updatedProject)
+                          .then((reference) => field.handleChange(reference))
+                          .catch(() =>
+                            setImageError(
+                              "We couldn't regenerate that reference. Try again.",
+                            ),
+                          )
+                          .finally(() => setIsRegeneratingReference(false));
+                      },
+                    }}
+                    onChange={(file) => {
+                      imageReadController.current?.abort();
+                      setImageError(undefined);
+                      if (!file) {
+                        field.handleChange("");
                         return;
                       }
-                      setIsRegeneratingReference(true);
-                      setImageError(undefined);
-                      void projectApi
-                        .regenerateReference(updatedProject)
-                        .then((reference) => field.handleChange(reference))
-                        .catch(() =>
-                          setImageError(
-                            "We couldn't regenerate that reference. Try again.",
-                          ),
-                        )
-                        .finally(() => setIsRegeneratingReference(false));
-                    }}
-                    error={imageError}
-                    onSelect={(file) => {
-                      imageReadController.current?.abort();
                       const controller = new AbortController();
                       imageReadController.current = controller;
-                      setImageError(undefined);
                       void readFileAsDataUrl(file, controller.signal).then(
                         (dataUrl) => {
                           if (controller.signal.aborted) return;
@@ -203,11 +209,6 @@ export function ProjectSettingsDialog({
                           );
                         },
                       );
-                    }}
-                    onClear={() => {
-                      imageReadController.current?.abort();
-                      setImageError(undefined);
-                      field.handleChange("");
                     }}
                   />
                   <Dialog
