@@ -76,7 +76,6 @@ export const projectApi: ProjectApi = {
     return {
       ...input,
       id: String(response.id),
-      assetCount: 0,
     };
   },
   generateReference: async (input) => {
@@ -136,9 +135,9 @@ function toCorePlatform(value: string): ProjectResponse["targetPlatform"] {
 
 export function toProjectSummary(
   project: ProjectResponse,
-  assetCount = 0,
+  assetCount?: number,
 ): ProjectSummary {
-  return {
+  const summary: ProjectSummary = {
     id: String(project.id),
     name: project.name,
     gameType: project.gameType,
@@ -147,6 +146,6 @@ export function toProjectSummary(
     reference: project.reference,
     style: project.style,
     perspective: project.perspective,
-    assetCount,
   };
+  return assetCount === undefined ? summary : { ...summary, assetCount };
 }

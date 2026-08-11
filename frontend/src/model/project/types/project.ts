@@ -12,7 +12,7 @@ export type Project = {
 
 export type ProjectSummary = Project & {
   perspective: Perspective;
-  assetCount: number;
+  assetCount?: number;
 };
 
 export type CreateProjectInput = Omit<ProjectSummary, "id" | "assetCount">;

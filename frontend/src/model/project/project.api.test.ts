@@ -152,7 +152,6 @@ describe("projectApi", () => {
     await expect(projectApi.create(input)).resolves.toEqual({
       ...input,
       id: "7",
-      assetCount: 0,
     });
     expect(mocks.core.create).toHaveBeenCalledWith({
       userID: 4927310,
@@ -185,8 +184,9 @@ describe("projectApi", () => {
       id: "7",
       gameType: "Role-playing game",
       reference: input.reference,
-      assetCount: 0,
     });
+    expect(toProjectSummary(remoteProject)).not.toHaveProperty("assetCount");
+    expect(toProjectSummary(remoteProject, 3)).toHaveProperty("assetCount", 3);
     expect(
       toProjectSummary({ ...remoteProject, gameType: "Rhythm game" }),
     ).toMatchObject({ gameType: "Rhythm game" });
