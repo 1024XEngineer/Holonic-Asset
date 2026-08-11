@@ -41,7 +41,7 @@ func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 	result, err := module.Projects.GenerateReference(context.Background(), &project.Project{
 		UserID:         7,
 		Name:           "Prototype",
-		GameType:       project.GameTypeRPG,
+		GameType:       "RPG",
 		Perspective:    project.PerspectiveTopDown,
 		TargetPlatform: project.PlatformTypePC,
 	})

@@ -135,7 +135,7 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 	const reference = "https://media.example/reference.png"
 	project := &domain.Project{
 		Name:           "Lantern Vale",
-		GameType:       domain.GameTypeRPG,
+		GameType:       "RPG",
 		Perspective:    domain.PerspectiveIsometric,
 		TargetPlatform: domain.PlatformTypeMobile,
 		Description:    "A courier explores a flooded clockwork city and protects a caravan from mechanical beasts.",
@@ -218,19 +218,19 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 	cases := []struct {
 		name        string
-		gameType    domain.GameType
+		gameType    string
 		description string
 		forbidden   []string
 	}{
 		{
 			name:        "farming",
-			gameType:    domain.GameType(""),
+			gameType:    "",
 			description: "玩家在安静的农场照料鸡、羊和菜地，给动物喂食，收获成熟作物。没有战斗，没有敌人。",
 			forbidden:   []string{"three rectangular crop plots", "two chickens and one sheep", "date/time and coin or produce counter"},
 		},
 		{
 			name:        "maze",
-			gameType:    domain.GameType(""),
+			gameType:    "",
 			description: "玩家在一座废弃的石头迷宫里寻找出口，火把照亮一小段走廊。不要战斗，不要装备界面。",
 			forbidden:   []string{"farming and animal-husbandry", "chickens", "sheep", "crop plots"},
 		},
@@ -262,6 +262,7 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 				t.Fatalf("expected raw user description in prompt")
 			}
 			for _, fragment := range []string{
+				`Interpret this as a "unspecified" game`,
 				"SCENE DECISION",
 				"AUTHENTIC PIXEL ART",
 				"GAMEPLAY SCREEN UI SET",
@@ -272,6 +273,9 @@ func TestGenerateReferenceUsesTheUserBriefForDifferentGameTypes(t *testing.T) {
 				if !strings.Contains(prompt, fragment) {
 					t.Errorf("expected generic prompt to contain %q", fragment)
 				}
+			}
+			if strings.Contains(prompt, `Interpret this as a "" game`) {
+				t.Fatal("prompt must not contain an empty game type")
 			}
 			for _, fragment := range tc.forbidden {
 				if strings.Contains(strings.ToLower(prompt), strings.ToLower(fragment)) {
@@ -389,7 +393,7 @@ func TestGenerateReferenceRequiresImageServiceAndImageResult(t *testing.T) {
 func validProject() *domain.Project {
 	return &domain.Project{
 		Name:           "Test Project",
-		GameType:       domain.GameTypeACT,
+		GameType:       "ACT",
 		Perspective:    domain.PerspectiveSideOn,
 		TargetPlatform: domain.PlatformTypePC,
 	}

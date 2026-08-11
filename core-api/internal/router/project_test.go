@@ -116,13 +116,14 @@ func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 		e,
 		http.MethodPost,
 		"/api/v1/project/create",
-		`{"userID":7,"name":"Prototype","gameType":"RPG","perspective":"Side-On","targetPlatform":"PC"}`,
+		`{"userID":7,"name":"Prototype","gameType":"Deck-building roguelike","perspective":"Side-On","targetPlatform":"PC"}`,
 	)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
 	if stub.createRequest.UserID != 7 || stub.createRequest.Name != "Prototype" ||
+		stub.createRequest.GameType != "Deck-building roguelike" ||
 		stub.createRequest.Perspective != project.PerspectiveSideOn {
 		t.Fatalf("unexpected create request: %+v", stub.createRequest)
 	}

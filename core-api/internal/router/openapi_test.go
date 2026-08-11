@@ -70,6 +70,23 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		}
 	}
 
+	type gameTypeSchema struct {
+		Type string   `json:"type"`
+		Enum []string `json:"enum"`
+	}
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
+		var schema struct {
+			Properties map[string]gameTypeSchema `json:"properties"`
+		}
+		if err := json.Unmarshal(document.Components.Schemas[schemaName], &schema); err != nil {
+			t.Fatalf("decode %s schema: %v", schemaName, err)
+		}
+		gameType := schema.Properties["gameType"]
+		if gameType.Type != "string" || len(gameType.Enum) != 0 {
+			t.Fatalf("expected %s gameType to accept any string, got type=%q enum=%v", schemaName, gameType.Type, gameType.Enum)
+		}
+	}
+
 	var generateReferenceSchema struct {
 		Properties map[string]json.RawMessage `json:"properties"`
 	}
