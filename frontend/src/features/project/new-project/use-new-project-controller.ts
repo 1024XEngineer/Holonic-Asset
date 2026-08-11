@@ -180,7 +180,7 @@ export function useNewProjectController() {
     setImportOpen(false);
     setStep(1);
     setSelectedStart("existing");
-  }, [form, gameFile, gameUrl, importMode]);
+  }, [form, gameUrl, importMode]);
 
   const start = useMemo(
     () => ({
