@@ -110,6 +110,41 @@ describe("useNewProjectController", () => {
     );
   });
 
+  it("reports reference generation failures and always clears the loading state", async () => {
+    mocks.generateReference.mockRejectedValueOnce(new Error("offline"));
+    const controller = useNewProjectController();
+
+    controller.preview.generate();
+    await vi.waitFor(() =>
+      expect(mocks.setters[9]).toHaveBeenCalledWith(
+        "We couldn't generate that reference. Try again.",
+      ),
+    );
+
+    expect(mocks.generateReference).toHaveBeenCalledOnce();
+    expect(mocks.setters[8]).toHaveBeenLastCalledWith(false);
+  });
+
+  it("submits blank projects directly and trims imported game links", async () => {
+    mocks.stateOverrides.set(0, "blank");
+    const blankController = useNewProjectController();
+    blankController.form.next();
+    await vi.waitFor(() => expect(mocks.form.handleSubmit).toHaveBeenCalled());
+
+    mocks.stateIndex = 0;
+    mocks.setters.length = 0;
+    mocks.stateOverrides.clear();
+    mocks.stateOverrides.set(3, "link");
+    mocks.stateOverrides.set(4, "  https://example.com/game  ");
+    const linkController = useNewProjectController();
+    linkController.existingGameImport.continue();
+
+    expect(mocks.form.setFieldValue).toHaveBeenLastCalledWith(
+      "reference",
+      "https://example.com/game",
+    );
+  });
+
   it("reads uploaded previews and clears them", async () => {
     const controller = useNewProjectController();
     const file = new File(["preview"], "preview.png", { type: "image/png" });
