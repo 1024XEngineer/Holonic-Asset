@@ -1,4 +1,3 @@
-export { createAssetCreationDraft, toCreationRequest } from "./asset-creation";
 export type {
   AssetCreationDraft,
   SceneryAssetCreationDraft,

@@ -1,4 +1,5 @@
 import type { AssetRevision, CharacterAnimation } from "@/model";
+import { z } from "zod";
 
 import type { AnimatedSpriteNodeId } from "../Canvas/AnimatedSpriteCanvas";
 
@@ -13,14 +14,31 @@ export type InspectorReference = {
   dataUrl: string;
 };
 
-export type InspectorSubmitRequest = {
-  prompt: string;
-  reference?: InspectorReference;
-  target: {
-    nodeIds: AnimatedSpriteNodeId[];
-    frames: InspectorFrameSelection[];
-  };
-};
+const inspectorReferenceSchema = z.object({
+  fileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  dataUrl: z.string().min(1),
+});
+
+const inspectorFrameSelectionSchema = z.object({
+  nodeId: z.string().min(1),
+  index: z.int().nonnegative(),
+});
+
+export const inspectorPromptSchema = z.string().trim().min(1);
+
+export const inspectorSubmitRequestSchema = z.object({
+  prompt: inspectorPromptSchema,
+  reference: inspectorReferenceSchema.optional(),
+  target: z.object({
+    nodeIds: z.array(z.string().min(1)),
+    frames: z.array(inspectorFrameSelectionSchema),
+  }),
+});
+
+export type InspectorSubmitRequest = z.infer<
+  typeof inspectorSubmitRequestSchema
+>;
 
 export type InspectorProps = {
   selectedNodes: AnimatedSpriteNodeId[];

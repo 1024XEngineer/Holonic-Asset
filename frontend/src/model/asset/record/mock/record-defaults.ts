@@ -6,6 +6,7 @@ import type {
   ProjectAsset,
 } from "../../types";
 import type {
+  AssetRecord,
   CharacterAssetRecord,
   TilesetItem,
   AssetRecordForKind,
@@ -18,7 +19,6 @@ import type {
   ObjectAssetRecord,
   SpriteAssetRecordData,
 } from "../types/asset-record";
-import { isAssetRecordForKind } from "../record.validation";
 
 const swordsmanPrototype: CharacterSpriteSheet = {
   format: "png-sprite-sheet",
@@ -370,12 +370,12 @@ export function createDefaultAssetRecord<K extends AssetKind>(
 export function mergeAssetRecord<K extends AssetKind>(
   kind: K,
   fallback: AssetRecordForKind<K>,
-  saved: unknown,
+  saved: AssetRecord | LegacySpriteSheetRecord | undefined,
 ): AssetRecordForKind<K> {
   const migrated = migrateLegacyTilesetRecord(kind, saved);
   const record = migrated ?? saved;
 
-  if (!record || !isAssetRecordForKind(kind, record)) {
+  if (!record) {
     return fallback;
   }
 
@@ -428,39 +428,24 @@ function createDefaultSpriteAssetRecordData(
 
 function migrateLegacyTilesetRecord(
   kind: AssetKind,
-  saved: unknown,
+  saved: AssetRecord | LegacySpriteSheetRecord | undefined,
 ): TilesetAssetRecord | undefined {
-  if (kind !== "tileset" || !isLegacySpriteSheetRecord(saved)) {
+  if (kind !== "tileset" || saved?.mode !== "sprite-sheet") {
     return undefined;
   }
 
-  const migrated: TilesetAssetRecord = {
+  return {
     mode: "tileset",
     prompt: saved.prompt,
     tileset: saved.spriteSheet,
   };
-
-  return isAssetRecordForKind("tileset", migrated) ? migrated : undefined;
 }
 
-function isLegacySpriteSheetRecord(value: unknown): value is {
+type LegacySpriteSheetRecord = {
   mode: "sprite-sheet";
   prompt: string;
   spriteSheet: TilesetAssetRecord["tileset"];
-} {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-  return (
-    record.mode === "sprite-sheet" &&
-    typeof record.prompt === "string" &&
-    typeof record.spriteSheet === "object" &&
-    record.spriteSheet !== null &&
-    !Array.isArray(record.spriteSheet)
-  );
-}
+};
 
 function mergeCharacterRecord(
   fallback: CharacterAssetRecord,

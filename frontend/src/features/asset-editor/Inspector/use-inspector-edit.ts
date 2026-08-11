@@ -10,7 +10,12 @@ import { useDropzone } from "react-dropzone";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 
 import { getInspectorTargetSummary } from "./inspector-target";
-import type { InspectorEditProps, InspectorReference } from "./inspector.types";
+import {
+  inspectorPromptSchema,
+  inspectorSubmitRequestSchema,
+  type InspectorEditProps,
+  type InspectorReference,
+} from "./inspector.types";
 
 const imageAccept = {
   "image/jpeg": [".jpg", ".jpeg"],
@@ -77,16 +82,16 @@ export function useInspectorEdit({
   };
 
   const submit = async () => {
-    const normalizedPrompt = prompt.trim();
-    if (!normalizedPrompt || isSubmitting || isReadingReference) return;
+    const result = inspectorSubmitRequestSchema.safeParse({
+      prompt,
+      reference: reference ?? undefined,
+      target: { nodeIds: selectedNodes, frames: selectedFrames },
+    });
+    if (!result.success || isSubmitting || isReadingReference) return;
 
     setSubmitError(null);
     try {
-      await onSubmit({
-        prompt: normalizedPrompt,
-        reference: reference ?? undefined,
-        target: { nodeIds: selectedNodes, frames: selectedFrames },
-      });
+      await onSubmit(result.data);
       setReference(null);
       setReferenceError(null);
     } catch {
@@ -126,7 +131,10 @@ export function useInspectorEdit({
 
   return {
     canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
-    canSubmit: Boolean(prompt.trim()) && !isReadingReference && !isSubmitting,
+    canSubmit:
+      inspectorPromptSchema.safeParse(prompt).success &&
+      !isReadingReference &&
+      !isSubmitting,
     changePrompt,
     clearReference,
     dropzone,
