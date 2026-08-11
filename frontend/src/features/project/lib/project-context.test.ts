@@ -7,6 +7,7 @@ import {
   createNewProjectDraft,
   createProjectSettingsDraft,
   projectContextOptions,
+  toCreateBlankProjectInput,
   toCreateProjectInput,
 } from "./project-context";
 
@@ -74,6 +75,21 @@ describe("toCreateProjectInput", () => {
     });
   });
 
+  it("creates blank projects with only a name and default perspective", () => {
+    expect(toCreateBlankProjectInput("  Blank project  ")).toEqual({
+      name: "Blank project",
+      gameType: "",
+      platform: "",
+      description: "",
+      perspective: "Top-Down",
+      reference: "",
+      style: "",
+    });
+    expect(() => toCreateBlankProjectInput("  ")).toThrow(
+      "Project name is required.",
+    );
+  });
+
   it("maps known and custom game types into editable drafts", () => {
     expect(createProjectSettingsDraft(project())).toMatchObject({
       gameType: "Role-playing game",
@@ -82,6 +98,9 @@ describe("toCreateProjectInput", () => {
     expect(
       createProjectSettingsDraft(project({ gameType: "Rhythm game" })),
     ).toMatchObject({ gameType: "Other", customGameType: "Rhythm game" });
+    expect(
+      createProjectSettingsDraft(project({ gameType: "", platform: "" })),
+    ).toMatchObject({ gameType: "", customGameType: "", platform: "" });
   });
 
   it("applies valid settings and rejects blank identity fields", () => {

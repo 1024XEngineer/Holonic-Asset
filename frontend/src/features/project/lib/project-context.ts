@@ -28,10 +28,15 @@ const projectGameTypeSchema = z.enum(projectContextOptions.gameTypes);
 const editableProjectGameTypeSchema = z.enum(
   editableProjectContextOptions.gameTypes,
 );
+const optionalEditableProjectGameTypeSchema = editableProjectGameTypeSchema.or(
+  z.literal(""),
+);
 const projectPlatformSchema = z.enum(projectContextOptions.platforms);
+const optionalProjectPlatformSchema = projectPlatformSchema.or(z.literal(""));
+const projectNameSchema = z.string().trim().min(1, "Project name is required.");
 
 const newProjectDraftSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required."),
+  name: projectNameSchema,
   gameType: projectGameTypeSchema,
   platform: projectPlatformSchema,
   description: z.string().trim(),
@@ -41,11 +46,11 @@ const newProjectDraftSchema = z.object({
 
 const projectSettingsDraftSchema = z
   .object({
-    name: z.string().trim().min(1, "Project name is required."),
-    gameType: editableProjectGameTypeSchema,
+    name: projectNameSchema,
+    gameType: optionalEditableProjectGameTypeSchema,
     customGameType: z.string().trim(),
     perspective: perspectiveSchema,
-    platform: projectPlatformSchema,
+    platform: optionalProjectPlatformSchema,
     description: z.string(),
     reference: z.string(),
   })
@@ -85,16 +90,29 @@ export function toCreateProjectInput(
   };
 }
 
+export function toCreateBlankProjectInput(name: string): CreateProjectInput {
+  return {
+    name: projectNameSchema.parse(name),
+    gameType: "",
+    platform: "",
+    description: "",
+    perspective: projectContextOptions.perspectives[0],
+    reference: "",
+    style: "",
+  };
+}
+
 export function createProjectSettingsDraft(
   project: ProjectSummary,
 ): ProjectSettingsDraft {
   const hasKnownGameType = projectGameTypeSchema.safeParse(
     project.gameType,
   ).success;
+  const hasSelectableGameType = project.gameType === "" || hasKnownGameType;
   return {
     name: project.name,
-    gameType: hasKnownGameType ? project.gameType : "Other",
-    customGameType: hasKnownGameType ? "" : project.gameType,
+    gameType: hasSelectableGameType ? project.gameType : "Other",
+    customGameType: hasSelectableGameType ? "" : project.gameType,
     perspective: project.perspective,
     platform: project.platform,
     description: project.description,
