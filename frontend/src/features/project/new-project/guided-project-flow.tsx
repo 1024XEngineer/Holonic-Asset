@@ -1,6 +1,8 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +16,8 @@ export function GuidedProjectFlow({
   project: NewProjectController;
 }) {
   const { form, preview } = project;
-  const { instance: newProjectForm, step } = form;
+  const { instance: newProjectForm, isGenerating, step } = form;
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
 
   return (
     <form
@@ -115,12 +118,30 @@ export function GuidedProjectFlow({
           </TabsList>
           <TabsContent value="generate" className="grid gap-3">
             <div className="aspect-[16/9] overflow-hidden rounded-md border bg-muted/30">
-              {preview.url ? (
-                <img
-                  src={preview.url}
-                  alt="Generated project overview"
-                  className="size-full object-cover"
-                />
+              {preview.isGenerating ? (
+                <div className="relative grid size-full place-items-center overflow-hidden">
+                  <img
+                    src="/project/reference/reference.png"
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 size-full scale-105 object-cover opacity-45 blur-md"
+                  />
+                  <div className="absolute inset-0 bg-background/25" />
+                  <LoaderCircle className="relative size-8 animate-spin text-foreground" />
+                </div>
+              ) : preview.url ? (
+                <button
+                  type="button"
+                  className="size-full cursor-zoom-in"
+                  aria-label="Preview generated project overview"
+                  onClick={() => setIsImagePreviewOpen(true)}
+                >
+                  <img
+                    src={preview.url}
+                    alt="Generated project overview"
+                    className="size-full object-cover"
+                  />
+                </button>
               ) : null}
             </div>
             <Button
@@ -128,9 +149,15 @@ export function GuidedProjectFlow({
               variant="outline"
               className="w-full"
               onClick={preview.generate}
+              disabled={preview.isGenerating}
             >
               {preview.url ? "Regenerate preview" : "Generate preview"}
             </Button>
+            {preview.error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {preview.error}
+              </p>
+            ) : null}
           </TabsContent>
           <TabsContent value="upload">
             <ImageDropzone
@@ -155,11 +182,26 @@ export function GuidedProjectFlow({
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
+          disabled={step === 2 && isGenerating}
         >
           {step === 2 ? "Submit" : "Next"}
           <ArrowRight size={16} />
         </button>
       </div>
+      <Dialog open={isImagePreviewOpen} onOpenChange={setIsImagePreviewOpen}>
+        <DialogContent className="max-w-5xl p-2 sm:max-w-5xl">
+          <DialogTitle className="sr-only">
+            Generated project overview
+          </DialogTitle>
+          {preview.url ? (
+            <img
+              src={preview.url}
+              alt="Generated project overview"
+              className="max-h-[80vh] w-full object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
