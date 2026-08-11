@@ -58,6 +58,8 @@ export type {
   UpdateAudioTrackInput,
 } from "./audio";
 export {
+  assetMetadataUpdateSchema,
+  assetKindSchema,
   assetKinds,
   creatableAssetKinds,
   type AssetAnimation,

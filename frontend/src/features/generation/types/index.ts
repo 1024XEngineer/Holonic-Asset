@@ -1,4 +1,8 @@
-export { createAssetCreationDraft, toCreationRequest } from "./asset-creation";
+export {
+  assetCreationDraftSchema,
+  createAssetCreationDraft,
+  toCreationRequest,
+} from "./asset-creation";
 export type {
   AssetCreationDraft,
   SceneryAssetCreationDraft,

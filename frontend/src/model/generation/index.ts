@@ -10,12 +10,17 @@ export {
   useGenerateQuickAssetMutation,
   useQuickAssetsQuery,
 } from "./quick";
-export type { GenerateQuickAssetInput, QuickGenerationAsset } from "./quick";
-export { useGenerateAnimationMutation } from "./animation";
-export type {
-  GenerateAnimationInput,
-  GenerateAnimationRequest,
-  GenerateAnimationResult,
-  GeneratedCharacterAnimation,
-  SpriteAssetKind,
+export {
+  generateQuickAssetInputSchema,
+  type GenerateQuickAssetInput,
+  type QuickGenerationAsset,
+} from "./quick";
+export {
+  generateAnimationRequestSchema,
+  useGenerateAnimationMutation,
+  type GenerateAnimationInput,
+  type GenerateAnimationRequest,
+  type GenerateAnimationResult,
+  type GeneratedCharacterAnimation,
+  type SpriteAssetKind,
 } from "./animation";

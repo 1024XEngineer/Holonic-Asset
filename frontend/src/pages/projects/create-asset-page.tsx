@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 
 import { getAssetKindConfig } from "@/components/asset-kind";
 import { CreateAssetForm } from "@/features/generation/create-asset-form";
-import { assetKinds, type CreatableAssetKind } from "@/model/asset";
+import { assetKindSchema } from "@/model/asset";
 import { useEnqueueGenerationMutation } from "@/model/generation";
 import { useProjectListQuery } from "@/model/project";
 
@@ -23,9 +23,8 @@ export function CreateAssetPage({
     reset: resetEnqueue,
   } = useEnqueueGenerationMutation();
   const project = projects.find((item) => item.id === projectId);
-  const kind = assetKinds.includes(rawKind as CreatableAssetKind)
-    ? (rawKind as CreatableAssetKind)
-    : undefined;
+  const kindResult = assetKindSchema.safeParse(rawKind);
+  const kind = kindResult.success ? kindResult.data : undefined;
 
   if (!project || !kind) return null;
 

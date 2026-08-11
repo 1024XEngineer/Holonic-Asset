@@ -13,11 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { CharacterAnimation } from "@/model";
+import { z } from "zod";
 
 // Keep these in sync with the fixed menu dimensions below.
 const CONTEXT_MENU_WIDTH = 192;
 const CONTEXT_MENU_HEIGHT = 82;
 const CONTEXT_MENU_VIEWPORT_PADDING = 8;
+const animationLabelSchema = z.string().trim().min(1);
 
 type ContextMenuState = {
   animation: CharacterAnimation;
@@ -81,9 +83,9 @@ export function useAnimationActions({
 
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const label = editedLabel.trim();
-    if (!editingAnimation || !label) return;
-    onRename(editingAnimation.id, label);
+    const result = animationLabelSchema.safeParse(editedLabel);
+    if (!editingAnimation || !result.success) return;
+    onRename(editingAnimation.id, result.data);
     setEditingAnimation(null);
   };
 
@@ -122,7 +124,12 @@ export function useAnimationActions({
                 >
                   Cancel
                 </DialogClose>
-                <Button type="submit" disabled={!editedLabel.trim()}>
+                <Button
+                  type="submit"
+                  disabled={
+                    !animationLabelSchema.safeParse(editedLabel).success
+                  }
+                >
                   Save name
                 </Button>
               </DialogFooter>

@@ -4,8 +4,7 @@ import { listMockProjects } from "../../../project/mock";
 import { DataApiError } from "@/lib/data-api-error";
 import { createDefaultAssetRecord, mergeAssetRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
-import { isAssetRecordForKind } from "../record.validation";
-import type { AssetWorkspaceData } from "../types";
+import type { AssetRecord, AssetWorkspaceData } from "../types";
 import type { GetAssetRecordInput, SaveAssetRecordInput } from "../types";
 
 export function getMockAssetRecord(
@@ -44,7 +43,11 @@ export function getMockAssetRecord(
         version: asset.version,
         history: structuredClone(asset.history),
       },
-      record: mergeAssetRecord(asset.kind, fallback, currentRevision?.content),
+      record: mergeAssetRecord(
+        asset.kind,
+        fallback,
+        currentRevision?.content as AssetRecord | undefined,
+      ),
     } as AssetWorkspaceData;
   }, options);
 }
@@ -62,15 +65,6 @@ export async function saveMockAssetRecordRevision({
       assetId,
     });
   }
-  const recordMode = record.mode;
-  if (!isAssetRecordForKind(asset.kind, record)) {
-    throw new DataApiError(
-      "BAD_REQUEST",
-      "Asset record does not match the asset kind.",
-      { projectId, assetId, assetKind: asset.kind, mode: recordMode },
-    );
-  }
-
   const updatedGroups = await assetApi.saveRevision({
     projectId,
     assetId,

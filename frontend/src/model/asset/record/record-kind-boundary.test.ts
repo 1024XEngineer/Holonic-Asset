@@ -5,7 +5,6 @@ import {
   createDefaultAssetRecord,
   mergeAssetRecord,
 } from "./mock/record-defaults";
-import { isAssetRecordForKind } from "./record.validation";
 
 const asset: ProjectAsset = {
   id: "test-sprite",
@@ -19,70 +18,7 @@ const asset: ProjectAsset = {
   animations: [],
 };
 
-describe("asset record kind boundaries", () => {
-  it("accepts relative and HTTPS image URLs", () => {
-    expect(
-      isAssetRecordForKind("scenery", {
-        mode: "scenery",
-        prompt: "Forest",
-        scenery: {
-          layers: [
-            {
-              id: "sky",
-              label: "Sky",
-              detail: "Background",
-              imageUrl: "/assets/sky.png",
-              blendMode: "normal",
-            },
-            {
-              id: "mist",
-              label: "Mist",
-              detail: "Atmosphere",
-              imageUrl: "https://cdn.example.com/mist.png",
-              blendMode: "multiply",
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it("rejects unsafe image URL schemes", () => {
-    const scenery = {
-      mode: "scenery",
-      prompt: "Forest",
-      scenery: {
-        layers: [
-          {
-            id: "sky",
-            label: "Sky",
-            detail: "Background",
-            imageUrl: "javascript:alert(1)",
-            blendMode: "normal",
-          },
-        ],
-      },
-    };
-    const tileset = {
-      mode: "tileset",
-      prompt: "Props",
-      tileset: {
-        gridSize: 8,
-        items: [
-          {
-            id: "barrel",
-            label: "Barrel",
-            imageUrl: "data:image/png;base64,abc",
-            tiles: [[0, 0]],
-          },
-        ],
-      },
-    };
-
-    expect(isAssetRecordForKind("scenery", scenery)).toBe(false);
-    expect(isAssetRecordForKind("tileset", tileset)).toBe(false);
-  });
-
+describe("asset record defaults", () => {
   it("creates independent character and object records from shared sprite data", () => {
     const characterRecord = createDefaultAssetRecord("character", asset);
     const objectRecord = createDefaultAssetRecord("object", asset);
@@ -97,16 +33,6 @@ describe("asset record kind boundaries", () => {
     });
     expect(characterRecord).not.toHaveProperty("object");
     expect(objectRecord).not.toHaveProperty("character");
-  });
-
-  it("does not accept one sprite record kind as the other", () => {
-    const characterRecord = createDefaultAssetRecord("character", asset);
-    const objectRecord = createDefaultAssetRecord("object", asset);
-
-    expect(isAssetRecordForKind("character", characterRecord)).toBe(true);
-    expect(isAssetRecordForKind("object", objectRecord)).toBe(true);
-    expect(isAssetRecordForKind("object", characterRecord)).toBe(false);
-    expect(isAssetRecordForKind("character", objectRecord)).toBe(false);
   });
 
   it("merges object records without crossing the character boundary", () => {

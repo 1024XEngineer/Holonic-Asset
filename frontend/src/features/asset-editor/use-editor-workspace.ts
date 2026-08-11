@@ -129,8 +129,8 @@ export function useEditorWorkspace({
   };
 
   const submitInspectorPrompt = async (request: InspectorSubmitRequest) => {
-    const prompt = request.prompt.trim();
-    if (!prompt || promptTask) return;
+    if (promptTask) return;
+    const prompt = request.prompt;
 
     const taskId = `prompt-${crypto.randomUUID()}`;
     setPromptTask({
