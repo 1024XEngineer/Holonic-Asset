@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   stateIndex: 0,
   stateOverrides: new Map<number, unknown>(),
   setters: [] as ReturnType<typeof vi.fn>[],
+  toast: { add: vi.fn() },
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -54,11 +55,21 @@ vi.mock("@/model", () => ({
 vi.mock("@/lib/read-file-as-data-url", () => ({
   readFileAsDataUrl: mocks.readFileAsDataUrl,
 }));
+vi.mock("@/components/ui/toast", () => ({ toast: mocks.toast }));
 vi.mock("@/model/project", () => ({
   projectApi: { generateReference: mocks.generateReference },
 }));
 vi.mock("../lib/project-context", () => ({
   createNewProjectDraft: () => ({ name: "" }),
+  toCreateBlankProjectInput: (name: string) => ({
+    name: name.trim(),
+    gameType: "",
+    platform: "",
+    description: "",
+    perspective: "Top-Down",
+    reference: "",
+    style: "",
+  }),
   toCreateProjectInput: (value: object) => value,
 }));
 
@@ -77,18 +88,60 @@ beforeEach(() => {
 });
 
 describe("useNewProjectController", () => {
-  it("submits a project and navigates to its workspace", async () => {
+  it("requires a project name before submitting", async () => {
+    mocks.stateOverrides.set(0, "blank");
     useNewProjectController();
 
     await mocks.formOptions!.onSubmit({ value: { name: "  " } });
 
+    expect(mocks.toast.add).toHaveBeenCalledWith({
+      title: "Project name is required.",
+      type: "error",
+    });
+    expect(mocks.createProject).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+
+  it("submits a named project and navigates to its workspace", async () => {
+    useNewProjectController();
+
+    await mocks.formOptions!.onSubmit({
+      value: { name: "  Moonlit Orchard  " },
+    });
+
     expect(mocks.createProject).toHaveBeenCalledWith({
-      name: "Untitled game",
+      name: "Moonlit Orchard",
       reference: "",
     });
     expect(mocks.navigate).toHaveBeenCalledWith({
       to: "/projects/$projectId",
       params: { projectId: "project-7" },
+    });
+  });
+
+  it("submits blank projects without optional context", async () => {
+    mocks.stateOverrides.set(0, "blank");
+    useNewProjectController();
+
+    await mocks.formOptions!.onSubmit({
+      value: {
+        name: "  Blank project  ",
+        gameType: "Role-playing game",
+        platform: "PC",
+        description: "Generated default",
+        perspective: "Top-Down",
+        reference: "reference.png",
+      },
+    });
+
+    expect(mocks.createProject).toHaveBeenCalledWith({
+      name: "Blank project",
+      gameType: "",
+      platform: "",
+      description: "",
+      perspective: "Top-Down",
+      reference: "",
+      style: "",
     });
   });
 
@@ -127,6 +180,7 @@ describe("useNewProjectController", () => {
   it("submits blank projects directly and trims imported game links", async () => {
     mocks.stateOverrides.set(0, "blank");
     const blankController = useNewProjectController();
+    blankController.start.chooseBlank();
     blankController.form.next();
     await vi.waitFor(() => expect(mocks.form.handleSubmit).toHaveBeenCalled());
 

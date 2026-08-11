@@ -3,11 +3,13 @@ import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/model";
+import { toast } from "@/components/ui/toast";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import { projectApi } from "@/model/project";
 
 import {
   createNewProjectDraft,
+  toCreateBlankProjectInput,
   toCreateProjectInput,
 } from "../lib/project-context";
 
@@ -40,12 +42,17 @@ export function useNewProjectController() {
   const form = useForm({
     defaultValues: createNewProjectDraft(),
     onSubmit: async ({ value }) => {
+      const name = requireProjectName(value.name);
+      if (!name) return;
+
       const project = await createProject(
-        toCreateProjectInput({
-          ...value,
-          name: value.name.trim() || "Untitled game",
-          reference: projectPreview,
-        }),
+        selectedStart === "blank"
+          ? toCreateBlankProjectInput(name)
+          : toCreateProjectInput({
+              ...value,
+              name,
+              reference: projectPreview,
+            }),
       );
       await navigate({
         to: "/projects/$projectId",
@@ -91,6 +98,9 @@ export function useNewProjectController() {
 
   const generateReference = useCallback(async () => {
     if (isGeneratingReference) return;
+    const name = requireProjectName(form.state.values.name);
+    if (!name) return;
+
     setIsGeneratingReference(true);
     setPreviewError(undefined);
     setPreviewMode("generate");
@@ -99,7 +109,7 @@ export function useNewProjectController() {
       const reference = await projectApi.generateReference(
         toCreateProjectInput({
           ...form.state.values,
-          name: form.state.values.name.trim() || "Untitled game",
+          name,
         }),
       );
       form.setFieldValue("reference", reference);
@@ -112,6 +122,7 @@ export function useNewProjectController() {
   }, [form, isGeneratingReference]);
 
   const next = useCallback(() => {
+    if (!requireProjectName(form.state.values.name)) return;
     if (selectedStart === "blank") void form.handleSubmit();
     else if (generatedPreview) {
       setPreviewMode("generate");
@@ -275,3 +286,11 @@ export function useNewProjectController() {
 }
 
 export type NewProjectController = ReturnType<typeof useNewProjectController>;
+
+function requireProjectName(name: string) {
+  const value = name.trim();
+  if (value) return value;
+
+  toast.add({ title: "Project name is required.", type: "error" });
+  return undefined;
+}
