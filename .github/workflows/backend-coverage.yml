@@ -1,0 +1,49 @@
+name: Backend Coverage
+
+on:
+  pull_request:
+    paths:
+      - "core-api/**"
+      - ".github/workflows/backend-coverage.yml"
+      - "codecov.yml"
+  push:
+    paths:
+      - "core-api/**"
+      - ".github/workflows/backend-coverage.yml"
+      - "codecov.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Generate backend coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core-api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: core-api/go.mod
+          cache-dependency-path: core-api/go.sum
+
+      - name: Generate coverage report
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: core-api/coverage.out
+          flags: backend
+          fail_ci_if_error: false
