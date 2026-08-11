@@ -10,7 +10,6 @@ import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
 import { coreProjectApi } from "./core-project.api";
 import type {
   GenerateProjectReferenceRequest,
-  ProjectGameType,
   ProjectResponse,
 } from "./project.contract";
 import type { CreateProjectInput, ProjectSummary } from "./types";
@@ -111,27 +110,16 @@ export const projectApi: ProjectApi = {
   },
 };
 
-const gameTypeByLabel: Record<string, ProjectGameType> = {
-  "Role-playing game": "RPG",
-  Action: "ACT",
-  Platformer: "ACT",
-  Strategy: "SLG",
-};
-
 const coreApiUserId = Number(
   import.meta.env.PUBLIC_CORE_API_USER_ID ?? "4927310",
 );
-
-function toCoreGameType(value: string): ProjectGameType {
-  return gameTypeByLabel[value] ?? "";
-}
 
 function toCoreProjectFields(
   input: CreateProjectInput,
 ): GenerateProjectReferenceRequest {
   return {
     name: input.name,
-    gameType: toCoreGameType(input.gameType),
+    gameType: input.gameType,
     perspective: input.perspective,
     targetPlatform: toCorePlatform(input.platform),
     description: input.description,
@@ -151,7 +139,7 @@ export function toProjectSummary(
   return {
     id: String(project.id),
     name: project.name,
-    gameType: projectGameTypeLabels[project.gameType],
+    gameType: project.gameType,
     platform: project.targetPlatform,
     description: project.description,
     reference: project.reference,
@@ -161,10 +149,3 @@ export function toProjectSummary(
     assetCount,
   };
 }
-
-const projectGameTypeLabels: Record<ProjectGameType, string> = {
-  RPG: "Role-playing game",
-  ACT: "Action",
-  SLG: "Strategy",
-  "": "Unspecified",
-};

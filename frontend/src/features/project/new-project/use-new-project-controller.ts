@@ -44,6 +44,7 @@ export function useNewProjectController() {
         toCreateProjectInput({
           ...value,
           name: value.name.trim() || "Untitled game",
+          reference: projectPreview,
           visualDirection: projectPreview,
         }),
       );
@@ -126,10 +127,14 @@ export function useNewProjectController() {
 
   const selectGenerate = useCallback(() => {
     setPreviewMode("generate");
+    form.setFieldValue("reference", generatedPreview);
     if (!generatedPreview) void generateReference();
-  }, [generateReference, generatedPreview]);
+  }, [form, generateReference, generatedPreview]);
 
-  const selectUpload = useCallback(() => setPreviewMode("upload"), []);
+  const selectUpload = useCallback(() => {
+    setPreviewMode("upload");
+    form.setFieldValue("reference", uploadedPreview);
+  }, [form, uploadedPreview]);
 
   const generate = useCallback(
     () => void generateReference(),
@@ -171,7 +176,7 @@ export function useNewProjectController() {
   const continueExistingGameImport = useCallback(() => {
     form.setFieldValue(
       "reference",
-      importMode === "link" ? gameUrl.trim() : (gameFile?.name ?? ""),
+      importMode === "link" ? gameUrl.trim() : "",
     );
     setImportOpen(false);
     setStep(1);

@@ -17,7 +17,7 @@ export const projectContextOptions = {
     "Simulation",
   ],
   perspectives: perspectiveOptions,
-  platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
+  platforms: ["PC", "Mobile", "Web"],
 } as const;
 
 export const editableProjectContextOptions = {

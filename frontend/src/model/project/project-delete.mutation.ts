@@ -28,6 +28,7 @@ export function clearDeletedProjectCache(
     projectKeys.list(),
     (current = []) => current.filter((project) => project.id !== projectId),
   );
+  queryClient.removeQueries({ queryKey: projectKeys.detail(projectId) });
   queryClient.removeQueries({ queryKey: assetKeys.library(projectId) });
   queryClient.removeQueries({ queryKey: generationKeys.runs(projectId) });
 }
