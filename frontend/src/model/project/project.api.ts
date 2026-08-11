@@ -47,13 +47,12 @@ export type ProjectApi = {
 export const projectApi: ProjectApi = {
   list: async () => {
     const mockProjects = await listMockProjects();
+    const mockProjectIds = new Set(mockProjects.map((project) => project.id));
     try {
       const response = await coreProjectApi.list(coreApiUserId);
       const remoteProjects = response.projects
         .map((project) => toProjectSummary(project))
-        .filter(
-          (project) => !mockProjects.some((mock) => mock.id === project.id),
-        );
+        .filter((project) => !mockProjectIds.has(project.id));
       return [...mockProjects, ...remoteProjects];
     } catch (error) {
       if (error instanceof DataApiError && error.code === "UNAVAILABLE") {
