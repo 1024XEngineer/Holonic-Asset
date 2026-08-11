@@ -271,10 +271,12 @@ func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
 	prototypeURL := "uploads/prototype.png"
 	frameURL := "uploads/frame.png"
 	tileURL := "uploads/tile.png"
+	layerResource := "projects/42/scenery/batch/layers/1.png"
 	content, err := domain.EncodeContent(domain.AssetContent{
 		Prototype:  &domain.Prototype{{ID: 1, URL: &prototypeURL}},
 		Animations: []domain.Animation{{Frames: []domain.Frame{{ID: 2, URL: &frameURL}}}},
 		Items:      []domain.TileSetItem{{Tiles: []domain.Tile{{URL: &tileURL}}}},
+		Layers:     []domain.SceneryLayer{{ID: 1, Name: "Sky", Resource: layerResource}},
 	})
 	if err != nil {
 		t.Fatalf("encode asset content: %v", err)
@@ -293,14 +295,16 @@ func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
 	}
 	if *(*decoded.Prototype)[0].URL != "signed:uploads/prototype.png" ||
 		*decoded.Animations[0].Frames[0].URL != "signed:uploads/frame.png" ||
-		*decoded.Items[0].Tiles[0].URL != "signed:uploads/tile.png" {
+		*decoded.Items[0].Tiles[0].URL != "signed:uploads/tile.png" ||
+		decoded.Layers[0].Resource != "signed:"+layerResource {
 		t.Fatalf("unexpected resolved content: %+v", decoded)
 	}
 	var persisted domain.AssetContent
 	if err := json.Unmarshal(managerStub.asset.Content, &persisted); err != nil {
 		t.Fatalf("decode original content: %v", err)
 	}
-	if *(*persisted.Prototype)[0].URL != prototypeURL || *persisted.Animations[0].Frames[0].URL != frameURL || *persisted.Items[0].Tiles[0].URL != tileURL {
+	if *(*persisted.Prototype)[0].URL != prototypeURL || *persisted.Animations[0].Frames[0].URL != frameURL ||
+		*persisted.Items[0].Tiles[0].URL != tileURL || persisted.Layers[0].Resource != layerResource {
 		t.Fatalf("handler mutated persisted content: %+v", persisted)
 	}
 }
