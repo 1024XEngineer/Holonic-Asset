@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DataApiError } from "@/lib/data-api-error";
 import type { CreateProjectInput, ProjectSummary } from "./types";
 import type { ProjectResponse } from "./project.contract";
 
@@ -87,8 +88,15 @@ describe("projectApi", () => {
       toProjectSummary(remoteProject),
     ]);
 
-    mocks.core.list.mockRejectedValueOnce(new Error("offline"));
+    mocks.core.list.mockRejectedValueOnce(
+      new DataApiError("UNAVAILABLE", "offline"),
+    );
     await expect(projectApi.list()).resolves.toEqual([mockProject]);
+
+    mocks.core.list.mockRejectedValueOnce(
+      new DataApiError("UNKNOWN", "invalid response"),
+    );
+    await expect(projectApi.list()).rejects.toMatchObject({ code: "UNKNOWN" });
   });
 
   it("uses the correct local and remote detail, update, and deletion paths", async () => {

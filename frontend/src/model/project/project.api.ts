@@ -1,3 +1,5 @@
+import { DataApiError } from "@/lib/data-api-error";
+
 import {
   deleteMockProject,
   getMockProject,
@@ -53,8 +55,11 @@ export const projectApi: ProjectApi = {
           (project) => !mockProjects.some((mock) => mock.id === project.id),
         );
       return [...mockProjects, ...remoteProjects];
-    } catch {
-      return mockProjects;
+    } catch (error) {
+      if (error instanceof DataApiError && error.code === "UNAVAILABLE") {
+        return mockProjects;
+      }
+      throw error;
     }
   },
   detail: async (projectId) => {
