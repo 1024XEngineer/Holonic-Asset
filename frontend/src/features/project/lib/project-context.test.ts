@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { ProjectSummary } from "@/model/project";
+
 import {
   applyProjectSettings,
+  createNewProjectDraft,
+  createProjectSettingsDraft,
   projectContextOptions,
   toCreateProjectInput,
 } from "./project-context";
@@ -53,30 +57,77 @@ describe("toCreateProjectInput", () => {
     ).toThrow();
   });
 
-  it("does not apply settings with a blank custom game type", () => {
-    const project = {
-      id: "project-1",
-      name: "Current",
-      style: "Top-Down",
-      gameType: "Puzzle",
+  it("creates a complete draft and fills optional API defaults", () => {
+    const draft = createNewProjectDraft();
+
+    expect(draft).toEqual({
+      name: "",
+      gameType: "Role-playing game",
       platform: "PC",
       description: "",
+      perspective: "Top-Down",
       reference: "",
-      perspective: "Top-Down" as const,
-      visualDirection: "",
-      assetCount: 0,
-    };
-
+    });
     expect(
-      applyProjectSettings(project, {
-        name: "Updated",
-        gameType: "Other",
-        customGameType: "   ",
-        perspective: "Top-Down",
-        platform: "PC",
-        description: "",
-        visualDirection: "",
-      }),
+      toCreateProjectInput({ ...draft, name: "New project" }),
+    ).toMatchObject({
+      description: "A new game asset workspace.",
+      visualDirection: "",
+    });
+  });
+
+  it("maps known and custom game types into editable drafts", () => {
+    expect(createProjectSettingsDraft(project())).toMatchObject({
+      gameType: "Role-playing game",
+      customGameType: "",
+    });
+    expect(
+      createProjectSettingsDraft(project({ gameType: "Rhythm game" })),
+    ).toMatchObject({ gameType: "Other", customGameType: "Rhythm game" });
+  });
+
+  it("applies valid settings and rejects blank identity fields", () => {
+    const current = project();
+    const knownDraft = createProjectSettingsDraft(current);
+    knownDraft.name = "  Updated project  ";
+    knownDraft.perspective = "Isometric";
+
+    expect(applyProjectSettings(current, knownDraft)).toMatchObject({
+      name: "Updated project",
+      gameType: "Role-playing game",
+      perspective: "Isometric",
+      style: "Isometric",
+    });
+
+    const customDraft = {
+      ...knownDraft,
+      gameType: "Other",
+      customGameType: "  Roguelike  ",
+    };
+    expect(applyProjectSettings(current, customDraft)?.gameType).toBe(
+      "Roguelike",
+    );
+    expect(
+      applyProjectSettings(current, { ...customDraft, name: " " }),
+    ).toBeUndefined();
+    expect(
+      applyProjectSettings(current, { ...customDraft, customGameType: " " }),
     ).toBeUndefined();
   });
 });
+
+function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
+  return {
+    id: "project-1",
+    name: "Moonlit Orchard",
+    style: "Top-Down",
+    gameType: "Role-playing game",
+    platform: "PC",
+    description: "Restore the orchard.",
+    reference: "",
+    perspective: "Top-Down",
+    visualDirection: "",
+    assetCount: 0,
+    ...overrides,
+  };
+}

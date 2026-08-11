@@ -28,5 +28,22 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "lcov"],
+      include: ["src/lib/**/*.ts", "src/model/**/*.ts", "src/features/**/*.ts"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/**/index.ts",
+        "src/**/*.interface.ts",
+        "src/**/*.types.ts",
+        "src/features/**/types/**/*.ts",
+        "src/**/*.query.ts",
+        "src/**/*.mutation.ts",
+        "src/**/*.mutations.ts",
+        "src/**/mock/**",
+        "src/model/generated/**",
+      ],
+    },
   },
 });
