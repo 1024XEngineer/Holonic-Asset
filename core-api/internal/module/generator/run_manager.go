@@ -131,9 +131,17 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.TileNum = uint(len(payload.TileDescriptions))
 		}
 		return payload, nil
+	case EditObjectProtoType:
+		if request.AssetID == nil || *request.AssetID == 0 {
+			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
+		}
+		return EditObjectPrototypePayload{
+			AssetID:          *request.AssetID,
+			ProjectID:        request.ProjectID,
+			EditInstructions: request.CreativeBrief,
+		}, nil
 	case EditCharacterProtoType,
 		EditCharacterFrames,
-		EditObjectProtoType,
 		EditObjectFrames,
 		EditAnimation,
 		EditTilesetItem,

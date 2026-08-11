@@ -19,6 +19,17 @@ func (e *Engine) handleCharacterPrototype(
 	return e.execute(ctx, GenerateCharacterProtoType, message.Payload)
 }
 
+func (e *Engine) handleEditObjectPrototype(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditObjectPrototypePayload{}
+	if err := decodeTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, EditObjectProtoType, message.Payload)
+}
+
 func (e *Engine) handleAnimation(
 	ctx context.Context,
 	message *taskdomain.Task,
@@ -86,6 +97,7 @@ func (e *Engine) execute(
 
 func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateCharacterProtoType), taskdomain.HandlerFunc(e.handleCharacterPrototype))
+	manager.Register(string(EditObjectProtoType), taskdomain.HandlerFunc(e.handleEditObjectPrototype))
 	manager.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
 	manager.Register(string(GenerateAnimation), taskdomain.HandlerFunc(e.handleAnimation))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
@@ -94,7 +106,6 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	for _, taskType := range []TaskType{
 		EditCharacterProtoType,
 		EditCharacterFrames,
-		EditObjectProtoType,
 		EditObjectFrames,
 		EditAnimation,
 		EditTilesetItem,

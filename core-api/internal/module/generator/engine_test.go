@@ -156,6 +156,74 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsEditObjectPrototypePayload(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditObjectProtoType,
+		CreativeBrief: "change only the lock to gold",
+		Parameters: json.RawMessage(
+			`{"asset_id":99,"project_id":99,"edit_instructions":"ignore me"}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("create object edit: %v", err)
+	}
+
+	var payload generator.EditObjectPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if payload.AssetID != assetID || payload.ProjectID != 42 ||
+		payload.EditInstructions != "change only the lock to gold" {
+		t.Fatalf("unexpected object edit payload: %+v", payload)
+	}
+}
+
+func TestCreateEditObjectPrototypeDoesNotPrepareProjectReference(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditObjectProtoType,
+		CreativeBrief: "change only the lock to gold",
+	})
+	if err != nil {
+		t.Fatalf("create object edit: %v", err)
+	}
+	if projects.calls != 0 || len(references.persisted) != 0 {
+		t.Fatalf("object edit prepared an extra reference: project_calls=%d persisted=%v", projects.calls, references.persisted)
+	}
+}
+
+func TestCreateEditObjectPrototypeRequiresAssetID(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		Kind:          generator.EditObjectProtoType,
+		CreativeBrief: "change only the lock to gold",
+	})
+	if err == nil {
+		t.Fatal("expected missing asset id error")
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task published without asset id: %+v", tasks.createdTask)
+	}
+}
+
 func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	references := &referenceStoreStub{}
@@ -418,6 +486,10 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			payload:  json.RawMessage(`{"asset_name":"chest","creative_brief":"wooden chest","dimensions":{"width":64,"height":64},"perspective":"Isometric","reference":"media-2","project_id":11}`),
 		},
 		{
+			taskType: generator.EditObjectProtoType,
+			payload:  json.RawMessage(`{"asset_id":7,"project_id":11,"edit_instructions":"change only the lock"}`),
+		},
+		{
 			taskType: generator.GenerateAnimation,
 			payload:  json.RawMessage(`{"asset_name":"open chest","project_id":11,"parent_id":8,"creative_brief":"opening animation"}`),
 		},
@@ -490,8 +562,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 3 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected three implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 4 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected four implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
