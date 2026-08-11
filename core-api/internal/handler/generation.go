@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 
@@ -31,6 +32,10 @@ func (h *GenerationHandler) Create(
 		Parameters:       request.Parameters,
 	})
 	if err != nil {
+		if errors.Is(err, generator.ErrInvalidTaskPayload) {
+			return dto.SuccessResponse[dto.CreateGenerationResponse]{},
+				echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+		}
 		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, err
 	}
 	return dto.NewTypedSuccessResponse(dto.CreateGenerationResponse{GenerationRunID: runID}), nil

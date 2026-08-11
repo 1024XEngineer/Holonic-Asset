@@ -1,11 +1,14 @@
 package generator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 const (
@@ -78,10 +81,8 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		value.Reference, err = prepare(value.Reference)
 		return value, err
-	case CreateTileSetPayload:
-		var err error
-		value.Reference, err = prepare(value.Reference)
-		return value, err
+	case CreateTileSetPayload, EditTilesetItemPayload, EditTilesPayload:
+		return value, nil
 	default:
 		return payload, nil
 	}
@@ -139,25 +140,85 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		return payload, nil
 	case GenerateTileSet:
-		payload := CreateTileSetPayload{}
-		if err := decodeParameters(request, &payload); err != nil {
+		parameters := struct {
+			AssetName  string                        `json:"asset_name"`
+			Dimensions assetdomain.TileSetDimensions `json:"dimensions"`
+			Items      []TileSetItemDefinition       `json:"items"`
+		}{}
+		if request.AssetID != nil || len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("generate_tileset does not accept assetId or targetAssetPaths")
+		}
+		if err := decodeTileSetParameters(request, &parameters); err != nil {
 			return nil, err
 		}
-		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = request.CreativeBrief
-		if payload.TileNum == 0 {
-			payload.TileNum = uint(len(payload.TileDescriptions))
+		payload := CreateTileSetPayload{
+			AssetName:     parameters.AssetName,
+			ProjectID:     request.ProjectID,
+			CreativeBrief: request.CreativeBrief,
+			Dimensions:    parameters.Dimensions,
+			Items:         parameters.Items,
+		}
+		if err := validateCreateTileSetPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case EditTilesetItem:
+		parameters := struct{}{}
+		if err := decodeTileSetParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := EditTilesetItemPayload{
+			ProjectID:        request.ProjectID,
+			CreativeBrief:    request.CreativeBrief,
+			TargetAssetPaths: append([]string(nil), request.TargetAssetPaths...),
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if err := validateEditTilesetItemPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case EditTiles:
+		parameters := struct{}{}
+		if err := decodeTileSetParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := EditTilesPayload{
+			ProjectID:        request.ProjectID,
+			CreativeBrief:    request.CreativeBrief,
+			TargetAssetPaths: append([]string(nil), request.TargetAssetPaths...),
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if err := validateEditTilesPayload(&payload); err != nil {
+			return nil, err
 		}
 		return payload, nil
 	case EditCharacterFrames,
 		EditObjectFrames,
-		EditAnimation,
-		EditTilesetItem,
-		EditTiles:
+		EditAnimation:
 		return struct{}{}, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, request.Kind)
 	}
+}
+
+func decodeTileSetParameters(request *Request, payload any) error {
+	if len(bytes.TrimSpace(request.Parameters)) == 0 {
+		return nil
+	}
+	decoder := json.NewDecoder(bytes.NewReader(request.Parameters))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(payload); err != nil {
+		return invalidTaskPayload("decode %s parameters: %v", request.Kind, err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return invalidTaskPayload("decode %s parameters: trailing JSON data", request.Kind)
+	}
+	return nil
 }
 
 func decodeParameters(request *Request, payload any) error {
