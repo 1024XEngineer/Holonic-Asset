@@ -13,6 +13,8 @@ type taskStoreStub struct {
 	statusErr     error
 	result        json.RawMessage
 	resultCalls   int
+	failure       string
+	failureCalls  int
 	listFilter    *ListFilter
 }
 
@@ -40,6 +42,14 @@ func (s *taskStoreStub) UpdateTaskResult(_ context.Context, _ uint, result json.
 	s.result = result
 	s.resultCalls++
 	return nil
+}
+
+func (s *taskStoreStub) UpdateTaskFailure(_ context.Context, _ uint, errorMessage string) error {
+	s.status = StatusFailed
+	s.statusUpdates = append(s.statusUpdates, StatusFailed)
+	s.failure = errorMessage
+	s.failureCalls++
+	return s.statusErr
 }
 
 func (*taskStoreStub) FetchPendingOutbox(context.Context, int) ([]OutboxRecord, error) {

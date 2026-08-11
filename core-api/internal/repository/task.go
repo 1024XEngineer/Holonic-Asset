@@ -79,6 +79,10 @@ func (r *TaskRepositoryImpl) UpdateTaskResult(ctx context.Context, taskID uint, 
 	return r.TaskDao.UpdateResult(ctx, taskID, uint(domain.StatusCompleted), datatypes.JSON(result))
 }
 
+func (r *TaskRepositoryImpl) UpdateTaskFailure(ctx context.Context, taskID uint, errorMessage string) error {
+	return r.TaskDao.UpdateFailure(ctx, taskID, uint(domain.StatusFailed), errorMessage)
+}
+
 func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID uint) (*domain.Task, error) {
 	dt, err := r.TaskDao.GetDetail(ctx, taskID)
 	if err != nil {

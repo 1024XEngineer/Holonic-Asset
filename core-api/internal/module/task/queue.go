@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -119,7 +120,6 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	if message == nil {
 		return fmt.Errorf("task: cannot dispatch nil task")
 	}
-
 	if err := q.repo.UpdateTaskStatus(ctx, message.ID, StatusProcessing); err != nil {
 		return fmt.Errorf("task: mark task %d as processing: %w", message.ID, err)
 	}
@@ -143,24 +143,39 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	return nil
 }
 
-// queueErrorHandler records a task failure when River has exhausted all retry
-// attempts. Transient failures remain processing while River retries the job.
+// queueErrorHandler records handler failures immediately. Generator handlers
+// can return provider, validation, and local-tool errors that are not safe to
+// blindly retry (for example, a paid video request or missing ffmpeg).
 type queueErrorHandler struct {
 	repo TaskExecutionStore
 }
 
-func (h *queueErrorHandler) HandleError(ctx context.Context, job *rivertype.JobRow, _ error) *riverqueue.ErrorHandlerResult {
-	h.markFailed(ctx, job)
-	return nil
+func (h *queueErrorHandler) HandleError(
+	ctx context.Context,
+	job *rivertype.JobRow,
+	jobErr error,
+) *riverqueue.ErrorHandlerResult {
+	h.markFailed(ctx, job, jobErr, true)
+	return &riverqueue.ErrorHandlerResult{SetCancelled: true}
 }
 
-func (h *queueErrorHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, _ any, _ string) *riverqueue.ErrorHandlerResult {
-	h.markFailed(ctx, job)
-	return nil
+func (h *queueErrorHandler) HandlePanic(
+	ctx context.Context,
+	job *rivertype.JobRow,
+	panicValue any,
+	_ string,
+) *riverqueue.ErrorHandlerResult {
+	h.markFailed(ctx, job, fmt.Errorf("task panicked: %v", panicValue), true)
+	return &riverqueue.ErrorHandlerResult{SetCancelled: true}
 }
 
-func (h *queueErrorHandler) markFailed(ctx context.Context, job *rivertype.JobRow) {
-	if job.Kind != queueTaskKind || job.Attempt < job.MaxAttempts {
+func (h *queueErrorHandler) markFailed(
+	ctx context.Context,
+	job *rivertype.JobRow,
+	failure error,
+	force bool,
+) {
+	if job == nil || job.Kind != queueTaskKind || (!force && job.Attempt < job.MaxAttempts) {
 		return
 	}
 
@@ -173,7 +188,15 @@ func (h *queueErrorHandler) markFailed(ctx context.Context, job *rivertype.JobRo
 		log.Printf("task: failed queue job %d has no task ID", job.ID)
 		return
 	}
-	if err := h.repo.UpdateTaskStatus(ctx, args.Task.ID, StatusFailed); err != nil {
+	errorMessage := "task execution failed"
+	if failure != nil {
+		errorMessage = failure.Error()
+	}
+	// The worker context has already expired on a job timeout. Detach the
+	// persistence write from it so the failed transition can still reach the DB.
+	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := h.repo.UpdateTaskFailure(persistCtx, args.Task.ID, errorMessage); err != nil {
 		log.Printf("task: mark task %d as failed: %v", args.Task.ID, err)
 	}
 }

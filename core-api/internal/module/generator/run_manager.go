@@ -116,8 +116,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
-		if payload.ParentID == 0 && request.AssetID != nil {
-			payload.ParentID = *request.AssetID
+		if payload.AssetID == 0 && request.AssetID != nil {
+			payload.AssetID = *request.AssetID
 		}
 		return payload, nil
 	case GenerateTileSet:

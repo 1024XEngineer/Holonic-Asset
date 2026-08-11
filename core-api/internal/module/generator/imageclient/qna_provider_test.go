@@ -30,7 +30,7 @@ func TestQNAProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 			t.Fatalf("decode request payload: %v", err)
 		}
 		if payload.Model != "configured-model" || payload.Prompt != "pixel sword" ||
-			payload.Size != "64x64" || payload.Quality != "high" || len(payload.Image) != 0 {
+			payload.Size != "1024x1024" || payload.Quality != "high" || len(payload.Image) != 0 {
 			t.Fatalf("unexpected request payload: %+v", payload)
 		}
 		writer.Header().Set("Content-Type", "application/json")

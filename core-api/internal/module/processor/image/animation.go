@@ -44,6 +44,8 @@ type normalizeAnimationRequest struct {
 	Anchor                   AnimationAnchor
 	PreserveHorizontalMotion bool
 	PreserveVerticalMotion   bool
+	NormalizeContentScale    bool
+	PreserveSourceCellScale  bool
 	MaxStabilizationShift    int
 	DetectGridBounds         bool
 	AllowEmptyFrames         bool
@@ -93,6 +95,10 @@ type AnimationNormalizationReport struct {
 	OutputAnchorRange       AnimationPoint    `json:"output_anchor_range"`
 	AppliedMaxShift         AnimationPoint    `json:"applied_max_shift"`
 	TranslationClamped      int               `json:"translation_clamped"`
+	ContentScaleNormalized  bool              `json:"content_scale_normalized,omitempty"`
+	ContentHeightMedian     float64           `json:"content_height_median,omitempty"`
+	ContentScaleMin         float64           `json:"content_scale_min,omitempty"`
+	ContentScaleMax         float64           `json:"content_scale_max,omitempty"`
 	GridXBounds             []int             `json:"grid_x_bounds"`
 	GridYBounds             []int             `json:"grid_y_bounds"`
 	GridPolicy              string            `json:"grid_policy"`
@@ -133,6 +139,9 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	}
 	if request.Margin < 0 || request.CropPadding < 0 || request.MaxStabilizationShift < 0 {
 		return nil, fmt.Errorf("margin, crop padding, and max stabilization shift must not be negative")
+	}
+	if request.NormalizeContentScale && request.PreserveSourceCellScale {
+		return nil, fmt.Errorf("normalize content scale and preserve source cell scale cannot be enabled together")
 	}
 	anchor := request.Anchor
 	if anchor == "" || anchor == AnimationAnchorAuto {
@@ -209,6 +218,13 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		RegistrationPolicy:      "median_root_anchor_shared_union_crop_single_global_scale_no_per_frame_recentering",
 		BackgroundRemovalReport: extractionReport,
 	}
+	if request.PreserveSourceCellScale {
+		report.RegistrationPolicy = "median_root_anchor_shared_source_cell_canvas_fixed_scale_no_per_frame_recentering"
+	}
+	if request.NormalizeContentScale {
+		normalizeAnimationCellContentScale(cells, cellW, cellH, threshold, anchor, &report)
+		report.RegistrationPolicy = "median_content_height_per_cell_scale_median_root_anchor_shared_union_crop"
+	}
 	stabilizeAnimationCells(cells, cellW, cellH, request, &report)
 
 	pad := max(6, int(math.Round(float64(min(cellW, cellH))*.14)))
@@ -244,12 +260,23 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	report.SharedCrop = rectangleToAlphaBoundingBox(shared)
 
 	innerW, innerH := frameWidth-2*margin, frameHeight-2*margin
-	scale := math.Min(float64(innerW)/float64(shared.Dx()), float64(innerH)/float64(shared.Dy()))
+	renderCrop := shared
+	var scale float64
+	if request.PreserveSourceCellScale {
+		// The prepared reference and the prototype both describe one complete
+		// direction cell. Render that same cell into the output frame instead of
+		// fitting the action's union bounds. The latter makes the body shrink
+		// whenever a held weapon reaches farther than the idle pose.
+		renderCrop = image.Rect(pad, pad, pad+cellW, pad+cellH)
+		scale = math.Min(float64(frameWidth)/float64(cellW), float64(frameHeight)/float64(cellH))
+	} else {
+		scale = math.Min(float64(innerW)/float64(shared.Dx()), float64(innerH)/float64(shared.Dy()))
+	}
 	if scale <= 0 {
 		return nil, fmt.Errorf("target frame is too small")
 	}
-	drawW := max(1, int(math.Round(float64(shared.Dx())*scale)))
-	drawH := max(1, int(math.Round(float64(shared.Dy())*scale)))
+	drawW := max(1, int(math.Round(float64(renderCrop.Dx())*scale)))
+	drawH := max(1, int(math.Round(float64(renderCrop.Dy())*scale)))
 	destX, destY := (frameWidth-drawW)/2, (frameHeight-drawH)/2
 	report.Scale = scale
 
@@ -259,7 +286,7 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	for i := range cells {
 		frame := image.NewNRGBA(image.Rect(0, 0, frameWidth, frameHeight))
 		if cells[i].visible {
-			cropped := cloneNRGBA(working[i].SubImage(shared))
+			cropped := cloneNRGBA(working[i].SubImage(renderCrop))
 			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH)
 			draw.Draw(frame, image.Rect(destX, destY, destX+drawW, destY+drawH), resized, image.Point{}, draw.Over)
 		}
@@ -277,8 +304,8 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		if cells[i].visible {
 			sourceValue := cells[i].anchor
 			outputValue := AnimationPoint{
-				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(shared.Min.X))*scale,
-				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(shared.Min.Y))*scale,
+				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(renderCrop.Min.X))*scale,
+				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(renderCrop.Min.Y))*scale,
 			}
 			sourceAnchor, outputAnchor = &sourceValue, &outputValue
 			outputAnchors = append(outputAnchors, outputValue)
@@ -359,6 +386,75 @@ func extractAnimationCells(input *image.NRGBA, xBounds, yBounds []int, frameCoun
 	return cells, cellW, cellH
 }
 
+// normalizeAnimationCellContentScale corrects static direction sheets where
+// an image model drew the same subject at a different apparent size in each
+// grid cell. The median visible height is deliberately used instead of the
+// largest cell so one accidental oversized generation cannot shrink every
+// other direction. The content is scaled around its own anchor, then the
+// regular registration pass below aligns all anchors on the output canvas.
+func normalizeAnimationCellContentScale(
+	cells []animationCell,
+	cellW, cellH int,
+	threshold uint8,
+	anchor AnimationAnchor,
+	report *AnimationNormalizationReport,
+) {
+	heights := make([]float64, 0, len(cells))
+	for i := range cells {
+		if cells[i].visible && cells[i].bbox.Dy() > 0 {
+			heights = append(heights, float64(cells[i].bbox.Dy()))
+		}
+	}
+	if len(heights) == 0 {
+		return
+	}
+	targetHeight := medianAnimationValue(heights)
+	minScale, maxScale := math.Inf(1), 0.0
+	for i := range cells {
+		cell := &cells[i]
+		if !cell.visible || cell.bbox.Dx() <= 0 || cell.bbox.Dy() <= 0 {
+			continue
+		}
+		scale := targetHeight / float64(cell.bbox.Dy())
+		// Keep the complete subject inside its source-cell canvas. The scaled
+		// rectangle is shifted when necessary; the following anchor registration
+		// removes that placement difference deterministically.
+		scale = math.Min(scale, float64(cellW)/float64(cell.bbox.Dx()))
+		scale = math.Min(scale, float64(cellH)/float64(cell.bbox.Dy()))
+		if scale <= 0 {
+			continue
+		}
+
+		content := cloneNRGBA(cell.image.SubImage(cell.bbox))
+		drawW := max(1, int(math.Round(float64(cell.bbox.Dx())*scale)))
+		drawH := max(1, int(math.Round(float64(cell.bbox.Dy())*scale)))
+		resized, _ := qualityResize(content, content.Bounds(), drawW, drawH)
+		relativeAnchorX := (cell.anchor.X - float64(cell.bbox.Min.X)) * scale
+		relativeAnchorY := (cell.anchor.Y - float64(cell.bbox.Min.Y)) * scale
+		dstX := int(math.Round(cell.anchor.X - relativeAnchorX))
+		dstY := int(math.Round(cell.anchor.Y - relativeAnchorY))
+		dstX = clampAnimationInt(dstX, 0, max(0, cellW-drawW))
+		dstY = clampAnimationInt(dstY, 0, max(0, cellH-drawH))
+
+		canvas := image.NewNRGBA(image.Rect(0, 0, cellW, cellH))
+		draw.Draw(canvas, image.Rect(dstX, dstY, dstX+drawW, dstY+drawH), resized, image.Point{}, draw.Over)
+		bbox, visible := alphaBoundsNRGBA(canvas, threshold)
+		cell.image, cell.bbox, cell.visible = canvas, bbox, visible
+		if visible {
+			cell.anchor = animationAnchorFor(canvas, bbox, anchor)
+		}
+		minScale = math.Min(minScale, scale)
+		maxScale = math.Max(maxScale, scale)
+	}
+	if math.IsInf(minScale, 1) {
+		return
+	}
+	report.ContentScaleNormalized = true
+	report.ContentHeightMedian = targetHeight
+	report.ContentScaleMin = minScale
+	report.ContentScaleMax = maxScale
+}
+
 func stabilizeAnimationCells(cells []animationCell, width, height int, request normalizeAnimationRequest, report *AnimationNormalizationReport) {
 	xs, ys := make([]float64, 0, len(cells)), make([]float64, 0, len(cells))
 	for i := range cells {
@@ -377,7 +473,14 @@ func stabilizeAnimationCells(cells []animationCell, width, height int, request n
 	targetX, targetY := math.Round(medianX), math.Round(medianY)
 	maxShift := request.MaxStabilizationShift
 	if maxShift == 0 {
-		maxShift = max(4, int(math.Round(float64(min(width, height))*.20)))
+		if request.NormalizeContentScale {
+			// Static direction sheets often place one row much higher or lower
+			// inside tall source cells. Those are generation/layout errors rather
+			// than intentional motion, so allow complete anchor registration.
+			maxShift = max(width, height)
+		} else {
+			maxShift = max(4, int(math.Round(float64(min(width, height))*.20)))
+		}
 	}
 	for i := range cells {
 		if !cells[i].visible {
@@ -407,7 +510,14 @@ func animationAnchorFor(img *image.NRGBA, bbox image.Rectangle, anchor Animation
 		top := image.Rect(bbox.Min.X, bbox.Min.Y, bbox.Max.X, bbox.Min.Y+max(1, int(math.Round(float64(bbox.Dy())*.45))))
 		return AnimationPoint{X: animationWeightedMedianX(img, top), Y: animationWeightedQuantileY(img, top, .48)}
 	case AnimationAnchorCenter:
-		return AnimationPoint{X: animationWeightedMedianX(img, bbox), Y: animationWeightedQuantileY(img, bbox, .5)}
+		// Center is primarily used for static objects that have no feet/root.
+		// Use the geometric alpha-bounds centre so equal-sized direction views
+		// occupy the same vertical and horizontal band even when their internal
+		// pixel mass is asymmetric (for example a chest lock on the front face).
+		return AnimationPoint{
+			X: float64(bbox.Min.X+bbox.Max.X) / 2,
+			Y: float64(bbox.Min.Y+bbox.Max.Y) / 2,
+		}
 	default:
 		band := image.Rect(bbox.Min.X, bbox.Min.Y+int(math.Round(float64(bbox.Dy())*.30)), bbox.Max.X, bbox.Min.Y+int(math.Round(float64(bbox.Dy())*.74)))
 		x := animationWeightedMedianX(img, band)

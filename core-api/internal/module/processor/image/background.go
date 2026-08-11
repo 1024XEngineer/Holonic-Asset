@@ -15,13 +15,15 @@ import (
 // hue retain the repository's original distance-only extraction; other images
 // use the imagegen-inspired soft matte and edge cleanup.
 const (
-	chromaKeyDominanceThreshold = 16.0
-	chromaAlphaNoiseFloor       = uint8(8)
-	chromaOverlapDistanceRatio  = 0.5
-	chromaOverlapDistanceMax    = 24.0
-	chromaKeyOverlapRouteRatio  = 0.05
-	chromaEdgeContractPixels    = 1
-	chromaEdgeFeatherRadius     = 0.6
+	chromaKeyDominanceThreshold          = 16.0
+	chromaAlphaNoiseFloor                = uint8(8)
+	chromaOverlapDistanceRatio           = 0.5
+	chromaOverlapDistanceMax             = 24.0
+	chromaKeyOverlapRouteRatio           = 0.05
+	chromaEnclosedMatteMinSeedRatio      = 0.05
+	chromaEnclosedMatteMinMeanConfidence = 0.45
+	chromaEdgeContractPixels             = 1
+	chromaEdgeFeatherRadius              = 0.6
 )
 
 type chromaCandidatePixel struct {
@@ -542,6 +544,7 @@ func extractBorderConnectedChroma(
 	}
 
 	connected := borderConnectedChromaMask(pixels, width, height)
+	includeEnclosedChromaComponents(pixels, connected, width, height)
 	for y := range height {
 		for x := range width {
 			index := y*width + x
@@ -621,6 +624,75 @@ func borderConnectedChromaMask(
 		}
 	}
 	return connected
+}
+
+// includeEnclosedChromaComponents extends the border-connected matte mask to
+// closed chroma regions that are surrounded by foreground. Generated motion
+// frames frequently contain these regions between a bent arm, a held prop, and
+// the torso. Requiring a high-confidence matte seed prevents ordinary dark
+// green foreground details from being removed merely because they are green.
+func includeEnclosedChromaComponents(
+	pixels []chromaCandidatePixel,
+	connected []bool,
+	width, height int,
+) {
+	visited := make([]bool, len(pixels))
+	stack := make([]int, 0, 64)
+	component := make([]int, 0, 64)
+
+	for start, pixel := range pixels {
+		if connected[start] || visited[start] || !pixel.candidate {
+			continue
+		}
+
+		stack = append(stack[:0], start)
+		visited[start] = true
+		component = component[:0]
+		strongSeeds := 0
+		confidenceSum := 0.0
+
+		for len(stack) > 0 {
+			last := len(stack) - 1
+			current := stack[last]
+			stack = stack[:last]
+			component = append(component, current)
+
+			candidate := pixels[current]
+			if candidate.outputAlpha <= chromaAlphaNoiseFloor {
+				strongSeeds++
+			}
+			if candidate.sourceAlpha == 0 {
+				confidenceSum++
+			} else {
+				confidenceSum += 1 - float64(candidate.outputAlpha)/float64(candidate.sourceAlpha)
+			}
+
+			x, y := current%width, current/width
+			for nearbyY := max(0, y-1); nearbyY <= min(height-1, y+1); nearbyY++ {
+				for nearbyX := max(0, x-1); nearbyX <= min(width-1, x+1); nearbyX++ {
+					next := nearbyY*width + nearbyX
+					if next == current || connected[next] || visited[next] || !pixels[next].candidate {
+						continue
+					}
+					visited[next] = true
+					stack = append(stack, next)
+				}
+			}
+		}
+
+		if strongSeeds == 0 {
+			continue
+		}
+		seedRatio := float64(strongSeeds) / float64(len(component))
+		meanConfidence := confidenceSum / float64(len(component))
+		if seedRatio < chromaEnclosedMatteMinSeedRatio ||
+			meanConfidence < chromaEnclosedMatteMinMeanConfidence {
+			continue
+		}
+		for _, index := range component {
+			connected[index] = true
+		}
+	}
 }
 
 func chromaChannelDistance(left, right MatteColor) float64 {

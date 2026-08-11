@@ -23,6 +23,7 @@ type OutboxStore interface {
 type TaskExecutionStore interface {
 	UpdateTaskStatus(ctx context.Context, taskID uint, status Status) error
 	UpdateTaskResult(ctx context.Context, taskID uint, result json.RawMessage) error
+	UpdateTaskFailure(ctx context.Context, taskID uint, errorMessage string) error
 }
 
 // TaskStore provides task persistence and transactional outbox creation.
