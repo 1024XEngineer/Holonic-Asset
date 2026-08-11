@@ -7,3 +7,9 @@ coverage:
         target: auto
         threshold: 0%
         informational: true
+      backend:
+        flags:
+          - backend
+        target: auto
+        threshold: 0%
+        informational: true
