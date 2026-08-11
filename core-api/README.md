@@ -58,6 +58,23 @@ pnpm api:generate
 Run `pnpm api:check` to regenerate and type-check the frontend API surface.
 Files under `frontend/src/model/generated/` must not be edited by hand.
 
+## Authentication
+
+Configure `auth.jwtSecret` and `auth.tokenExpiry` before starting the API. The
+application only provides login and token verification; it does not create
+initial users during startup.
+
+To add the development users explicitly, generate a deployment-specific bcrypt
+hash, export it as `BOOTSTRAP_PASSWORD_HASH`, and apply the SQL seed from the
+`core-api` directory:
+
+```shell
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v password_hash="$BOOTSTRAP_PASSWORD_HASH" -f seed.sql
+```
+
+The seed is idempotent by username and does not replace existing passwords.
+
 ## Qiniu Uploads
 
 Configure `qiniu.accessKey`, `qiniu.secretKey`, `qiniu.bucket`, and

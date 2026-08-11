@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log in */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/generation-runs/{run_id}": {
         parameters: {
             query?: never;
@@ -510,6 +527,24 @@ export interface components {
         ListProjectsResponse: {
             projects: components["schemas"]["ProjectResponse"][];
         };
+        LoginRequest: {
+            password: string;
+            username: string;
+        };
+        LoginResponse: {
+            accessToken: string;
+            /** Format: int64 */
+            expiresIn: number;
+            /** @enum {string} */
+            tokenType: "Bearer";
+            user: components["schemas"]["LoginUser"];
+        };
+        LoginUser: {
+            email: string;
+            /** Format: int64 */
+            id: number;
+            username: string;
+        };
         ProjectDetailResponse: {
             project: components["schemas"]["ProjectResponse"];
         };
@@ -692,6 +727,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["ListProjectsResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseLoginResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["LoginResponse"];
             /** @constant */
             message: "success";
         };
@@ -1139,6 +1184,57 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseLoginResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
