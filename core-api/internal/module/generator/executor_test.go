@@ -150,6 +150,8 @@ type generationAssetWriterStub struct {
 	objectAsset      *assetdomain.Asset
 	prototypeAssetID uint
 	prototypeImages  []assetdomain.ImageResource
+	createdRecord    *assetdomain.AssetRecord
+	recordVersion    uint
 	animationAssetID uint
 	animationName    string
 	animationID      uint
@@ -220,6 +222,26 @@ func (s *generationAssetWriterStub) UpdatePrototypeImages(
 	s.prototypeAssetID = assetID
 	s.prototypeImages = append([]assetdomain.ImageResource(nil), images...)
 	return s.err
+}
+
+func (s *generationAssetWriterStub) CreateRecord(
+	_ context.Context,
+	record *assetdomain.AssetRecord,
+) (*assetdomain.AssetRecord, error) {
+	*s.events = append(*s.events, "create_record")
+	if record != nil {
+		copy := *record
+		copy.Content = append(json.RawMessage(nil), record.Content...)
+		s.createdRecord = &copy
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	version := s.recordVersion
+	if version == 0 {
+		version = 2
+	}
+	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
 }
 
 func (s *generationAssetWriterStub) UpdateAnimationFrames(
@@ -295,6 +317,113 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.characterAsset, 4)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
+}
+
+func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+	events := []string{}
+	originalURLs := []string{
+		"assets/hero/up.png",
+		"assets/hero/right.png",
+		"assets/hero/down.png",
+		"assets/hero/left.png",
+	}
+	prototype := make(assetdomain.Prototype, len(originalURLs))
+	for index := range originalURLs {
+		prototype[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &originalURLs[index]}
+	}
+	content, err := assetdomain.EncodeContent(assetdomain.AssetContent{
+		DirectionCount: 4,
+		Prototype:      &prototype,
+		Animations: []assetdomain.Animation{{
+			ID: 7, Name: "idle", Frames: []assetdomain.Frame{},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("encode source content: %v", err)
+	}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{
+		events:        &events,
+		recordVersion: 3,
+		asset: assetdomain.Asset{
+			ID:          7,
+			Name:        "hero",
+			ProjectID:   11,
+			Type:        assetdomain.AssetTypeCharacter,
+			Description: "a red knight carrying a steel spear",
+			Perspective: assetdomain.PerspectiveTopDown,
+			Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
+			Content:     content,
+			Version:     2,
+		},
+	}
+	references := &referenceStoreStub{events: &events}
+	executor := generator.NewExecutor(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		references,
+	)
+
+	result, err := executor.Generate(
+		context.Background(),
+		generator.EditCharacterProtoType,
+		json.RawMessage(`{
+			"asset_id":7,
+			"project_id":11,
+			"edit_instructions":"change only the cape to blue"
+		}`),
+	)
+	if err != nil {
+		t.Fatalf("edit character prototype: %v", err)
+	}
+
+	wantResolved := append([]string(nil), originalURLs...)
+	if !reflect.DeepEqual(references.resolved, wantResolved) {
+		t.Fatalf("unexpected resolved references: got %v want %v", references.resolved, wantResolved)
+	}
+	wantImageReferences := make([]string, len(wantResolved))
+	for index, reference := range wantResolved {
+		wantImageReferences[index] = "signed:" + reference
+	}
+	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, wantImageReferences) {
+		t.Fatalf("unexpected edit image references: %+v", images.request)
+	}
+	for _, expected := range []string{
+		"a red knight carrying a steel spear",
+		"change only the cape to blue",
+		"Reference images 1 through 4",
+		"No separate user or project reference image is supplied",
+	} {
+		if !strings.Contains(images.request.Prompt, expected) {
+			t.Fatalf("edit prompt missing %q: %s", expected, images.request.Prompt)
+		}
+	}
+	if assets.createdRecord == nil || assets.createdRecord.AssetID != 7 {
+		t.Fatalf("expected version record for asset 7: %+v", assets.createdRecord)
+	}
+	updated, err := (assetdomain.Asset{
+		Type: assetdomain.AssetTypeCharacter, Content: assets.createdRecord.Content,
+	}).DecodeContent()
+	if err != nil {
+		t.Fatalf("decode version content: %v", err)
+	}
+	if updated.DirectionCount != 4 || updated.Prototype == nil || len(*updated.Prototype) != 4 {
+		t.Fatalf("unexpected edited prototype content: %+v", updated)
+	}
+	if len(updated.Animations) != 1 || updated.Animations[0].ID != 7 || updated.Animations[0].Name != "idle" {
+		t.Fatalf("existing animations were not preserved: %+v", updated.Animations)
+	}
+	for index, resource := range *updated.Prototype {
+		want := fmt.Sprintf("uploads/prototype-%d.png", index)
+		if resource.URL == nil || *resource.URL != want {
+			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
+		}
+	}
+	if events[len(events)-1] != "create_record" {
+		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	}
+	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, Version: 3})
 }
 
 func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyInput(t *testing.T) {

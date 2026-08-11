@@ -101,6 +101,15 @@ func buildTaskPayload(request *Request) (any, error) {
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
+	case EditCharacterProtoType:
+		if request.AssetID == nil || *request.AssetID == 0 {
+			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
+		}
+		return EditCharacterPrototypePayload{
+			AssetID:          *request.AssetID,
+			ProjectID:        request.ProjectID,
+			EditInstructions: request.CreativeBrief,
+		}, nil
 	case GenerateObjectProtoType:
 		payload := CreateObjectPrototypePayload{}
 		if err := decodeParameters(request, &payload); err != nil {
@@ -131,8 +140,7 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.TileNum = uint(len(payload.TileDescriptions))
 		}
 		return payload, nil
-	case EditCharacterProtoType,
-		EditCharacterFrames,
+	case EditCharacterFrames,
 		EditObjectProtoType,
 		EditObjectFrames,
 		EditAnimation,

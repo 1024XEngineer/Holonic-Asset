@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -200,6 +201,50 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
 		t.Fatalf("asset current pointer was not updated: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
+	currentContentID := uint(4)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Perspective: "Top-Down",
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 2, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{"version":2}`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+	replacement := json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"new.png"}]}`)
+
+	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: replacement,
+	})
+	if err != nil {
+		t.Fatalf("create replacement record: %v", err)
+	}
+	if record.Version != 3 || record.ContentID != 5 || string(record.Content) != string(replacement) {
+		t.Fatalf("unexpected replacement record: %+v", record)
+	}
+	if got := string(contentDao.contents[record.ContentID].Content); got != string(replacement) {
+		t.Fatalf("replacement content was not persisted: %s", got)
+	}
+	if assetDao.updatedVersion != 3 || assetDao.updatedContent != record.ContentID {
+		t.Fatalf("asset current pointer was not moved to replacement: %+v", assetDao)
 	}
 }
 
