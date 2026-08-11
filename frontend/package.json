@@ -34,6 +34,7 @@
     "react-dom": "^19.2.7",
     "react-dropzone": "^19.1.1",
     "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
     "zundo": "^2.3.0",
     "zustand": "^5.0.14"
   },

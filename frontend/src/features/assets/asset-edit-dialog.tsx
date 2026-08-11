@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import {
+  assetMetadataUpdateSchema,
   assetCanvasSizeOptions,
   type AssetLibraryItem,
   type AssetMetadataUpdate,
@@ -56,6 +57,7 @@ export function AssetEditDialog({
   const [perspective, setPerspective] = useState<Perspective>(
     perspectiveOptions[0],
   );
+  const [validationError, setValidationError] = useState<string>();
   const initializedAssetIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -78,6 +80,13 @@ export function AssetEditDialog({
   const canvasOptions = Array.from(
     new Set([...assetCanvasSizeOptions, canvasSize]),
   );
+  const metadataResult = assetMetadataUpdateSchema.safeParse({
+    name,
+    description,
+    tags,
+    canvasSize,
+    perspective,
+  });
   const toggleTag = (tag: string, checked: boolean) => {
     setTags((currentTags) =>
       checked
@@ -100,7 +109,12 @@ export function AssetEditDialog({
             className="contents"
             onSubmit={(event) => {
               event.preventDefault();
-              onSave({ name, description, tags, canvasSize, perspective });
+              if (!metadataResult.success) {
+                setValidationError(metadataResult.error.issues[0]?.message);
+                return;
+              }
+              setValidationError(undefined);
+              onSave(metadataResult.data);
             }}
           >
             <DialogClose
@@ -146,7 +160,10 @@ export function AssetEditDialog({
                       disabled={isSaving}
                       id="asset-name"
                       value={name}
-                      onChange={(event) => setName(event.target.value)}
+                      onChange={(event) => {
+                        setValidationError(undefined);
+                        setName(event.target.value);
+                      }}
                     />
                   </Field>
                   <Field label="Description" htmlFor="asset-description">
@@ -154,7 +171,10 @@ export function AssetEditDialog({
                       disabled={isSaving}
                       id="asset-description"
                       value={description}
-                      onChange={(event) => setDescription(event.target.value)}
+                      onChange={(event) => {
+                        setValidationError(undefined);
+                        setDescription(event.target.value);
+                      }}
                     />
                   </Field>
                   <Field
@@ -182,9 +202,10 @@ export function AssetEditDialog({
                             key={tag}
                             checked={tags.includes(tag)}
                             closeOnClick={false}
-                            onCheckedChange={(checked) =>
-                              toggleTag(tag, checked)
-                            }
+                            onCheckedChange={(checked) => {
+                              setValidationError(undefined);
+                              toggleTag(tag, checked);
+                            }}
                           >
                             {tag}
                           </DropdownMenuCheckboxItem>
@@ -201,7 +222,10 @@ export function AssetEditDialog({
                           Canvas
                         </>
                       }
-                      onChange={setCanvasSize}
+                      onChange={(value) => {
+                        setValidationError(undefined);
+                        setCanvasSize(value);
+                      }}
                       options={canvasOptions}
                       size="compact"
                       value={canvasSize}
@@ -215,7 +239,10 @@ export function AssetEditDialog({
                         </>
                       }
                       onChange={(value) => {
-                        if (isPerspective(value)) setPerspective(value);
+                        if (isPerspective(value)) {
+                          setValidationError(undefined);
+                          setPerspective(value);
+                        }
                       }}
                       options={perspectiveOptions}
                       size="compact"
@@ -231,6 +258,15 @@ export function AssetEditDialog({
                       <span>{error.message}</span>
                     </div>
                   ) : null}
+                  {validationError ? (
+                    <div
+                      className="flex items-start gap-2 border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                      role="alert"
+                    >
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{validationError}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -242,7 +278,10 @@ export function AssetEditDialog({
               >
                 Close
               </DialogClose>
-              <Button type="submit" disabled={isSaving || !name.trim()}>
+              <Button
+                type="submit"
+                disabled={isSaving || !metadataResult.success}
+              >
                 {isSaving ? "Saving..." : "Save changes"}
               </Button>
             </DialogFooter>

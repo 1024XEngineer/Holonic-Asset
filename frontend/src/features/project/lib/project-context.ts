@@ -1,5 +1,7 @@
 import { perspectiveOptions } from "@/model/project";
 import type { CreateProjectInput, ProjectSummary } from "@/model/project";
+import { perspectiveSchema } from "@/model/project";
+import { z } from "zod";
 
 import type {
   NewProjectDraft,
@@ -22,6 +24,41 @@ export const editableProjectContextOptions = {
   gameTypes: [...projectContextOptions.gameTypes, "Other"],
 } as const;
 
+const projectGameTypeSchema = z.enum(projectContextOptions.gameTypes);
+const editableProjectGameTypeSchema = z.enum(
+  editableProjectContextOptions.gameTypes,
+);
+const projectPlatformSchema = z.enum(projectContextOptions.platforms);
+
+const newProjectDraftSchema = z.object({
+  name: z.string().trim().min(1, "Project name is required."),
+  gameType: projectGameTypeSchema,
+  platform: projectPlatformSchema,
+  description: z.string().trim(),
+  perspective: perspectiveSchema,
+  reference: z.string().trim(),
+  visualDirection: z.string().optional(),
+});
+
+const projectSettingsDraftSchema = z
+  .object({
+    name: z.string().trim().min(1, "Project name is required."),
+    gameType: editableProjectGameTypeSchema,
+    customGameType: z.string().trim(),
+    perspective: perspectiveSchema,
+    platform: projectPlatformSchema,
+    description: z.string(),
+    visualDirection: z.string(),
+  })
+  .refine(
+    ({ customGameType, gameType }) =>
+      gameType !== "Other" || customGameType.length > 0,
+    {
+      error: "Custom game type is required.",
+      path: ["customGameType"],
+    },
+  );
+
 export function createNewProjectDraft(): NewProjectDraft {
   return {
     name: "",
@@ -36,25 +73,26 @@ export function createNewProjectDraft(): NewProjectDraft {
 export function toCreateProjectInput(
   draft: NewProjectDraft & { visualDirection?: string },
 ): CreateProjectInput {
+  const value = newProjectDraftSchema.parse(draft);
+
   return {
-    name: draft.name.trim(),
-    gameType: draft.gameType,
-    platform: draft.platform,
-    description: draft.description.trim() || "A new game asset workspace.",
-    reference: draft.reference.trim(),
-    style: draft.perspective,
-    perspective: draft.perspective,
-    visualDirection: draft.visualDirection ?? "",
+    name: value.name,
+    gameType: value.gameType,
+    platform: value.platform,
+    description: value.description || "A new game asset workspace.",
+    reference: value.reference,
+    style: value.perspective,
+    perspective: value.perspective,
+    visualDirection: value.visualDirection ?? "",
   };
 }
 
 export function createProjectSettingsDraft(
   project: ProjectSummary,
 ): ProjectSettingsDraft {
-  const hasKnownGameType = isKnownOption(
-    projectContextOptions.gameTypes,
+  const hasKnownGameType = projectGameTypeSchema.safeParse(
     project.gameType,
-  );
+  ).success;
   return {
     name: project.name,
     gameType: hasKnownGameType ? project.gameType : "Other",
@@ -70,26 +108,21 @@ export function applyProjectSettings(
   project: ProjectSummary,
   draft: ProjectSettingsDraft,
 ): ProjectSummary | undefined {
-  const name = draft.name.trim();
-  const gameType = resolveEditableOption(draft.gameType, draft.customGameType);
-  if (!name || !gameType) return undefined;
+  const result = projectSettingsDraftSchema.safeParse(draft);
+  if (!result.success) return undefined;
+
+  const value = result.data;
+  const gameType =
+    value.gameType === "Other" ? value.customGameType : value.gameType;
 
   return {
     ...project,
-    name,
+    name: value.name,
     gameType,
-    perspective: draft.perspective,
-    style: draft.perspective,
-    platform: draft.platform,
-    description: draft.description,
-    visualDirection: draft.visualDirection,
+    perspective: value.perspective,
+    style: value.perspective,
+    platform: value.platform,
+    description: value.description,
+    visualDirection: value.visualDirection,
   };
-}
-
-function isKnownOption(options: readonly string[], value: string) {
-  return options.includes(value);
-}
-
-function resolveEditableOption(value: string, customValue: string) {
-  return value === "Other" ? customValue.trim() : value;
 }

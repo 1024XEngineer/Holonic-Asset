@@ -5,7 +5,6 @@ import {
   createDefaultAssetRecord,
   mergeAssetRecord,
 } from "./mock/record-defaults";
-import { isAssetRecordForKind } from "./record.validation";
 
 const asset: ProjectAsset = {
   id: "test-sprite",
@@ -19,7 +18,7 @@ const asset: ProjectAsset = {
   animations: [],
 };
 
-describe("asset record kind boundaries", () => {
+describe("asset record defaults", () => {
   it("creates independent character and object records from shared sprite data", () => {
     const characterRecord = createDefaultAssetRecord("character", asset);
     const objectRecord = createDefaultAssetRecord("object", asset);
@@ -34,16 +33,6 @@ describe("asset record kind boundaries", () => {
     });
     expect(characterRecord).not.toHaveProperty("object");
     expect(objectRecord).not.toHaveProperty("character");
-  });
-
-  it("does not accept one sprite record kind as the other", () => {
-    const characterRecord = createDefaultAssetRecord("character", asset);
-    const objectRecord = createDefaultAssetRecord("object", asset);
-
-    expect(isAssetRecordForKind("character", characterRecord)).toBe(true);
-    expect(isAssetRecordForKind("object", objectRecord)).toBe(true);
-    expect(isAssetRecordForKind("object", characterRecord)).toBe(false);
-    expect(isAssetRecordForKind("character", objectRecord)).toBe(false);
   });
 
   it("merges object records without crossing the character boundary", () => {

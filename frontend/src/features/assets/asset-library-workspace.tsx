@@ -70,7 +70,7 @@ export function AssetLibraryWorkspace({
                     onDelete={() => library.deleteAsset(asset.id)}
                     onEdit={() => library.openAssetEditor(asset.id)}
                     onOpenEditor={
-                      asset.kind === "character" || asset.kind === "object"
+                      asset.kind !== "audio"
                         ? () =>
                             void navigate({
                               to: "/projects/$projectId/assets/$assetId",

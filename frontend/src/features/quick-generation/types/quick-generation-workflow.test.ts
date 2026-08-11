@@ -37,25 +37,28 @@ describe("quick generation workflow", () => {
     });
   });
 
-  it("validates and trims generation inputs", () => {
-    expect(
-      toGenerateQuickAssetInput({ prompt: "  ", size: "64 × 64 px" }),
-    ).toBeUndefined();
-    expect(
-      toGenerateQuickAssetInput({ prompt: "Tree", size: "   " }),
-    ).toBeUndefined();
+  it("normalizes valid input through the Zod schema", () => {
     expect(
       toGenerateQuickAssetInput({
         assetId: "asset-1",
-        prompt: "  Ancient tree  ",
-        size: " 64 × 64 px ",
-        referenceFileName: "tree.png",
+        prompt: "  Moonlit orchard  ",
+        size: " 64 x 64 px ",
+        referenceFileName: "reference.png",
       }),
     ).toEqual({
       assetId: "asset-1",
-      prompt: "Ancient tree",
-      size: "64 × 64 px",
-      referenceFileName: "tree.png",
+      prompt: "Moonlit orchard",
+      size: "64 x 64 px",
+      referenceFileName: "reference.png",
     });
+  });
+
+  it("rejects blank required values", () => {
+    expect(
+      toGenerateQuickAssetInput({ prompt: "   ", size: "64 x 64 px" }),
+    ).toBeUndefined();
+    expect(
+      toGenerateQuickAssetInput({ prompt: "Orchard", size: "   " }),
+    ).toBeUndefined();
   });
 });

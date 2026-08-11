@@ -44,6 +44,19 @@ describe("toCreateProjectInput", () => {
     ]);
   });
 
+  it("rejects unsupported project options", () => {
+    expect(() =>
+      toCreateProjectInput({
+        name: "Test",
+        gameType: "Unknown",
+        platform: "PC",
+        description: "",
+        perspective: "Top-Down",
+        reference: "",
+      } as never),
+    ).toThrow();
+  });
+
   it("creates a complete draft and fills optional API defaults", () => {
     const draft = createNewProjectDraft();
 
