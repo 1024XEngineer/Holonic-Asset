@@ -1,8 +1,5 @@
-import {
-  createQuickGenerationDraft,
-  toGenerateQuickAssetInput,
-  type QuickGenerationDraft,
-} from "../types";
+import { createQuickGenerationDraft, toGenerateQuickAssetInput } from "../lib";
+import type { QuickGenerationDraft } from "../types";
 import type {
   GenerateQuickAssetInput,
   QuickGenerationAsset,
