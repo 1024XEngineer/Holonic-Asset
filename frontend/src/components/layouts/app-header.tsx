@@ -18,7 +18,7 @@ import {
   defaultAccountProfile,
   readAccountProfile,
   type AccountProfile,
-} from "@/lib/account-profile";
+} from "@/model/account";
 
 const navItems = [
   { to: "/", label: "Home" },
