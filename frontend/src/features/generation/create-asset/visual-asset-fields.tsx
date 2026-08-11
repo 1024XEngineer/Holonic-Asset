@@ -49,21 +49,6 @@ export function VisualAssetFields({
         />
       </div>
 
-      <OptionSelect
-        label="Direction count"
-        value={draft.directionCount}
-        options={[
-          ["1", "1 direction"],
-          ["4", "4 directions"],
-          ["8", "8 directions"],
-        ]}
-        onChange={(directionCount) =>
-          onChange({
-            ...draft,
-            directionCount,
-          })
-        }
-      />
       <div className="grid gap-2 text-sm font-medium">
         <span>Reference</span>
         <ImageDropzone
