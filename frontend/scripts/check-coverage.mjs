@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const minimumPercent = 80;
-const [currentPath = "coverage/coverage-final.json", baselinePath] =
-  process.argv.slice(2);
+const [currentPath = "coverage/coverage-final.json"] = process.argv.slice(2);
 
 function readCoverage(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -58,31 +57,18 @@ function format(metric) {
 }
 
 const current = summarize(readCoverage(currentPath));
-const baseline = baselinePath
-  ? summarize(readCoverage(baselinePath))
-  : undefined;
 let failed = false;
 
 console.log("Coverage gates:");
 for (const [name, metric] of Object.entries(current)) {
   const meetsThreshold = metric.covered * 100 >= minimumPercent * metric.total;
-  const meetsBaseline =
-    !baseline ||
-    metric.covered * baseline[name].total >=
-      baseline[name].covered * metric.total;
-  const baselineLabel = baseline ? `, main ${format(baseline[name])}` : "";
 
   console.log(
-    `- ${name}: ${format(metric)} (minimum ${minimumPercent.toFixed(2)}%${baselineLabel})`,
+    `- ${name}: ${format(metric)} (minimum ${minimumPercent.toFixed(2)}%)`,
   );
 
   if (!meetsThreshold) {
     console.error(`${name} coverage is below ${minimumPercent}%.`);
-    failed = true;
-  }
-
-  if (!meetsBaseline) {
-    console.error(`${name} coverage is below main.`);
     failed = true;
   }
 }

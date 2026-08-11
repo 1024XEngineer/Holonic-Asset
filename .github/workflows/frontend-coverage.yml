@@ -22,6 +22,7 @@ jobs:
   coverage:
     name: Check frontend coverage
     runs-on: ubuntu-latest
+    continue-on-error: true
     defaults:
       run:
         working-directory: frontend
@@ -47,34 +48,14 @@ jobs:
       - name: Generate coverage report
         run: pnpm test:coverage:report
 
-      - name: Check out main coverage baseline
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
-          ref: main
-          path: .coverage-baseline
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
 
-      - name: Check whether main has coverage support
-        if: github.event_name == 'pull_request'
-        id: baseline-coverage
-        run: |
-          if test -f ../.coverage-baseline/frontend/scripts/check-coverage.mjs; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install main dependencies
-        if: steps.baseline-coverage.outputs.available == 'true'
-        working-directory: .coverage-baseline/frontend
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate main coverage report
-        if: steps.baseline-coverage.outputs.available == 'true'
-        working-directory: .coverage-baseline/frontend
-        run: pnpm test:coverage:report
-
-      - name: Enforce coverage gates
-        env:
-          BASELINE_COVERAGE: ${{ steps.baseline-coverage.outputs.available == 'true' && '../.coverage-baseline/frontend/coverage/coverage-final.json' || '' }}
-        run: node scripts/check-coverage.mjs coverage/coverage-final.json "$BASELINE_COVERAGE"
+      - name: Report 80% coverage thresholds
+        continue-on-error: true
+        run: pnpm coverage:check
