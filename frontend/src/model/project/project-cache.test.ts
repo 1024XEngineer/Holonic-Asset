@@ -47,7 +47,6 @@ function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     description: "Description",
     reference: "reference.png",
     perspective: "Top-Down",
-    visualDirection: "reference.png",
     assetCount: 0,
     ...overrides,
   };

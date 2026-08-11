@@ -45,7 +45,6 @@ export function useNewProjectController() {
           ...value,
           name: value.name.trim() || "Untitled game",
           reference: projectPreview,
-          visualDirection: projectPreview,
         }),
       );
       await navigate({

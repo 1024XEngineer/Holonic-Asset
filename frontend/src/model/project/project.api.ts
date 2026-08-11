@@ -82,10 +82,9 @@ export const projectApi: ProjectApi = {
     return response.reference;
   },
   regenerateReference: async (input) => {
-    const response = await coreProjectApi.generateReference({
-      ...toCoreProjectFields(input),
-      reference: "",
-    });
+    const response = await coreProjectApi.generateReference(
+      toCoreProjectFields(input),
+    );
     return response.reference;
   },
   update: async (project) => {
@@ -94,7 +93,6 @@ export const projectApi: ProjectApi = {
     await coreProjectApi.update({
       projectID: Number(project.id),
       ...toCoreProjectFields(project),
-      reference: project.visualDirection || project.reference,
     });
     return project;
   },
@@ -145,7 +143,6 @@ export function toProjectSummary(
     reference: project.reference,
     style: project.style,
     perspective: project.perspective,
-    visualDirection: project.reference,
     assetCount,
   };
 }

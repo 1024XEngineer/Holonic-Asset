@@ -37,7 +37,6 @@ const newProjectDraftSchema = z.object({
   description: z.string().trim(),
   perspective: perspectiveSchema,
   reference: z.string().trim(),
-  visualDirection: z.string().optional(),
 });
 
 const projectSettingsDraftSchema = z
@@ -48,7 +47,7 @@ const projectSettingsDraftSchema = z
     perspective: perspectiveSchema,
     platform: projectPlatformSchema,
     description: z.string(),
-    visualDirection: z.string(),
+    reference: z.string(),
   })
   .refine(
     ({ customGameType, gameType }) =>
@@ -71,7 +70,7 @@ export function createNewProjectDraft(): NewProjectDraft {
 }
 
 export function toCreateProjectInput(
-  draft: NewProjectDraft & { visualDirection?: string },
+  draft: NewProjectDraft,
 ): CreateProjectInput {
   const value = newProjectDraftSchema.parse(draft);
 
@@ -83,7 +82,6 @@ export function toCreateProjectInput(
     reference: value.reference,
     style: value.perspective,
     perspective: value.perspective,
-    visualDirection: value.visualDirection ?? "",
   };
 }
 
@@ -100,7 +98,7 @@ export function createProjectSettingsDraft(
     perspective: project.perspective,
     platform: project.platform,
     description: project.description,
-    visualDirection: project.visualDirection,
+    reference: project.reference,
   };
 }
 
@@ -123,6 +121,6 @@ export function applyProjectSettings(
     style: value.perspective,
     platform: value.platform,
     description: value.description,
-    visualDirection: value.visualDirection,
+    reference: value.reference,
   };
 }

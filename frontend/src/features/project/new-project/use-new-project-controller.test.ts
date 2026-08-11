@@ -85,7 +85,6 @@ describe("useNewProjectController", () => {
     expect(mocks.createProject).toHaveBeenCalledWith({
       name: "Untitled game",
       reference: "",
-      visualDirection: "",
     });
     expect(mocks.navigate).toHaveBeenCalledWith({
       to: "/projects/$projectId",
@@ -186,7 +185,6 @@ describe("useNewProjectController", () => {
     expect(mocks.createProject).toHaveBeenCalledWith({
       name: "Project",
       reference: "uploaded.png",
-      visualDirection: "uploaded.png",
     });
   });
 

@@ -46,7 +46,6 @@ const input: CreateProjectInput = {
   reference: "reference.png",
   style: "Top-Down",
   perspective: "Top-Down",
-  visualDirection: "preview.png",
 };
 
 const remoteProject: ProjectResponse = {
@@ -108,14 +107,28 @@ describe("projectApi", () => {
       localProject,
     );
 
-    const remoteSummary = toProjectSummary(remoteProject);
+    const remoteSummary = {
+      ...toProjectSummary(remoteProject),
+      reference: "updated-reference.png",
+    };
     await expect(projectApi.update(remoteSummary)).resolves.toEqual(
       remoteSummary,
     );
     expect(mocks.core.update).toHaveBeenCalledWith({
       projectID: 7,
       ...coreFields(remoteSummary),
-      reference: remoteSummary.visualDirection,
+      reference: "updated-reference.png",
+    });
+
+    const clearedRemoteSummary = {
+      ...remoteSummary,
+      reference: "",
+    };
+    await projectApi.update(clearedRemoteSummary);
+    expect(mocks.core.update).toHaveBeenLastCalledWith({
+      projectID: 7,
+      ...coreFields(clearedRemoteSummary),
+      reference: "",
     });
 
     mocks.hasMockProject.mockReturnValueOnce(true);
@@ -150,7 +163,6 @@ describe("projectApi", () => {
     );
     expect(mocks.core.generateReference).toHaveBeenNthCalledWith(2, {
       ...coreFields(input),
-      reference: "",
     });
 
     const customInput = { ...input, gameType: "Deck-building roguelike" };
@@ -164,7 +176,7 @@ describe("projectApi", () => {
     expect(toProjectSummary(remoteProject)).toMatchObject({
       id: "7",
       gameType: "Role-playing game",
-      visualDirection: input.reference,
+      reference: input.reference,
       assetCount: 0,
     });
     expect(

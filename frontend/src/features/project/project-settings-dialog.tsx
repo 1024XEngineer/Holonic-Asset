@@ -154,7 +154,7 @@ export function ProjectSettingsDialog({
                 </label>
               )}
             </form.Field>
-            <form.Field name="visualDirection">
+            <form.Field name="reference">
               {(field) => (
                 <div className="min-w-0 sm:col-span-2">
                   <p className="text-sm font-medium">Reference</p>

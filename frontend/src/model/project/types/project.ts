@@ -12,7 +12,6 @@ export type Project = {
 
 export type ProjectSummary = Project & {
   perspective: Perspective;
-  visualDirection: string;
   assetCount: number;
 };
 

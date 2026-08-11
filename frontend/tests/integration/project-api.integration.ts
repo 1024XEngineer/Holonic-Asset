@@ -29,7 +29,6 @@ describe("project API integration", () => {
       reference: "reference.png",
       style: "pixel",
       perspective: "Top-Down",
-      visualDirection: "reference.png",
     });
     expect(Number(created.id)).toBeGreaterThan(0);
 
@@ -38,7 +37,7 @@ describe("project API integration", () => {
       id: created.id,
       name: "Integration Orchard",
       description: "Restore the orchard.",
-      visualDirection: "reference.png",
+      reference: "reference.png",
     });
 
     const detail = await projectApi.detail(created.id);
@@ -52,7 +51,7 @@ describe("project API integration", () => {
       projectApi.update({
         ...detail,
         description: "Rebuild the moonlit orchard.",
-        visualDirection: "updated-reference.png",
+        reference: "updated-reference.png",
       }),
     ).resolves.toMatchObject({
       id: created.id,
@@ -63,7 +62,6 @@ describe("project API integration", () => {
       name: "Integration Orchard",
       description: "Rebuild the moonlit orchard.",
       reference: "updated-reference.png",
-      visualDirection: "updated-reference.png",
     });
 
     await projectApi.delete(created.id);
