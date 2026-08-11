@@ -16,8 +16,24 @@
     "fourNote": "Each view should retain the same silhouette, weapon position, and lighting direction. This swordsman set shows the four cardinal views needed for a top-down character.",
     "eightTitle": "Eight directions",
     "eightBody": "Add the four diagonals when the game includes diagonal movement, aiming, or smoother turning. Do not select eight directions by default; they need more consistency work.",
-    "eightNote": "The basketball player set adds north-west, north-east, south-west, and south-east views. Compare each diagonal with its neighboring cardinal directions before using it in animation."
-    ,"labels": { "front": "Front", "right": "Right", "back": "Back", "left": "Left", "north-west": "North-west", "north": "North", "north-east": "North-east", "west": "West", "east": "East", "south-west": "South-west", "south": "South", "south-east": "South-east", "oneAlt": "Idle knight shown from a single direction", "swordsmanAlt": "{{label}} swordsman direction", "basketballAlt": "{{label}} basketball player direction" }
+    "eightNote": "The basketball player set adds north-west, north-east, south-west, and south-east views. Compare each diagonal with its neighboring cardinal directions before using it in animation.",
+    "labels": {
+      "front": "Front",
+      "right": "Right",
+      "back": "Back",
+      "left": "Left",
+      "north-west": "North-west",
+      "north": "North",
+      "north-east": "North-east",
+      "west": "West",
+      "east": "East",
+      "south-west": "South-west",
+      "south": "South",
+      "south-east": "South-east",
+      "oneAlt": "Idle knight shown from a single direction",
+      "swordsmanAlt": "{{label}} swordsman direction",
+      "basketballAlt": "{{label}} basketball player direction"
+    }
   },
   "perspective": {
     "heading": "Choose the camera for your world before generating its assets.",
@@ -51,7 +67,13 @@
     "differenceBody": "This reference defines the target character's identity and visual style. The two results below target the same role.",
     "resultImageAlt": "Pixel-art farming game reference for a character generation example",
     "resultNote": "Both results use the same prompt. The first uses the prompt alone; the second adds this image as a reference, producing stronger visual consistency.",
-    "comparison": { "onlyPrompt": "only prompt (Without reference)", "withReference": "prompt (With reference)", "onlyPromptDescription": "Without a reference, the shared prompt alone does not reliably achieve the intended game's visual style or quality.", "withReferenceDescription": "Generated with the same prompt and a reference, producing a result more consistent with the game's visual style and quality.", "imageAlt": "{{title}} generated pixel-art character" }
+    "comparison": {
+      "onlyPrompt": "only prompt (Without reference)",
+      "withReference": "prompt (With reference)",
+      "onlyPromptDescription": "Without a reference, the shared prompt alone does not reliably achieve the intended game's visual style or quality.",
+      "withReferenceDescription": "Generated with the same prompt and a reference, producing a result more consistent with the game's visual style and quality.",
+      "imageAlt": "{{title}} generated pixel-art character"
+    }
   },
   "tilesets": {
     "heading": "Split tilesets by construction rules.",

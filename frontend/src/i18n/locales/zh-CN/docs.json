@@ -16,8 +16,24 @@
     "fourNote": "每个视图都应保持相同的轮廓、武器位置和光照方向。这组剑士展示了俯视角色所需的四个基本方向。",
     "eightTitle": "八个方向",
     "eightBody": "当游戏包含斜向移动、瞄准或更平滑的转向时，再增加四个对角方向。不要默认选择八个方向，它们需要更多一致性工作。",
-    "eightNote": "篮球运动员增加了西北、东北、西南和东南视图。用于动画前，请将每个对角方向与相邻的基本方向进行比较。"
-    ,"labels": { "front": "前", "right": "右", "back": "后", "left": "左", "north-west": "西北", "north": "北", "north-east": "东北", "west": "西", "east": "东", "south-west": "西南", "south": "南", "south-east": "东南", "oneAlt": "从单一方向展示的待机骑士", "swordsmanAlt": "{{label}}方向的剑士", "basketballAlt": "{{label}}方向的篮球运动员" }
+    "eightNote": "篮球运动员增加了西北、东北、西南和东南视图。用于动画前，请将每个对角方向与相邻的基本方向进行比较。",
+    "labels": {
+      "front": "前",
+      "right": "右",
+      "back": "后",
+      "left": "左",
+      "north-west": "西北",
+      "north": "北",
+      "north-east": "东北",
+      "west": "西",
+      "east": "东",
+      "south-west": "西南",
+      "south": "南",
+      "south-east": "东南",
+      "oneAlt": "从单一方向展示的待机骑士",
+      "swordsmanAlt": "{{label}}方向的剑士",
+      "basketballAlt": "{{label}}方向的篮球运动员"
+    }
   },
   "perspective": {
     "heading": "在生成资产前，先为你的世界选择摄像机视角。",
@@ -51,7 +67,13 @@
     "differenceBody": "这张参考图定义了目标角色的身份和视觉风格。下面两个结果针对的是同一个角色定位。",
     "resultImageAlt": "用于角色生成示例的像素风农场游戏参考图",
     "resultNote": "两个结果使用相同的提示词。第一个只使用提示词，第二个加入这张参考图，因此获得了更强的视觉一致性。",
-    "comparison": { "onlyPrompt": "仅使用提示词（无参考图）", "withReference": "提示词（带参考图）", "onlyPromptDescription": "没有参考图时，仅靠相同提示词无法稳定达到目标游戏的视觉风格和质量。", "withReferenceDescription": "使用相同提示词和参考图生成，结果与游戏的视觉风格和质量更加一致。", "imageAlt": "{{title}}生成的像素风角色" }
+    "comparison": {
+      "onlyPrompt": "仅使用提示词（无参考图）",
+      "withReference": "提示词（带参考图）",
+      "onlyPromptDescription": "没有参考图时，仅靠相同提示词无法稳定达到目标游戏的视觉风格和质量。",
+      "withReferenceDescription": "使用相同提示词和参考图生成，结果与游戏的视觉风格和质量更加一致。",
+      "imageAlt": "{{title}}生成的像素风角色"
+    }
   },
   "tilesets": {
     "heading": "按照构建规则拆分瓦片集。",
