@@ -493,7 +493,12 @@ func (r *AssetRepositoryImpl) CreateSceneryAsset(ctx context.Context, asset *dom
 	return r.createAsset(ctx, asset, domain.AssetTypeScenery)
 }
 
-func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error) {
+func (r *AssetRepositoryImpl) CreateAnimation(
+	ctx context.Context,
+	assetID uint,
+	name string,
+	frames []domain.Frame,
+) (uint, error) {
 	if name == "" {
 		return 0, fmt.Errorf("repository: animation name is empty")
 	}
@@ -503,7 +508,7 @@ func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint,
 		content.Animations = append(content.Animations, domain.Animation{
 			ID:     animationID,
 			Name:   name,
-			Frames: make([]domain.Frame, 0),
+			Frames: append([]domain.Frame(nil), frames...),
 		})
 		return nil
 	}); err != nil {
