@@ -25,6 +25,11 @@ const (
 	animationLoopCompactnessWeight = 1.15
 	animationLoopRecoveryWeight    = 0.35
 	animationLoopMotionWeight      = 0.65
+
+	maxAnimationExtractedFrames   = 100
+	maxAnimationFrameDimension    = 4096
+	maxAnimationDecodedFrameBytes = 128 << 20
+	animationDecodedBytesPerPixel = 4
 )
 
 type AnimationLoopSelection struct {
@@ -86,8 +91,12 @@ func (e ffmpegAnimationFrameExtractor) Extract(
 		ffmpeg,
 		"-hide_banner", "-loglevel", "error",
 		"-i", input,
-		"-vf", fmt.Sprintf("fps=%d", fps),
+		"-vf", fmt.Sprintf("fps=%d,format=rgba", fps),
 		"-vsync", "0",
+		// Stop ffmpeg one frame beyond the accepted limit. This bounds temp
+		// disk usage while still allowing the post-extraction check to reject
+		// videos that would have yielded too many candidate frames.
+		"-frames:v", fmt.Sprintf("%d", maxAnimationExtractedFrames+1),
 		pattern,
 	)
 	var stderr bytes.Buffer
@@ -100,6 +109,21 @@ func (e ffmpegAnimationFrameExtractor) Extract(
 		return nil, fmt.Errorf("generator: list extracted animation frames: %w", err)
 	}
 	sort.Strings(paths)
+	if err := validateExtractedAnimationFrameCount(len(paths)); err != nil {
+		return nil, err
+	}
+	configs := make([]image.Config, 0, len(paths))
+	for _, path := range paths {
+		config, configErr := decodeAnimationFrameConfig(path)
+		if configErr != nil {
+			return nil, configErr
+		}
+		configs = append(configs, config)
+	}
+	if err := validateExtractedAnimationFrameConfigs(configs); err != nil {
+		return nil, err
+	}
+
 	frames := make([]image.Image, 0, len(paths))
 	for _, path := range paths {
 		// paths only contains entries produced by filepath.Glob inside temp.
@@ -121,6 +145,72 @@ func (e ffmpegAnimationFrameExtractor) Extract(
 		return nil, fmt.Errorf("generator: video yielded only %d decodable frame(s)", len(frames))
 	}
 	return frames, nil
+}
+
+func validateExtractedAnimationFrameCount(count int) error {
+	if count > maxAnimationExtractedFrames {
+		return fmt.Errorf(
+			"generator: video yielded %d animation frames; limit is %d",
+			count,
+			maxAnimationExtractedFrames,
+		)
+	}
+	return nil
+}
+
+func decodeAnimationFrameConfig(path string) (image.Config, error) {
+	// path is produced by filepath.Glob inside the private temporary directory.
+	file, err := os.Open(path) //nolint:gosec // The path is constrained to the private temporary directory.
+	if err != nil {
+		return image.Config{}, fmt.Errorf("generator: open extracted animation frame metadata: %w", err)
+	}
+	config, _, decodeErr := image.DecodeConfig(file)
+	closeErr := file.Close()
+	if decodeErr != nil {
+		return image.Config{}, fmt.Errorf("generator: decode extracted animation frame metadata: %w", decodeErr)
+	}
+	if closeErr != nil {
+		return image.Config{}, fmt.Errorf("generator: close extracted animation frame metadata: %w", closeErr)
+	}
+	return config, nil
+}
+
+func validateExtractedAnimationFrameConfigs(configs []image.Config) error {
+	var estimatedBytes int64
+	for index, config := range configs {
+		if config.Width < 1 || config.Height < 1 {
+			return fmt.Errorf(
+				"generator: extracted animation frame %d has invalid dimensions %dx%d",
+				index+1,
+				config.Width,
+				config.Height,
+			)
+		}
+		if config.Width > maxAnimationFrameDimension || config.Height > maxAnimationFrameDimension {
+			return fmt.Errorf(
+				"generator: extracted animation frame %d dimensions %dx%d exceed limit %dx%d",
+				index+1,
+				config.Width,
+				config.Height,
+				maxAnimationFrameDimension,
+				maxAnimationFrameDimension,
+			)
+		}
+
+		framePixels := int64(config.Width) * int64(config.Height)
+		frameBytes := framePixels * animationDecodedBytesPerPixel
+		if frameBytes > maxAnimationDecodedFrameBytes-estimatedBytes {
+			return fmt.Errorf(
+				"generator: decoded animation frames exceed %d MiB memory budget at frame %d (%dx%d)",
+				maxAnimationDecodedFrameBytes>>20,
+				index+1,
+				config.Width,
+				config.Height,
+			)
+		}
+		estimatedBytes += frameBytes
+	}
+	return nil
 }
 
 func resolveFFmpeg(configured string) (string, error) {
