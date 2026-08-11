@@ -13,7 +13,6 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
@@ -43,6 +42,8 @@ type AssetWriter interface {
 type ReferenceStore interface {
 	ResolveReference(context.Context, string) (string, error)
 	PersistReference(context.Context, string) (string, error)
+	NewObjectKey(string) (string, error)
+	PersistReferenceAt(context.Context, string, string) error
 }
 
 // ResourceStore publishes generated resources under stable object keys and
@@ -100,107 +101,6 @@ func NewExecutorWithDependencies(
 		references: dependencies.References,
 		resources:  dependencies.Resources,
 	}
-}
-
-type ProcessedSceneryLayer struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	ImageBase64 string `json:"image_base64"`
-	MediaType   string `json:"media_type"`
-}
-
-const (
-	sceneryLayerPlanSchemaName   = "scenery_layer_plan"
-	sceneryLayerLayoutSchemaName = "scenery_layer_layout"
-	sceneryBatchIDBytes          = 16
-	sceneryCleanupTTL            = 15 * time.Second
-)
-
-var sceneryLayerPlanJSONSchema = json.RawMessage(`{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["layers"],
-  "properties": {
-    "layers": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["name", "creative_brief"],
-        "properties": {
-          "name": {"type": "string", "minLength": 1},
-          "creative_brief": {"type": "string", "minLength": 1}
-        }
-      }
-    }
-  }
-}`)
-
-var sceneryLayerLayoutJSONSchema = json.RawMessage(`{
-  "type":"object","additionalProperties":false,"required":["layers"],"properties":{"layers":{
-    "type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,
-      "required":["id","position","scale","rotation","opacity","zIndex"],"properties":{
-        "id":{"type":"integer","minimum":1},
-        "position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number"},"y":{"type":"number"}}},
-        "scale":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","exclusiveMinimum":0},"y":{"type":"number","exclusiveMinimum":0}}},
-        "rotation":{"type":"number"},"opacity":{"type":"number","minimum":0,"maximum":1},"zIndex":{"type":"integer"}
-      }
-    }
-  }}
-}`)
-
-type sceneryLayerPlanResponse struct {
-	Layers *[]sceneryLayerPlanCandidate `json:"layers"`
-}
-
-type sceneryLayerPlanCandidate struct {
-	Name          *string `json:"name"`
-	CreativeBrief *string `json:"creative_brief"`
-}
-
-type SceneryLayoutVector struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
-type SceneryLayerLayout struct {
-	Position SceneryLayoutVector `json:"position"`
-	Scale    SceneryLayoutVector `json:"scale"`
-	Rotation float64             `json:"rotation"`
-	Opacity  float64             `json:"opacity"`
-	ZIndex   int                 `json:"zIndex"`
-}
-
-type LaidOutSceneryLayer struct {
-	ID          uint               `json:"id"`
-	Name        string             `json:"name"`
-	ImageBase64 string             `json:"image_base64"`
-	MediaType   string             `json:"media_type"`
-	Layout      SceneryLayerLayout `json:"layout"`
-}
-
-type sceneryLayoutResponse struct {
-	Layers *[]sceneryLayoutCandidate `json:"layers"`
-}
-
-type sceneryLayoutCandidate struct {
-	ID       *uint                         `json:"id"`
-	Position *sceneryLayoutVectorCandidate `json:"position"`
-	Scale    *sceneryLayoutVectorCandidate `json:"scale"`
-	Rotation *float64                      `json:"rotation"`
-	Opacity  *float64                      `json:"opacity"`
-	ZIndex   *int                          `json:"zIndex"`
-}
-
-type sceneryLayoutVectorCandidate struct {
-	X *float64 `json:"x"`
-	Y *float64 `json:"y"`
-}
-
-type sceneryTransform struct {
-	Scale    SceneryLayoutVector `json:"scale"`
-	Rotation float64             `json:"rotation"`
 }
 
 func (e *executor) Generate(
@@ -299,63 +199,6 @@ func (e *executor) planSceneryLayers(
 		return nil, fmt.Errorf("%w: LLM returned no completion", ErrInvalidSceneryPlan)
 	}
 	return decodeSceneryLayerPlan(completion.JSON)
-}
-
-func decodeSceneryLayerPlan(raw []byte) ([]SceneryLayerDefinition, error) {
-	invalid := func(reason string) error {
-		return fmt.Errorf("%w: %s", ErrInvalidSceneryPlan, reason)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var response sceneryLayerPlanResponse
-	if err := decoder.Decode(&response); err != nil {
-		return nil, invalid(err.Error())
-	}
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return nil, invalid("trailing data")
-		}
-		return nil, invalid(err.Error())
-	}
-	if response.Layers == nil {
-		return nil, invalid("layers is required")
-	}
-	if len(*response.Layers) == 0 {
-		return nil, invalid("at least one layer is required")
-	}
-
-	layers := make([]SceneryLayerDefinition, len(*response.Layers))
-	names := make(map[string]struct{}, len(layers))
-	for index, candidate := range *response.Layers {
-		if candidate.Name == nil {
-			return nil, invalid(fmt.Sprintf("layer %d name is required", index+1))
-		}
-		name := strings.TrimSpace(*candidate.Name)
-		if name == "" {
-			return nil, invalid(fmt.Sprintf("layer %d name is required", index+1))
-		}
-		normalizedName := strings.ToLower(name)
-		if _, duplicate := names[normalizedName]; duplicate {
-			return nil, invalid(fmt.Sprintf("layer name %q is duplicated", name))
-		}
-		names[normalizedName] = struct{}{}
-
-		if candidate.CreativeBrief == nil {
-			return nil, invalid(fmt.Sprintf("layer %d creative brief is required", index+1))
-		}
-		creativeBrief := strings.TrimSpace(*candidate.CreativeBrief)
-		if creativeBrief == "" {
-			return nil, invalid(fmt.Sprintf("layer %d creative brief is required", index+1))
-		}
-		layers[index] = SceneryLayerDefinition{
-			ID:            uint(index + 1),
-			Name:          name,
-			CreativeBrief: creativeBrief,
-		}
-	}
-	return layers, nil
 }
 
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {
@@ -718,17 +561,19 @@ func (e *executor) generateCharacterPrototype(
 	if err != nil {
 		return nil, err
 	}
-	generated, err := e.generateImages(
+	directionCount := perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateCharacterProtoType,
-		payload.CreativeBrief,
+		prompts.CharacterPrototype(
+			payload.CreativeBrief,
+			payload.Perspective,
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
 		payload.Dimensions,
+		directionCount,
 		payload.Reference,
 	)
-	if err != nil {
-		return nil, err
-	}
-	resources, err := e.prototypeResources(ctx, generated)
 	if err != nil {
 		return nil, err
 	}
@@ -739,7 +584,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.CreativeBrief,
 		perspective,
 		payload.Dimensions,
-		perspective.CharacterDirectionCount(),
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -763,17 +608,19 @@ func (e *executor) generateObjectPrototype(
 	if err != nil {
 		return nil, err
 	}
-	generated, err := e.generateImages(
+	directionCount := perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateObjectProtoType,
-		payload.CreativeBrief,
+		prompts.ObjectPrototype(
+			payload.CreativeBrief,
+			payload.Perspective,
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
 		payload.Dimensions,
+		directionCount,
 		payload.Reference,
 	)
-	if err != nil {
-		return nil, err
-	}
-	resources, err := e.prototypeResources(ctx, generated)
 	if err != nil {
 		return nil, err
 	}
@@ -784,7 +631,7 @@ func (e *executor) generateObjectPrototype(
 		payload.CreativeBrief,
 		perspective,
 		payload.Dimensions,
-		0,
+		directionCount,
 		resources,
 	)
 	if err != nil {
@@ -910,6 +757,156 @@ func (e *executor) generateImages(
 	return processed, nil
 }
 
+func (e *executor) generatePrototypeResources(
+	ctx context.Context,
+	taskType TaskType,
+	prompt string,
+	dimensions assetdomain.Size,
+	directionCount uint,
+	reference string,
+) ([]assetdomain.ImageResource, error) {
+	if directionCount == 0 {
+		return nil, fmt.Errorf("generator: prototype direction count must be positive")
+	}
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return nil, fmt.Errorf("generator: process %s images: dimensions must be positive", taskType)
+	}
+	columns, rows, err := directionGrid(directionCount)
+	if err != nil {
+		return nil, err
+	}
+	references := []string(nil)
+	if reference != "" {
+		if e.references != nil {
+			resolved, resolveErr := e.references.ResolveReference(ctx, reference)
+			if resolveErr != nil {
+				return nil, fmt.Errorf("generator: resolve %s reference: %w", taskType, resolveErr)
+			}
+			reference = resolved
+		}
+		references = []string{reference}
+	}
+	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
+		Prompt:          prompt,
+		ReferenceImages: references,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
+	}
+	if result == nil || len(result.Images) == 0 {
+		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
+	}
+	if len(result.Images) != 1 {
+		return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
+	}
+
+	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
+		ImageBase64: result.Images[0].Base64,
+		MatteColor:  imageprocessor.DefaultMatteColor,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: remove %s background: %w", taskType, err)
+	}
+	if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
+		return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
+	}
+	split, err := e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
+		ImageBase64:           backgroundRemoved.ImageBase64,
+		Mode:                  imageprocessor.ImageSplitModeGrid,
+		Columns:               columns,
+		Rows:                  rows,
+		ForceProportionalGrid: true,
+		CropToContent:         true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: split %s direction sheet: %w", taskType, err)
+	}
+	if split == nil || len(split.Regions) != int(directionCount) {
+		got := 0
+		if split != nil {
+			got = len(split.Regions)
+		}
+		return nil, fmt.Errorf("generator: split %s direction sheet: got %d regions, want %d", taskType, got, directionCount)
+	}
+
+	var baseKey string
+	if e.references != nil {
+		baseKey, err = e.references.NewObjectKey("image/png")
+		if err != nil {
+			return nil, fmt.Errorf("generator: allocate %s image key: %w", taskType, err)
+		}
+	}
+	resources := make([]assetdomain.ImageResource, 0, len(split.Regions))
+	for index, region := range split.Regions {
+		if region.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: split %s direction %d is empty", taskType, index)
+		}
+		unprocessedURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    region.ImageBase64,
+			MediaType: region.MIMEType,
+		})
+		finalKey := ""
+		if e.references != nil {
+			finalKey = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
+			if err := e.references.PersistReferenceAt(
+				ctx,
+				addObjectKeySuffix(finalKey, "-unprocessed"),
+				unprocessedURL,
+			); err != nil {
+				return nil, fmt.Errorf("generator: persist %s direction %d unprocessed image: %w", taskType, index, err)
+			}
+		}
+
+		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+			ImageBase64: region.ImageBase64,
+			Options:     imageprocessor.DefaultResizeOptions(int(dimensions.Width), int(dimensions.Height)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generator: resize %s direction %d image: %w", taskType, index, err)
+		}
+		if resized == nil || resized.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: resize %s direction %d image: empty result", taskType, index)
+		}
+		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    resized.ImageBase64,
+			MediaType: resized.MIMEType,
+		})
+		if e.references != nil {
+			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
+				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
+			}
+			finalURL = finalKey
+		}
+		resources = append(resources, assetdomain.ImageResource{
+			ID:  uint(index + 1),
+			URL: &finalURL,
+		})
+	}
+	return resources, nil
+}
+
+func directionGrid(directionCount uint) (int, int, error) {
+	switch directionCount {
+	case 2:
+		return 2, 1, nil
+	case 4:
+		return 2, 2, nil
+	case 8:
+		return 4, 2, nil
+	default:
+		return 0, 0, fmt.Errorf("generator: unsupported prototype direction count %d", directionCount)
+	}
+}
+
+func addObjectKeySuffix(objectKey, suffix string) string {
+	lastSlash := strings.LastIndex(objectKey, "/")
+	lastDot := strings.LastIndex(objectKey, ".")
+	if lastDot <= lastSlash {
+		return objectKey + suffix
+	}
+	return objectKey[:lastDot] + suffix + objectKey[lastDot:]
+}
+
 func newPrototypeAsset(
 	assetType assetdomain.AssetType,
 	name string,
@@ -949,25 +946,6 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 		return "", fmt.Errorf("generator: invalid perspective %q", perspective)
 	}
 	return value, nil
-}
-
-func (e *executor) prototypeResources(
-	ctx context.Context,
-	result *imageclient.GenerateResult,
-) ([]assetdomain.ImageResource, error) {
-	resources := make([]assetdomain.ImageResource, len(result.Images))
-	for index, image := range result.Images {
-		url := generatedImageDataURL(image)
-		if e.references != nil {
-			objectKey, err := e.references.PersistReference(ctx, url)
-			if err != nil {
-				return nil, fmt.Errorf("generator: persist prototype image %d: %w", index+1, err)
-			}
-			url = objectKey
-		}
-		resources[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &url}
-	}
-	return resources, nil
 }
 
 func (e *executor) animationFrames(

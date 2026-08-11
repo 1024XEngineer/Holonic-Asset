@@ -243,12 +243,6 @@
             "type": "string"
           },
           "gameType": {
-            "enum": [
-              "",
-              "RPG",
-              "ACT",
-              "SLG"
-            ],
             "type": "string"
           },
           "name": {
@@ -455,12 +449,6 @@
             "type": "string"
           },
           "gameType": {
-            "enum": [
-              "",
-              "RPG",
-              "ACT",
-              "SLG"
-            ],
             "type": "string"
           },
           "name": {
@@ -721,12 +709,6 @@
             "type": "string"
           },
           "gameType": {
-            "enum": [
-              "",
-              "RPG",
-              "ACT",
-              "SLG"
-            ],
             "type": "string"
           },
           "id": {
@@ -1480,12 +1462,6 @@
             "type": "string"
           },
           "gameType": {
-            "enum": [
-              "",
-              "RPG",
-              "ACT",
-              "SLG"
-            ],
             "type": "string"
           },
           "name": {

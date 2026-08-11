@@ -1,11 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  ChevronDown,
-  CreditCard,
-  LogOut,
-  Settings,
-  UserRound,
-} from "lucide-react";
+import { ChevronDown, CreditCard, LogOut, Settings } from "lucide-react";
 import { useHoverDropdown } from "./use-hover-dropdown";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  accountProfileUpdatedEvent,
+  defaultAccountProfile,
+  readAccountProfile,
+  type AccountProfile,
+} from "@/model/account";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -33,6 +34,7 @@ function isActivePath(pathname: string, to: string) {
 }
 
 function AccountMenu() {
+  const [profile, setProfile] = useState<AccountProfile>(defaultAccountProfile);
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -46,6 +48,17 @@ function AccountMenu() {
   } = useHoverDropdown();
   const isSettingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
+
+  useEffect(() => {
+    const syncProfile = () => setProfile(readAccountProfile());
+    syncProfile();
+    window.addEventListener(accountProfileUpdatedEvent, syncProfile);
+    window.addEventListener("storage", syncProfile);
+    return () => {
+      window.removeEventListener(accountProfileUpdatedEvent, syncProfile);
+      window.removeEventListener("storage", syncProfile);
+    };
+  }, []);
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
@@ -77,15 +90,19 @@ function AccountMenu() {
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-2">
             <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-                <UserRound className="size-4" />
+              <div className="grid size-9 place-items-center overflow-hidden rounded-lg border border-border bg-transparent">
+                <img
+                  src={profile.avatarUrl ?? "/setting/images.jpg"}
+                  alt="Profile"
+                  className="size-full object-cover"
+                />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-popover-foreground">
-                  Demo User
+                  {profile.name}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  demo@holonicasset.app
+                  {profile.email}
                 </p>
               </div>
             </div>

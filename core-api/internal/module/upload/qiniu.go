@@ -280,31 +280,33 @@ func (s *QiniuStorage) PutObject(
 	if len(data) == 0 {
 		return fmt.Errorf("%w: resource data is required", ErrInvalidObjectData)
 	}
+	return s.putObjectAt(ctx, objectKey, mediaType, data)
+}
 
-	policy := qiniustorage.PutPolicy{
-		Scope:        s.bucket + ":" + objectKey,
-		Expires:      validatedDurationSeconds(s.uploadTokenExpiry),
-		InsertOnly:   1,
-		SaveKey:      objectKey,
-		ForceSaveKey: true,
-		FsizeMin:     int64(len(data)),
-		FsizeLimit:   int64(len(data)),
-		DetectMime:   1,
-		MimeLimit:    mediaType,
+// NewObjectKey allocates an image object key without uploading content.
+func (s *QiniuStorage) NewObjectKey(mediaType string) (string, error) {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(mediaType))
+	if err != nil || !strings.HasPrefix(mediaType, "image/") {
+		return "", fmt.Errorf("%w: concrete image media type is required", ErrInvalidObjectData)
 	}
-	var result qiniustorage.PutRet
-	if err := s.uploader.Put(
-		ctx,
-		&result,
-		policy.UploadToken(s.credentials),
-		objectKey,
-		bytes.NewReader(data),
-		int64(len(data)),
-		&qiniustorage.PutExtra{MimeType: mediaType, UpHost: s.uploadURL},
-	); err != nil {
-		return fmt.Errorf("upload: put object %q: %w", objectKey, err)
+	return s.generateObjectKey(fileExtension(mediaType))
+}
+
+// PersistReferenceAt uploads a generated data URL to an exact object key.
+func (s *QiniuStorage) PersistReferenceAt(
+	ctx context.Context,
+	objectKey string,
+	reference string,
+) error {
+	objectKey = strings.TrimSpace(objectKey)
+	if err := validateObjectKey(objectKey); err != nil {
+		return err
 	}
-	return nil
+	mediaType, data, err := decodeDataURL(strings.TrimSpace(reference))
+	if err != nil {
+		return err
+	}
+	return s.putObjectAt(ctx, objectKey, mediaType, data)
 }
 
 // DeleteObject removes a generated resource that was not published in Asset
@@ -324,10 +326,22 @@ func (s *QiniuStorage) DeleteObject(ctx context.Context, objectKey string) error
 }
 
 func (s *QiniuStorage) putObject(ctx context.Context, mediaType string, data []byte) (string, error) {
-	objectKey, err := s.generateObjectKey(fileExtension(mediaType))
+	objectKey, err := s.NewObjectKey(mediaType)
 	if err != nil {
 		return "", fmt.Errorf("upload: generate object key: %w", err)
 	}
+	if err := s.putObjectAt(ctx, objectKey, mediaType, data); err != nil {
+		return "", err
+	}
+	return objectKey, nil
+}
+
+func (s *QiniuStorage) putObjectAt(
+	ctx context.Context,
+	objectKey string,
+	mediaType string,
+	data []byte,
+) error {
 	policy := qiniustorage.PutPolicy{
 		Scope:        s.bucket + ":" + objectKey,
 		Expires:      validatedDurationSeconds(s.uploadTokenExpiry),
@@ -340,7 +354,7 @@ func (s *QiniuStorage) putObject(ctx context.Context, mediaType string, data []b
 		MimeLimit:    mediaType,
 	}
 	var result qiniustorage.PutRet
-	err = s.uploader.Put(
+	err := s.uploader.Put(
 		ctx,
 		&result,
 		policy.UploadToken(s.credentials),
@@ -350,9 +364,9 @@ func (s *QiniuStorage) putObject(ctx context.Context, mediaType string, data []b
 		&qiniustorage.PutExtra{MimeType: mediaType, UpHost: s.uploadURL},
 	)
 	if err != nil {
-		return "", fmt.Errorf("upload: put object %q: %w", objectKey, err)
+		return fmt.Errorf("upload: put object %q: %w", objectKey, err)
 	}
-	return objectKey, nil
+	return nil
 }
 
 func (s *QiniuStorage) generateObjectKey(suffix string) (string, error) {

@@ -1,8 +1,9 @@
 export { useGenerateAnimationMutation } from "./animation-generation.mutation";
-export type {
-  GenerateAnimationInput,
-  GenerateAnimationRequest,
-  GenerateAnimationResult,
-  GeneratedCharacterAnimation,
-  SpriteAssetKind,
+export {
+  generateAnimationRequestSchema,
+  type GenerateAnimationInput,
+  type GenerateAnimationRequest,
+  type GenerateAnimationResult,
+  type GeneratedCharacterAnimation,
+  type SpriteAssetKind,
 } from "./types";

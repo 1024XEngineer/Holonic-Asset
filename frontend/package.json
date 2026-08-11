@@ -13,6 +13,9 @@
     "format:check": "oxfmt --check",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "pnpm test:coverage:report && pnpm coverage:check",
+    "test:coverage:report": "vitest run --coverage",
+    "coverage:check": "node scripts/check-coverage.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -31,6 +34,7 @@
     "react-dom": "^19.2.7",
     "react-dropzone": "^19.1.1",
     "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
     "zundo": "^2.3.0",
     "zustand": "^5.0.14"
   },
@@ -42,6 +46,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "openapi-typescript": "7.13.0",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.71.0",

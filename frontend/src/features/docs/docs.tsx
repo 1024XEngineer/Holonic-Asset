@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ComponentPropsWithoutRef, ComponentType } from "react";
 import { useScrollSpy } from "@mantine/hooks";
 import { Link } from "@tanstack/react-router";
+import { z } from "zod";
 
 import DirectionsEn, {
   metadata as directionsEn,
@@ -26,7 +27,9 @@ export const articleOrder = [
   "tilesets",
 ] as const;
 
-export type ArticleId = (typeof articleOrder)[number];
+const articleIdSchema = z.enum(articleOrder);
+
+export type ArticleId = z.infer<typeof articleIdSchema>;
 
 const articles: Record<ArticleId, Article> = {
   reference: { Content: ReferenceEn, metadata: referenceEn },
@@ -35,8 +38,8 @@ const articles: Record<ArticleId, Article> = {
   tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
 };
 
-export function isArticleId(value: string): value is ArticleId {
-  return articleOrder.includes(value as ArticleId);
+export function isArticleId(value: unknown): value is ArticleId {
+  return articleIdSchema.safeParse(value).success;
 }
 
 const mdxComponents = {
