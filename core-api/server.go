@@ -124,6 +124,10 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	if candidate, ok := uploadStore.(upload.ReferenceStore); ok {
 		references = candidate
 	}
+	var resources upload.ResourceStore
+	if candidate, ok := uploadStore.(upload.ResourceStore); ok {
+		resources = candidate
+	}
 	taskManager, err := InitTask(ctx, cfg.Queue, taskStore)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
@@ -139,6 +143,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		workspaceModule.Assets,
 		generator.ExecutorDependencies{
 			References: references,
+			Resources:  resources,
 			LLM:        llmService,
 		},
 	)

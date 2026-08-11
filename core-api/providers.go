@@ -91,9 +91,11 @@ func InitGeneratorExecutor(
 	llm llmclient.LLMService,
 	processor imageprocessor.Processor,
 	assets generator.AssetWriter,
+	resources generator.ResourceStore,
 ) generator.Executor {
 	return generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
-		LLM: llm,
+		LLM:       llm,
+		Resources: resources,
 	})
 }
 
