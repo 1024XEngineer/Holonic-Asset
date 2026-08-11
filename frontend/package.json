@@ -16,7 +16,8 @@
     "test:coverage": "pnpm test:coverage:report && pnpm coverage:check",
     "test:coverage:report": "vitest run --coverage",
     "coverage:check": "node scripts/check-coverage.mjs",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

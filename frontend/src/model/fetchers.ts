@@ -9,7 +9,9 @@ export type ApiResponse<T> = {
   data: T;
 };
 
-const apiBaseUrl = import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
+function apiBaseUrl() {
+  return import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
+}
 
 function getJson<T>(
   path: string,
@@ -67,7 +69,7 @@ async function requestJson<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
+    response = await fetch(`${apiBaseUrl()}${path}`, {
       ...asyncRequestInit(body),
       ...init,
     });
