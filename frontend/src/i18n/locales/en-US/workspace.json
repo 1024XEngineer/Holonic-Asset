@@ -1,0 +1,57 @@
+{
+  "home": {
+    "heroTitle": "Make the world. Keep it yours.",
+    "heroDescription": "Holonic Asset helps you generate characters, objects, environments, tilesets, and UI Set assets, then keep every asset in a library with one consistent visual style.",
+    "projectBased": "PROJECT-BASED",
+    "engineReady": "ENGINE-READY",
+    "systemOnline": "CREATIVE SYSTEM ONLINE",
+    "previewAlt": "A complete game asset project preview",
+    "completeSystem": "COMPLETE GAME ASSET SYSTEM",
+    "syncTitle": "One project. Every asset in sync.",
+    "syncDescription": "Generate characters, objects, scenery, tilesets, and UI Set assets in one consistent style, then manage the complete set together.",
+    "disciplines": { "characters": ["Characters", "Sprites + motion"], "objects": ["Objects", "Props + states"], "scenery": ["Scenery", "Scenes + layers"], "tilesets": ["Tilesets", "Tiles + maps"], "uiSet": ["UI Set", "HUD + menus"] },
+    "capabilitiesLabel": "Asset creation capabilities",
+    "explore": "Explore assets",
+    "capabilities": {
+      "characters": { "title": "Characters", "description": "Generate character prototypes (1/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.", "detail": "Prototypes, Spritesheets & SFX", "alt": "Basketball player running south animation", "headline": "Make your characters move" },
+      "objects": { "title": "Objects", "description": "Generate distinctive game objects with consistent style, clear silhouettes, and the visual states needed for your world.", "detail": "Game Objects & Visual States", "alt": "Animated blue object" },
+      "scenery": { "title": "Scenery", "description": "Generate multi-layer backgrounds with parallax sky, wind, and foreground detail for level design.", "detail": "Parallax Scenery Layers", "alt": "Pixel-art scenery sky", "treesAlt": "Pixel-art scenery trees" },
+      "tilesets": { "title": "Tilesets", "description": "Build reusable pixel-art tilesets for streets, interiors, terrain, and seamless game-world construction.", "detail": "Modular Tiles & Map Building", "alt": "Pixel-art interior tileset preview" },
+      "uiSet": { "title": "UI Set", "description": "Design cohesive health bars, inventory panels, skill icon frames, system menus, and UI Set interaction sounds.", "detail": "HUD, Controls & System Menus", "alt": "Pixel-art UI Set preview" },
+      "audio": { "title": "Game Audio & BGM", "description": "Generate action sound effects (SFX) matched with animations, plus immersive looping background music (BGM).", "detail": "Animation SFX & Loopable BGM" }
+    },
+    "workflowTitle": "One workflow from idea to game-ready pipeline.",
+    "workflowDescription": "Holonic Asset connects project visual context, asset prototyping, animation frame generation, and sound effect binding into one structured workflow.",
+    "workflow": [
+      ["Project & Style System", "Define your game type, visual style, and target platform once. Every asset generated in the project follows the same style."],
+      ["Multi-View Prototypes", "Generate character and object prototypes with 1, 4, or 8-directional views (top-down, side-on, isometric) maintaining consistent style."],
+      ["Animations & Bound SFX", "Expand prototypes into 4-16 frame action sequences (Idle, Walk, Attack) and attach generated sound effects directly to animations."],
+      ["Engine-Ready Export", "Export structured Spritesheets, Parallax Scenery Layers, Tilemaps, UI Set components, and audio files ready for Unity or Godot."]
+    ],
+    "closingEyebrow": "YOUR NEXT WORLD STARTS HERE",
+    "closingTitle": "Make the first asset. Then build everything around it.",
+    "startProject": "Start a project",
+    "tryGeneration": "Try image generation",
+    "footerDescription": "AI-powered game asset creation for characters, environments, UI Set assets, and consistent project libraries.",
+    "footerNavigation": "Footer navigation"
+    ,"projectStory": {
+      "organizedByProject": "ORGANIZED BY PROJECT",
+      "sceneLayers": "SCENE LAYERS",
+      "consistencyFeature": "CONSISTENCY IS A FEATURE",
+      "title": "Not a folder of outputs. A complete game asset library.",
+      "description": "Every project keeps the game type, platform, and visual style in one place so new assets stay consistent. Assets stay grouped by type, from characters and objects to scenery, tilesets, and UI Set assets.",
+      "details": "Keep useful details attached to every asset: canvas size, perspective, tags, scene layers, and revision history. Your library stays understandable as the game grows.",
+      "openWorkspace": "See the project workspace",
+      "imageAlt": "A multi-layer game scenery project",
+      "layers": {
+        "foreground": ["Foreground", "Trees and close-range detail"],
+        "atmosphere": ["Atmosphere", "Wind, depth and movement"],
+        "background": ["Background", "Sky and distant worldbuilding"]
+      }
+    }
+  },
+  "actions": { "cancel": "Cancel", "delete": "Delete asset", "save": "Save changes", "tryAgain": "Try again", "close": "Close", "back": "Back", "newProject": "New Project", "newAsset": "New asset", "create": "Create", "creating": "Creating..." },
+  "project": { "assetLibrary": "Asset Library", "edit": "Edit project", "reference": "Reference", "save": "Save changes", "gameType": "Game type", "perspective": "Perspective", "platform": "Target platform", "describeGameType": "Describe the game type", "projectOverview": "Project overview", "overviewDescription": "Upload an image that represents the game world, characters, and visual language together.", "overviewSource": "Project overview source", "generatedOverview": "Generated project overview", "generate": "Generate", "upload": "Upload", "regeneratePreview": "Regenerate preview", "generatePreview": "Generate preview", "uploadOverview": "Upload project overview image", "gameDescription": "Game description", "next": "Next", "blank": "Blank project", "blankDescription": "Open a flexible workspace. Add context if useful, or create an asset immediately.", "existing": "Existing game", "existingDescription": "Import a playable link or upload a local build so we can learn its direction.", "importTitle": "Import an existing game", "importDescription": "Share a playable link or upload a local game build to begin its project setup.", "gameLink": "Game link", "localFiles": "Local files", "playableUrl": "Playable URL", "chooseBuild": "Choose a game build", "continue": "Continue", "existingUrl": "https://your-game.example", "idea": "I have an idea", "ideaDescription": "Describe the game, generate a visual direction, and refine it until it feels right.", "projectName": "Project name", "projectNamePlaceholder": "e.g. Moonlit Orchard", "gameDescriptionPlaceholder": "What is the player doing? What should the world feel like?", "startTitle": "Where would you like to start?", "startPrompt": "Pick the option that best matches where you are today.", "tellGameTitle": "Tell us about your game", "detailsPrompt": "Add a few details to help shape your project.", "startBlankTitle": "Start with as little as you like", "blankPrompt": "Give your project a name. You can add details whenever you are ready.", "previous": "Previous", "submit": "Submit" },
+  "generation": { "assetName": "Asset name", "creativeBrief": "Creative brief", "audioNamePlaceholder": "e.g. Orchard at Night", "characterNamePlaceholder": "e.g. Orchard Keeper", "objectNamePlaceholder": "e.g. Moonlit Lantern", "audioPromptPlaceholder": "Describe the mood, instruments, rhythm, and intended use...", "promptPlaceholder": "Describe the subject, material, mood, and details to generate...", "useContext": "Use {{name}} project context", "context": "Generation context", "createError": "Unable to create the asset. Please try again.", "reference": "Reference", "referenceImage": "Reference image", "layerCount": "Layer count", "scenePlaceholder": "Describe the overall scene style...", "aspectPlaceholder": "e.g. 16:9", "layoutComponents": "Layout components", "componentName": "Component name", "uiStylePlaceholder": "Describe the overall UI Set style...", "directionCount": "Direction count", "generateAnimation": "Generate animation", "motionPlaceholder": "Describe the motion, timing, and pose...", "castSpellPlaceholder": "e.g. Cast spell", "newAsset": "New asset", "createKind": "Create {{kind}}", "queue": "Generation queue", "task_one": "task", "task_other": "tasks", "failed": "failed" },
+  "assets": { "openEditor": "Open asset editor", "copy": "Copy asset", "editDetails": "Edit asset details", "deleteConfirm": "Delete {{name}}?", "deleteDescription": "This removes the asset and its saved records from this project. This action cannot be undone.", "tags": "Tags", "filter": "Filter assets by type", "assetType": "Asset type", "showAll": "Show all types", "search": "Search assets", "searchPlaceholder": "Search names, tags, or descriptions", "clearSearch": "Clear search", "selectProject": "Select a project", "selectProjectDescription": "Choose a project from the sidebar to open its asset library.", "loading": "Loading assets", "loadError": "Unable to load assets", "noMatching": "No matching assets", "none": "No assets yet", "trySearch": "Try another search or show more asset types.", "empty": "Assets created for this project will appear here.", "reset": "Reset filters" }
+}

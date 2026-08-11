@@ -3,6 +3,7 @@ import {
   Camera,
   Check,
   CreditCard,
+  ChevronDown,
   IdCard,
   Monitor,
   Moon,
@@ -20,10 +21,25 @@ import {
   type ThemePreference,
 } from "@/lib/theme-preference";
 import { z } from "zod";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useTranslation } from "react-i18next";
+import { changeLanguage } from "@/i18n";
+import {
+  readLanguagePreference,
+  supportedLanguages,
+  type Language,
+} from "@/lib/language-preference";
 
 const emailSchema = z.string().trim().email();
 
 export function Settings() {
+  const { t } = useTranslation(["settings", "common", "navigation"]);
   const [profile] = useState(readAccountProfile);
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
@@ -31,6 +47,8 @@ export function Settings() {
   const [avatarUrl, setAvatarUrl] = useState<string>();
   const [profileSaved, setProfileSaved] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
+  const [language, setLanguage] = useState<Language>(readLanguagePreference);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schedule } = useTimeout();
   const hasValidEmail = emailSchema.safeParse(email).success;
@@ -41,9 +59,9 @@ export function Settings() {
       <main className="w-full px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto max-w-4xl space-y-5">
           <SettingsSection
-            description="The details shown across your Holonic Asset workspace."
+            description={t("settings:profile.description")}
             icon={<IdCard />}
-            title="Profile"
+            title={t("settings:profile.title")}
           >
             <form
               className="space-y-5"
@@ -62,13 +80,13 @@ export function Settings() {
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
-                      alt="Profile"
+                      alt={t("navigation:profileImageAlt")}
                       className="size-full object-cover"
                     />
                   ) : (
                     <img
                       src="/setting/images.jpg"
-                      alt="Profile"
+                      alt={t("navigation:profileImageAlt")}
                       className="size-full object-cover"
                     />
                   )}
@@ -98,12 +116,15 @@ export function Settings() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Camera />
-                  Change photo
+                  {t("settings:profile.changePhoto")}
                 </Button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Display name" htmlFor="settings-display-name">
+                <Field
+                  label={t("settings:profile.displayName")}
+                  htmlFor="settings-display-name"
+                >
                   <Input
                     id="settings-display-name"
                     value={name}
@@ -113,7 +134,10 @@ export function Settings() {
                     }}
                   />
                 </Field>
-                <Field label="Email" htmlFor="settings-email">
+                <Field
+                  label={t("settings:profile.email")}
+                  htmlFor="settings-email"
+                >
                   <Input
                     id="settings-email"
                     aria-describedby={
@@ -135,7 +159,7 @@ export function Settings() {
                       id="settings-email-error"
                       className="text-sm text-destructive"
                     >
-                      Enter a valid email address.
+                      {t("settings:profile.invalidEmail")}
                     </p>
                   ) : null}
                 </Field>
@@ -143,30 +167,30 @@ export function Settings() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                 <p className="text-sm text-muted-foreground" aria-live="polite">
-                  {profileSaved ? "Profile saved." : ""}
+                  {profileSaved ? t("settings:profile.saved") : ""}
                 </p>
                 <Button type="submit" disabled={!name.trim() || !hasValidEmail}>
                   {profileSaved ? <Check /> : null}
-                  Save profile
+                  {t("settings:profile.save")}
                 </Button>
               </div>
             </form>
           </SettingsSection>
 
           <SettingsSection
-            description="Choose how the workspace looks and opens for you."
+            description={t("settings:preferences.description")}
             icon={<Monitor />}
-            title="Preferences"
+            title={t("settings:preferences.title")}
           >
             <div className="space-y-1">
               <PreferenceRow
-                description="Use a light, dark, or system appearance."
-                label="Appearance"
+                description={t("settings:preferences.appearanceDescription")}
+                label={t("settings:preferences.appearance")}
               >
                 <div className="flex rounded-lg border bg-muted/30 p-1">
                   <ThemeButton
                     active={theme === "light"}
-                    label="Light"
+                    label={t("settings:preferences.light")}
                     onClick={() => {
                       setTheme("light");
                       saveThemePreference("light");
@@ -176,7 +200,7 @@ export function Settings() {
                   </ThemeButton>
                   <ThemeButton
                     active={theme === "dark"}
-                    label="Dark"
+                    label={t("settings:preferences.dark")}
                     onClick={() => {
                       setTheme("dark");
                       saveThemePreference("dark");
@@ -186,24 +210,66 @@ export function Settings() {
                   </ThemeButton>
                 </div>
               </PreferenceRow>
+              <PreferenceRow
+                description={t("settings:language.description")}
+                label={t("common:language")}
+              >
+                <DropdownMenu
+                  open={languageMenuOpen}
+                  onOpenChange={setLanguageMenuOpen}
+                >
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-w-40 justify-between"
+                        aria-label={t("common:language")}
+                      />
+                    }
+                  >
+                    {t(`common:languages.${language}`)}
+                    <ChevronDown className="size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-40">
+                    <DropdownMenuRadioGroup
+                      value={language}
+                      onValueChange={(value) => {
+                        const nextLanguage = value as Language;
+                        setLanguage(nextLanguage);
+                        void changeLanguage(nextLanguage);
+                        setLanguageMenuOpen(false);
+                      }}
+                    >
+                      {supportedLanguages.map((value) => (
+                        <DropdownMenuRadioItem key={value} value={value}>
+                          {t(`common:languages.${value}`)}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </PreferenceRow>
             </div>
           </SettingsSection>
 
           <SettingsSection
-            description="A quick view of the generation resources available to this account."
+            description={t("settings:plan.description")}
             icon={<CreditCard />}
-            title="Plan & credits"
+            title={t("settings:plan.title")}
           >
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
               <div className="border-l-2 border-primary pl-3">
                 <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                  Current plan
+                  {t("settings:plan.current")}
                 </p>
-                <p className="mt-1 text-lg font-semibold">Starter</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {t("navigation:starter")}
+                </p>
               </div>
               <div className="border-l-2 border-primary pl-3">
                 <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                  Available credits
+                  {t("settings:plan.available")}
                 </p>
                 <p className="mt-1 text-lg font-semibold">1,280</p>
               </div>
@@ -212,7 +278,7 @@ export function Settings() {
                 variant="outline"
                 className="sm:justify-self-end"
               >
-                Manage plan
+                {t("settings:plan.manage")}
               </Button>
             </div>
           </SettingsSection>

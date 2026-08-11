@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { BlankProjectFlow } from "./blank-project-flow";
 import { ExistingGameFlow } from "./existing-game-flow";
@@ -10,6 +11,7 @@ export interface NewProjectWorkspaceProps {
 }
 
 export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
+  const { t } = useTranslation("workspace");
   const { backToLibrary, form } = project;
   const { selectedStart } = form;
   const isBlank = selectedStart === "blank";
@@ -23,7 +25,7 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         className="absolute left-4 top-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:left-6 sm:top-6"
       >
         <ArrowLeft className="size-4" />
-        Back
+        {t("actions.back")}
       </button>
       <div
         className={`mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6 ${
@@ -35,16 +37,16 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {selectedStart
                 ? isBlank
-                  ? "Start with as little as you like"
-                  : "Tell us about your game"
-                : "Where would you like to start?"}
+                  ? t("project.startBlankTitle")
+                  : t("project.tellGameTitle")
+                : t("project.startTitle")}
             </h1>
             <p className="mt-2 text-muted-foreground">
               {selectedStart
                 ? isBlank
-                  ? "Give your project a name. You can add details whenever you are ready."
-                  : "Add a few details to help shape your project."
-                : "Pick the option that best matches where you are today."}
+                  ? t("project.blankPrompt")
+                  : t("project.detailsPrompt")
+                : t("project.startPrompt")}
             </p>
           </div>
         </div>

@@ -1,0 +1,10 @@
+{
+  "loadingTitle": "正在加载工作区",
+  "loadingDescription": "正在准备下一个工作区。",
+  "errorTitle": "无法打开此工作区",
+  "unexpectedError": "加载此页面时发生意外错误。",
+  "notFoundTitle": "页面不存在",
+  "notFoundDescription": "此地址与应用中的工作区不匹配。",
+  "tryAgain": "重试",
+  "projectLibrary": "前往项目库"
+}

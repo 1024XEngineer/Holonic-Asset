@@ -1,10 +1,12 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { Badge } from "@/components/ui/badge";
 import { isGenerationRunActive, type GenerationRun } from "@/model/generation";
 
 export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
+  const { t } = useTranslation("workspace");
   if (runs.length === 0) return null;
   const hasActiveRuns = runs.some(isGenerationRunActive);
 
@@ -20,10 +22,13 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
           ) : (
             <AlertCircle className="size-4 text-destructive" />
           )}
-          Generation queue
+          {t("generation.queue")}
         </h2>
         <Badge variant="secondary">
-          {runs.length} {runs.length === 1 ? "task" : "tasks"}
+          {runs.length}{" "}
+          {t(
+            runs.length === 1 ? "generation.task_one" : "generation.task_other",
+          )}
         </Badge>
       </div>
       <div className="mt-3 divide-y border-y" aria-live="polite">
@@ -50,7 +55,7 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
                 ) : (
                   <LoaderCircle className="animate-spin" />
                 )}
-                {run.status}
+                {run.status === "failed" ? t("generation.failed") : run.status}
               </Badge>
             </div>
           );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "@tanstack/react-form";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function ProjectSettingsDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (project: ProjectSummary) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const [imageError, setImageError] = useState<string>();
   const imageReadController = useRef<AbortController | null>(null);
   const form = useForm({
@@ -52,7 +54,7 @@ export function ProjectSettingsDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit project</DialogTitle>
+          <DialogTitle>{t("project.edit")}</DialogTitle>
           <DialogDescription>
             These defaults guide every asset generated inside this project.
           </DialogDescription>
@@ -80,7 +82,7 @@ export function ProjectSettingsDialog({
             <form.Field name="gameType">
               {(field) => (
                 <DropdownField
-                  label="Game type"
+                  label={t("project.gameType")}
                   value={field.state.value}
                   options={[...editableProjectContextOptions.gameTypes]}
                   onChange={(value) => {
@@ -94,7 +96,7 @@ export function ProjectSettingsDialog({
             <form.Field name="perspective">
               {(field) => (
                 <DropdownField
-                  label="Perspective"
+                  label={t("project.perspective")}
                   value={field.state.value}
                   options={projectContextOptions.perspectives}
                   onChange={(value) => {
@@ -114,7 +116,7 @@ export function ProjectSettingsDialog({
                         Custom game type
                         <Input
                           required
-                          placeholder="Describe the game type"
+                          placeholder={t("project.describeGameType")}
                           value={field.state.value}
                           onChange={(event) =>
                             field.handleChange(event.target.value)
@@ -130,7 +132,7 @@ export function ProjectSettingsDialog({
               <form.Field name="platform">
                 {(field) => (
                   <DropdownField
-                    label="Target platform"
+                    label={t("project.platform")}
                     value={field.state.value}
                     options={[...projectContextOptions.platforms]}
                     onChange={field.handleChange}
@@ -154,7 +156,7 @@ export function ProjectSettingsDialog({
           <form.Field name="visualDirection">
             {(field) => (
               <div>
-                <p className="text-sm font-medium">Reference</p>
+                <p className="text-sm font-medium">{t("project.reference")}</p>
                 <ImageDropzone
                   className="mt-2 h-28"
                   previewUrl={field.state.value || undefined}
@@ -190,7 +192,7 @@ export function ProjectSettingsDialog({
             <DialogClose render={<Button type="button" variant="outline" />}>
               Cancel
             </DialogClose>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit">{t("project.save")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

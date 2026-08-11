@@ -1,4 +1,5 @@
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export function AssetFilters({
   selectedKinds: AssetKind[];
   onSelectedKindsChange: (kinds: AssetKind[]) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const hiddenTypeCount = assetKinds.length - selectedKinds.length;
 
   const toggleKind = (kind: AssetKind, checked: boolean) => {
@@ -46,8 +48,8 @@ export function AssetFilters({
             type="button"
             variant="outline"
             size="icon-lg"
-            aria-label="Filter assets by type"
-            title="Filter assets by type"
+            aria-label={t("assets.filter")}
+            title={t("assets.filter")}
           />
         }
       >
@@ -55,7 +57,7 @@ export function AssetFilters({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Asset type</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("assets.assetType")}</DropdownMenuLabel>
           {assetKinds.map((kind) => (
             <DropdownMenuCheckboxItem
               key={kind}
@@ -78,7 +80,7 @@ export function AssetFilters({
               onClick={() => onSelectedKindsChange([...assetKinds])}
             >
               <RotateCcw />
-              Show all types
+              {t("assets.showAll")}
             </DropdownMenuItem>
           </>
         ) : null}

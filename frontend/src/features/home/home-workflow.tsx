@@ -1,34 +1,10 @@
 import { useState } from "react";
-
-const workflow = [
-  {
-    number: "01",
-    title: "Project & Style System",
-    description:
-      "Define your game type, visual style, and target platform once. Every asset generated in the project follows the same style.",
-  },
-  {
-    number: "02",
-    title: "Multi-View Prototypes",
-    description:
-      "Generate character and object prototypes with 1, 4, or 8-directional views (top-down, side-on, isometric) maintaining consistent style.",
-  },
-  {
-    number: "03",
-    title: "Animations & Bound SFX",
-    description:
-      "Expand prototypes into 4–16 frame action sequences (Idle, Walk, Attack) and attach generated sound effects directly to animations.",
-  },
-  {
-    number: "04",
-    title: "Engine-Ready Export",
-    description:
-      "Export structured Spritesheets, Parallax Scenery Layers, Tilemaps, UI Set components, and audio files ready for Unity or Godot.",
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export function HomeWorkflow() {
+  const { t } = useTranslation("workspace");
   const [activeStep, setActiveStep] = useState("01");
+  const workflow = ["01", "02", "03", "04"] as const;
 
   return (
     <section
@@ -41,17 +17,14 @@ export function HomeWorkflow() {
             id="workflow-heading"
             className="max-w-4xl text-5xl leading-[0.94] font-semibold tracking-[-0.06em] sm:text-6xl lg:text-7xl"
           >
-            One workflow from idea to game-ready pipeline.
+            {t("home.workflowTitle")}
           </h2>
           <p className="max-w-md text-sm leading-7 text-neutral-700 lg:justify-self-end">
-            Holonic Asset connects project visual context, asset prototyping,
-            animation frame generation, and sound effect binding into one
-            structured workflow.
+            {t("home.workflowDescription")}
           </p>
         </div>
-
         <ol className="mt-16 grid border-t border-neutral-950/30 sm:grid-cols-2 lg:grid-cols-4">
-          {workflow.map(({ description, number, title }) => (
+          {workflow.map((number, index) => (
             <li
               key={number}
               className="border-b border-neutral-950/30 py-8 lg:border-r lg:border-b-0 lg:px-6 lg:first:pl-0 lg:last:border-r-0"
@@ -68,12 +41,12 @@ export function HomeWorkflow() {
                   {number}
                 </span>
                 <h3 className="mt-10 text-xl font-semibold tracking-tight">
-                  {title}
+                  {t(`home.workflow.${index}.0`)}
                 </h3>
                 <p
                   className={`mt-3 text-sm leading-6 transition-opacity ${activeStep === number ? "text-neutral-950 opacity-100" : "text-neutral-700 opacity-65 group-hover:opacity-100"}`}
                 >
-                  {description}
+                  {t(`home.workflow.${index}.1`)}
                 </p>
                 <span
                   className={`mt-5 block h-1 origin-left bg-neutral-950 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${activeStep === number ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"}`}

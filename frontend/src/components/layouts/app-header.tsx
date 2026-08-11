@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, CreditCard, LogOut, Settings } from "lucide-react";
 import { useHoverDropdown } from "./use-hover-dropdown";
@@ -20,13 +21,6 @@ import {
   type AccountProfile,
 } from "@/model/account";
 
-const navItems = [
-  { to: "/", label: "Home" },
-  { to: "/generate", label: "Image" },
-  { to: "/projects", label: "Project" },
-  { to: "/docs", label: "Docs" },
-] as const;
-
 function isActivePath(pathname: string, to: string) {
   return to === "/"
     ? pathname === "/"
@@ -34,6 +28,7 @@ function isActivePath(pathname: string, to: string) {
 }
 
 function AccountMenu() {
+  const { t } = useTranslation("navigation");
   const [profile, setProfile] = useState<AccountProfile>(defaultAccountProfile);
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -72,7 +67,7 @@ function AccountMenu() {
             "bg-foreground text-background hover:bg-foreground hover:text-background",
         )}
       >
-        Account{" "}
+        {t("account")}{" "}
         <ChevronDown
           className={cn(
             "size-3.5 transition-transform",
@@ -93,7 +88,7 @@ function AccountMenu() {
               <div className="grid size-9 place-items-center overflow-hidden rounded-lg border border-border bg-transparent">
                 <img
                   src={profile.avatarUrl ?? "/setting/images.jpg"}
-                  alt="Profile"
+                  alt={t("profileImageAlt")}
                   className="size-full object-cover"
                 />
               </div>
@@ -110,13 +105,13 @@ function AccountMenu() {
         </DropdownMenuGroup>
         <div className="grid grid-cols-2 gap-2 px-2 py-2">
           <div className="rounded-lg border bg-muted/50 p-2">
-            <p className="text-xs text-muted-foreground">Credits</p>
+            <p className="text-xs text-muted-foreground">{t("credits")}</p>
             <p className="mt-1 text-lg font-semibold">1,280</p>
           </div>
           <div className="rounded-lg border bg-muted/50 p-2">
-            <p className="text-xs text-muted-foreground">Plan</p>
+            <p className="text-xs text-muted-foreground">{t("plan")}</p>
             <Badge variant="secondary" className="mt-1">
-              Starter
+              {t("starter")}
             </Badge>
           </div>
         </div>
@@ -126,17 +121,17 @@ function AccountMenu() {
             render={<Link to="/settings" onClick={releaseMenu} />}
           >
             <Settings />
-            Settings
+            {t("settings")}
           </DropdownMenuItem>
           <DropdownMenuItem>
             <CreditCard />
-            Billing &amp; credits
+            {t("billing")}
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={releaseMenu}>
           <LogOut />
-          Log out
+          {t("logout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -144,6 +139,7 @@ function AccountMenu() {
 }
 
 export function AppHeader() {
+  const { t } = useTranslation("navigation");
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -173,7 +169,12 @@ export function AppHeader() {
           </Link>
         </div>
         <div className="flex items-center justify-center gap-1 sm:gap-2">
-          {navItems.map(({ to, label }) => {
+          {[
+            ["/", "home"],
+            ["/generate", "image"],
+            ["/projects", "project"],
+            ["/docs", "docs"],
+          ].map(([to, key]) => {
             const active = isActivePath(pathname, to);
             return (
               <Link
@@ -186,7 +187,7 @@ export function AppHeader() {
                     "bg-foreground text-background hover:bg-foreground hover:text-background",
                 )}
               >
-                {label}
+                {t(key)}
               </Link>
             );
           })}

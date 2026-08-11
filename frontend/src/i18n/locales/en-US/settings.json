@@ -1,0 +1,6 @@
+{
+  "profile": { "title": "Profile", "description": "The details shown across your Holonic Asset workspace.", "changePhoto": "Change photo", "displayName": "Display name", "email": "Email", "invalidEmail": "Enter a valid email address.", "saved": "Profile saved.", "save": "Save profile" },
+  "preferences": { "title": "Preferences", "description": "Choose how the workspace looks and opens for you.", "appearance": "Appearance", "appearanceDescription": "Use a light or dark appearance.", "light": "Light", "dark": "Dark" },
+  "language": { "description": "Choose the language used throughout the workspace." },
+  "plan": { "title": "Plan & credits", "description": "A quick view of the generation resources available to this account.", "current": "Current plan", "available": "Available credits", "manage": "Manage plan" }
+}

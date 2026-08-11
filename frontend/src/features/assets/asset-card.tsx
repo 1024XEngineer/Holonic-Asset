@@ -1,4 +1,5 @@
 import { Copy, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ export function AssetCard({
   onOpenEditor?: () => void;
   projectId?: string;
 }) {
+  const { t } = useTranslation("workspace");
   const kindConfig = getAssetKindConfig(asset.kind);
 
   return (
@@ -69,7 +71,9 @@ export function AssetCard({
               />
             }
           />
-          <TooltipContent side="bottom">Open asset editor</TooltipContent>
+          <TooltipContent side="bottom">
+            {t("assets.openEditor")}
+          </TooltipContent>
         </Tooltip>
       ) : null}
       <div className="min-w-0">
@@ -82,7 +86,10 @@ export function AssetCard({
                 {asset.description}
               </p>
               {asset.tags.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1" aria-label="Tags">
+                <div
+                  className="mt-2 flex flex-wrap gap-1"
+                  aria-label={t("assets.tags")}
+                >
                   {asset.tags.map((tag) => (
                     <Badge
                       key={tag}
@@ -126,7 +133,7 @@ export function AssetCard({
           >
             {isCopying ? <LoaderCircle className="animate-spin" /> : <Copy />}
           </TooltipTrigger>
-          <TooltipContent>Copy asset</TooltipContent>
+          <TooltipContent>{t("assets.copy")}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -147,7 +154,7 @@ export function AssetCard({
           >
             <Pencil />
           </TooltipTrigger>
-          <TooltipContent>Edit asset details</TooltipContent>
+          <TooltipContent>{t("assets.editDetails")}</TooltipContent>
         </Tooltip>
         <AlertDialog>
           <Tooltip>
@@ -166,20 +173,21 @@ export function AssetCard({
                 <Trash2 />
               </AlertDialogTrigger>
             </TooltipTrigger>
-            <TooltipContent>Delete asset</TooltipContent>
+            <TooltipContent>{t("actions.delete")}</TooltipContent>
           </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete {asset.name}?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t("assets.deleteConfirm", { name: asset.name })}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                This removes the asset and its saved records from this project.
-                This action cannot be undone.
+                {t("assets.deleteDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={onDelete}>
-                Delete asset
+                {t("actions.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

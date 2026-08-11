@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Gamepad2, Link2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export function ExistingGameFlow({
   active: boolean;
   project: NewProjectController;
 }) {
+  const { t } = useTranslation("workspace");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { existingGameImport } = project;
 
@@ -30,8 +32,8 @@ export function ExistingGameFlow({
   return (
     <>
       <ProjectStartCard
-        title="Existing game"
-        description="Import a playable link or upload a local build so we can learn its direction."
+        title={t("project.existing")}
+        description={t("project.existingDescription")}
         icon={<Gamepad2 size={20} />}
         onSelect={project.start.openExistingGameImport}
       />
@@ -41,10 +43,9 @@ export function ExistingGameFlow({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Import an existing game</DialogTitle>
+            <DialogTitle>{t("project.importTitle")}</DialogTitle>
             <DialogDescription>
-              Share a playable link or upload a local game build to begin its
-              project setup.
+              {t("project.importDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
@@ -52,21 +53,21 @@ export function ExistingGameFlow({
               variant={existingGameImport.mode === "link" ? "default" : "ghost"}
               onClick={existingGameImport.selectLink}
             >
-              <Link2 /> Game link
+              <Link2 /> {t("project.gameLink")}
             </Button>
             <Button
               variant={existingGameImport.mode === "file" ? "default" : "ghost"}
               onClick={existingGameImport.selectFile}
             >
-              <Upload /> Local files
+              <Upload /> {t("project.localFiles")}
             </Button>
           </div>
           {existingGameImport.mode === "link" ? (
             <label className="grid gap-2 text-sm font-medium">
-              Playable URL
+              {t("project.playableUrl")}
               <Input
                 type="url"
-                placeholder="https://your-game.example"
+                placeholder={t("project.existingUrl")}
                 value={existingGameImport.gameUrl}
                 onChange={(event) =>
                   existingGameImport.setGameUrl(event.target.value)
@@ -93,14 +94,15 @@ export function ExistingGameFlow({
               >
                 <span>
                   <Upload className="mx-auto mb-2 size-5 text-muted-foreground" />
-                  {existingGameImport.gameFile?.name ?? "Choose a game build"}
+                  {existingGameImport.gameFile?.name ??
+                    t("project.chooseBuild")}
                 </span>
               </button>
             </>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={existingGameImport.dismiss}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               disabled={
@@ -110,7 +112,7 @@ export function ExistingGameFlow({
               }
               onClick={existingGameImport.continue}
             >
-              Continue
+              {t("project.continue")}
             </Button>
           </DialogFooter>
         </DialogContent>

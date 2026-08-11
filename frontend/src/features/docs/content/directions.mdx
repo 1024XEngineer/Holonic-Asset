@@ -3,33 +3,34 @@ import {
   FourDirectionExample,
   OneDirectionExample,
 } from "@/features/docs/direction-examples";
+import { DocText } from "../doc-text";
 
 export const metadata = { title: "1 / 4 / 8 directions" };
 
-## Direction count defines how freely a character can move.
+## <DocText i18nKey="directions.heading" />
 
-A direction is one view of the same character. More directions make movement more natural, but each added view must preserve pose, equipment, and lighting.
+<DocText i18nKey="directions.intro" />
 
-## Match direction count to real movement
+## <DocText i18nKey="directions.match" />
 
-### One direction
+### <DocText i18nKey="directions.oneTitle" />
 
-Use one direction for static portraits, side-view characters, or objects with a fixed orientation.
+<DocText i18nKey="directions.oneBody" />
 
 <OneDirectionExample />
 
-### Four directions
+### <DocText i18nKey="directions.fourTitle" />
 
-Use front, back, left, and right as the practical starting point for top-down movement.
+<DocText i18nKey="directions.fourBody" />
 
 <FourDirectionExample />
 
-Each view should retain the same silhouette, weapon position, and lighting direction. This swordsman set shows the four cardinal views needed for a top-down character.
+<DocText i18nKey="directions.fourNote" />
 
-### Eight directions
+### <DocText i18nKey="directions.eightTitle" />
 
-Add the four diagonals when the game includes diagonal movement, aiming, or smoother turning. Do not select eight directions by default; they need more consistency work.
+<DocText i18nKey="directions.eightBody" />
 
 <EightDirectionExample />
 
-The basketball player set adds north-west, north-east, south-west, and south-east views. Compare each diagonal with its neighboring cardinal directions before using it in animation.
+<DocText i18nKey="directions.eightNote" />

@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 
@@ -14,6 +15,7 @@ export function CreateAssetToolbar({
   assetKinds: CreatableAssetKind[];
   project: ProjectSummary;
 }) {
+  const { t } = useTranslation("workspace");
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -59,7 +61,7 @@ export function CreateAssetToolbar({
         onClick={() => setPinned((current) => !current)}
       >
         <Plus data-icon="inline-start" />
-        New asset
+        {t("generation.newAsset")}
         <ChevronDown
           className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
           aria-hidden="true"
@@ -92,7 +94,9 @@ export function CreateAssetToolbar({
                 }}
               >
                 <AssetKindIcon kind={kind} className="size-4" />
-                Create {getAssetKindConfig(kind).label}
+                {t("generation.createKind", {
+                  kind: getAssetKindConfig(kind).label,
+                })}
               </Button>
             ))}
           </div>

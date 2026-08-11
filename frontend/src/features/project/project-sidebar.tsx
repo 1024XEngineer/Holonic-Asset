@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   AlertDialog,
@@ -34,6 +35,7 @@ export function ProjectSidebar({
 }: {
   library: ProjectLibraryProjectModel;
 }) {
+  const { t } = useTranslation("workspace");
   const [isOpen, setIsOpen] = useState(readProjectSidebarOpen);
   const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
@@ -87,7 +89,9 @@ export function ProjectSidebar({
               <p className="text-xs font-semibold uppercase text-muted-foreground">
                 Projects
               </p>
-              <h2 className="truncate text-lg font-semibold">Asset Library</h2>
+              <h2 className="truncate text-lg font-semibold">
+                {t("project.assetLibrary")}
+              </h2>
             </div>
           ) : null}
           <Button
@@ -119,7 +123,7 @@ export function ProjectSidebar({
               onClick={() => void create()}
             >
               <Plus data-icon="inline-start" />
-              New Project
+              {t("actions.newProject")}
             </Button>
             <div className="space-y-2">
               {items.map((project) => (
@@ -167,7 +171,9 @@ export function ProjectSidebar({
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>
+                          {t("actions.cancel")}
+                        </AlertDialogCancel>
                         <AlertDialogAction
                           variant="destructive"
                           onClick={() => void remove(project.id)}
@@ -185,7 +191,7 @@ export function ProjectSidebar({
           <div className="hidden min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:flex">
             <Button
               type="button"
-              aria-label="New Project"
+              aria-label={t("actions.newProject")}
               variant="outline"
               size="icon-lg"
               onClick={() => void create()}
@@ -199,7 +205,7 @@ export function ProjectSidebar({
         <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:hidden">
           <Button
             type="button"
-            aria-label="New Project"
+            aria-label={t("actions.newProject")}
             variant="outline"
             size="icon-lg"
             onClick={() => void create()}

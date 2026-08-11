@@ -5,6 +5,7 @@ import { AppProviders } from "@/app/providers";
 import { router } from "@/app/router";
 import "@/app/styles/index.css";
 import { initializeThemePreference } from "@/lib/theme-preference";
+import "@/i18n";
 
 initializeThemePreference();
 createRoot(document.getElementById("root")!).render(
