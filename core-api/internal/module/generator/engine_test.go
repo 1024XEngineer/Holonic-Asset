@@ -490,8 +490,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 3 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected three implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 4 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected four implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
