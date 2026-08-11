@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 const (
@@ -78,6 +81,38 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		value.Reference, err = prepare(value.Reference)
 		return value, err
+	case CreateSceneryPayload:
+		if e.projects == nil {
+			return nil, ErrProjectReaderRequired
+		}
+		project, err := e.projects.GetDetail(ctx, projectID)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load project %d context: %w", projectID, err)
+		}
+		if project == nil {
+			return nil, fmt.Errorf("generator: load project %d context: empty result", projectID)
+		}
+		value.Perspective = string(project.Perspective)
+		value.ProjectContext = SceneryProjectContext{
+			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(string(project.GameType)),
+			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
+		}
+		if strings.TrimSpace(value.Style) == "" {
+			value.Style = strings.TrimSpace(project.Style)
+		}
+		if strings.TrimSpace(value.Reference) == "" {
+			value.Reference = project.Reference
+		}
+		if e.references != nil && strings.TrimSpace(value.Reference) != "" {
+			value.Reference, err = e.references.PersistReference(ctx, value.Reference)
+			if err != nil {
+				return nil, fmt.Errorf("generator: persist reference: %w", err)
+			}
+		}
+		if err := validateSceneryPayload(value); err != nil {
+			return nil, err
+		}
+		return value, nil
 	case CreateTileSetPayload:
 		var err error
 		value.Reference, err = prepare(value.Reference)
@@ -108,6 +143,22 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
+		return payload, nil
+	case GenerateScenery:
+		parameters := struct {
+			AssetName  string           `json:"asset_name"`
+			Style      string           `json:"style"`
+			Dimensions assetdomain.Size `json:"dimensions"`
+			Reference  string           `json:"reference"`
+		}{}
+		if err := decodeStrictSceneryParameters(request.Parameters, &parameters); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidSceneryPayload, err)
+		}
+		payload := CreateSceneryPayload{AssetName: parameters.AssetName, CreativeBrief: request.CreativeBrief,
+			Style: parameters.Style, Dimensions: parameters.Dimensions, Reference: parameters.Reference, ProjectID: request.ProjectID}
+		if err := validateSceneryPayload(payload); err != nil {
+			return nil, err
+		}
 		return payload, nil
 	case GenerateAnimation:
 		payload := CreateAnimationPayload{}
@@ -150,6 +201,43 @@ func decodeParameters(request *Request, payload any) error {
 	}
 	if err := json.Unmarshal(request.Parameters, payload); err != nil {
 		return fmt.Errorf("generator: decode %s parameters: %w", request.Kind, err)
+	}
+	return nil
+}
+
+func decodeStrictSceneryParameters(raw json.RawMessage, payload any) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(payload); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("trailing data")
+		}
+		return err
+	}
+	return nil
+}
+
+func validateSceneryPayload(payload CreateSceneryPayload) error {
+	invalid := func(reason string) error { return fmt.Errorf("%w: %s", ErrInvalidSceneryPayload, reason) }
+	if payload.ProjectID == 0 || strings.TrimSpace(payload.AssetName) == "" || strings.TrimSpace(payload.CreativeBrief) == "" {
+		return invalid("project ID, asset name, and creative brief are required")
+	}
+	dimensions, err := json.Marshal(payload.Dimensions)
+	if err != nil {
+		return invalid("dimensions are invalid")
+	}
+	if err := assetdomain.ValidateDimensions(assetdomain.AssetTypeScenery, dimensions); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidSceneryPayload, err)
+	}
+	if !assetdomain.Perspective(payload.Perspective).Valid() {
+		return invalid("project perspective is invalid")
 	}
 	return nil
 }
