@@ -68,7 +68,9 @@ describe("toCreateProjectInput", () => {
       perspective: "Top-Down",
       reference: "",
     });
-    expect(toCreateProjectInput(draft)).toMatchObject({
+    expect(
+      toCreateProjectInput({ ...draft, name: "New project" }),
+    ).toMatchObject({
       description: "A new game asset workspace.",
       visualDirection: "",
     });
