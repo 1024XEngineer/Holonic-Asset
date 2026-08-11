@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CreatableAssetKind } from "@/model/asset";
 
-import { createAssetCreationDraft, toCreationRequest } from "./AssetCreation";
+import { createAssetCreationDraft, toCreationRequest } from "./asset-creation";
 
 const kinds: CreatableAssetKind[] = [
   "character",

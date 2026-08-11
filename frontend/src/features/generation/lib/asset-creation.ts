@@ -4,7 +4,7 @@ import { getDefaultAssetCanvasSize } from "@/model";
 import { perspectiveOptions, perspectiveSchema } from "@/model/project";
 import { z } from "zod";
 
-import type { AssetCreationDraft } from "./AssetCreation.interface";
+import type { AssetCreationDraft } from "../types";
 
 const commonAssetCreationDraftShape = {
   name: z.string().trim().min(1, "Asset name is required."),

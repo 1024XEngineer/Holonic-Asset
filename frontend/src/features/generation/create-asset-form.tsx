@@ -14,8 +14,8 @@ import {
   assetCreationDraftSchema,
   createAssetCreationDraft,
   toCreationRequest,
-  type AssetCreationDraft,
-} from "./types";
+} from "./lib";
+import type { AssetCreationDraft } from "./types";
 import { TilesetAssetFields } from "./create-asset/tileset-asset-fields";
 import { VisualAssetFields } from "./create-asset/visual-asset-fields";
 import { SceneryAssetFields } from "./create-asset/scenery-asset-fields";
