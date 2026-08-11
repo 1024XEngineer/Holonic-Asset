@@ -8,7 +8,6 @@ export type CreationRequest<Reference = unknown> = {
   prompt: string;
   canvasSize: string;
   perspective?: Perspective;
-  directionCount?: "1" | "4" | "8";
   reference?: Reference;
   useProjectContext: boolean;
   style?: string;
