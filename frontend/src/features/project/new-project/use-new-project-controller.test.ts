@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   generateReference: vi.fn(),
   navigate: vi.fn(),
   readFileAsDataUrl: vi.fn(),
+  stateIndex: 0,
+  stateOverrides: new Map<number, unknown>(),
   setters: [] as ReturnType<typeof vi.fn>[],
 }));
 
@@ -25,9 +27,15 @@ vi.mock("react", async (importOriginal) => {
     useMemo: (factory: () => unknown) => factory(),
     useRef: <T>(value: T) => ({ current: value }),
     useState: (initial: unknown) => {
+      const index = mocks.stateIndex++;
       const setter = vi.fn();
       mocks.setters.push(setter);
-      return [typeof initial === "function" ? initial() : initial, setter];
+      const value = mocks.stateOverrides.has(index)
+        ? mocks.stateOverrides.get(index)
+        : typeof initial === "function"
+          ? initial()
+          : initial;
+      return [value, setter];
     },
   };
 });
@@ -58,6 +66,8 @@ import { useNewProjectController } from "./use-new-project-controller";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.stateIndex = 0;
+  mocks.stateOverrides.clear();
   mocks.setters.length = 0;
   mocks.formOptions = undefined;
   mocks.createProject.mockResolvedValue({ id: "project-7" });
@@ -74,6 +84,7 @@ describe("useNewProjectController", () => {
 
     expect(mocks.createProject).toHaveBeenCalledWith({
       name: "Untitled game",
+      reference: "",
       visualDirection: "",
     });
     expect(mocks.navigate).toHaveBeenCalledWith({
@@ -117,6 +128,44 @@ describe("useNewProjectController", () => {
       expect.any(AbortSignal),
     );
     expect(mocks.form.setFieldValue).toHaveBeenLastCalledWith("reference", "");
+  });
+
+  it("keeps the form reference synchronized with the selected preview", async () => {
+    mocks.stateOverrides.set(6, "generated.png");
+    mocks.stateOverrides.set(7, "uploaded.png");
+    mocks.stateOverrides.set(10, "upload");
+    const controller = useNewProjectController();
+
+    controller.preview.selectGenerate();
+    controller.preview.selectUpload();
+    await mocks.formOptions!.onSubmit({ value: { name: "Project" } });
+
+    expect(mocks.form.setFieldValue).toHaveBeenCalledWith(
+      "reference",
+      "generated.png",
+    );
+    expect(mocks.form.setFieldValue).toHaveBeenCalledWith(
+      "reference",
+      "uploaded.png",
+    );
+    expect(mocks.createProject).toHaveBeenCalledWith({
+      name: "Project",
+      reference: "uploaded.png",
+      visualDirection: "uploaded.png",
+    });
+  });
+
+  it("does not use a local game build filename as an image reference", () => {
+    mocks.stateOverrides.set(3, "file");
+    mocks.stateOverrides.set(
+      5,
+      new File(["build"], "game.zip", { type: "application/zip" }),
+    );
+    const controller = useNewProjectController();
+
+    controller.existingGameImport.continue();
+
+    expect(mocks.form.setFieldValue).toHaveBeenCalledWith("reference", "");
   });
 
   it("resets the form for a chosen start and returns to the library", () => {

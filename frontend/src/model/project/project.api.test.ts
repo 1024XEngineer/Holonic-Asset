@@ -52,7 +52,7 @@ const input: CreateProjectInput = {
 const remoteProject: ProjectResponse = {
   id: 7,
   name: input.name,
-  gameType: "RPG",
+  gameType: "Role-playing game",
   targetPlatform: "PC",
   description: input.description,
   reference: input.reference,
@@ -152,9 +152,15 @@ describe("projectApi", () => {
       ...coreFields(input),
       reference: "",
     });
+
+    const customInput = { ...input, gameType: "Deck-building roguelike" };
+    await projectApi.generateReference(customInput);
+    expect(mocks.core.generateReference).toHaveBeenLastCalledWith(
+      coreFields(customInput),
+    );
   });
 
-  it("maps API labels and unsupported fields into project summaries", () => {
+  it("preserves game types from the current string contract", () => {
     expect(toProjectSummary(remoteProject)).toMatchObject({
       id: "7",
       gameType: "Role-playing game",
@@ -162,15 +168,18 @@ describe("projectApi", () => {
       assetCount: 0,
     });
     expect(
+      toProjectSummary({ ...remoteProject, gameType: "Rhythm game" }),
+    ).toMatchObject({ gameType: "Rhythm game" });
+    expect(
       toProjectSummary({ ...remoteProject, gameType: "", targetPlatform: "" }),
-    ).toMatchObject({ gameType: "Unspecified", platform: "" });
+    ).toMatchObject({ gameType: "", platform: "" });
   });
 });
 
 function coreFields(project: CreateProjectInput | ProjectSummary) {
   return {
     name: project.name,
-    gameType: project.gameType === "Role-playing game" ? "RPG" : "",
+    gameType: project.gameType,
     perspective: project.perspective,
     targetPlatform: "PC",
     description: project.description,
