@@ -9,7 +9,7 @@ export type ApiResponse<T> = {
   data: T;
 };
 
-const apiBaseUrl = import.meta.env.VITE_CORE_API_BASE_URL ?? "/api/v1";
+const apiBaseUrl = import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
 
 function getJson<T>(
   path: string,
