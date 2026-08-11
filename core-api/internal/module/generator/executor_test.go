@@ -157,12 +157,23 @@ type generationAssetWriterStub struct {
 	animationID      uint
 	frames           []assetdomain.Frame
 	err              error
+	detailErr        error
+	recordErr        error
+	detailResult     *assetdomain.Asset
+	nilRecord        bool
+	emptyRecord      bool
 	asset            assetdomain.Asset
 }
 
 func (s *generationAssetWriterStub) GetDetail(_ context.Context, assetID uint) (assetdomain.Asset, error) {
+	if s.detailErr != nil {
+		return assetdomain.Asset{}, s.detailErr
+	}
 	if s.err != nil {
 		return assetdomain.Asset{}, s.err
+	}
+	if s.detailResult != nil {
+		return *s.detailResult, nil
 	}
 	if s.asset.ID != 0 {
 		return s.asset, nil
@@ -234,11 +245,17 @@ func (s *generationAssetWriterStub) CreateRecord(
 		copy.Content = append(json.RawMessage(nil), record.Content...)
 		s.createdRecord = &copy
 	}
+	if s.recordErr != nil {
+		return nil, s.recordErr
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
+	if s.nilRecord {
+		return nil, nil //nolint:nilnil // Exercise the executor's defensive empty-result check.
+	}
 	version := s.recordVersion
-	if version == 0 {
+	if version == 0 && !s.emptyRecord {
 		version = 2
 	}
 	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
@@ -424,6 +441,190 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 		t.Fatalf("record must be created after generated images are persisted: %v", events)
 	}
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, Version: 3})
+}
+
+func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
+	wantLoadErr := errors.New("asset unavailable")
+	wantResolveErr := errors.New("reference unavailable")
+	wantRecordErr := errors.New("record unavailable")
+
+	tests := []struct {
+		name      string
+		payload   json.RawMessage
+		configure func(*generationAssetWriterStub, *referenceStoreStub)
+		wantErr   error
+		wantText  string
+		withStore bool
+	}{
+		{
+			name:     "malformed payload",
+			payload:  json.RawMessage(`{`),
+			wantText: "decode edit_character_prototype execution payload",
+		},
+		{
+			name: "asset load failure",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				assets.detailErr = wantLoadErr
+			},
+			wantErr: wantLoadErr,
+		},
+		{
+			name: "asset not found",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				assets.detailResult = &assetdomain.Asset{}
+			},
+			wantText: "character asset 7 not found",
+		},
+		{
+			name: "wrong asset type",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Type = assetdomain.AssetTypeObject
+				assets.detailResult = &asset
+			},
+			wantText: "unsupported for asset type",
+		},
+		{
+			name: "invalid perspective",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Perspective = assetdomain.Perspective("sideways")
+				assets.detailResult = &asset
+			},
+			wantText: "invalid perspective",
+		},
+		{
+			name: "malformed dimensions",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Dimensions = json.RawMessage(`{`)
+				assets.detailResult = &asset
+			},
+			wantText: "decode asset 7 dimensions",
+		},
+		{
+			name: "nonpositive dimensions",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Dimensions = json.RawMessage(`{"width":0,"height":64}`)
+				assets.detailResult = &asset
+			},
+			wantText: "dimensions must be positive",
+		},
+		{
+			name: "malformed content",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Content = json.RawMessage(`{`)
+				assets.detailResult = &asset
+			},
+			wantText: "decode character asset 7 content",
+		},
+		{
+			name: "missing prototype",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Content = json.RawMessage(`{}`)
+				assets.detailResult = &asset
+			},
+			wantText: "prototype images are required",
+		},
+		{
+			name: "missing prototype URL",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				asset := editableCharacterAsset()
+				asset.Content = json.RawMessage(`{"prototype":[{"id":1}]}`)
+				assets.detailResult = &asset
+			},
+			wantText: "prototype image 1 URL is required",
+		},
+		{
+			name: "reference resolution failure",
+			configure: func(_ *generationAssetWriterStub, references *referenceStoreStub) {
+				references.resolveErr = wantResolveErr
+			},
+			wantErr:   wantResolveErr,
+			withStore: true,
+		},
+		{
+			name: "record creation failure",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				assets.recordErr = wantRecordErr
+			},
+			wantErr: wantRecordErr,
+		},
+		{
+			name: "nil record",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				assets.nilRecord = true
+			},
+			wantText: "version: empty result",
+		},
+		{
+			name: "zero record version",
+			configure: func(assets *generationAssetWriterStub, _ *referenceStoreStub) {
+				assets.emptyRecord = true
+			},
+			wantText: "version: empty result",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			asset := editableCharacterAsset()
+			assets := &generationAssetWriterStub{events: &events, detailResult: &asset}
+			references := &referenceStoreStub{events: &events}
+			if tt.configure != nil {
+				tt.configure(assets, references)
+			}
+
+			var executor generator.Executor
+			if tt.withStore {
+				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+			} else {
+				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+			}
+			payload := tt.payload
+			if payload == nil {
+				payload = json.RawMessage(`{"asset_id":7,"edit_instructions":"make the cape blue"}`)
+			}
+
+			_, err := executor.Generate(context.Background(), generator.EditCharacterProtoType, payload)
+			if err == nil {
+				t.Fatal("expected edit failure")
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected wrapped error %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantText != "" && !strings.Contains(err.Error(), tt.wantText) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantText, err)
+			}
+		})
+	}
+}
+
+func editableCharacterAsset() assetdomain.Asset {
+	return assetdomain.Asset{
+		ID:          7,
+		Name:        "hero",
+		ProjectID:   11,
+		Type:        assetdomain.AssetTypeCharacter,
+		Description: "a red knight carrying a steel spear",
+		Perspective: assetdomain.PerspectiveTopDown,
+		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
+		Content: json.RawMessage(`{
+			"directionCount":4,
+			"prototype":[
+				{"id":1,"url":"assets/hero/up.png"},
+				{"id":2,"url":"assets/hero/right.png"},
+				{"id":3,"url":"assets/hero/down.png"},
+				{"id":4,"url":"assets/hero/left.png"}
+			]
+		}`),
+		Version: 2,
+	}
 }
 
 func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyInput(t *testing.T) {

@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -117,6 +118,7 @@ type recordContentDaoStub struct {
 	dao.AssetContentDao
 	contents map[uint]dao.AssetContent
 	nextID   uint
+	getErr   error
 }
 
 func (s *recordContentDaoStub) CreateAssetContent(_ context.Context, content *dao.AssetContent) (dao.AssetContent, error) {
@@ -140,6 +142,9 @@ func (s *recordContentDaoStub) CreateAssetContents(_ context.Context, contents [
 }
 
 func (s *recordContentDaoStub) GetAssetContent(_ context.Context, id uint) (dao.AssetContent, error) {
+	if s.getErr != nil {
+		return dao.AssetContent{}, s.getErr
+	}
 	return s.contents[id], nil
 }
 
@@ -201,6 +206,25 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
 		t.Fatalf("asset current pointer was not updated: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.T) {
+	currentContentID := uint(4)
+	wantErr := testingError("content unavailable")
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao: &recordAssetDaoStub{asset: dao.Asset{
+			ID:        7,
+			Version:   2,
+			ContentID: &currentContentID,
+		}},
+		ContentDao: &recordContentDaoStub{getErr: wantErr},
+		RecordDao:  &recordDaoStub{records: map[uint]dao.AssetRecord{}},
+	}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected content lookup error %v, got %v", wantErr, err)
 	}
 }
 
