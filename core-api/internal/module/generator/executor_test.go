@@ -22,6 +22,23 @@ type imageGenerationServiceStub struct {
 	err     error
 }
 
+type animationGenerationServiceStub struct {
+	events  *[]string
+	request *generator.AnimationGenerationRequest
+	result  *generator.AnimationGenerationResult
+	err     error
+}
+
+func (s *animationGenerationServiceStub) Generate(
+	_ context.Context,
+	request *generator.AnimationGenerationRequest,
+) (*generator.AnimationGenerationResult, error) {
+	*s.events = append(*s.events, "generate_animation")
+	copy := *request
+	s.request = &copy
+	return s.result, s.err
+}
+
 type imageProcessorStub struct {
 	events         *[]string
 	resizeRequests []*imageprocessor.ResizeRequest
@@ -34,12 +51,13 @@ type referenceUpload struct {
 }
 
 type referenceStoreStub struct {
-	resolved   []string
-	persisted  []string
-	uploads    []referenceUpload
-	events     *[]string
-	resolveErr error
-	persistErr error
+	resolved     []string
+	persisted    []string
+	persistValue string
+	uploads      []referenceUpload
+	events       *[]string
+	resolveErr   error
+	persistErr   error
 }
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
@@ -54,6 +72,9 @@ func (s *referenceStoreStub) PersistReference(_ context.Context, reference strin
 	s.persisted = append(s.persisted, reference)
 	if s.persistErr != nil {
 		return "", s.persistErr
+	}
+	if s.persistValue != "" {
+		return s.persistValue, nil
 	}
 	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
 }
@@ -146,6 +167,8 @@ func (s *imageGenerationServiceStub) Generate(
 
 type generationAssetWriterStub struct {
 	events           *[]string
+	parentAsset      assetdomain.Asset
+	getDetailErr     error
 	characterAsset   *assetdomain.Asset
 	objectAsset      *assetdomain.Asset
 	prototypeAssetID uint
@@ -165,12 +188,24 @@ type generationAssetWriterStub struct {
 	asset            assetdomain.Asset
 }
 
-func (s *generationAssetWriterStub) GetDetail(_ context.Context, assetID uint) (assetdomain.Asset, error) {
+func (s *generationAssetWriterStub) GetDetail(
+	_ context.Context,
+	assetID uint,
+) (assetdomain.Asset, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "get_asset")
+	}
+	if s.getDetailErr != nil {
+		return assetdomain.Asset{}, s.getDetailErr
+	}
 	if s.detailErr != nil {
 		return assetdomain.Asset{}, s.detailErr
 	}
 	if s.err != nil {
 		return assetdomain.Asset{}, s.err
+	}
+	if s.parentAsset.ID == assetID {
+		return s.parentAsset, nil
 	}
 	if s.detailResult != nil {
 		return *s.detailResult, nil
@@ -214,13 +249,16 @@ func (s *generationAssetWriterStub) CreateAnimation(
 	_ context.Context,
 	assetID uint,
 	name string,
+	frames []assetdomain.Frame,
 ) (uint, error) {
 	*s.events = append(*s.events, "create_animation")
 	s.animationAssetID = assetID
 	s.animationName = name
+	s.frames = append([]assetdomain.Frame(nil), frames...)
 	if s.err != nil {
 		return 0, s.err
 	}
+	s.animationID = 3
 	return 3, nil
 }
 
@@ -260,20 +298,6 @@ func (s *generationAssetWriterStub) CreateRecord(
 	}
 	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
 }
-
-func (s *generationAssetWriterStub) UpdateAnimationFrames(
-	_ context.Context,
-	assetID uint,
-	animationID uint,
-	frames []assetdomain.Frame,
-) error {
-	*s.events = append(*s.events, "update_animation_frames")
-	s.animationAssetID = assetID
-	s.animationID = animationID
-	s.frames = append([]assetdomain.Frame(nil), frames...)
-	return s.err
-}
-
 func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{
@@ -386,6 +410,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 		"creative_brief":"pixel knight",
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
+		"direction_count":"4",
 		"reference":"projects/7/reference.png",
 		"project_id":11
 	}`)
@@ -442,7 +467,6 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"wooden chest",
 		"dimensions":{"width":128,"height":128},
 		"perspective":"Isometric",
-		"direction_count":"4",
 		"project_id":12
 	}`)
 
@@ -472,6 +496,13 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	if assets.objectAsset.Perspective != assetdomain.PerspectiveIsometric {
 		t.Fatalf("unexpected object perspective: %q", assets.objectAsset.Perspective)
+	}
+	content, err := assets.objectAsset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode object content: %v", err)
+	}
+	if content.DirectionCount != 8 {
+		t.Fatalf("unexpected object content: %+v", content)
 	}
 	if images.request == nil || !strings.Contains(images.request.Prompt, "<direction_count>\n8\n</direction_count>") {
 		t.Fatalf("object prompt did not include derived direction count: %+v", images.request)
@@ -729,99 +760,378 @@ func editableObjectAsset() assetdomain.Asset {
 }
 
 func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
-	tests := []generator.TaskType{
-		generator.GenerateAnimation,
+	events := []string{}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{
+				{Index: 0, ImageBase64: "first", MIMEType: "image/png"},
+				{Index: 1, ImageBase64: "second", MIMEType: "image/png"},
+			},
+			VideoRequestID:  "request-1",
+			VideoAttempts:   1,
+			FrameDurationMS: 100,
+		},
 	}
-	for _, taskType := range tests {
-		t.Run(string(taskType), func(t *testing.T) {
-			events := []string{}
-			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
-			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
-			payload := json.RawMessage(`{
-				"asset_name":"walk",
-				"creative_brief":"walking cycle",
-				"parent_id":7,
-				"project_id":11
-			}`)
+	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+	references := &referenceStoreStub{}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, references)
+	payload := json.RawMessage(`{
+		"animation_name":"  walk  ",
+		"creative_brief":"walking cycle",
+		"asset_id":7,
+		"project_id":11,
+		"direction":"back_right",
+		"style":"painted pixel art",
+		"frame_count":8,
+		"columns":4,
+		"frame_width":128,
+		"frame_height":128,
+		"fps":12,
+		"resolution":"1080p",
+		"duration":8,
+		"aspect_ratio":"1:1"
+	}`)
 
-			result, err := executor.Generate(context.Background(), taskType, payload)
-			if err != nil {
-				t.Fatalf("generate animation: %v", err)
-			}
-			if !reflect.DeepEqual(events, []string{
-				"generate_image",
-				"resize_image",
-				"create_animation",
-				"update_animation_frames",
-			}) {
-				t.Fatalf("unexpected workflow order: %v", events)
-			}
-			if images.request == nil || images.request.Prompt != "walking cycle" ||
-				len(images.request.ReferenceImages) != 0 || images.request.Size != "" {
-				t.Fatalf("unexpected image request: %+v", images.request)
-			}
-			if assets.animationAssetID != 7 || assets.animationID != 3 ||
-				assets.animationName != "walk" || len(assets.frames) != 1 {
-				t.Fatalf("unexpected animation update: %+v", assets)
-			}
-			if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
-				*assets.frames[0].URL != "data:image/png;base64,sheet" {
-				t.Fatalf("unexpected animation frames: %+v", assets.frames)
-			}
-			assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
-		})
+	result, err := executor.Generate(context.Background(), generator.GenerateAnimation, payload)
+	if err != nil {
+		t.Fatalf("generate animation: %v", err)
 	}
+	if !reflect.DeepEqual(events, []string{
+		"get_asset",
+		"generate_animation",
+		"create_animation",
+	}) {
+		t.Fatalf("unexpected workflow order: %v", events)
+	}
+	wantRequest := &generator.AnimationGenerationRequest{
+		Description:            "silver-haired knight",
+		Style:                  "painted pixel art",
+		Action:                 "walking cycle",
+		ReferenceImage:         "https://cdn.example.com/hero/direction_03-unprocessed.png?version=7",
+		ReferenceImagePrepared: false,
+		FrameCount:             8,
+		Columns:                4,
+		FrameWidth:             128,
+		FrameHeight:            128,
+		FPS:                    12,
+		Resolution:             "1080p",
+		Duration:               8,
+		AspectRatio:            "1:1",
+	}
+	if !reflect.DeepEqual(animations.request, wantRequest) {
+		t.Fatalf("unexpected animation request: got %+v want %+v", animations.request, wantRequest)
+	}
+	if assets.animationAssetID != 7 || assets.animationID != 3 ||
+		assets.animationName != "walk" || len(assets.frames) != 2 {
+		t.Fatalf("unexpected animation update: %+v", assets)
+	}
+	if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
+		*assets.frames[0].URL != "uploads/generated-1.png" ||
+		assets.frames[0].Duration != 100 ||
+		assets.frames[1].ID != 2 || assets.frames[1].URL == nil ||
+		*assets.frames[1].URL != "uploads/generated-2.png" ||
+		assets.frames[1].Duration != 100 {
+		t.Fatalf("unexpected animation frames: %+v", assets.frames)
+	}
+	if len(assets.frames[0].Metadata) != 0 || len(assets.frames[1].Metadata) != 0 {
+		t.Fatalf("animation frames should not persist generator metadata: %+v", assets.frames)
+	}
+	if !reflect.DeepEqual(references.persisted, []string{
+		"data:image/png;base64,first",
+		"data:image/png;base64,second",
+	}) {
+		t.Fatalf("unexpected persisted animation frame inputs: %v", references.persisted)
+	}
+	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
 }
 
-func TestExecutorRejectsAnimationForNonFrameAssetTypes(t *testing.T) {
-	for _, assetType := range []assetdomain.AssetType{
-		assetdomain.AssetTypeTileSet,
-		assetdomain.AssetTypeUISet,
-		assetdomain.AssetTypeScenery,
-		assetdomain.AssetTypeAudio,
-	} {
-		t.Run(string(assetType), func(t *testing.T) {
+func TestExecutorRejectsMissingAnimationIdentityBeforeLookup(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload json.RawMessage
+		want    string
+	}{
+		{
+			name:    "asset id",
+			payload: json.RawMessage(`{"animation_name":"walk"}`),
+			want:    "animation asset is required",
+		},
+		{
+			name:    "animation name",
+			payload: json.RawMessage(`{"animation_name":"   ","asset_id":7}`),
+			want:    "animation name is required",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			events := []string{}
-			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
-			assets := &generationAssetWriterStub{
-				events: &events,
-				asset: assetdomain.Asset{
-					ID:         7,
-					Type:       assetType,
-					Dimensions: json.RawMessage(`{"width":64,"height":64}`),
-				},
-			}
-			executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+			animations := &animationGenerationServiceStub{events: &events}
+			assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+			executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
 
-			_, err := executor.Generate(context.Background(), generator.GenerateAnimation, json.RawMessage(`{"parent_id":7}`))
-			if err == nil {
-				t.Fatal("expected unsupported asset type error")
+			_, err := executor.Generate(context.Background(), generator.GenerateAnimation, tt.payload)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
 			}
 			if len(events) != 0 {
-				t.Fatalf("animation should stop before image generation: %v", events)
+				t.Fatalf("animation validation should run before asset lookup or generation: %v", events)
 			}
 		})
 	}
 }
 
-func TestExecutorDoesNotMutateAssetsWhenImageGenerationFails(t *testing.T) {
-	wantErr := errors.New("provider unavailable")
+func TestExecutorRejectsNonObjectKeyAnimationFrameReference(t *testing.T) {
 	events := []string{}
-	images := &imageGenerationServiceStub{events: &events, err: wantErr}
-	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame", MIMEType: "image/png"}},
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+	references := &referenceStoreStub{persistValue: "https://private.example/frame.png?token=temporary"}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, references)
 
 	_, err := executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
-		json.RawMessage(`{"asset_name":"walk","parent_id":7}`),
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"front"}`),
+	)
+	if err == nil || !strings.Contains(err.Error(), "storage returned a non-object-key reference") {
+		t.Fatalf("expected object-key validation error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
+		t.Fatalf("asset should not change when frame persistence is invalid: %v", events)
+	}
+}
+
+func TestExecutorDoesNotMutateAssetsWhenAnimationGenerationFails(t *testing.T) {
+	wantErr := errors.New("provider unavailable")
+	events := []string{}
+	animations := &animationGenerationServiceStub{events: &events, err: wantErr}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err := executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"front"}`),
 	)
 	if !errors.Is(err, wantErr) {
-		t.Fatalf("expected image generation error, got %v", err)
+		t.Fatalf("expected animation generation error, got %v", err)
 	}
-	if !reflect.DeepEqual(events, []string{"generate_image"}) {
-		t.Fatalf("asset changed before image generation succeeded: %v", events)
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
+		t.Fatalf("asset changed before animation generation succeeded: %v", events)
+	}
+}
+
+func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
+	events := []string{}
+	referenceLeft := "https://cdn.example.com/hero/left.png"
+	referenceRight := "https://cdn.example.com/hero/right.png"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 2
+	prototype := assetdomain.Prototype{
+		{ID: 1, URL: &referenceLeft},
+		{ID: 2, URL: &referenceRight},
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded}
+	animations := &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"left"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate left animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/hero/left-unprocessed.png" {
+		t.Fatalf("left direction mapped to wrong reference: %+v", animations.request)
+	}
+
+	events = nil
+	animations = &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
+	assets = &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor = generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"right"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate right animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/hero/right-unprocessed.png" {
+		t.Fatalf("right direction mapped to wrong reference: %+v", animations.request)
+	}
+}
+
+func TestExecutorGeneratesObjectAnimationForSelectedDirection(t *testing.T) {
+	events := []string{}
+	prototypeURLs := []string{
+		"https://cdn.example.com/chest/front.png",
+		"https://cdn.example.com/chest/right.png",
+		"https://cdn.example.com/chest/back.png",
+		"https://cdn.example.com/chest/left.png",
+	}
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeObject)
+	content.DirectionCount = 4
+	prototype := assetdomain.Prototype{}
+	for index, value := range prototypeURLs {
+		url := value
+		prototype = append(prototype, assetdomain.ImageResource{ID: uint(index + 1), URL: &url})
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{
+		ID:          8,
+		ProjectID:   11,
+		Type:        assetdomain.AssetTypeObject,
+		Name:        "chest",
+		Description: "wooden treasure chest",
+		Content:     encoded,
+	}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}},
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"open","asset_id":8,"project_id":11,"direction":"right","creative_brief":"slowly open the chest lid, then close it"}`),
+	)
+	if err != nil {
+		t.Fatalf("generate object animation: %v", err)
+	}
+	if animations.request.ReferenceImage != "https://cdn.example.com/chest/right-unprocessed.png" {
+		t.Fatalf("object animation mapped to wrong reference: %+v", animations.request)
+	}
+	if animations.request.Action != "slowly open the chest lid, then close it" {
+		t.Fatalf("unexpected object action: %+v", animations.request)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "create_animation"}) {
+		t.Fatalf("unexpected object animation workflow: %v", events)
+	}
+}
+
+func TestExecutorRejectsObjectAnimationWithoutDirection(t *testing.T) {
+	events := []string{}
+	reference := "https://cdn.example.com/chest/front.png"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeObject)
+	content.DirectionCount = 4
+	prototype := assetdomain.Prototype{{ID: 1, URL: &reference}}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{ID: 8, ProjectID: 11, Type: assetdomain.AssetTypeObject, Name: "chest", Content: encoded}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(context.Background(), generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"open","asset_id":8,"direction":""}`))
+	if err == nil || !strings.Contains(err.Error(), "animation direction is required") {
+		t.Fatalf("expected required object direction error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start without direction: %v", events)
+	}
+}
+
+func TestExecutorRejectsUnsupportedSingleDirectionAsset(t *testing.T) {
+	events := []string{}
+	reference := "https://cdn.example.com/hero/front.png"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 1
+	prototype := assetdomain.Prototype{{ID: 1, URL: &reference}}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := assetdomain.Asset{
+		ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded,
+	}
+	animations := &animationGenerationServiceStub{events: &events}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":"front"}`),
+	)
+	if err == nil || !strings.Contains(err.Error(), "direction count must be one of 2, 4, or 8") {
+		t.Fatalf("expected unsupported direction-count error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start for unsupported direction count: %v", events)
+	}
+}
+
+func TestExecutorRejectsAnimationDirectionOutsidePrototypeOrder(t *testing.T) {
+	events := []string{}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err := executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"up"}`),
+	)
+	if err == nil || !strings.Contains(err.Error(), `direction "up" is unavailable`) {
+		t.Fatalf("expected invalid direction error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start for an invalid direction: %v", events)
+	}
+}
+
+func TestExecutorRejectsMultiDirectionParentWithoutAnimationReference(t *testing.T) {
+	events := []string{}
+	parent := animationParentAsset(t)
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 8
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent.Content = encoded
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &referenceStoreStub{})
+
+	_, err = executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"walk","asset_id":7,"direction":"front"}`),
+	)
+	if err == nil || !strings.Contains(err.Error(), `no prototype for direction "front"`) {
+		t.Fatalf("expected missing multi-direction reference error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("generation should not start without a prototype: %v", events)
 	}
 }
 
@@ -870,6 +1180,49 @@ func TestExecutorRequiresDependencies(t *testing.T) {
 	if !errors.Is(err, generator.ErrImageProcessorRequired) {
 		t.Fatalf("expected image processor required error, got %v", err)
 	}
+
+	executor = generator.NewExecutor(nil, nil, &generationAssetWriterStub{events: &events})
+	_, err = executor.Generate(context.Background(), generator.GenerateAnimation, nil)
+	if !errors.Is(err, generator.ErrAnimationServiceRequired) {
+		t.Fatalf("expected animation service required error, got %v", err)
+	}
+
+	executor = generator.NewExecutorWithAnimation(
+		nil,
+		&animationGenerationServiceStub{events: &events},
+		nil,
+		&generationAssetWriterStub{events: &events},
+	)
+	_, err = executor.Generate(context.Background(), generator.GenerateAnimation, nil)
+	if !errors.Is(err, generator.ErrAnimationReferenceStoreRequired) {
+		t.Fatalf("expected animation reference store required error, got %v", err)
+	}
+}
+
+func animationParentAsset(t *testing.T) assetdomain.Asset {
+	t.Helper()
+	animationReference := "data:image/png;base64,legacy-multi-direction-source"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 8
+	content.Metadata = map[string]any{"animation_reference": animationReference}
+	prototype := make(assetdomain.Prototype, 0, content.DirectionCount)
+	for direction := range content.DirectionCount {
+		reference := fmt.Sprintf("https://cdn.example.com/hero/direction_%02d.png?version=7", direction)
+		prototype = append(prototype, assetdomain.ImageResource{ID: uint(direction) + 1, URL: &reference})
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode animation parent content: %v", err)
+	}
+	return assetdomain.Asset{
+		ID:          7,
+		ProjectID:   11,
+		Type:        assetdomain.AssetTypeCharacter,
+		Name:        "hero",
+		Description: "silver-haired knight",
+		Content:     encoded,
+	}
 }
 
 func generatedImages() *imageclient.GenerateResult {
@@ -911,5 +1264,6 @@ func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.Exe
 }
 
 var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)
+var _ generator.AnimationGenerationService = (*animationGenerationServiceStub)(nil)
 var _ imageprocessor.Processor = (*imageProcessorStub)(nil)
 var _ generator.AssetWriter = (*generationAssetWriterStub)(nil)
