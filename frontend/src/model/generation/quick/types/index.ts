@@ -1,4 +1,5 @@
-export type {
-  GenerateQuickAssetInput,
-  QuickGenerationAsset,
+export {
+  generateQuickAssetInputSchema,
+  type GenerateQuickAssetInput,
+  type QuickGenerationAsset,
 } from "./quick-generation";

@@ -1,9 +1,67 @@
 import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import { getDefaultAssetCanvasSize } from "@/model";
-import { perspectiveOptions } from "@/model/project";
+import { perspectiveOptions, perspectiveSchema } from "@/model/project";
+import { z } from "zod";
 
 import type { AssetCreationDraft } from "./AssetCreation.interface";
+
+const commonAssetCreationDraftShape = {
+  name: z.string().trim().min(1, "Asset name is required."),
+  prompt: z.string().trim().min(1, "Creative brief is required."),
+  canvasSize: z.string().trim().min(1, "Canvas size is required."),
+  useProjectContext: z.boolean(),
+};
+
+const itemTileSchema = z.tuple([z.number(), z.number()]);
+
+export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...commonAssetCreationDraftShape,
+    kind: z.literal("audio"),
+  }),
+  z.object({
+    ...commonAssetCreationDraftShape,
+    kind: z.literal("scenery"),
+    style: z.string(),
+    aspectRatio: z.string(),
+    layers: z.array(z.object({ description: z.string() })),
+    reference: z.unknown().optional(),
+  }),
+  z.object({
+    ...commonAssetCreationDraftShape,
+    kind: z.literal("tileset"),
+    tiles: z.array(
+      z.object({
+        description: z.string(),
+        reference: z.unknown().optional(),
+        shape: z
+          .array(itemTileSchema)
+          .min(1, "Each tileset item must have at least one occupied tile."),
+      }),
+    ),
+  }),
+  z.object({
+    ...commonAssetCreationDraftShape,
+    kind: z.literal("uiset"),
+    style: z.string(),
+    reference: z.unknown().optional(),
+    components: z.array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        isCustom: z.boolean(),
+      }),
+    ),
+  }),
+  z.object({
+    ...commonAssetCreationDraftShape,
+    kind: z.enum(["character", "object"]),
+    perspective: perspectiveSchema,
+    directionCount: z.enum(["1", "4", "8"]),
+    reference: z.unknown().optional(),
+  }),
+]);
 
 export function createAssetCreationDraft<Reference = unknown>(
   kind: CreatableAssetKind,

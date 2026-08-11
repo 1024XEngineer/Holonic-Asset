@@ -11,6 +11,7 @@ import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
 import {
+  assetCreationDraftSchema,
   createAssetCreationDraft,
   toCreationRequest,
   type AssetCreationDraft,
@@ -36,29 +37,28 @@ export function CreateAssetForm({
   isSubmitting?: boolean;
 }) {
   const [useProjectContext, setUseProjectContext] = useState(true);
-  const [tilesetShapeError, setTilesetShapeError] = useState(false);
+  const [validationError, setValidationError] = useState<string>();
   const form = useForm({
     defaultValues: { draft: createAssetCreationDraft<File>(kind) },
     onSubmit: async ({ value }) => {
-      if (
-        value.draft.kind === "tileset" &&
-        value.draft.tiles.some((tile) => tile.shape.length === 0)
-      ) {
-        setTilesetShapeError(true);
+      const submittedDraft = { ...value.draft, useProjectContext };
+      const result = assetCreationDraftSchema.safeParse(submittedDraft);
+      if (!result.success) {
+        setValidationError(
+          [...new Set(result.error.issues.map((issue) => issue.message))].join(
+            " ",
+          ),
+        );
         return;
       }
 
-      await onCreate(toCreationRequest({ ...value.draft, useProjectContext }));
+      setValidationError(undefined);
+      await onCreate(toCreationRequest(submittedDraft));
     },
   });
   const draft = useStore(form.store, (state) => state.values.draft);
   const setDraft = (nextDraft: AssetCreationDraft<File>) => {
-    if (
-      nextDraft.kind === "tileset" &&
-      nextDraft.tiles.every((tile) => tile.shape.length > 0)
-    ) {
-      setTilesetShapeError(false);
-    }
+    setValidationError(undefined);
     form.setFieldValue("draft", nextDraft);
   };
 
@@ -109,16 +109,17 @@ export function CreateAssetForm({
       ) : draft.kind === "tileset" ? (
         <>
           <TilesetAssetFields draft={draft} onChange={setDraft} />
-          {tilesetShapeError ? (
-            <p className="text-sm text-destructive" role="alert">
-              Each tileset item must have at least one occupied tile.
-            </p>
-          ) : null}
         </>
       ) : draft.kind === "uiset" ? (
         <UISetAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "character" || draft.kind === "object" ? (
         <VisualAssetFields draft={draft} onChange={setDraft} />
+      ) : null}
+
+      {validationError ? (
+        <p className="text-sm text-destructive" role="alert">
+          {validationError}
+        </p>
       ) : null}
 
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
