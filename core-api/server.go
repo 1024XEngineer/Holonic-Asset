@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/middleware"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
@@ -97,6 +99,9 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	if ctx == nil {
 		return nil, errors.New("app: initialization context is required")
 	}
+	if len(cfg.HTTP.AllowedOrigins) == 0 {
+		return nil, errors.New("app: at least one allowed HTTP origin is required")
+	}
 
 	// Infrastructure.
 	appLogger, err := InitLogger(&cfg.Log)
@@ -110,6 +115,12 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	}
 
 	// Repositories and external services.
+	userStore := InitUserStore(db)
+	authService, err := InitAuthService(cfg.Auth, userStore)
+	if err != nil {
+		cleanupInitialization(db, appLogger)
+		return nil, err
+	}
 	projectStore := InitProjectStore(db)
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
@@ -148,7 +159,18 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
 	generationHandler := handler.NewGenerationHandler(generatorEngine)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
-	httpEngine := router.Register(assetHandler, projectHandler, generationHandler, uploadHandler)
+	authHandler := handler.NewAuthHandler(authService)
+	httpEngine := router.Register(
+		assetHandler,
+		projectHandler,
+		generationHandler,
+		uploadHandler,
+		router.Authentication{
+			Router:         authHandler,
+			Middleware:     middleware.JWT(authService),
+			AllowedOrigins: cfg.HTTP.AllowedOrigins,
+		},
+	)
 
 	app := NewApp(httpEngine, taskManager, db, appLogger)
 	appLogger.Info("application initialized")
@@ -160,6 +182,9 @@ func LoadAppConfig(path string) (config.Config, error) {
 	var cfg config.Config
 	if err := viperx.LoadConfig(path, &cfg); err != nil {
 		return config.Config{}, fmt.Errorf("app: load config: %w", err)
+	}
+	if secret, ok := os.LookupEnv("HOLONIC_AUTH_JWT_SECRET"); ok {
+		cfg.Auth.JWTSecret = secret
 	}
 	return cfg, nil
 }
