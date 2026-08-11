@@ -40,12 +40,12 @@ describe("toAssetGroups", () => {
       },
       {
         kind: "tileset",
-        assets: [{ canvasSize: "16 × 24 px", perspective: "Top-Down" }],
+        assets: [{ canvasSize: "128 × 144 px", perspective: "Top-Down" }],
       },
     ]);
   });
 
-  it("uses the kind default for assets without visual dimensions", () => {
+  it("does not report a visual canvas size for audio assets", () => {
     const [group] = toAssetGroups([
       {
         ...assetItemBase,
@@ -54,6 +54,6 @@ describe("toAssetGroups", () => {
       },
     ] satisfies AssetListItemResponse[]);
 
-    expect(group.assets[0].canvasSize).toBe("32 × 32 px");
+    expect(group.assets[0].canvasSize).toBe("N/A");
   });
 });

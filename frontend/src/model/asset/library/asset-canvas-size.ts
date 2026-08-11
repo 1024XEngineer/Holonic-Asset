@@ -26,9 +26,14 @@ export function getDefaultAssetCanvasSize(kind: AssetKind) {
 export function resolveAssetCanvasSize(item: AssetListItemResponse) {
   switch (item.type) {
     case "audio":
-      return getDefaultAssetCanvasSize("audio");
+      return "N/A";
     case "tileSet":
-      return formatAssetSize(item.dimensions.tileSize);
+      return formatAssetSize({
+        width:
+          item.dimensions.tileSize.width * item.dimensions.tileAmount.columns,
+        height:
+          item.dimensions.tileSize.height * item.dimensions.tileAmount.rows,
+      });
     default:
       return formatAssetSize(item.dimensions);
   }
