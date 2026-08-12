@@ -16,6 +16,7 @@ describe("core API clients", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await coreProjectApi.create({} as never);
+    await coreProjectApi.generateReference({} as never);
     await coreProjectApi.list(7);
     await coreProjectApi.detail(8);
     await coreProjectApi.update({} as never);
@@ -37,31 +38,35 @@ describe("core API clients", () => {
     await coreGenerationApi.cancel(10);
     await uploadApi.createTarget({} as never);
 
-    expect(fetchMock).toHaveBeenCalledTimes(19);
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "/api/v1/project/create",
-      "/api/v1/project/list?userID=7",
-      "/api/v1/project/detail?projectID=8",
-      "/api/v1/project/update",
-      "/api/v1/project/delete",
-      "/api/v1/projects/7/assets?types=character",
-      "/api/v1/projects/7/assets",
-      "/api/v1/asset/9",
-      "/api/v1/asset/9/records",
-      "/api/v1/asset/save",
-      "/api/v1/asset/copy",
-      "/api/v1/asset/rollback",
-      "/api/v1/asset/update",
-      "/api/v1/asset/delete",
-      "/api/v1/projects/7/generation-runs",
-      "/api/v1/projects/7/generation-runs?status=active",
-      "/api/v1/generation-runs/10",
-      "/api/v1/generation-runs/10/cancel",
-      "/api/v1/uploads",
-    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(
+      [
+        "/project/create",
+        "/project/reference/generate",
+        "/project/list?userID=7",
+        "/project/detail?projectID=8",
+        "/project/update",
+        "/project/delete",
+        "/projects/7/assets?types=character",
+        "/projects/7/assets",
+        "/asset/9",
+        "/asset/9/records",
+        "/asset/save",
+        "/asset/copy",
+        "/asset/rollback",
+        "/asset/update",
+        "/asset/delete",
+        "/projects/7/generation-runs",
+        "/projects/7/generation-runs?status=active",
+        "/generation-runs/10",
+        "/generation-runs/10/cancel",
+        "/uploads",
+      ].map((path) => `/api/v1${path}`),
+    );
     expect(
       fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET"),
     ).toEqual([
+      "POST",
       "POST",
       "GET",
       "GET",

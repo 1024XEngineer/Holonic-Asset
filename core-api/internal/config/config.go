@@ -16,6 +16,15 @@ type QueueConfig struct {
 	JobTimeout  time.Duration `mapstructure:"jobTimeout" yaml:"jobTimeout"`
 }
 
+type AuthConfig struct {
+	JWTSecret   string        `mapstructure:"jwtSecret" yaml:"jwtSecret"`
+	TokenExpiry time.Duration `mapstructure:"tokenExpiry" yaml:"tokenExpiry"`
+}
+
+type HTTPConfig struct {
+	AllowedOrigins []string `mapstructure:"allowedOrigins" yaml:"allowedOrigins"`
+}
+
 type LogConfig struct {
 	Path       string `mapstructure:"path" yaml:"path"`
 	MaxSize    int    `mapstructure:"maxSize" yaml:"maxSize"`
@@ -48,6 +57,8 @@ type QiniuConfig struct {
 type Config struct {
 	DB    DBConfig          `mapstructure:"db" yaml:"db"`
 	Queue QueueConfig       `mapstructure:"queue" yaml:"queue"`
+	Auth  AuthConfig        `mapstructure:"auth" yaml:"auth"`
+	HTTP  HTTPConfig        `mapstructure:"http" yaml:"http"`
 	Log   LogConfig         `mapstructure:"log" yaml:"log"`
 	Image ImageClientConfig `mapstructure:"image" yaml:"image"`
 	Video VideoClientConfig `mapstructure:"video" yaml:"video"`

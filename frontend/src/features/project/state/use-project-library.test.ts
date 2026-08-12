@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
     data: undefined as ProjectSummary[] | undefined,
     isSuccess: false,
   },
+  projectDetailQuery: {
+    data: undefined as ProjectSummary | undefined,
+  },
   reconcile: vi.fn(),
   removeSelection: vi.fn(),
   updateProject: vi.fn(),
@@ -32,6 +35,7 @@ vi.mock("@/model", () => ({
   reconcileProjectSelection: mocks.reconcile,
   removeProjectSelection: mocks.removeSelection,
   useDeleteProjectMutation: () => ({ mutateAsync: mocks.deleteProject }),
+  useProjectDetailQuery: () => mocks.projectDetailQuery,
   useProjectListQuery: () => mocks.projectQuery,
   useUpdateProjectMutation: () => ({ mutate: mocks.updateProject }),
 }));
@@ -44,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.projectQuery.data = projects;
   mocks.projectQuery.isSuccess = true;
+  mocks.projectDetailQuery.data = undefined;
   mocks.reconcile.mockReturnValue({});
   mocks.removeSelection.mockReturnValue("second");
   mocks.deleteProject.mockResolvedValue(undefined);
@@ -113,7 +118,6 @@ function project(id: string): ProjectSummary {
     description: "",
     reference: "",
     perspective: "Top-Down",
-    visualDirection: "",
     assetCount: 0,
   };
 }

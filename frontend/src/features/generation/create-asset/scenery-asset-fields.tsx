@@ -87,9 +87,8 @@ export function SceneryAssetFields({
         />
       </label>
       <ImageDropzone
-        fileName={draft.reference?.name}
-        onSelect={(reference) => onChange({ ...draft, reference })}
-        onClear={() => onChange({ ...draft, reference: undefined })}
+        value={draft.reference}
+        onChange={(reference) => onChange({ ...draft, reference })}
       />
     </>
   );
