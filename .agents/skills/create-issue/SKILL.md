@@ -44,6 +44,7 @@ For CI/CD requests, also identify the affected workflow area from the template (
 When a request could fit multiple templates, prefer the template whose required fields most directly match the requested outcome. Use `08-ci-cd.yml` for automation behavior even when the underlying application defect is not being changed; use `06-performance.yml` when the primary outcome is an application or system performance metric rather than workflow execution.
 
 New issue-form templates should be picked up automatically by this workflow after they are added to `.github/ISSUE_TEMPLATE/`; do not rely on a hard-coded list alone. Update this skill only when a new template needs special routing or drafting rules.
+
 If the request contains multiple independent outcomes, recommend splitting it instead of hiding them in one issue.
 
 ### 3. Check related work
