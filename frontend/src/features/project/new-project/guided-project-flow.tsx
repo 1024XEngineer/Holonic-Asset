@@ -137,10 +137,12 @@ export function GuidedProjectFlow({
             <ImageDropzone
               className="aspect-[16/9] min-h-0"
               label={t("uploadOverview")}
-              previewUrl={preview.url || undefined}
+              value={preview.url || undefined}
               error={preview.error}
-              onSelect={preview.setFile}
-              onClear={preview.clear}
+              onChange={(file) => {
+                if (file) preview.setFile(file);
+                else preview.clear();
+              }}
             />
           </TabsContent>
         </Tabs>

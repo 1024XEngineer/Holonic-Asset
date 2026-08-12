@@ -153,19 +153,24 @@ export function ProjectSettingsDialog({
               )}
             </form.Field>
           </div>
-          <form.Field name="visualDirection">
+          <form.Field name="reference">
             {(field) => (
               <div>
                 <p className="text-sm font-medium">{t("reference")}</p>
                 <ImageDropzone
                   className="mt-2 h-28"
-                  previewUrl={field.state.value || undefined}
+                  value={field.state.value || undefined}
                   error={imageError}
-                  onSelect={(file) => {
+                  onChange={(file) => {
                     imageReadController.current?.abort();
+                    setImageError(undefined);
+                    if (!file) {
+                      field.handleChange("");
+                      return;
+                    }
+
                     const controller = new AbortController();
                     imageReadController.current = controller;
-                    setImageError(undefined);
                     void readFileAsDataUrl(file, controller.signal).then(
                       (dataUrl) => {
                         if (controller.signal.aborted) return;
@@ -178,11 +183,6 @@ export function ProjectSettingsDialog({
                         );
                       },
                     );
-                  }}
-                  onClear={() => {
-                    imageReadController.current?.abort();
-                    setImageError(undefined);
-                    field.handleChange("");
                   }}
                 />
               </div>
