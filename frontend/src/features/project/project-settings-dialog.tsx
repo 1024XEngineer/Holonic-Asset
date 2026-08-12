@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useForm } from "@tanstack/react-form";
+import { Eye, LoaderCircle, RefreshCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import { isPerspective, projectApi } from "@/model/project";
@@ -158,59 +164,69 @@ export function ProjectSettingsDialog({
               {(field) => (
                 <div className="min-w-0 sm:col-span-2">
                   <p className="text-sm font-medium">Reference</p>
-                  <ImageDropzone
-                    className="mt-2 aspect-[16/9] min-h-48 min-w-0 max-w-full"
-                    value={field.state.value || undefined}
-                    error={imageError}
-                    actions={{
-                      loading: isRegeneratingReference,
-                      preview: () => setIsReferencePreviewOpen(true),
-                      regenerate: () => {
-                        if (isRegeneratingReference) return;
-                        const updatedProject = applyProjectSettings(
-                          project,
-                          form.state.values,
-                        );
-                        if (!updatedProject) {
-                          setImageError("Complete the project details first.");
+                  <div className="relative mt-2">
+                    <ImageDropzone
+                      className="aspect-[16/9] min-h-48 min-w-0 max-w-full"
+                      value={field.state.value || undefined}
+                      error={imageError}
+                      onChange={(file) => {
+                        imageReadController.current?.abort();
+                        setImageError(undefined);
+                        if (!file) {
+                          field.handleChange("");
                           return;
                         }
-                        setIsRegeneratingReference(true);
-                        setImageError(undefined);
-                        void projectApi
-                          .regenerateReference(updatedProject)
-                          .then((reference) => field.handleChange(reference))
-                          .catch(() =>
+                        const controller = new AbortController();
+                        imageReadController.current = controller;
+                        void readFileAsDataUrl(file, controller.signal).then(
+                          (dataUrl) => {
+                            if (controller.signal.aborted) return;
+                            field.handleChange(dataUrl);
+                          },
+                          () => {
+                            if (controller.signal.aborted) return;
                             setImageError(
-                              "We couldn't regenerate that reference. Try again.",
-                            ),
-                          )
-                          .finally(() => setIsRegeneratingReference(false));
-                      },
-                    }}
-                    onChange={(file) => {
-                      imageReadController.current?.abort();
-                      setImageError(undefined);
-                      if (!file) {
-                        field.handleChange("");
-                        return;
-                      }
-                      const controller = new AbortController();
-                      imageReadController.current = controller;
-                      void readFileAsDataUrl(file, controller.signal).then(
-                        (dataUrl) => {
-                          if (controller.signal.aborted) return;
-                          field.handleChange(dataUrl);
-                        },
-                        () => {
-                          if (controller.signal.aborted) return;
-                          setImageError(
-                            "We couldn't read that image. Try another file.",
+                              "We couldn't read that image. Try another file.",
+                            );
+                          },
+                        );
+                      }}
+                    />
+                    {field.state.value ? (
+                      <ProjectReferenceActions
+                        isRegenerating={isRegeneratingReference}
+                        onClear={() => {
+                          imageReadController.current?.abort();
+                          setImageError(undefined);
+                          field.handleChange("");
+                        }}
+                        onPreview={() => setIsReferencePreviewOpen(true)}
+                        onRegenerate={() => {
+                          const updatedProject = applyProjectSettings(
+                            project,
+                            form.state.values,
                           );
-                        },
-                      );
-                    }}
-                  />
+                          if (!updatedProject) {
+                            setImageError(
+                              "Complete the project details first.",
+                            );
+                            return;
+                          }
+                          setIsRegeneratingReference(true);
+                          setImageError(undefined);
+                          void projectApi
+                            .regenerateReference(updatedProject)
+                            .then((reference) => field.handleChange(reference))
+                            .catch(() =>
+                              setImageError(
+                                "We couldn't regenerate that reference. Try again.",
+                              ),
+                            )
+                            .finally(() => setIsRegeneratingReference(false));
+                        }}
+                      />
+                    ) : null}
+                  </div>
                   <Dialog
                     open={isReferencePreviewOpen}
                     onOpenChange={setIsReferencePreviewOpen}
@@ -248,5 +264,83 @@ export function ProjectSettingsDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ProjectReferenceActions({
+  isRegenerating,
+  onClear,
+  onPreview,
+  onRegenerate,
+}: {
+  isRegenerating: boolean;
+  onClear: () => void;
+  onPreview: () => void;
+  onRegenerate: () => void;
+}) {
+  return (
+    <div className="absolute right-2 top-2 z-10 flex gap-1">
+      <ReferenceAction
+        label="Preview reference image"
+        disabled={isRegenerating}
+        onClick={onPreview}
+      >
+        <Eye />
+      </ReferenceAction>
+      <ReferenceAction
+        label="Regenerate reference image"
+        disabled={isRegenerating}
+        onClick={onRegenerate}
+      >
+        {isRegenerating ? (
+          <LoaderCircle className="animate-spin" />
+        ) : (
+          <RefreshCw />
+        )}
+      </ReferenceAction>
+      <ReferenceAction
+        label="Remove reference image"
+        disabled={isRegenerating}
+        onClick={onClear}
+      >
+        <X />
+      </ReferenceAction>
+    </div>
+  );
+}
+
+function ReferenceAction({
+  children,
+  disabled,
+  label,
+  onClick,
+}: {
+  children: ReactNode;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="bg-background/90 shadow-xs backdrop-blur-sm"
+            aria-label={label}
+            disabled={disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClick();
+            }}
+          />
+        }
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
