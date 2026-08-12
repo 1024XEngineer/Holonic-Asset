@@ -1,7 +1,3 @@
-ignore:
-  # In-memory HTTP server used only to support frontend integration tests.
-  - core-api/internal/testserver/**
-
 coverage:
   status:
     project:
