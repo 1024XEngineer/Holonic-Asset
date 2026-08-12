@@ -59,9 +59,14 @@ body:
     attributes:
       label: Current behavior and evidence
       description: Describe the observed result and attach a GitHub Actions run URL, redacted logs, screenshots, timing data, or other evidence.
-      render: shell
     validations:
       required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Command output or logs (optional)
+      description: Paste redacted command output, stack traces, or workflow logs here. Keep links and screenshots in the evidence field above, and never include secrets or tokens.
+      render: shell
   - type: textarea
     id: expected_behavior
     attributes:
