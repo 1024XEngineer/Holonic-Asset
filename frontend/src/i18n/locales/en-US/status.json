@@ -1,0 +1,10 @@
+{
+  "loadingTitle": "Loading workspace",
+  "loadingDescription": "Preparing the next workspace.",
+  "errorTitle": "Unable to open this workspace",
+  "unexpectedError": "An unexpected error occurred while loading this page.",
+  "notFoundTitle": "Page not found",
+  "notFoundDescription": "The address does not match a workspace in this application.",
+  "tryAgain": "Try again",
+  "projectLibrary": "Go to project library"
+}

@@ -6,6 +6,7 @@ import {
   createRootRouteWithContext,
   useRouter,
 } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, LoaderCircle, MapPinOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,37 +42,38 @@ function RouteStatus({
 }
 
 function ProjectLibraryLink() {
+  const { t } = useTranslation("status");
   return (
     <Button nativeButton={false} render={<Link to="/projects" />}>
-      Go to project library
+      {t("projectLibrary")}
     </Button>
   );
 }
 
 function RoutePending() {
+  const { t } = useTranslation("status");
   return (
     <RouteStatus
-      title="Loading workspace"
-      description="Preparing the next workspace."
+      title={t("loadingTitle")}
+      description={t("loadingDescription")}
       icon={<LoaderCircle className="size-5 animate-spin" />}
     />
   );
 }
 
 function RouteError({ error }: { error: Error }) {
+  const { t } = useTranslation("status");
   const router = useRouter();
 
   return (
     <RouteStatus
-      title="Unable to open this workspace"
-      description={
-        error.message || "An unexpected error occurred while loading this page."
-      }
+      title={t("errorTitle")}
+      description={error.message || t("unexpectedError")}
       icon={<AlertTriangle className="size-5" />}
       action={
         <>
           <Button variant="outline" onClick={() => void router.invalidate()}>
-            Try again
+            {t("tryAgain")}
           </Button>
           <ProjectLibraryLink />
         </>
@@ -81,10 +83,11 @@ function RouteError({ error }: { error: Error }) {
 }
 
 function RouteNotFound() {
+  const { t } = useTranslation("status");
   return (
     <RouteStatus
-      title="Page not found"
-      description="The address does not match a workspace in this application."
+      title={t("notFoundTitle")}
+      description={t("notFoundDescription")}
       icon={<MapPinOff className="size-5" />}
       action={<ProjectLibraryLink />}
     />

@@ -1,4 +1,5 @@
 import { ImageOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,7 @@ function TilesetPreview({
   assetId: string;
   projectId: string;
 }) {
+  const { t } = useTranslation("assets");
   const recordQuery = useRecordQuery(projectId, assetId);
   const record = recordQuery.data?.record;
 
@@ -150,7 +152,7 @@ function TilesetPreview({
 
   return (
     <div
-      aria-label="Tileset preview"
+      aria-label={t("tilesetPreview")}
       className="grid size-full overflow-hidden bg-[#eeece7] p-3"
       style={{
         gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,

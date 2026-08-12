@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { CharacterAnimation } from "@/model";
+import { withI18n } from "@/testing/with-i18n";
 
 import { Inspector } from "./inspector";
 import { getInspectorTargetSummary } from "./inspector-target";
@@ -18,16 +19,18 @@ const animations: CharacterAnimation[] = [
 describe("Inspector", () => {
   it("renders the AI composer controls without the old draft label", () => {
     const html = renderToStaticMarkup(
-      <Inspector
-        selectedNodes={[]}
-        selectedFrames={[]}
-        prompt="Refine the silhouette"
-        onPromptChange={() => undefined}
-        history={[]}
-        animations={animations}
-        onSubmit={() => undefined}
-        onClearSelection={() => undefined}
-      />,
+      withI18n(
+        <Inspector
+          selectedNodes={[]}
+          selectedFrames={[]}
+          prompt="Refine the silhouette"
+          onPromptChange={() => undefined}
+          history={[]}
+          animations={animations}
+          onSubmit={() => undefined}
+          onClearSelection={() => undefined}
+        />,
+      ),
     );
 
     expect(html).toContain("Entire asset");

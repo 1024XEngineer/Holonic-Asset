@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
@@ -23,14 +24,16 @@ export function SceneryAssetFields({
   draft: SceneryAssetCreationDraft<File>;
   onChange: (draft: SceneryAssetCreationDraft<File>) => void;
 }) {
+  const { t } = useTranslation("generation");
+
   return (
     <>
       <label className="grid gap-2 text-sm font-medium">
-        Style
+        {t("style")}
         <Textarea
           required
           className="min-h-20 resize-none"
-          placeholder="Describe the overall scene style..."
+          placeholder={t("scenePlaceholder")}
           value={draft.style}
           onChange={(event) =>
             onChange({ ...draft, style: event.target.value })
@@ -38,7 +41,7 @@ export function SceneryAssetFields({
         />
       </label>
       <CountSelect
-        label="Layer count"
+        label={t("layerCount")}
         value={draft.layers.length}
         onChange={(count) =>
           onChange({
@@ -53,7 +56,7 @@ export function SceneryAssetFields({
       <div className="grid gap-3">
         {draft.layers.map((layer, index) => (
           <label key={index} className="grid gap-2 text-sm font-medium">
-            Layer {index + 1} description
+            {t("layerDescription", { number: index + 1 })}
             <Textarea
               required
               className="resize-none"
@@ -73,10 +76,10 @@ export function SceneryAssetFields({
         ))}
       </div>
       <label className="grid gap-2 text-sm font-medium">
-        Aspect ratio
+        {t("aspectRatio")}
         <Input
           required
-          placeholder="e.g. 16:9"
+          placeholder={t("aspectPlaceholder")}
           value={draft.aspectRatio}
           onChange={(event) =>
             onChange({ ...draft, aspectRatio: event.target.value })

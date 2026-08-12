@@ -1,0 +1,125 @@
+{
+  "heroTitle": "Make the world. Keep it yours.",
+  "heroDescription": "Holonic Asset helps you generate characters, objects, environments, tilesets, and UI Set assets, then keep every asset in a library with one consistent visual style.",
+  "projectBased": "PROJECT-BASED",
+  "engineReady": "ENGINE-READY",
+  "systemOnline": "CREATIVE SYSTEM ONLINE",
+  "previewAlt": "A complete game asset project preview",
+  "completeSystem": "COMPLETE GAME ASSET SYSTEM",
+  "syncTitle": "One project. Every asset in sync.",
+  "syncDescription": "Generate characters, objects, scenery, tilesets, and UI Set assets in one consistent style, then manage the complete set together.",
+  "disciplines": {
+    "characters": {
+      "label": "Characters",
+      "detail": "Sprites + motion"
+    },
+    "objects": {
+      "label": "Objects",
+      "detail": "Props + states"
+    },
+    "scenery": {
+      "label": "Scenery",
+      "detail": "Scenes + layers"
+    },
+    "tilesets": {
+      "label": "Tilesets",
+      "detail": "Tiles + maps"
+    },
+    "uiSet": {
+      "label": "UI Set",
+      "detail": "HUD + menus"
+    }
+  },
+  "capabilitiesLabel": "Asset creation capabilities",
+  "explore": "Explore assets",
+  "capabilities": {
+    "characters": {
+      "title": "Characters",
+      "description": "Generate character prototypes (1/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
+      "detail": "Prototypes, Spritesheets & SFX",
+      "alt": "Basketball player running south animation",
+      "headline": "Make your characters move"
+    },
+    "objects": {
+      "title": "Objects",
+      "description": "Generate distinctive game objects with consistent style, clear silhouettes, and the visual states needed for your world.",
+      "detail": "Game Objects & Visual States",
+      "alt": "Animated blue object"
+    },
+    "scenery": {
+      "title": "Scenery",
+      "description": "Generate multi-layer backgrounds with parallax sky, wind, and foreground detail for level design.",
+      "detail": "Parallax Scenery Layers",
+      "alt": "Pixel-art scenery sky",
+      "treesAlt": "Pixel-art scenery trees"
+    },
+    "tilesets": {
+      "title": "Tilesets",
+      "description": "Build reusable pixel-art tilesets for streets, interiors, terrain, and seamless game-world construction.",
+      "detail": "Modular Tiles & Map Building",
+      "alt": "Pixel-art interior tileset preview"
+    },
+    "uiSet": {
+      "title": "UI Set",
+      "description": "Design cohesive health bars, inventory panels, skill icon frames, system menus, and UI Set interaction sounds.",
+      "detail": "HUD, Controls & System Menus",
+      "alt": "Pixel-art UI Set preview"
+    },
+    "audio": {
+      "title": "Game Audio & BGM",
+      "description": "Generate action sound effects (SFX) matched with animations, plus immersive looping background music (BGM).",
+      "detail": "Animation SFX & Loopable BGM",
+      "alt": "Game audio waveform"
+    }
+  },
+  "workflowTitle": "One workflow from idea to game-ready pipeline.",
+  "workflowDescription": "Holonic Asset connects project visual context, asset prototyping, animation frame generation, and sound effect binding into one structured workflow.",
+  "workflow": {
+    "projectStyle": {
+      "title": "Project & Style System",
+      "description": "Define your game type, visual style, and target platform once. Every asset generated in the project follows the same style."
+    },
+    "prototypes": {
+      "title": "Multi-View Prototypes",
+      "description": "Generate character and object prototypes with 1, 4, or 8-directional views (top-down, side-on, isometric) maintaining consistent style."
+    },
+    "animations": {
+      "title": "Animations & Bound SFX",
+      "description": "Expand prototypes into 4-16 frame action sequences (Idle, Walk, Attack) and attach generated sound effects directly to animations."
+    },
+    "export": {
+      "title": "Engine-Ready Export",
+      "description": "Export structured Spritesheets, Parallax Scenery Layers, Tilemaps, UI Set components, and audio files ready for Unity or Godot."
+    }
+  },
+  "closingEyebrow": "YOUR NEXT WORLD STARTS HERE",
+  "closingTitle": "Make the first asset. Then build everything around it.",
+  "startProject": "Start a project",
+  "tryGeneration": "Try image generation",
+  "footerDescription": "AI-powered game asset creation for characters, environments, UI Set assets, and consistent project libraries.",
+  "footerNavigation": "Footer navigation",
+  "projectStory": {
+    "organizedByProject": "ORGANIZED BY PROJECT",
+    "sceneLayers": "SCENE LAYERS",
+    "consistencyFeature": "CONSISTENCY IS A FEATURE",
+    "title": "Not a folder of outputs. A complete game asset library.",
+    "description": "Every project keeps the game type, platform, and visual style in one place so new assets stay consistent. Assets stay grouped by type, from characters and objects to scenery, tilesets, and UI Set assets.",
+    "details": "Keep useful details attached to every asset: canvas size, perspective, tags, scene layers, and revision history. Your library stays understandable as the game grows.",
+    "openWorkspace": "See the project workspace",
+    "imageAlt": "A multi-layer game scenery project",
+    "layers": {
+      "foreground": {
+        "label": "Foreground",
+        "description": "Trees and close-range detail"
+      },
+      "atmosphere": {
+        "label": "Atmosphere",
+        "description": "Wind, depth and movement"
+      },
+      "background": {
+        "label": "Background",
+        "description": "Sky and distant worldbuilding"
+      }
+    }
+  }
+}

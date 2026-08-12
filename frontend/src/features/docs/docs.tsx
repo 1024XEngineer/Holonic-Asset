@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, ComponentType } from "react";
 import { useScrollSpy } from "@mantine/hooks";
 import { Link } from "@tanstack/react-router";
 import { z } from "zod";
+import { useTranslation } from "react-i18next";
 
 import DirectionsEn, {
   metadata as directionsEn,
@@ -37,6 +38,13 @@ const articles: Record<ArticleId, Article> = {
   directions: { Content: DirectionsEn, metadata: directionsEn },
   tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
 };
+
+const articleTitleKeys = {
+  reference: "referenceTitle",
+  perspective: "perspectiveTitle",
+  directions: "directionsTitle",
+  tilesets: "tilesetsTitle",
+} as const;
 
 export function isArticleId(value: unknown): value is ArticleId {
   return articleIdSchema.safeParse(value).success;
@@ -86,6 +94,7 @@ type DocsProps = {
 };
 
 export function Docs({ articleId }: DocsProps) {
+  const { t } = useTranslation("docs");
   const article = articles[articleId];
   const outline = useScrollSpy({
     selector: `#${articleId}-panel :is(h2, h3)`,
@@ -107,7 +116,7 @@ export function Docs({ articleId }: DocsProps) {
         <div className="mx-auto grid max-w-[110rem] lg:grid-cols-[17rem_minmax(0,1fr)_14rem]">
           <aside className="border-b border-neutral-950/10 bg-white px-5 py-8 sm:px-8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-10 lg:py-12">
             <nav
-              aria-label="Documentation topics"
+              aria-label={t("topics")}
               className="flex gap-1 overflow-x-auto pb-1 lg:block lg:space-y-1.5 lg:overflow-visible"
             >
               {articleOrder.map((id) => {
@@ -123,7 +132,7 @@ export function Docs({ articleId }: DocsProps) {
                       active && "font-semibold text-neutral-950",
                     )}
                   >
-                    {articles[id].metadata.title}
+                    {t(articleTitleKeys[id])}
                   </Link>
                 );
               })}
@@ -140,7 +149,7 @@ export function Docs({ articleId }: DocsProps) {
           </article>
 
           <aside className="hidden border-l border-neutral-950/10 bg-white px-7 py-12 lg:sticky lg:top-14 lg:block lg:h-[calc(100vh-3.5rem)] lg:self-start lg:overflow-y-auto">
-            <nav aria-label="Table of contents">
+            <nav aria-label={t("contents")}>
               <ol className="mt-5 space-y-3 border-l border-neutral-950/15 pl-4">
                 {outline.data.map(({ id, value, depth }) => (
                   <li key={id}>

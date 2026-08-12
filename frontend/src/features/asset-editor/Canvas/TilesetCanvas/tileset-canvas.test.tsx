@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TilesetItem } from "@/model";
+import { withI18n } from "@/testing/with-i18n";
 
 import { TilesetCanvas } from "./tileset-canvas";
 
@@ -28,14 +29,16 @@ const items: TilesetItem[] = [
 describe("TilesetCanvas", () => {
   it("renders valid item images and filters invalid selected cells", () => {
     const html = renderToStaticMarkup(
-      <TilesetCanvas
-        model={{
-          gridSize: 4,
-          items,
-          selectedCellIndexes: [0, 5, -1, 1.5, 16],
-        }}
-        onEvent={vi.fn()}
-      />,
+      withI18n(
+        <TilesetCanvas
+          model={{
+            gridSize: 4,
+            items,
+            selectedCellIndexes: [0, 5, -1, 1.5, 16],
+          }}
+          onEvent={vi.fn()}
+        />,
+      ),
     );
 
     expect(html).toContain('src="/sofa.png"');
@@ -47,10 +50,12 @@ describe("TilesetCanvas", () => {
 
   it("renders an empty state for an invalid grid size", () => {
     const html = renderToStaticMarkup(
-      <TilesetCanvas
-        model={{ gridSize: 0, items: [], selectedCellIndexes: [] }}
-        onEvent={vi.fn()}
-      />,
+      withI18n(
+        <TilesetCanvas
+          model={{ gridSize: 0, items: [], selectedCellIndexes: [] }}
+          onEvent={vi.fn()}
+        />,
+      ),
     );
 
     expect(html).toContain("No tileset grid");

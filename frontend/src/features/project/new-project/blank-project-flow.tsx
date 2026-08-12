@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight, FilePlus2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { NewProjectController } from "./use-new-project-controller";
 import { ProjectStartCard } from "./project-start-card";
@@ -10,11 +11,12 @@ export function BlankProjectFlow({
   active: boolean;
   project: NewProjectController;
 }) {
+  const { t } = useTranslation("projects");
   if (!active) {
     return (
       <ProjectStartCard
-        title="Blank project"
-        description="Open a flexible workspace. Add context if useful, or create an asset immediately."
+        title={t("blank")}
+        description={t("blankDescription")}
         icon={<FilePlus2 size={20} />}
         onSelect={project.start.chooseBlank}
       />
@@ -35,13 +37,13 @@ export function BlankProjectFlow({
       <newProjectForm.Field name="name">
         {(field) => (
           <label className="grid gap-2 text-sm font-semibold">
-            Project name
+            {t("projectName")}
             <input
               autoFocus
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               className="w-full rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-              placeholder="e.g. Moonlit Orchard"
+              placeholder={t("projectNamePlaceholder")}
             />
           </label>
         )}
@@ -52,13 +54,13 @@ export function BlankProjectFlow({
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           onClick={form.previous}
         >
-          <ArrowLeft size={16} /> Previous
+          <ArrowLeft size={16} /> {t("previous")}
         </button>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
         >
-          Submit
+          {t("submit")}
           <ArrowRight size={16} />
         </button>
       </div>

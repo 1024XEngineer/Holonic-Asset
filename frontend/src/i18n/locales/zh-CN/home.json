@@ -1,0 +1,125 @@
+{
+  "heroTitle": "创造世界，保持独特。",
+  "heroDescription": "Holonic Asset 帮助你生成角色、物体、环境、瓦片集和 UI 资源，并将所有资产以一致的视觉风格整理在项目库中。",
+  "projectBased": "项目驱动",
+  "engineReady": "引擎就绪",
+  "systemOnline": "创作系统在线",
+  "previewAlt": "完整游戏资产项目预览",
+  "completeSystem": "完整游戏资产系统",
+  "syncTitle": "一个项目，所有资产保持同步。",
+  "syncDescription": "以一致的风格生成角色、物体、场景、瓦片集和 UI 资源，并统一管理完整资产集。",
+  "disciplines": {
+    "characters": {
+      "label": "角色",
+      "detail": "精灵图 + 动作"
+    },
+    "objects": {
+      "label": "物体",
+      "detail": "道具 + 状态"
+    },
+    "scenery": {
+      "label": "场景",
+      "detail": "场景 + 图层"
+    },
+    "tilesets": {
+      "label": "瓦片集",
+      "detail": "瓦片 + 地图"
+    },
+    "uiSet": {
+      "label": "UI 资源",
+      "detail": "HUD + 菜单"
+    }
+  },
+  "capabilitiesLabel": "资产创作能力",
+  "explore": "浏览资产",
+  "capabilities": {
+    "characters": {
+      "title": "角色",
+      "description": "生成角色原型（1/4/8 方向视图）、4-16 帧动画（待机、行走、攻击）以及配套动作音效。",
+      "detail": "原型、精灵图与音效",
+      "alt": "篮球运动员向南奔跑的动画",
+      "headline": "让你的角色动起来"
+    },
+    "objects": {
+      "title": "物体",
+      "description": "生成风格统一、轮廓清晰并具备完整视觉状态的独特游戏物体。",
+      "detail": "游戏物体与视觉状态",
+      "alt": "动态蓝色物体"
+    },
+    "scenery": {
+      "title": "场景",
+      "description": "生成带有视差天空、风和前景细节的多层背景，用于关卡设计。",
+      "detail": "视差场景图层",
+      "alt": "像素风场景天空",
+      "treesAlt": "像素风场景树木"
+    },
+    "tilesets": {
+      "title": "瓦片集",
+      "description": "构建可复用的像素风瓦片集，用于街道、室内、地形和无缝游戏世界。",
+      "detail": "模块化瓦片与地图构建",
+      "alt": "像素风室内瓦片集预览"
+    },
+    "uiSet": {
+      "title": "UI 资源",
+      "description": "设计统一的血条、背包面板、技能图标框、系统菜单和 UI 交互音效。",
+      "detail": "HUD、控件与系统菜单",
+      "alt": "像素风 UI 资源预览"
+    },
+    "audio": {
+      "title": "游戏音频与 BGM",
+      "description": "生成与动画匹配的动作音效，以及沉浸式循环背景音乐。",
+      "detail": "动画音效与循环 BGM",
+      "alt": "游戏音频波形"
+    }
+  },
+  "workflowTitle": "从想法到可用于游戏的完整流程。",
+  "workflowDescription": "Holonic Asset 将项目视觉上下文、资产原型、动画帧生成和音效绑定整合为一个结构化流程。",
+  "workflow": {
+    "projectStyle": {
+      "title": "项目与风格系统",
+      "description": "一次定义游戏类型、视觉风格和目标平台。项目中生成的每个资产都会遵循同一风格。"
+    },
+    "prototypes": {
+      "title": "多视角原型",
+      "description": "以 1、4 或 8 个方向生成角色和物体原型，并保持统一风格。"
+    },
+    "animations": {
+      "title": "动画与音效绑定",
+      "description": "将原型扩展为 4-16 帧动作序列（待机、行走、攻击），并直接为动画绑定生成的音效。"
+    },
+    "export": {
+      "title": "引擎就绪导出",
+      "description": "导出可直接用于 Unity 或 Godot 的精灵图、视差场景图层、瓦片地图、UI 组件和音频文件。"
+    }
+  },
+  "closingEyebrow": "你的下一个世界，从这里开始",
+  "closingTitle": "先制作第一个资产，再围绕它构建一切。",
+  "startProject": "开始一个项目",
+  "tryGeneration": "试用图像生成",
+  "footerDescription": "为角色、环境和 UI 资源提供 AI 游戏资产创作，并构建一致的项目资产库。",
+  "footerNavigation": "页脚导航",
+  "projectStory": {
+    "organizedByProject": "按项目整理",
+    "sceneLayers": "场景图层",
+    "consistencyFeature": "一致性就是功能",
+    "title": "不是一堆输出，而是完整的游戏资产库。",
+    "description": "每个项目都会集中保存游戏类型、平台和视觉风格，让新资产始终保持一致。资产按类型分组，从角色、物体到场景、瓦片集和 UI 资源都清晰可见。",
+    "details": "为每个资产保留有用信息：画布尺寸、视角、标签、场景图层和修订历史。随着游戏成长，你的资产库依然清晰易懂。",
+    "openWorkspace": "查看项目工作区",
+    "imageAlt": "多图层游戏场景项目",
+    "layers": {
+      "foreground": {
+        "label": "前景",
+        "description": "树木与近景细节"
+      },
+      "atmosphere": {
+        "label": "氛围层",
+        "description": "风、深度与动态"
+      },
+      "background": {
+        "label": "背景",
+        "description": "天空与远景世界构建"
+      }
+    }
+  }
+}

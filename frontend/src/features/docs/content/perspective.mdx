@@ -1,38 +1,34 @@
 export const metadata = { title: "Perspective types" };
 
 import { PerspectiveExample } from "@/features/docs/perspective-examples";
+import { DocHeading, DocText } from "../doc-text";
 
-## Choose the camera for your world before generating its assets.
+<DocHeading level={2} id="choose-perspective" i18nKey="perspective.heading" />
 
-Perspective controls how players read space. Decide it before creating characters, props, and scenery so every asset can share the same visual rules.
+<DocText i18nKey="perspective.intro" />
 
-### Top-Down
+<DocHeading level={3} id="top-down" i18nKey="perspective.topDownTitle" />
 
-Use top-down when players need to see terrain, nearby opponents, and movement around a character. It is a practical fit for action RPGs and tactical maps.
+<DocText i18nKey="perspective.topDownBody" />
 
-<PerspectiveExample
-  image="top-down-2d.jpg"
-  alt="Top-Down game scene showing terrain, props, and characters from above"
+<PerspectiveExample image="top-down-2d.jpg" altKey="perspective.topDownAlt" />
+
+<DocHeading level={3} id="side-on" i18nKey="perspective.sideOnTitle" />
+
+<DocText i18nKey="perspective.sideOnBody" />
+
+<PerspectiveExample image="side-on.jpg" altKey="perspective.sideOnAlt" />
+
+<DocHeading level={3} id="isometric" i18nKey="perspective.isometricTitle" />
+
+<DocText i18nKey="perspective.isometricBody" />
+
+<PerspectiveExample image="isometric.png" altKey="perspective.isometricAlt" />
+
+<DocHeading
+  level={2}
+  id="keep-one-perspective"
+  i18nKey="perspective.keepTitle"
 />
 
-### Side-On
-
-Use Side-On when jumping height, horizontal rhythm, and silhouette readability drive the experience. It suits platformers and side-scrolling action games.
-
-<PerspectiveExample
-  image="side-on.jpg"
-  alt="Side-On game scene showing a character and platform environment"
-/>
-
-### Isometric
-
-Use isometric when the scene needs both building volume and a readable map layout. It suits simulation and strategy scenes.
-
-<PerspectiveExample
-  image="isometric.png"
-  alt="Isometric game scene showing buildings and terrain at an angled view"
-/>
-
-## Keep one camera language
-
-Once you choose a perspective, include it in every character, prop, and environment request. Mixing Top-Down characters with Side-On props makes the asset set difficult to combine, even when colour and style match.
+<DocText i18nKey="perspective.keepBody" />

@@ -1,4 +1,5 @@
 import { AlertCircle, FolderOpen, SearchX } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ export function AssetLibraryWorkspace({
 }: {
   library: AssetLibraryController;
 }) {
+  const { t } = useTranslation("assets");
   const project = library.project;
   const navigate = useNavigate();
 
@@ -23,9 +25,9 @@ export function AssetLibraryWorkspace({
       <div className="grid h-full place-items-center px-6 text-center">
         <div className="max-w-sm">
           <FolderOpen className="mx-auto size-8 text-muted-foreground" />
-          <h1 className="mt-4 text-base font-semibold">Select a project</h1>
+          <h1 className="mt-4 text-base font-semibold">{t("selectProject")}</h1>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Choose a project from the sidebar to open its asset library.
+            {t("selectProjectDescription")}
           </p>
         </div>
       </div>
@@ -108,10 +110,11 @@ export function AssetLibraryWorkspace({
 }
 
 function AssetLibrarySkeleton() {
+  const { t } = useTranslation("assets");
   return (
     <div
       className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      aria-label="Loading assets"
+      aria-label={t("loading")}
       role="status"
     >
       {Array.from({ length: 8 }).map((_, index) => (
@@ -135,15 +138,16 @@ function AssetLibraryError({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation(["assets", "common"]);
   return (
     <div className="border border-destructive/25 bg-background px-6 py-14 text-center">
       <AlertCircle className="mx-auto size-7 text-destructive" />
-      <h2 className="mt-4 text-sm font-semibold">Unable to load assets</h2>
+      <h2 className="mt-4 text-sm font-semibold">{t("loadError")}</h2>
       <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
         {message}
       </p>
       <Button variant="outline" className="mt-5" onClick={onRetry}>
-        Try again
+        {t("common:actions.tryAgain")}
       </Button>
     </div>
   );
@@ -156,6 +160,7 @@ function AssetLibraryEmptyState({
   hasAssets: boolean;
   onReset: () => void;
 }) {
+  const { t } = useTranslation("assets");
   return (
     <div className="border border-dashed bg-background px-6 py-16 text-center">
       {hasAssets ? (
@@ -164,16 +169,14 @@ function AssetLibraryEmptyState({
         <FolderOpen className="mx-auto size-7 text-muted-foreground" />
       )}
       <h2 className="mt-4 text-sm font-semibold">
-        {hasAssets ? "No matching assets" : "No assets yet"}
+        {hasAssets ? t("noMatching") : t("none")}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {hasAssets
-          ? "Try another search or show more asset types."
-          : "Assets created for this project will appear here."}
+        {hasAssets ? t("trySearch") : t("empty")}
       </p>
       {hasAssets ? (
         <Button variant="outline" className="mt-5" onClick={onReset}>
-          Reset filters
+          {t("reset")}
         </Button>
       ) : null}
     </div>

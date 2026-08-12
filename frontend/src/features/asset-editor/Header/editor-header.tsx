@@ -1,4 +1,5 @@
 import { ArrowLeft, Redo2, Save, Undo2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,14 +45,15 @@ export function EditorHeader({
   onRedo,
   onSave,
 }: EditorHeaderProps) {
+  const { t } = useTranslation("editor");
   return (
     <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-3 sm:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Back to asset library"
-          title="Back to asset library"
+          aria-label={t("backToLibrary")}
+          title={t("backToLibrary")}
           onClick={onBack}
         >
           <ArrowLeft />
@@ -85,8 +87,8 @@ export function EditorHeader({
         <Button
           variant="outline"
           size="icon"
-          aria-label="Undo"
-          title="Undo"
+          aria-label={t("undo")}
+          title={t("undo")}
           disabled={!canUndo}
           onClick={onUndo}
         >
@@ -95,8 +97,8 @@ export function EditorHeader({
         <Button
           variant="outline"
           size="icon"
-          aria-label="Redo"
-          title="Redo"
+          aria-label={t("redo")}
+          title={t("redo")}
           disabled={!canRedo}
           onClick={onRedo}
         >
@@ -105,7 +107,7 @@ export function EditorHeader({
         <Button size="sm" disabled={isSaving || !isDirty} onClick={onSave}>
           <Save data-icon="inline-start" />
           <span className="hidden sm:inline">
-            {isSaving ? "Saving" : "Save"}
+            {isSaving ? t("saving") : t("save")}
           </span>
         </Button>
       </div>

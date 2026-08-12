@@ -1,4 +1,5 @@
 import { Lightbulb } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { NewProjectController } from "./use-new-project-controller";
 import { GuidedProjectFlow } from "./guided-project-flow";
@@ -11,12 +12,13 @@ export function IdeaProjectFlow({
   active: boolean;
   project: NewProjectController;
 }) {
+  const { t } = useTranslation("projects");
   if (active) return <GuidedProjectFlow project={project} />;
 
   return (
     <ProjectStartCard
-      title="I have an idea"
-      description="Describe the game, generate a reference, and refine it until it feels right."
+      title={t("idea")}
+      description={t("ideaDescription")}
       icon={<Lightbulb size={20} />}
       onSelect={project.start.chooseIdea}
     />

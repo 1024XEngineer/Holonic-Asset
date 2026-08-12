@@ -1,5 +1,6 @@
 import { PencilLine, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ export function useAnimationActions({
   onRename: (animationId: string, label: string) => void;
   onDelete: (animationId: string) => void;
 }) {
+  const { t } = useTranslation("editor");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [editingAnimation, setEditingAnimation] =
     useState<CharacterAnimation | null>(null);
@@ -99,9 +101,9 @@ export function useAnimationActions({
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit animation name</DialogTitle>
+              <DialogTitle>{t("editAnimationName")}</DialogTitle>
               <DialogDescription>
-                Rename this clip without changing its generated frames.
+                {t("renameAnimationDescription")}
               </DialogDescription>
             </DialogHeader>
             <form className="grid gap-5" onSubmit={handleEdit}>
@@ -109,7 +111,7 @@ export function useAnimationActions({
                 className="grid gap-2 text-sm font-medium"
                 htmlFor="edit-animation-name"
               >
-                Animation name
+                {t("animationName")}
                 <Input
                   id="edit-animation-name"
                   autoFocus
@@ -122,7 +124,7 @@ export function useAnimationActions({
                 <DialogClose
                   render={<Button type="button" variant="outline" />}
                 >
-                  Cancel
+                  {t("cancel")}
                 </DialogClose>
                 <Button
                   type="submit"
@@ -130,7 +132,7 @@ export function useAnimationActions({
                     !animationLabelSchema.safeParse(editedLabel).success
                   }
                 >
-                  Save name
+                  {t("saveName")}
                 </Button>
               </DialogFooter>
             </form>
@@ -155,7 +157,7 @@ export function useAnimationActions({
               className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-xs font-medium hover:bg-muted"
             >
               <PencilLine className="size-3.5" />
-              Edit name
+              {t("editName")}
             </button>
             <button
               type="button"
@@ -167,7 +169,7 @@ export function useAnimationActions({
               className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-destructive hover:bg-destructive/10"
             >
               <Trash2 className="size-3.5" />
-              Delete animation
+              {t("deleteAnimation")}
             </button>
           </div>
         ) : null}

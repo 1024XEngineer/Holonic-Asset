@@ -1,5 +1,6 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { useRecordQuery } from "@/model";
@@ -16,6 +17,7 @@ export function EditorWorkspace({
   assetId: string;
   onBack: () => void;
 }) {
+  const { t } = useTranslation("editor");
   const { projectId } = useParams({
     from: "/projects/$projectId/assets/$assetId",
   });
@@ -25,8 +27,8 @@ export function EditorWorkspace({
     return (
       <EditorStatus
         icon={<LoaderCircle className="size-5 animate-spin" />}
-        title="Loading asset editor"
-        description="Preparing the latest asset record."
+        title={t("loadingTitle")}
+        description={t("loadingDescription")}
       />
     );
   }
@@ -35,7 +37,7 @@ export function EditorWorkspace({
     return (
       <EditorStatus
         icon={<AlertTriangle className="size-5" />}
-        title="Unable to open asset"
+        title={t("unableTitle")}
         description={recordQuery.error.message}
         action={
           <>
@@ -43,9 +45,9 @@ export function EditorWorkspace({
               variant="outline"
               onClick={() => void recordQuery.refetch()}
             >
-              Try again
+              {t("tryAgain")}
             </Button>
-            <Button onClick={onBack}>Back to library</Button>
+            <Button onClick={onBack}>{t("backToLibraryButton")}</Button>
           </>
         }
       />
@@ -56,9 +58,9 @@ export function EditorWorkspace({
     return (
       <EditorStatus
         icon={<AlertTriangle className="size-5" />}
-        title="Editor unavailable"
-        description="Audio assets do not have an editor workspace yet."
-        action={<Button onClick={onBack}>Back to library</Button>}
+        title={t("editorUnavailable")}
+        description={t("audioUnavailable")}
+        action={<Button onClick={onBack}>{t("backToLibraryButton")}</Button>}
       />
     );
   }

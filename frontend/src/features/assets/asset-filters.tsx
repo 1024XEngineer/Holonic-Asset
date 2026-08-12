@@ -1,6 +1,7 @@
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import { AssetKindIcon } from "@/components/asset-kind";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ export function AssetFilters({
   selectedKinds: AssetKind[];
   onSelectedKindsChange: (kinds: AssetKind[]) => void;
 }) {
+  const { t } = useTranslation(["assets", "common"]);
   const hiddenTypeCount = assetKinds.length - selectedKinds.length;
 
   const toggleKind = (kind: AssetKind, checked: boolean) => {
@@ -46,8 +48,8 @@ export function AssetFilters({
             type="button"
             variant="outline"
             size="icon-lg"
-            aria-label="Filter assets by type"
-            title="Filter assets by type"
+            aria-label={t("filter")}
+            title={t("filter")}
           />
         }
       >
@@ -55,7 +57,7 @@ export function AssetFilters({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Asset type</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("assetType")}</DropdownMenuLabel>
           {assetKinds.map((kind) => (
             <DropdownMenuCheckboxItem
               key={kind}
@@ -64,7 +66,7 @@ export function AssetFilters({
               onCheckedChange={(checked) => toggleKind(kind, checked)}
             >
               <AssetKindIcon kind={kind} />
-              <span className="flex-1">{getAssetKindConfig(kind).label}</span>
+              <span className="flex-1">{t(`common:assetKinds.${kind}`)}</span>
               <span className="text-xs text-muted-foreground">
                 {counts[kind]}
               </span>
@@ -78,7 +80,7 @@ export function AssetFilters({
               onClick={() => onSelectedKindsChange([...assetKinds])}
             >
               <RotateCcw />
-              Show all types
+              {t("showAll")}
             </DropdownMenuItem>
           </>
         ) : null}
