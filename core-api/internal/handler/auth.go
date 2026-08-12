@@ -31,7 +31,10 @@ func (h *AuthHandler) Login(
 				auth.ErrInvalidCredentials.Error(),
 			).SetInternal(err)
 		}
-		return dto.SuccessResponse[dto.LoginResponse]{}, err
+		return dto.SuccessResponse[dto.LoginResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			http.StatusText(http.StatusInternalServerError),
+		).SetInternal(err)
 	}
 	return dto.NewTypedSuccessResponse(dto.LoginResponse{
 		AccessToken: result.AccessToken,

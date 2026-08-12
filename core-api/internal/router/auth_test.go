@@ -2,6 +2,7 @@ package router_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/auth"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
@@ -27,6 +29,18 @@ func (authRouterStub) Login(
 		ExpiresIn:   3600,
 		User:        dto.LoginUser{ID: 1, Username: request.Username},
 	}), nil
+}
+
+type authManagerErrorStub struct {
+	err error
+}
+
+func (s authManagerErrorStub) Login(context.Context, string, string) (*auth.LoginResult, error) {
+	return nil, s.err
+}
+
+func (authManagerErrorStub) VerifyToken(string) (*auth.Claims, error) {
+	return nil, nil
 }
 
 func TestAuthenticationKeepsLoginPublicAndProtectsAPIRoutes(t *testing.T) {
@@ -61,5 +75,37 @@ func TestAuthenticationKeepsLoginPublicAndProtectsAPIRoutes(t *testing.T) {
 	server.ServeHTTP(protectedResponse, httptest.NewRequest(http.MethodPost, "/api/v1/uploads", nil))
 	if protectedResponse.Code != http.StatusUnauthorized {
 		t.Fatalf("expected protected route status %d, got %d", http.StatusUnauthorized, protectedResponse.Code)
+	}
+}
+
+func TestLoginResponseDoesNotExposeInternalErrors(t *testing.T) {
+	internalMessage := "auth: find user: database connection details"
+	server := router.Register(
+		nil,
+		nil,
+		nil,
+		nil,
+		router.Authentication{
+			Router: handler.NewAuthHandler(authManagerErrorStub{err: errors.New(internalMessage)}),
+		},
+	)
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		strings.NewReader(`{"username":"login-test-user","password":"login-test-password"}`),
+	)
+	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), internalMessage) {
+		t.Fatalf("response exposed internal error: %s", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), http.StatusText(http.StatusInternalServerError)) {
+		t.Fatalf("expected generic internal server error response, got %s", response.Body.String())
 	}
 }
