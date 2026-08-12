@@ -39,6 +39,22 @@ func TestJWTRejectsMissingToken(t *testing.T) {
 	}
 }
 
+func TestJWTRejectsInvalidToken(t *testing.T) {
+	e := echo.New()
+	e.GET("/protected", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	}, appmiddleware.JWT(tokenVerifierStub{}))
+	request := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	request.Header.Set(echo.HeaderAuthorization, "Bearer invalid-token")
+	response := httptest.NewRecorder()
+
+	e.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, response.Code)
+	}
+}
+
 func TestJWTExposesAuthenticatedUser(t *testing.T) {
 	e := echo.New()
 	e.GET("/protected", func(c echo.Context) error {

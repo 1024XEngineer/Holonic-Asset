@@ -40,7 +40,7 @@ func (s authManagerErrorStub) Login(context.Context, string, string) (*auth.Logi
 }
 
 func (authManagerErrorStub) VerifyToken(string) (*auth.Claims, error) {
-	return nil, nil
+	return &auth.Claims{}, nil
 }
 
 func TestAuthenticationKeepsLoginPublicAndProtectsAPIRoutes(t *testing.T) {
@@ -75,6 +75,25 @@ func TestAuthenticationKeepsLoginPublicAndProtectsAPIRoutes(t *testing.T) {
 	server.ServeHTTP(protectedResponse, httptest.NewRequest(http.MethodPost, "/api/v1/uploads", nil))
 	if protectedResponse.Code != http.StatusUnauthorized {
 		t.Fatalf("expected protected route status %d, got %d", http.StatusUnauthorized, protectedResponse.Code)
+	}
+}
+
+func TestAuthenticationUsesConfiguredAllowedOrigins(t *testing.T) {
+	server := router.Register(
+		nil,
+		nil,
+		nil,
+		nil,
+		router.Authentication{AllowedOrigins: []string{"https://example.com"}},
+	)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/openapi.json", nil)
+	request.Header.Set(echo.HeaderOrigin, "https://example.com")
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+
+	if origin := response.Header().Get(echo.HeaderAccessControlAllowOrigin); origin != "https://example.com" {
+		t.Fatalf("expected configured allowed origin, got %q", origin)
 	}
 }
 

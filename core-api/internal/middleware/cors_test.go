@@ -39,6 +39,23 @@ func TestCORSAllowsConfiguredOrigin(t *testing.T) {
 	}
 }
 
+func TestCORSAllowsAnyOriginByDefault(t *testing.T) {
+	e := echo.New()
+	e.Use(appmiddleware.CORS())
+	e.GET("/resource", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/resource", nil)
+	request.Header.Set(echo.HeaderOrigin, "https://example.com")
+	response := httptest.NewRecorder()
+	e.ServeHTTP(response, request)
+
+	if origin := response.Header().Get(echo.HeaderAccessControlAllowOrigin); origin != "*" {
+		t.Fatalf("expected wildcard allowed origin, got %q", origin)
+	}
+}
+
 func TestCORSMarksResponsesWithoutOriginAsVariant(t *testing.T) {
 	e := echo.New()
 	e.Use(appmiddleware.CORS("https://example.com"))
