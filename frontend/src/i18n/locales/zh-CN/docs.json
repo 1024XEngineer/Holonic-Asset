@@ -3,14 +3,14 @@
   "contents": "目录",
   "referenceTitle": "为什么参考图很重要",
   "perspectiveTitle": "视角类型",
-  "directionsTitle": "1 / 4 / 8 个方向",
+  "directionsTitle": "2 / 4 / 8 个方向",
   "tilesetsTitle": "拆分瓦片集",
   "directions": {
     "heading": "方向数量决定角色移动的自由度。",
     "intro": "一个方向代表同一角色的一个视图。更多方向会让移动更自然，但每个新增视图都必须保持姿势、装备和光照一致。",
     "match": "让方向数量匹配真实移动",
-    "oneTitle": "一个方向",
-    "oneBody": "静态肖像、侧视角色或固定朝向的物体适合使用一个方向。",
+    "twoTitle": "两个方向",
+    "twoBody": "侧视角色水平移动时，使用左、右两个视图；它适合平台游戏和横版动作游戏中的角色。",
     "fourTitle": "四个方向",
     "fourBody": "对于俯视移动，前、后、左、右是实用的起点。",
     "fourNote": "每个视图都应保持相同的轮廓、武器位置和光照方向。这组剑士展示了俯视角色所需的四个基本方向。",
@@ -30,7 +30,6 @@
       "south-west": "西南",
       "south": "南",
       "south-east": "东南",
-      "oneAlt": "从单一方向展示的待机骑士",
       "swordsmanAlt": "{{label}}方向的剑士",
       "basketballAlt": "{{label}}方向的篮球运动员"
     }

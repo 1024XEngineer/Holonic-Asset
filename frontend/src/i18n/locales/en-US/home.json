@@ -35,7 +35,7 @@
   "capabilities": {
     "characters": {
       "title": "Characters",
-      "description": "Generate character prototypes (1/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
+      "description": "Generate character prototypes (2/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
       "detail": "Prototypes, Spritesheets & SFX",
       "alt": "Basketball player running south animation",
       "headline": "Make your characters move"
@@ -81,7 +81,7 @@
     },
     "prototypes": {
       "title": "Multi-View Prototypes",
-      "description": "Generate character and object prototypes with 1, 4, or 8-directional views (top-down, side-on, isometric) maintaining consistent style."
+      "description": "Generate character and object prototypes with 2, 4, or 8-directional views (side-on, top-down, isometric) while maintaining consistent style."
     },
     "animations": {
       "title": "Animations & Bound SFX",

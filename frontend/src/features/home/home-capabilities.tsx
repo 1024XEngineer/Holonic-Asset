@@ -14,7 +14,7 @@ const capabilities = [
     key: "characters",
     title: "Characters",
     description:
-      "Generate character prototypes (1/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
+      "Generate character prototypes (2/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
     detail: "Prototypes, Spritesheets & SFX",
     to: "/projects",
     icon: ImageIcon,
