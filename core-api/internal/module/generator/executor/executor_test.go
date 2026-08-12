@@ -169,8 +169,6 @@ type generationAssetWriterStub struct {
 	getDetailErr     error
 	characterAsset   *assetdomain.Asset
 	objectAsset      *assetdomain.Asset
-	prototypeAssetID uint
-	prototypeImages  []assetdomain.ImageResource
 	createdRecord    *assetdomain.AssetRecord
 	recordVersion    uint
 	animationAssetID uint
@@ -255,17 +253,6 @@ func (s *generationAssetWriterStub) CreateAnimation(
 	return 3, nil
 }
 
-func (s *generationAssetWriterStub) UpdatePrototypeImages(
-	_ context.Context,
-	assetID uint,
-	images []assetdomain.ImageResource,
-) error {
-	*s.events = append(*s.events, "update_prototype")
-	s.prototypeAssetID = assetID
-	s.prototypeImages = append([]assetdomain.ImageResource(nil), images...)
-	return s.err
-}
-
 func (s *generationAssetWriterStub) CreateRecord(
 	_ context.Context,
 	record *assetdomain.AssetRecord,
@@ -290,19 +277,6 @@ func (s *generationAssetWriterStub) CreateRecord(
 		version = 2
 	}
 	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
-}
-
-func (s *generationAssetWriterStub) UpdateAnimationFrames(
-	_ context.Context,
-	assetID uint,
-	animationID uint,
-	frames []assetdomain.Frame,
-) error {
-	*s.events = append(*s.events, "update_animation_frames")
-	s.animationAssetID = assetID
-	s.animationID = animationID
-	s.frames = append([]assetdomain.Frame(nil), frames...)
-	return s.err
 }
 
 func animationParentAsset(t *testing.T) assetdomain.Asset {
