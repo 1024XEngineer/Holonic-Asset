@@ -5,6 +5,7 @@ import {
   reconcileProjectSelection,
   removeProjectSelection,
   useDeleteProjectMutation,
+  useProjectDetailQuery,
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "@/model";
@@ -36,10 +37,12 @@ export function useProjectLibrary(
   const navigate = useNavigate();
   const { data: projectData, isSuccess: projectsLoaded } =
     useProjectListQuery();
+  const { data: projectDetail } = useProjectDetailQuery(selectedProjectId);
   const projects = projectData ?? EMPTY_PROJECTS;
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
   const { mutate: updateProject } = useUpdateProjectMutation();
-  const project = projects.find((item) => item.id === selectedProjectId);
+  const project =
+    projectDetail ?? projects.find((item) => item.id === selectedProjectId);
 
   const selectProject = useCallback(
     (projectId: string | undefined, replace = false) => {
