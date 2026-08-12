@@ -10,6 +10,16 @@ queue:
   maxWorkers: 10
   jobTimeout: 30m
 
+auth:
+  # Replace this value with a secret of at least 32 bytes. The
+  # HOLONIC_AUTH_JWT_SECRET environment variable takes precedence.
+  jwtSecret: "replace-with-a-long-random-secret"
+  tokenExpiry: 24h
+
+http:
+  allowedOrigins:
+    - "http://localhost:5173"
+
 log:
   path: ./logs/holonic-asset.log
   maxSize: 100

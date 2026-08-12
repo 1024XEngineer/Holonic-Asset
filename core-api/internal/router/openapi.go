@@ -11,9 +11,23 @@ import (
 
 const apiBasePath = "/api/v1"
 
-func newOpenAPI(e *echo.Echo, group *echo.Group) huma.API {
+func newOpenAPI(e *echo.Echo, group *echo.Group, authenticated bool) huma.API {
 	config := huma.DefaultConfig("Holonic Asset Core API", "0.1.0")
 	config.Servers = []*huma.Server{{URL: apiBasePath}}
+	if authenticated {
+		config.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+			"bearerAuth": {
+				Type:         "http",
+				Scheme:       "bearer",
+				BearerFormat: "JWT",
+			},
+		}
+		config.OnAddOperation = append(config.OnAddOperation, func(_ *huma.OpenAPI, operation *huma.Operation) {
+			if operation.OperationID != "login" {
+				operation.Security = []map[string][]string{{"bearerAuth": {}}}
+			}
+		})
+	}
 
 	// Keep existing response bodies stable while Huma is introduced
 	// incrementally. The default schema-link transformer adds a $schema field.
