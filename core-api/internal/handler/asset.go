@@ -101,7 +101,7 @@ func (h *Handler) Record(
 	if asset.AssetID == 0 {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, echo.ErrBadRequest
 	}
-	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID})
+	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID}, 0)
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}

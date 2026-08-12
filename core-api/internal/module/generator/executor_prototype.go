@@ -119,7 +119,7 @@ func (e *executor) editCharacterPrototype(
 	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
 		AssetID: asset.ID,
 		Content: encoded,
-	})
+	}, asset.Version)
 	if err != nil {
 		return nil, fmt.Errorf("generator: create character asset %d version: %w", asset.ID, err)
 	}
@@ -395,4 +395,74 @@ func newPrototypeAsset(
 		Dimensions:  dimensionsValue,
 		Content:     encoded,
 	}, nil
+}
+
+func (e *executor) editObjectPrototype(
+	ctx context.Context,
+	payload EditObjectPrototypePayload,
+) (json.RawMessage, error) {
+	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: load object asset %d: %w", payload.AssetID, err)
+	}
+	if asset.ID == 0 {
+		return nil, fmt.Errorf("generator: object asset %d not found", payload.AssetID)
+	}
+	if asset.Type != assetdomain.AssetTypeObject {
+		return nil, fmt.Errorf("generator: object prototype edit is unsupported for asset type %q", asset.Type)
+	}
+	if !asset.Perspective.Valid() {
+		return nil, fmt.Errorf("generator: invalid perspective %q", asset.Perspective)
+	}
+	var dimensions assetdomain.Size
+	if err := json.Unmarshal(asset.Dimensions, &dimensions); err != nil {
+		return nil, fmt.Errorf("generator: decode asset %d dimensions: %w", asset.ID, err)
+	}
+	if err := assetdomain.ValidateDimensions(asset.Type, asset.Dimensions); err != nil {
+		return nil, err
+	}
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("generator: decode object asset %d content: %w", asset.ID, err)
+	}
+	originalReferences, err := prototypeReferences(content.Prototype)
+	if err != nil {
+		return nil, fmt.Errorf("generator: load object asset %d prototype: %w", asset.ID, err)
+	}
+	directionCount := asset.Perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
+		ctx,
+		EditObjectProtoType,
+		prompts.EditObjectPrototype(
+			asset.Description,
+			payload.EditInstructions,
+			string(asset.Perspective),
+			uint(len(originalReferences)),
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
+		dimensions,
+		directionCount,
+		originalReferences,
+	)
+	if err != nil {
+		return nil, err
+	}
+	prototype := assetdomain.Prototype(resources)
+	content.Prototype = &prototype
+	content.DirectionCount = directionCount
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		return nil, fmt.Errorf("generator: encode edited object asset %d content: %w", asset.ID, err)
+	}
+	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
+		AssetID: asset.ID,
+		Content: encoded,
+	}, asset.Version)
+	if err != nil {
+		return nil, fmt.Errorf("generator: create object asset %d version: %w", asset.ID, err)
+	}
+	if record == nil || record.Version == 0 {
+		return nil, fmt.Errorf("generator: create object asset %d version: empty result", asset.ID)
+	}
+	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
 }
