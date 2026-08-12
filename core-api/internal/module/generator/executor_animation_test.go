@@ -4,7 +4,52 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 )
+
+func TestAnimationFrameSelectionOptionsOwnBusinessPolicy(t *testing.T) {
+	options := animationFrameSelectionOptions(16)
+	if options.SampleCount != 16 ||
+		options.MinimumSpanFrames != animationMinLoopSpanFrames ||
+		options.MinimumSpanRatio != animationMinLoopSpanRatio ||
+		options.MinimumStartWindowFrames != animationMinStartWindow ||
+		options.StartWindowRatio != animationInitialWindowRatio ||
+		!options.PreferFirstFrame ||
+		options.MinimumForegroundRatio != animationMinForegroundRatio {
+		t.Fatalf("unexpected animation frame selection constraints: %+v", options)
+	}
+	weights := options.Weights
+	if weights.EndpointSimilarity != animationEndpointWeight ||
+		weights.MeanAdjacentMSE != animationRichnessWeight ||
+		weights.CentroidStability != animationCentroidStabilityWeight ||
+		weights.LinearCentroidMotion != animationTranslationWeight ||
+		weights.FirstFrameSimilarity != animationInitialFrameWeight ||
+		weights.Compactness != animationLoopCompactnessWeight ||
+		weights.GeometryCoverage != animationPoseCoverageWeight ||
+		weights.ChangeCoverage != animationMotionCoverageWeight ||
+		weights.PostIntervalStability != animationRecoveryWeight {
+		t.Fatalf("unexpected animation frame selection weights: %+v", weights)
+	}
+}
+
+func TestAnimationLoopSelectionMapsMediaMeasurements(t *testing.T) {
+	loop := animationLoopSelection(videoprocessor.FrameIntervalSelection{
+		StartFrame: 2, EndFrame: 18, Score: 1.1234567,
+		EndpointSimilarity: .9876543, MeanAdjacentMSE: .1234567,
+		GeometryCoverage: .7654321, SpanRatio: .5000004,
+		CentroidStability: .8765432, EndpointMSE: animationSeamWarningMSE + .001,
+	}, 12)
+	if loop.CandidateFPS != 12 || loop.StartFrame != 2 || loop.EndFrame != 18 || loop.SpanFrames != 16 {
+		t.Fatalf("unexpected animation loop boundaries: %+v", loop)
+	}
+	if loop.Score != 1.123457 || loop.Richness != .123457 || loop.PoseCoverage != .765432 {
+		t.Fatalf("unexpected mapped animation metrics: %+v", loop)
+	}
+	if loop.Method != "subject_mse_full_cycle" || loop.SeamWarning == "" {
+		t.Fatalf("unexpected animation loop metadata: %+v", loop)
+	}
+}
 
 func TestAnimationDirectionIndexUsesAssetDirectionLayout(t *testing.T) {
 	tests := []struct {

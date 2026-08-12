@@ -52,3 +52,10 @@ func TestAnimationVideoPromptsStayInsideProviderLimit(t *testing.T) {
 		t.Fatalf("retry prompt has %d runes", got)
 	}
 }
+
+func TestAnimationVideoRetryMapsForegroundMediaErrorToSubjectCorrection(t *testing.T) {
+	retry := BuildAnimationVideoRetry("base", "foreground")
+	if !strings.Contains(retry, "lost the readable subject silhouette") {
+		t.Fatalf("foreground error did not select subject correction: %s", retry)
+	}
+}
