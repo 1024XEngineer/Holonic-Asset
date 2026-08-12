@@ -15,9 +15,14 @@ vi.mock("@/lib/read-file-as-data-url", () => ({
   readFileAsDataUrl: mocks.readFileAsDataUrl,
 }));
 
-import { generationApi, toCreateGenerationRequest } from "./generation.api";
+import {
+  generationApi,
+  pruneGenerationRequests,
+  toCreateGenerationRequest,
+} from "./generation.api";
 
 beforeEach(() => {
+  pruneGenerationRequests("42", []);
   vi.clearAllMocks();
   mocks.core.create.mockResolvedValue({ generationRunId: 17 });
   mocks.core.list.mockResolvedValue({ items: [] });
@@ -53,14 +58,14 @@ describe("generationApi", () => {
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 
-    await expect(
-      generationApi.enqueue({ projectId: "42", request }),
-    ).resolves.toMatchObject({
+    const run = await generationApi.enqueue({ projectId: "42", request });
+    expect(run).toMatchObject({
       id: "17",
       projectId: "42",
       name: request.name,
       status: "pending",
     });
+    expect(run).not.toHaveProperty("reference");
     expect(mocks.core.create).toHaveBeenCalledWith(
       42,
       expect.objectContaining({ kind: "generate_character_prototype" }),
@@ -85,6 +90,45 @@ describe("generationApi", () => {
       }),
     ]);
     expect(mocks.core.list).toHaveBeenCalledWith(42, { status: "active" });
+
+    pruneGenerationRequests("42", []);
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "17",
+        name: "New character",
+        prompt: "",
+        canvasSize: "32 × 32 px",
+      }),
+    ]);
+  });
+
+  it("retains metadata for failed runs while pruning runs no longer listed", async () => {
+    const request = creationRequest();
+    await generationApi.enqueue({ projectId: "42", request });
+
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 17,
+          projectId: 42,
+          kind: "generate_character_prototype",
+          status: "failed",
+        },
+      ],
+    });
+    pruneGenerationRequests("42", ["17"]);
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "17",
+        name: request.name,
+        prompt: request.prompt,
+        status: "failed",
+      }),
+    ]);
+
+    pruneGenerationRequests("42", []);
+    mocks.core.list.mockResolvedValue({ items: [] });
+    await expect(generationApi.listRuns("42")).resolves.toEqual([]);
   });
 
   it("rejects projects that have not been persisted by the Core API", async () => {
