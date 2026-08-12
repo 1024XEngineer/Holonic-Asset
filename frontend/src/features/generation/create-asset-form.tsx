@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getAssetKindConfig } from "@/components/asset-kind";
 import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
@@ -37,7 +36,7 @@ export function CreateAssetForm({
   error?: Error | null;
   isSubmitting?: boolean;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["generation", "common"]);
   const [useProjectContext, setUseProjectContext] = useState(true);
   const [validationError, setValidationError] = useState<string>();
   const form = useForm({
@@ -74,15 +73,15 @@ export function CreateAssetForm({
     >
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
-          {t("generation.assetName")}
+          {t("assetName")}
           <Input
             required
             placeholder={
               draft.kind === "audio"
-                ? t("generation.audioNamePlaceholder")
+                ? t("audioNamePlaceholder")
                 : draft.kind === "character"
-                  ? t("generation.characterNamePlaceholder")
-                  : t("generation.objectNamePlaceholder")
+                  ? t("characterNamePlaceholder")
+                  : t("objectNamePlaceholder")
             }
             value={draft.name}
             onChange={(event) =>
@@ -91,14 +90,14 @@ export function CreateAssetForm({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium lg:col-span-2">
-          {t("generation.creativeBrief")}
+          {t("creativeBrief")}
           <Textarea
             required
             className="min-h-28 resize-none"
             placeholder={
               draft.kind === "audio"
-                ? t("generation.audioPromptPlaceholder")
-                : t("generation.promptPlaceholder")
+                ? t("audioPromptPlaceholder")
+                : t("promptPlaceholder")
             }
             value={draft.prompt}
             onChange={(event) =>
@@ -133,13 +132,13 @@ export function CreateAssetForm({
           checked={useProjectContext}
           onChange={(event) => setUseProjectContext(event.target.checked)}
         />
-        {t("generation.useContext", { name: project.name })}
+        {t("useContext", { name: project.name })}
       </label>
 
       {useProjectContext ? (
         <div className="border bg-muted/40 p-4">
           <p className="text-xs font-medium text-muted-foreground">
-            {t("generation.context")}
+            {t("context")}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {[project.gameType, project.style, project.platform]
@@ -160,7 +159,7 @@ export function CreateAssetForm({
 
       {error ? (
         <p className="text-sm text-destructive" role="alert">
-          {error.message || t("generation.createError")}
+          {error.message || t("createError")}
         </p>
       ) : null}
 
@@ -171,13 +170,13 @@ export function CreateAssetForm({
           disabled={isSubmitting}
           onClick={onCancel}
         >
-          {t("actions.cancel")}
+          {t("common:actions.cancel")}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <LoaderCircle className="animate-spin" /> : null}
           {isSubmitting
-            ? t("actions.creating")
-            : t("actions.create") + ` ${getAssetKindConfig(kind).label}`}
+            ? t("common:actions.creating")
+            : t("createKind", { kind: t(`common:assetKinds.${kind}`) })}
         </Button>
       </div>
     </form>

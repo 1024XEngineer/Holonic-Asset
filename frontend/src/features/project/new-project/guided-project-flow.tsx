@@ -14,7 +14,7 @@ export function GuidedProjectFlow({
 }: {
   project: NewProjectController;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation("projects");
   const { form, preview } = project;
   const { instance: newProjectForm, step } = form;
 
@@ -29,11 +29,9 @@ export function GuidedProjectFlow({
     >
       {step === 2 ? (
         <div>
-          <h2 className="text-lg font-semibold">
-            {t("project.projectOverview")}
-          </h2>
+          <h2 className="text-lg font-semibold">{t("projectOverview")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("project.overviewDescription")}
+            {t("overviewDescription")}
           </p>
         </div>
       ) : null}
@@ -42,13 +40,13 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="name">
             {(field) => (
               <label className="grid gap-2 text-sm font-semibold">
-                {t("project.projectName")}
+                {t("projectName")}
                 <input
                   autoFocus
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   className="w-full rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-                  placeholder={t("project.projectNamePlaceholder")}
+                  placeholder={t("projectNamePlaceholder")}
                 />
               </label>
             )}
@@ -57,7 +55,7 @@ export function GuidedProjectFlow({
             <newProjectForm.Field name="gameType">
               {(field) => (
                 <DropdownField
-                  label={t("project.gameType")}
+                  label={t("gameType")}
                   value={field.state.value}
                   options={projectContextOptions.gameTypes}
                   onChange={field.handleChange}
@@ -67,7 +65,7 @@ export function GuidedProjectFlow({
             <newProjectForm.Field name="platform">
               {(field) => (
                 <DropdownField
-                  label={t("project.platform")}
+                  label={t("platform")}
                   value={field.state.value}
                   options={projectContextOptions.platforms}
                   onChange={field.handleChange}
@@ -78,7 +76,7 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="perspective">
             {(field) => (
               <DropdownField
-                label={t("project.perspective")}
+                label={t("perspective")}
                 value={field.state.value}
                 options={projectContextOptions.perspectives}
                 onChange={(value) => {
@@ -90,12 +88,12 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="description">
             {(field) => (
               <label className="grid gap-2 text-sm font-semibold">
-                {t("project.gameDescription")}
+                {t("gameDescription")}
                 <textarea
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   className="min-h-28 w-full resize-none rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-                  placeholder={t("project.gameDescriptionPlaceholder")}
+                  placeholder={t("gameDescriptionPlaceholder")}
                 />
               </label>
             )}
@@ -110,18 +108,18 @@ export function GuidedProjectFlow({
           }}
         >
           <TabsList
-            aria-label={t("project.overviewSource")}
+            aria-label={t("overviewSource")}
             className="grid w-full grid-cols-2"
           >
-            <TabsTrigger value="generate">{t("project.generate")}</TabsTrigger>
-            <TabsTrigger value="upload">{t("project.upload")}</TabsTrigger>
+            <TabsTrigger value="generate">{t("generate")}</TabsTrigger>
+            <TabsTrigger value="upload">{t("upload")}</TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="grid gap-3">
             <div className="aspect-[16/9] overflow-hidden rounded-md border bg-muted/30">
               {preview.url ? (
                 <img
                   src={preview.url}
-                  alt={t("project.generatedOverview")}
+                  alt={t("generatedOverview")}
                   className="size-full object-cover"
                 />
               ) : null}
@@ -132,15 +130,13 @@ export function GuidedProjectFlow({
               className="w-full"
               onClick={preview.generate}
             >
-              {preview.url
-                ? t("project.regeneratePreview")
-                : t("project.generatePreview")}
+              {preview.url ? t("regeneratePreview") : t("generatePreview")}
             </Button>
           </TabsContent>
           <TabsContent value="upload">
             <ImageDropzone
               className="aspect-[16/9] min-h-0"
-              label={t("project.uploadOverview")}
+              label={t("uploadOverview")}
               previewUrl={preview.url || undefined}
               error={preview.error}
               onSelect={preview.setFile}
@@ -155,13 +151,13 @@ export function GuidedProjectFlow({
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           onClick={form.previous}
         >
-          <ArrowLeft size={16} /> {t("project.previous")}
+          <ArrowLeft size={16} /> {t("previous")}
         </button>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
         >
-          {step === 2 ? t("project.submit") : t("project.next")}
+          {step === 2 ? t("submit") : t("next")}
           <ArrowRight size={16} />
         </button>
       </div>

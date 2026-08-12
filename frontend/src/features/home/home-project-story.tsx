@@ -9,10 +9,10 @@ const layers = [
   { id: "foreground", color: "bg-emerald-300" },
   { id: "atmosphere", color: "bg-amber-200" },
   { id: "background", color: "bg-sky-300" },
-];
+] as const;
 
 export function HomeProjectStory() {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["home", "projects"]);
   const [activeLayer, setActiveLayer] = useState("foreground");
 
   return (
@@ -34,17 +34,16 @@ export function HomeProjectStory() {
           />
           <img
             src="/assets/nearby-trees.png"
-            alt={t("home.projectStory.imageAlt")}
+            alt={t("projectStory.imageAlt")}
             className={`absolute inset-0 size-full object-cover mix-blend-multiply transition-opacity duration-500 ${activeLayer === "foreground" ? "opacity-100" : "opacity-35"}`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20" />
 
           <div className="absolute top-5 right-5 left-5 flex items-center justify-between border-b border-white/25 pb-4 font-mono text-[10px] tracking-[0.14em] text-white/65">
             <span>
-              {t("project.assetLibrary")} /{" "}
-              {t("home.capabilities.scenery.title")}
+              {t("projects:assetLibrary")} / {t("capabilities.scenery.title")}
             </span>
-            <span>{t("home.projectStory.organizedByProject")}</span>
+            <span>{t("projectStory.organizedByProject")}</span>
           </div>
 
           <div className="absolute right-5 bottom-5 left-5 sm:right-8 sm:bottom-8 sm:left-8">
@@ -52,7 +51,7 @@ export function HomeProjectStory() {
               <div className="flex items-center gap-2">
                 <Layers3 className="size-4 text-white/60" />
                 <p className="text-xs font-semibold tracking-[0.14em] text-white/60">
-                  {t("home.projectStory.sceneLayers")}
+                  {t("projectStory.sceneLayers")}
                 </p>
               </div>
               <div className="mt-4 grid gap-1">
@@ -65,9 +64,9 @@ export function HomeProjectStory() {
                     className={`flex w-full items-center gap-3 border-t border-white/10 px-1 pt-2 text-left text-sm transition-colors hover:text-lime-200 focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:outline-none ${activeLayer === id ? "text-lime-200" : "text-white"}`}
                   >
                     <span className={`size-2 rounded-full ${color}`} />
-                    <span>{t(`home.projectStory.layers.${id}.0`)}</span>
+                    <span>{t(`projectStory.layers.${id}.label`)}</span>
                     <span className="ml-auto text-[10px] text-white/45">
-                      {t(`home.projectStory.layers.${id}.1`)}
+                      {t(`projectStory.layers.${id}.description`)}
                     </span>
                   </button>
                 ))}
@@ -79,29 +78,29 @@ export function HomeProjectStory() {
         <div className="flex flex-col justify-between px-5 py-14 sm:px-8 sm:py-20 lg:px-14 lg:py-24">
           <div>
             <p className="text-xs font-semibold tracking-[0.2em] text-lime-300">
-              {t("home.projectStory.consistencyFeature")}
+              {t("projectStory.consistencyFeature")}
             </p>
             <h2
               id="project-story-heading"
               className="mt-6 max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] sm:text-5xl lg:text-6xl"
             >
-              {t("home.projectStory.title")}
+              {t("projectStory.title")}
             </h2>
           </div>
 
           <div className="mt-20 max-w-xl lg:mt-28">
             <p className="text-lg leading-8 text-white/70">
-              {t("home.projectStory.description")}
+              {t("projectStory.description")}
             </p>
             <p className="mt-5 text-sm leading-7 text-white/50">
-              {t("home.projectStory.details")}
+              {t("projectStory.details")}
             </p>
             <Button
               className="mt-8 bg-white text-neutral-950 hover:bg-lime-300"
               nativeButton={false}
               render={<Link to="/projects" />}
             >
-              {t("home.projectStory.openWorkspace")}
+              {t("projectStory.openWorkspace")}
               <ArrowRight data-icon="inline-end" />
             </Button>
           </div>

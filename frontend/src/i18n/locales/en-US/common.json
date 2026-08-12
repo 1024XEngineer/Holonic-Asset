@@ -1,4 +1,23 @@
 {
   "language": "Language",
-  "languages": { "en-US": "English", "zh-CN": "Simplified Chinese" }
+  "actions": {
+    "cancel": "Cancel",
+    "delete": "Delete asset",
+    "save": "Save changes",
+    "tryAgain": "Try again",
+    "close": "Close",
+    "back": "Back",
+    "newProject": "New Project",
+    "newAsset": "New asset",
+    "create": "Create",
+    "creating": "Creating..."
+  },
+  "assetKinds": {
+    "character": "Character",
+    "object": "Object",
+    "tileset": "Tileset",
+    "scenery": "Scenery",
+    "uiset": "UI Set",
+    "audio": "Audio"
+  }
 }

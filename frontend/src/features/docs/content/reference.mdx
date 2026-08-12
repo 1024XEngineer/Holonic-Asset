@@ -1,15 +1,11 @@
 export const metadata = { title: "Why references matter" };
 
 import { ReferenceComparison } from "@/features/docs/reference-comparison";
-import { DocImage, DocText } from "../doc-text";
+import { DocHeading, DocImage, DocText } from "../doc-text";
 
-<h2 id="reference-heading">
-  <DocText i18nKey="reference.heading" />
-</h2>
+<DocHeading level={2} id="reference-constraint" i18nKey="reference.heading" />
 
-<h3 id="reference-introduction">
-  <DocText i18nKey="reference.introTitle" />
-</h3>
+<DocHeading level={3} id="introduction" i18nKey="reference.introTitle" />
 
 <DocText i18nKey="reference.introBody" />
 
@@ -19,9 +15,7 @@ import { DocImage, DocText } from "../doc-text";
   className="mt-6 block h-auto w-full border border-neutral-950/10 bg-[#f0eee7]"
 />
 
-<h3 id="reference-choose">
-  <DocText i18nKey="reference.chooseTitle" />
-</h3>
+<DocHeading level={3} id="choose-references" i18nKey="reference.chooseTitle" />
 
 - <DocText i18nKey="reference.choose1" />
 - <DocText i18nKey="reference.choose2" />
@@ -29,15 +23,15 @@ import { DocImage, DocText } from "../doc-text";
 - <DocText i18nKey="reference.choose4" />
 - <DocText i18nKey="reference.choose5" />
 
-<h3 id="reference-prompt">
-  <DocText i18nKey="reference.promptTitle" />
-</h3>
+<DocHeading level={3} id="explicit-prompt" i18nKey="reference.promptTitle" />
 
 <DocText i18nKey="reference.promptBody" />
 
-<h2 id="reference-difference">
-  <DocText i18nKey="reference.differenceTitle" />
-</h2>
+<DocHeading
+  level={2}
+  id="reference-comparison"
+  i18nKey="reference.differenceTitle"
+/>
 
 <DocText i18nKey="reference.differenceBody" />
 

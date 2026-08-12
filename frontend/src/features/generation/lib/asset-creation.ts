@@ -58,7 +58,6 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
     ...commonAssetCreationDraftShape,
     kind: z.enum(["character", "object"]),
     perspective: perspectiveSchema,
-    directionCount: z.enum(["1", "4", "8"]),
     reference: z.unknown().optional(),
   }),
 ]);
@@ -105,7 +104,6 @@ export function createAssetCreationDraft<Reference = unknown>(
         ...common,
         kind,
         perspective: perspectiveOptions[0],
-        directionCount: "4",
         reference: undefined,
       };
   }
@@ -146,7 +144,6 @@ export function toCreationRequest<Reference>(
         ? {
             ...common,
             perspective: draft.perspective,
-            directionCount: draft.directionCount,
             reference: draft.reference,
           }
         : common;

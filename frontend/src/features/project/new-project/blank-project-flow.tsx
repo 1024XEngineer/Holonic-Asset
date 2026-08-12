@@ -11,12 +11,12 @@ export function BlankProjectFlow({
   active: boolean;
   project: NewProjectController;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation("projects");
   if (!active) {
     return (
       <ProjectStartCard
-        title={t("project.blank")}
-        description={t("project.blankDescription")}
+        title={t("blank")}
+        description={t("blankDescription")}
         icon={<FilePlus2 size={20} />}
         onSelect={project.start.chooseBlank}
       />
@@ -37,13 +37,13 @@ export function BlankProjectFlow({
       <newProjectForm.Field name="name">
         {(field) => (
           <label className="grid gap-2 text-sm font-semibold">
-            {t("project.projectName")}
+            {t("projectName")}
             <input
               autoFocus
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               className="w-full rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-              placeholder={t("project.projectNamePlaceholder")}
+              placeholder={t("projectNamePlaceholder")}
             />
           </label>
         )}
@@ -54,13 +54,13 @@ export function BlankProjectFlow({
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           onClick={form.previous}
         >
-          <ArrowLeft size={16} /> {t("project.previous")}
+          <ArrowLeft size={16} /> {t("previous")}
         </button>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
         >
-          {t("project.submit")}
+          {t("submit")}
           <ArrowRight size={16} />
         </button>
       </div>

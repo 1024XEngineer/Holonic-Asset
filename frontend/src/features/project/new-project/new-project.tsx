@@ -11,7 +11,7 @@ export interface NewProjectWorkspaceProps {
 }
 
 export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["projects", "common"]);
   const { backToLibrary, form } = project;
   const { selectedStart } = form;
   const isBlank = selectedStart === "blank";
@@ -25,7 +25,7 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         className="absolute left-4 top-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:left-6 sm:top-6"
       >
         <ArrowLeft className="size-4" />
-        {t("actions.back")}
+        {t("common:actions.back")}
       </button>
       <div
         className={`mx-auto w-full max-w-6xl px-4 py-8 pb-20 sm:px-6 ${
@@ -37,16 +37,16 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {selectedStart
                 ? isBlank
-                  ? t("project.startBlankTitle")
-                  : t("project.tellGameTitle")
-                : t("project.startTitle")}
+                  ? t("startBlankTitle")
+                  : t("tellGameTitle")
+                : t("startTitle")}
             </h1>
             <p className="mt-2 text-muted-foreground">
               {selectedStart
                 ? isBlank
-                  ? t("project.blankPrompt")
-                  : t("project.detailsPrompt")
-                : t("project.startPrompt")}
+                  ? t("blankPrompt")
+                  : t("detailsPrompt")
+                : t("startPrompt")}
             </p>
           </div>
         </div>

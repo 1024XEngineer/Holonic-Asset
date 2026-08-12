@@ -1,40 +1,34 @@
 export const metadata = { title: "Perspective types" };
 
 import { PerspectiveExample } from "@/features/docs/perspective-examples";
-import { DocText } from "../doc-text";
+import { DocHeading, DocText } from "../doc-text";
 
-<h2 id="perspective-heading">
-  <DocText i18nKey="perspective.heading" />
-</h2>
+<DocHeading level={2} id="choose-perspective" i18nKey="perspective.heading" />
 
 <DocText i18nKey="perspective.intro" />
 
-<h3 id="perspective-top-down">
-  <DocText i18nKey="perspective.topDownTitle" />
-</h3>
+<DocHeading level={3} id="top-down" i18nKey="perspective.topDownTitle" />
 
 <DocText i18nKey="perspective.topDownBody" />
 
 <PerspectiveExample image="top-down-2d.jpg" altKey="perspective.topDownAlt" />
 
-<h3 id="perspective-side-on">
-  <DocText i18nKey="perspective.sideOnTitle" />
-</h3>
+<DocHeading level={3} id="side-on" i18nKey="perspective.sideOnTitle" />
 
 <DocText i18nKey="perspective.sideOnBody" />
 
 <PerspectiveExample image="side-on.jpg" altKey="perspective.sideOnAlt" />
 
-<h3 id="perspective-isometric">
-  <DocText i18nKey="perspective.isometricTitle" />
-</h3>
+<DocHeading level={3} id="isometric" i18nKey="perspective.isometricTitle" />
 
 <DocText i18nKey="perspective.isometricBody" />
 
 <PerspectiveExample image="isometric.png" altKey="perspective.isometricAlt" />
 
-<h2 id="perspective-keep-camera-language">
-  <DocText i18nKey="perspective.keepTitle" />
-</h2>
+<DocHeading
+  level={2}
+  id="keep-one-perspective"
+  i18nKey="perspective.keepTitle"
+/>
 
 <DocText i18nKey="perspective.keepBody" />

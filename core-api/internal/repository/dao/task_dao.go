@@ -32,6 +32,7 @@ type TaskDao interface {
 
 	UpdateStatus(ctx context.Context, taskID uint, status uint) error
 	UpdateResult(ctx context.Context, taskID uint, status uint, result datatypes.JSON) error
+	UpdateFailure(ctx context.Context, taskID uint, status uint, errorMessage string) error
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
 	List(ctx context.Context, filter TaskListFilter) ([]*Task, error)
 }
@@ -69,6 +70,20 @@ func (d *TaskDaoImpl) UpdateResult(ctx context.Context, taskID uint, status uint
 		})
 	if query.Error != nil {
 		return fmt.Errorf("dao: update result task %d: %w", taskID, query.Error)
+	}
+	return nil
+}
+
+func (d *TaskDaoImpl) UpdateFailure(ctx context.Context, taskID uint, status uint, errorMessage string) error {
+	query := d.DB.WithContext(ctx).
+		Model(&Task{}).
+		Where("id = ?", taskID).
+		Updates(map[string]any{
+			"status": status,
+			"error":  errorMessage,
+		})
+	if query.Error != nil {
+		return fmt.Errorf("dao: update failure task %d: %w", taskID, query.Error)
 	}
 	return nil
 }

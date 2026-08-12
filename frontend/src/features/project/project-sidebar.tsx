@@ -35,7 +35,7 @@ export function ProjectSidebar({
 }: {
   library: ProjectLibraryProjectModel;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["projects", "common"]);
   const [isOpen, setIsOpen] = useState(readProjectSidebarOpen);
   const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
@@ -90,7 +90,7 @@ export function ProjectSidebar({
                 {t("project.sidebar.projects")}
               </p>
               <h2 className="truncate text-lg font-semibold">
-                {t("project.assetLibrary")}
+                {t("assetLibrary")}
               </h2>
             </div>
           ) : null}
@@ -125,7 +125,7 @@ export function ProjectSidebar({
               onClick={() => void create()}
             >
               <Plus data-icon="inline-start" />
-              {t("actions.newProject")}
+              {t("common:actions.newProject")}
             </Button>
             <div className="space-y-2">
               {items.map((project) => (
@@ -179,7 +179,7 @@ export function ProjectSidebar({
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>
-                          {t("actions.cancel")}
+                          {t("common:actions.cancel")}
                         </AlertDialogCancel>
                         <AlertDialogAction
                           variant="destructive"
@@ -198,7 +198,7 @@ export function ProjectSidebar({
           <div className="hidden min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:flex">
             <Button
               type="button"
-              aria-label={t("actions.newProject")}
+              aria-label={t("common:actions.newProject")}
               variant="outline"
               size="icon-lg"
               onClick={() => void create()}
@@ -212,7 +212,7 @@ export function ProjectSidebar({
         <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:hidden">
           <Button
             type="button"
-            aria-label={t("actions.newProject")}
+            aria-label={t("common:actions.newProject")}
             variant="outline"
             size="icon-lg"
             onClick={() => void create()}

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { perspectiveOptions, type Perspective } from "@/model/project";
 import type { VisualAssetCreationDraft } from "../types";
 
@@ -26,11 +27,13 @@ export function VisualAssetFields({
   draft: VisualAssetCreationDraft<File>;
   onChange: (draft: VisualAssetCreationDraft<File>) => void;
 }) {
+  const { t } = useTranslation("generation");
+
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
-          Canvas size
+          {t("canvasSize")}
           <Input
             value={draft.canvasSize}
             onChange={(event) =>
@@ -39,7 +42,7 @@ export function VisualAssetFields({
           />
         </label>
         <OptionSelect
-          label="Perspective"
+          label={t("perspective")}
           value={draft.perspective}
           options={perspectiveOptions.map((perspective) => [
             perspective,
@@ -49,23 +52,8 @@ export function VisualAssetFields({
         />
       </div>
 
-      <OptionSelect
-        label="Direction count"
-        value={draft.directionCount}
-        options={[
-          ["1", "1 direction"],
-          ["4", "4 directions"],
-          ["8", "8 directions"],
-        ]}
-        onChange={(directionCount) =>
-          onChange({
-            ...draft,
-            directionCount,
-          })
-        }
-      />
       <div className="grid gap-2 text-sm font-medium">
-        <span>Reference</span>
+        <span>{t("reference")}</span>
         <ImageDropzone
           fileName={draft.reference?.name}
           onSelect={(reference) => onChange({ ...draft, reference })}

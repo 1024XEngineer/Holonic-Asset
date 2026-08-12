@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
+import type { DocsKey } from "./doc-text";
 
 type PerspectiveExampleProps = {
   image: "top-down-2d.jpg" | "side-on.jpg" | "isometric.png";
-  altKey: string;
+  altKey: DocsKey;
 };
 
 export function PerspectiveExample({ image, altKey }: PerspectiveExampleProps) {

@@ -3,31 +3,23 @@ import {
   FourDirectionExample,
   OneDirectionExample,
 } from "@/features/docs/direction-examples";
-import { DocText } from "../doc-text";
+import { DocHeading, DocText } from "../doc-text";
 
 export const metadata = { title: "1 / 4 / 8 directions" };
 
-<h2 id="directions-heading">
-  <DocText i18nKey="directions.heading" />
-</h2>
+<DocHeading level={2} id="direction-count" i18nKey="directions.heading" />
 
 <DocText i18nKey="directions.intro" />
 
-<h2 id="directions-match">
-  <DocText i18nKey="directions.match" />
-</h2>
+<DocHeading level={2} id="match-direction-count" i18nKey="directions.match" />
 
-<h3 id="directions-one">
-  <DocText i18nKey="directions.oneTitle" />
-</h3>
+<DocHeading level={3} id="one-direction" i18nKey="directions.oneTitle" />
 
 <DocText i18nKey="directions.oneBody" />
 
 <OneDirectionExample />
 
-<h3 id="directions-four">
-  <DocText i18nKey="directions.fourTitle" />
-</h3>
+<DocHeading level={3} id="four-directions" i18nKey="directions.fourTitle" />
 
 <DocText i18nKey="directions.fourBody" />
 
@@ -35,9 +27,7 @@ export const metadata = { title: "1 / 4 / 8 directions" };
 
 <DocText i18nKey="directions.fourNote" />
 
-<h3 id="directions-eight">
-  <DocText i18nKey="directions.eightTitle" />
-</h3>
+<DocHeading level={3} id="eight-directions" i18nKey="directions.eightTitle" />
 
 <DocText i18nKey="directions.eightBody" />
 
