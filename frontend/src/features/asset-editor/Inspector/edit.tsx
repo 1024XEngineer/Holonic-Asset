@@ -1,4 +1,5 @@
 import { ArrowUp, ImagePlus, LoaderCircle, Target, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,7 @@ import type { InspectorEditProps, InspectorReference } from "./inspector.types";
 import { useInspectorEdit } from "./use-inspector-edit";
 
 export function InspectorEdit(props: InspectorEditProps) {
+  const { t } = useTranslation("editor");
   const {
     selectedNodes,
     selectedFrames,
@@ -50,7 +52,7 @@ export function InspectorEdit(props: InspectorEditProps) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Target
+              {t("target")}
             </p>
             <p className="truncate text-xs font-semibold">
               {controller.target.label}
@@ -67,22 +69,22 @@ export function InspectorEdit(props: InspectorEditProps) {
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Clear selected target"
+                    aria-label={t("clearSelectedTarget")}
                     onClick={onClearSelection}
                   />
                 }
               >
                 <X />
               </TooltipTrigger>
-              <TooltipContent>Use the entire asset</TooltipContent>
+              <TooltipContent>{t("useEntireAsset")}</TooltipContent>
             </Tooltip>
           ) : null}
         </div>
 
         <Textarea
-          aria-label="Edit prompt"
+          aria-label={t("editPrompt")}
           className="mt-4 min-h-28 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0"
-          placeholder="What would you like to change?"
+          placeholder={t("promptPlaceholder")}
           value={prompt}
           onChange={(event) => controller.changePrompt(event.target.value)}
           onKeyDown={controller.handlePromptKeyDown}
@@ -96,7 +98,7 @@ export function InspectorEdit(props: InspectorEditProps) {
         ) : null}
         {isDragActive ? (
           <p className="mt-2 text-xs font-medium text-primary">
-            Drop image to attach
+            {t("dropImage")}
           </p>
         ) : null}
       </div>
@@ -115,20 +117,20 @@ export function InspectorEdit(props: InspectorEditProps) {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label="Attach image"
+                aria-label={t("attachImage")}
                 onClick={open}
               />
             }
           >
             <ImagePlus />
           </TooltipTrigger>
-          <TooltipContent>Attach image</TooltipContent>
+          <TooltipContent>{t("attachImage")}</TooltipContent>
         </Tooltip>
         <div className="flex items-center gap-2">
           {controller.isReadingReference ? (
             <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <LoaderCircle className="size-3 animate-spin" />
-              Reading image
+              {t("readingImage")}
             </span>
           ) : null}
           <Tooltip>
@@ -137,8 +139,8 @@ export function InspectorEdit(props: InspectorEditProps) {
                 <Button
                   type="submit"
                   size="icon"
-                  aria-label="Send prompt"
-                  title="Send prompt"
+                  aria-label={t("sendPrompt")}
+                  title={t("sendPrompt")}
                   disabled={!controller.canSubmit}
                 />
               }
@@ -149,7 +151,7 @@ export function InspectorEdit(props: InspectorEditProps) {
                 <ArrowUp />
               )}
             </TooltipTrigger>
-            <TooltipContent>Send prompt</TooltipContent>
+            <TooltipContent>{t("sendPrompt")}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -164,6 +166,7 @@ function ReferencePreview({
   reference: InspectorReference;
   onClear: () => void;
 }) {
+  const { t } = useTranslation("editor");
   return (
     <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 p-1.5">
       <img
@@ -181,14 +184,14 @@ function ReferencePreview({
               type="button"
               variant="ghost"
               size="icon-xs"
-              aria-label="Remove attached image"
+              aria-label={t("removeImage")}
               onClick={onClear}
             />
           }
         >
           <X />
         </TooltipTrigger>
-        <TooltipContent>Remove image</TooltipContent>
+        <TooltipContent>{t("removeImage")}</TooltipContent>
       </Tooltip>
     </div>
   );

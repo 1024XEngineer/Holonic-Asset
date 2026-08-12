@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,9 +14,9 @@ export function GuidedProjectFlow({
 }: {
   project: NewProjectController;
 }) {
+  const { t } = useTranslation("projects");
   const { form, preview } = project;
-  const { instance: newProjectForm, isGenerating, step } = form;
-  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const { instance: newProjectForm, step } = form;
 
   return (
     <form
@@ -30,10 +29,9 @@ export function GuidedProjectFlow({
     >
       {step === 2 ? (
         <div>
-          <h2 className="text-lg font-semibold">Project overview</h2>
+          <h2 className="text-lg font-semibold">{t("projectOverview")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Upload an image that represents the game world, characters, and
-            visual language together.
+            {t("overviewDescription")}
           </p>
         </div>
       ) : null}
@@ -42,13 +40,13 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="name">
             {(field) => (
               <label className="grid gap-2 text-sm font-semibold">
-                Project name
+                {t("projectName")}
                 <input
                   autoFocus
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   className="w-full rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-                  placeholder="e.g. Moonlit Orchard"
+                  placeholder={t("projectNamePlaceholder")}
                 />
               </label>
             )}
@@ -57,7 +55,7 @@ export function GuidedProjectFlow({
             <newProjectForm.Field name="gameType">
               {(field) => (
                 <DropdownField
-                  label="Game type"
+                  label={t("gameType")}
                   value={field.state.value}
                   options={projectContextOptions.gameTypes}
                   onChange={field.handleChange}
@@ -67,7 +65,7 @@ export function GuidedProjectFlow({
             <newProjectForm.Field name="platform">
               {(field) => (
                 <DropdownField
-                  label="Target platform"
+                  label={t("platform")}
                   value={field.state.value}
                   options={projectContextOptions.platforms}
                   onChange={field.handleChange}
@@ -78,7 +76,7 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="perspective">
             {(field) => (
               <DropdownField
-                label="Perspective"
+                label={t("perspective")}
                 value={field.state.value}
                 options={projectContextOptions.perspectives}
                 onChange={(value) => {
@@ -90,12 +88,12 @@ export function GuidedProjectFlow({
           <newProjectForm.Field name="description">
             {(field) => (
               <label className="grid gap-2 text-sm font-semibold">
-                Game description
+                {t("gameDescription")}
                 <textarea
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   className="min-h-28 w-full resize-none rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
-                  placeholder="What is the player doing? What should the world feel like?"
+                  placeholder={t("gameDescriptionPlaceholder")}
                 />
               </label>
             )}
@@ -110,38 +108,20 @@ export function GuidedProjectFlow({
           }}
         >
           <TabsList
-            aria-label="Project overview source"
+            aria-label={t("overviewSource")}
             className="grid w-full grid-cols-2"
           >
-            <TabsTrigger value="generate">Generate</TabsTrigger>
-            <TabsTrigger value="upload">Upload</TabsTrigger>
+            <TabsTrigger value="generate">{t("generate")}</TabsTrigger>
+            <TabsTrigger value="upload">{t("upload")}</TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="grid gap-3">
             <div className="aspect-[16/9] overflow-hidden rounded-md border bg-muted/30">
-              {preview.isGenerating ? (
-                <div className="relative grid size-full place-items-center overflow-hidden">
-                  <img
-                    src="/project/reference/reference.png"
-                    alt=""
-                    aria-hidden
-                    className="absolute inset-0 size-full scale-105 object-cover opacity-45 blur-md"
-                  />
-                  <div className="absolute inset-0 bg-background/25" />
-                  <LoaderCircle className="relative size-8 animate-spin text-foreground" />
-                </div>
-              ) : preview.url ? (
-                <button
-                  type="button"
-                  className="size-full cursor-zoom-in"
-                  aria-label="Preview generated project overview"
-                  onClick={() => setIsImagePreviewOpen(true)}
-                >
-                  <img
-                    src={preview.url}
-                    alt="Generated project overview"
-                    className="size-full object-cover"
-                  />
-                </button>
+              {preview.url ? (
+                <img
+                  src={preview.url}
+                  alt={t("generatedOverview")}
+                  className="size-full object-cover"
+                />
               ) : null}
             </div>
             <Button
@@ -149,20 +129,14 @@ export function GuidedProjectFlow({
               variant="outline"
               className="w-full"
               onClick={preview.generate}
-              disabled={preview.isGenerating}
             >
-              {preview.url ? "Regenerate preview" : "Generate preview"}
+              {preview.url ? t("regeneratePreview") : t("generatePreview")}
             </Button>
-            {preview.error ? (
-              <p role="alert" className="text-sm text-destructive">
-                {preview.error}
-              </p>
-            ) : null}
           </TabsContent>
           <TabsContent value="upload">
             <ImageDropzone
               className="aspect-[16/9] min-h-0"
-              label="Upload project overview image"
+              label={t("uploadOverview")}
               value={preview.url || undefined}
               error={preview.error}
               onChange={(file) => {
@@ -179,31 +153,16 @@ export function GuidedProjectFlow({
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           onClick={form.previous}
         >
-          <ArrowLeft size={16} /> Previous
+          <ArrowLeft size={16} /> {t("previous")}
         </button>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
-          disabled={step === 2 && isGenerating}
         >
-          {step === 2 ? "Submit" : "Next"}
+          {step === 2 ? t("submit") : t("next")}
           <ArrowRight size={16} />
         </button>
       </div>
-      <Dialog open={isImagePreviewOpen} onOpenChange={setIsImagePreviewOpen}>
-        <DialogContent className="max-w-5xl p-2 sm:max-w-5xl">
-          <DialogTitle className="sr-only">
-            Generated project overview
-          </DialogTitle>
-          {preview.url ? (
-            <img
-              src={preview.url}
-              alt="Generated project overview"
-              className="max-h-[80vh] w-full object-contain"
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </form>
   );
 }

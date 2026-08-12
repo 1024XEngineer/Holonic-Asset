@@ -5,10 +5,13 @@ import (
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
-// CORS temporarily allows the API to be called from any origin.
-func CORS() echo.MiddlewareFunc {
+// CORS configures cross-origin access for the API.
+func CORS(allowedOrigins ...string) echo.MiddlewareFunc {
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"*"}
+	}
 	return echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{echo.HeaderContentType},
+		AllowOrigins: allowedOrigins,
+		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAuthorization},
 	})
 }

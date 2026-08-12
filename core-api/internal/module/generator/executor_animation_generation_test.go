@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 )
 
 type animationVideoServiceStub struct {
@@ -107,20 +107,20 @@ func (s *animationReferenceResolverStub) ResolveReference(_ context.Context, ref
 	return s.resolved, nil
 }
 
-type animationExtractorStub struct {
-	results [][]image.Image
+type animationVideoProcessorStub struct {
+	results []*videoprocessor.Result
 	errors  []error
 	calls   int
 }
 
-func (s *animationExtractorStub) Extract(context.Context, []byte, int) ([]image.Image, error) {
+func (s *animationVideoProcessorStub) Process(context.Context, []byte, int) (*videoprocessor.Result, error) {
 	index := s.calls
 	s.calls++
 	if index < len(s.errors) && s.errors[index] != nil {
 		return nil, s.errors[index]
 	}
 	if index >= len(s.results) {
-		return nil, errors.New("unexpected extractor call")
+		return nil, errors.New("unexpected video processor call")
 	}
 	return s.results[index], nil
 }
@@ -145,7 +145,7 @@ func TestPrepareAnimationReferenceResolvesAndDownloadsUnprocessedImage(t *testin
 	service := newAnimationGenerationServiceWithResolver(
 		&animationVideoServiceStub{},
 		processor,
-		&animationExtractorStub{},
+		&animationVideoProcessorStub{},
 		resolver,
 	).(*animationGenerationService)
 
@@ -173,7 +173,7 @@ func TestPrepareAnimationReferenceRejectsDownloadFailures(t *testing.T) {
 	service := newAnimationGenerationServiceWithResolver(
 		nil,
 		nil,
-		&animationExtractorStub{},
+		&animationVideoProcessorStub{},
 		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
 	).(*animationGenerationService)
 	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
@@ -191,7 +191,7 @@ func TestPrepareAnimationReferenceRejectsInvalidDownloadedImage(t *testing.T) {
 	service := newAnimationGenerationServiceWithResolver(
 		nil,
 		nil,
-		&animationExtractorStub{},
+		&animationVideoProcessorStub{},
 		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
 	).(*animationGenerationService)
 	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
@@ -251,8 +251,8 @@ func TestAnimationGenerationKeepsPreparedGreenReference(t *testing.T) {
 	videos := &animationVideoServiceStub{}
 	processor := &animationProcessorStub{}
 	wantErr := errors.New("stop after provider call")
-	extractor := &animationExtractorStub{errors: []error{wantErr}}
-	service := newAnimationGenerationService(videos, processor, extractor)
+	videoProcessor := &animationVideoProcessorStub{errors: []error{wantErr}}
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
 
 	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
 		ReferenceImage:         "data:image/png;base64," + prepared,
@@ -301,12 +301,12 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 			},
 		},
 	}
-	qualityErr := &AnimationVideoQualityError{Kind: "framing", Message: "unsafe framing"}
-	extractor := &animationExtractorStub{
+	qualityErr := &videoprocessor.AnimationVideoQualityError{Kind: "framing", Message: "unsafe framing"}
+	videoProcessor := &animationVideoProcessorStub{
 		errors:  []error{fmt.Errorf("wrapped quality error: %w", qualityErr), nil},
-		results: [][]image.Image{nil, animationTestVideoFrames(12)},
+		results: []*videoprocessor.Result{nil, {Frames: animationTestVideoFrames(4)}},
 	}
-	service := newAnimationGenerationService(videos, processor, extractor)
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
 	action := "以左脚为轴完成不规则仪式动作，然后把容器放回腰间"
 
 	result, err := service.Generate(context.Background(), &AnimationGenerationRequest{
@@ -388,8 +388,8 @@ func TestAnimationGenerationDoesNotRetryNonQualityError(t *testing.T) {
 	videos := &animationVideoServiceStub{}
 	processor := &animationProcessorStub{foregroundBase64: foreground}
 	wantErr := errors.New("ffmpeg failed")
-	extractor := &animationExtractorStub{errors: []error{wantErr}}
-	service := newAnimationGenerationService(videos, processor, extractor)
+	videoProcessor := &animationVideoProcessorStub{errors: []error{wantErr}}
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
 
 	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
 		ReferenceImage: animationTestOpaquePrototype(t),
@@ -401,16 +401,18 @@ func TestAnimationGenerationDoesNotRetryNonQualityError(t *testing.T) {
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected extractor error, got %v", err)
 	}
-	if len(videos.requests) != 1 || extractor.calls != 1 {
-		t.Fatalf("non-quality error retried: video=%d extractor=%d", len(videos.requests), extractor.calls)
+	if len(videos.requests) != 1 || videoProcessor.calls != 1 {
+		t.Fatalf("non-quality error retried: video=%d processor=%d", len(videos.requests), videoProcessor.calls)
 	}
 }
 
 func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
-	extractor := &animationExtractorStub{results: [][]image.Image{animationTestVideoFrames(12)}}
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+		Frames: animationTestVideoFrames(4),
+	}}}
 	service := &animationGenerationService{
-		processor: imageprocessor.NewProcessor(),
-		extractor: extractor,
+		processor:      imageprocessor.NewProcessor(),
+		videoProcessor: videoProcessor,
 	}
 	result, err := service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
 		Action:      "idle breathing",
@@ -433,73 +435,6 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 		if decoded.Bounds().Dx() != 64 || decoded.Bounds().Dy() != 64 {
 			t.Fatalf("frame %d has size %v", index, decoded.Bounds().Size())
 		}
-	}
-}
-
-func TestSelectAnimationLoopFramesUsesCompleteLongCycle(t *testing.T) {
-	frames := make([]image.Image, 48)
-	for index := range frames {
-		frame := image.NewNRGBA(image.Rect(0, 0, 120, 120))
-		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
-		draw.Draw(frame, image.Rect(49, 24, 69, 104), &image.Uniform{C: color.NRGBA{R: 105, G: 50, B: 32, A: 255}}, image.Point{}, draw.Src)
-		var prop image.Rectangle
-		switch {
-		case index < 16:
-			x := 26 + animationMinInt(index%8, 8-index%8)*3
-			prop = image.Rect(x, 42, x+42, 49)
-		case index < 30:
-			y := 42 + (index-16)*3
-			prop = image.Rect(35, y, 88, y+7)
-		default:
-			y := 84 - (index-30)*2
-			prop = image.Rect(35, y, 88, y+7)
-		}
-		draw.Draw(frame, prop, &image.Uniform{C: color.NRGBA{R: 105, G: 50, B: 32, A: 255}}, image.Point{}, draw.Src)
-		frames[index] = frame
-	}
-
-	indices, loop, err := selectAnimationLoopFrames(frames, 16, 12)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if loop.SpanRatio < animationMinLoopSpanRatio || indices[len(indices)-1] != loop.EndFrame || loop.StartFrame > int(math.Ceil(float64(len(frames))*animationInitialWindowRatio)) {
-		t.Fatalf("selector omitted part of the complete cycle: loop=%+v indices=%v", loop, indices)
-	}
-	if loop.Method != "subject_mse_full_cycle" {
-		t.Fatalf("loop method = %q", loop.Method)
-	}
-	for index := 1; index < len(indices); index++ {
-		if indices[index] <= indices[index-1] {
-			t.Fatalf("sampled indices are not strictly ordered: %v", indices)
-		}
-	}
-}
-
-func TestSelectAnimationLoopFramesSkipsTransientUnsafeSourceFrames(t *testing.T) {
-	frames := animationTestVideoFrames(48)
-	unsafe := map[int]bool{10: true, 30: true}
-	for index := range unsafe {
-		frame, ok := frames[index].(*image.NRGBA)
-		if !ok {
-			t.Fatalf("frame %d has type %T", index, frames[index])
-		}
-		draw.Draw(frame, image.Rect(0, 40, 12, 48), &image.Uniform{C: color.NRGBA{R: 105, G: 50, B: 32, A: 255}}, image.Point{}, draw.Src)
-	}
-
-	indices, loop, err := selectAnimationLoopFrames(frames, 8, 12)
-	if err != nil {
-		t.Fatalf("select loop with transient unsafe source frames: %v", err)
-	}
-	if loop.SpanRatio < animationMinLoopSpanRatio {
-		t.Fatalf("selected interval is too short: %+v", loop)
-	}
-	for _, index := range indices {
-		if unsafe[index] {
-			t.Fatalf("unsafe source frame %d was selected: %v", index, indices)
-		}
-	}
-	if err := validateAnimationMotionSafeAreaAtIndices(frames, indices); err != nil {
-		t.Fatalf("selected frames should remain inside the safety band: %v", err)
 	}
 }
 
@@ -552,50 +487,4 @@ func animationTestVideoFrames(count int) []image.Image {
 
 var _ videoclient.VideoGenerationService = (*animationVideoServiceStub)(nil)
 var _ imageprocessor.Processor = (*animationProcessorStub)(nil)
-var _ animationFrameExtractor = (*animationExtractorStub)(nil)
-
-func TestSelectAnimationLoopFramesDoesNotSampleIdleTail(t *testing.T) {
-	const total = 60
-	frames := make([]image.Image, total)
-	for index := range frames {
-		frame := image.NewNRGBA(image.Rect(0, 0, 120, 120))
-		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
-		draw.Draw(frame, image.Rect(49, 24, 69, 104), &image.Uniform{C: color.NRGBA{R: 105, G: 50, B: 32, A: 255}}, image.Point{}, draw.Src)
-
-		// The action completes by frame 42 and the provider then holds the
-		// recovered pose until the end of the five-second video.
-		propX, propY := 35, 42
-		switch {
-		case index < 10:
-			propY = 42 + index*2
-		case index < 26:
-			propX = 35 + (index-10)*2
-			propY = 60 + (index-10)*2
-		case index < 35:
-			propX = 65 - (index-26)*3
-			propY = 90 - (index-26)*4
-		case index < 43:
-			propX = 38 - (index-35)*1
-			propY = 54 - (index-35)*1
-		}
-		if index >= 43 {
-			propX, propY = 35, 42
-		}
-		draw.Draw(frame, image.Rect(propX, propY, propX+42, propY+7), &image.Uniform{C: color.NRGBA{R: 105, G: 50, B: 32, A: 255}}, image.Point{}, draw.Src)
-		frames[index] = frame
-	}
-
-	indices, loop, err := selectAnimationLoopFrames(frames, 8, 12)
-	if err != nil {
-		t.Fatalf("select loop: %v", err)
-	}
-	if loop.StartFrame != 0 {
-		t.Fatalf("action should begin at the source initial pose: %+v", loop)
-	}
-	if loop.EndFrame < 40 || loop.EndFrame > 45 {
-		t.Fatalf("selector should include recovery but exclude idle tail: %+v indices=%v", loop, indices)
-	}
-	if indices[len(indices)-1] != loop.EndFrame {
-		t.Fatalf("last sampled frame must be recovery endpoint: %+v indices=%v", loop, indices)
-	}
-}
+var _ videoprocessor.Processor = (*animationVideoProcessorStub)(nil)

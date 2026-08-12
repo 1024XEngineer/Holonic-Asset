@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { UISetComponent } from "@/model";
+import { withI18n } from "@/testing/with-i18n";
 
 import { UISetCanvas } from "./ui-set-canvas";
 
@@ -34,10 +35,12 @@ const components: UISetComponent[] = [
 describe("UISetCanvas", () => {
   it("renders component kinds, clamped bounds, and selection state", () => {
     const html = renderToStaticMarkup(
-      <UISetCanvas
-        model={{ components, selectedComponentIds: ["panel", "button"] }}
-        onEvent={vi.fn()}
-      />,
+      withI18n(
+        <UISetCanvas
+          model={{ components, selectedComponentIds: ["panel", "button"] }}
+          onEvent={vi.fn()}
+        />,
+      ),
     );
 
     expect(html).toContain('aria-pressed="true"');

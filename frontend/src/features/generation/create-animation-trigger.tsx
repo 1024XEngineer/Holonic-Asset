@@ -1,5 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ export function CreateAnimationTrigger({
   isGenerating,
   onGenerate,
 }: CreateAnimationTriggerProps) {
+  const { t } = useTranslation(["generation", "common"]);
   const [open, setOpen] = useState(false);
   const [animationName, setAnimationName] = useState("");
   const [generationPrompt, setGenerationPrompt] = useState("");
@@ -56,22 +58,20 @@ export function CreateAnimationTrigger({
       {children(openDialog)}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Generate animation</DialogTitle>
-          <DialogDescription>
-            Describe a motion and add the generated clip to this asset.
-          </DialogDescription>
+          <DialogTitle>{t("generateAnimation")}</DialogTitle>
+          <DialogDescription>{t("animationDescription")}</DialogDescription>
         </DialogHeader>
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <label
             className="grid gap-2 text-sm font-medium"
             htmlFor="animation-name"
           >
-            Animation name
+            {t("animationName")}
             <Input
               id="animation-name"
               autoFocus
               required
-              placeholder="e.g. Cast spell"
+              placeholder={t("castSpellPlaceholder")}
               value={animationName}
               onChange={(event) => setAnimationName(event.target.value)}
             />
@@ -80,19 +80,19 @@ export function CreateAnimationTrigger({
             className="grid gap-2 text-sm font-medium"
             htmlFor="generated-animation-prompt"
           >
-            Generation prompt
+            {t("generationPrompt")}
             <Textarea
               id="generated-animation-prompt"
               required
               className="min-h-28 resize-y"
-              placeholder="Describe the motion, timing, and pose..."
+              placeholder={t("motionPlaceholder")}
               value={generationPrompt}
               onChange={(event) => setGenerationPrompt(event.target.value)}
             />
           </label>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
-              Cancel
+              {t("common:actions.cancel")}
             </DialogClose>
             <Button
               type="submit"
@@ -105,7 +105,7 @@ export function CreateAnimationTrigger({
               }
             >
               <Sparkles />
-              Generate animation
+              {t("generateAnimation")}
             </Button>
           </DialogFooter>
         </form>
