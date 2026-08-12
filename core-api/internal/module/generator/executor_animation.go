@@ -3,6 +3,7 @@ package generator
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -10,11 +11,15 @@ import (
 	"image/draw"
 	"io"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 const (
@@ -70,7 +75,7 @@ type AnimationGenerationResult struct {
 	Spritesheet     string
 	MIMEType        string
 	Normalization   *imageprocessor.AnimationNormalizationReport
-	Loop            AnimationLoopSelection
+	Loop            videoprocessor.AnimationLoopSelection
 	VideoRequestID  string
 	VideoAttempts   int
 	FrameDurationMS uint
@@ -79,7 +84,7 @@ type AnimationGenerationResult struct {
 type animationGenerationService struct {
 	videos              videoclient.VideoGenerationService
 	processor           imageprocessor.Processor
-	extractor           animationFrameExtractor
+	videoProcessor      videoprocessor.Processor
 	referenceResolver   AnimationReferenceResolver
 	referenceHTTPClient *http.Client
 }
@@ -98,7 +103,7 @@ func NewAnimationGenerationService(
 	return newAnimationGenerationServiceWithResolver(
 		videos,
 		processor,
-		ffmpegAnimationFrameExtractor{},
+		videoprocessor.NewProcessor(),
 		resolver,
 	)
 }
@@ -106,21 +111,21 @@ func NewAnimationGenerationService(
 func newAnimationGenerationService(
 	videos videoclient.VideoGenerationService,
 	processor imageprocessor.Processor,
-	extractor animationFrameExtractor,
+	videoProcessor videoprocessor.Processor,
 ) AnimationGenerationService {
-	return newAnimationGenerationServiceWithResolver(videos, processor, extractor, nil)
+	return newAnimationGenerationServiceWithResolver(videos, processor, videoProcessor, nil)
 }
 
 func newAnimationGenerationServiceWithResolver(
 	videos videoclient.VideoGenerationService,
 	processor imageprocessor.Processor,
-	extractor animationFrameExtractor,
+	videoProcessor videoprocessor.Processor,
 	resolver AnimationReferenceResolver,
 ) AnimationGenerationService {
 	return &animationGenerationService{
 		videos:              videos,
 		processor:           processor,
-		extractor:           extractor,
+		videoProcessor:      videoProcessor,
 		referenceResolver:   resolver,
 		referenceHTTPClient: http.DefaultClient,
 	}
@@ -136,7 +141,7 @@ func (s *animationGenerationService) Generate(
 	if s.processor == nil {
 		return nil, ErrImageProcessorRequired
 	}
-	if s.extractor == nil {
+	if s.videoProcessor == nil {
 		return nil, ErrVideoFrameExtractorRequired
 	}
 	options, err := normalizeAnimationGenerationRequest(request)
@@ -188,7 +193,7 @@ func (s *animationGenerationService) Generate(
 			processed.FrameDurationMS = uint((1000 + options.FPS/2) / options.FPS)
 			return processed, nil
 		}
-		var qualityError *AnimationVideoQualityError
+		var qualityError *videoprocessor.AnimationVideoQualityError
 		if !errors.As(processErr, &qualityError) || attempt == animationVideoAttempts {
 			return nil, fmt.Errorf("generator: process animation video: %w", processErr)
 		}
@@ -422,22 +427,11 @@ func (s *animationGenerationService) processVideo(
 	video []byte,
 	request AnimationGenerationRequest,
 ) (*AnimationGenerationResult, error) {
-	frames, err := s.extractor.Extract(ctx, video, animationCandidateFPS)
+	processed, err := s.videoProcessor.Process(ctx, video, request.FrameCount)
 	if err != nil {
 		return nil, err
 	}
-	indices, loop, err := selectAnimationLoopFrames(frames, request.FrameCount, animationCandidateFPS)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateAnimationMotionSafeAreaAtIndices(frames, indices); err != nil {
-		return nil, err
-	}
-	selected := make([]image.Image, 0, len(indices))
-	for _, index := range indices {
-		selected = append(selected, frames[index])
-	}
-	rawSheet, err := packAnimationVideoFrames(selected, request.Columns)
+	rawSheet, err := packAnimationVideoFrames(processed.Frames, request.Columns)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +465,7 @@ func (s *animationGenerationService) processVideo(
 	return &AnimationGenerationResult{
 		Frames: normalized.Regions, Spritesheet: normalized.ImageBase64,
 		MIMEType: normalized.MIMEType, Normalization: normalized.AnimationReport,
-		Loop: loop,
+		Loop: processed.Loop,
 	}, nil
 }
 
@@ -506,3 +500,195 @@ func animationRows(frameCount, columns int) int {
 }
 
 var _ AnimationGenerationService = (*animationGenerationService)(nil)
+
+var animationDirectionLayouts = map[uint][]string{
+	2: {
+		AnimationDirectionLeft,
+		AnimationDirectionRight,
+	},
+	4: {
+		AnimationDirectionFront,
+		AnimationDirectionRight,
+		AnimationDirectionBack,
+		AnimationDirectionLeft,
+	},
+	8: {
+		AnimationDirectionFront,
+		AnimationDirectionFrontRight,
+		AnimationDirectionRight,
+		AnimationDirectionBackRight,
+		AnimationDirectionBack,
+		AnimationDirectionBackLeft,
+		AnimationDirectionLeft,
+		AnimationDirectionFrontLeft,
+	},
+}
+
+func animationDirectionIndex(direction string, directionCount uint) (int, error) {
+	if directionCount > 8 {
+		return 0, fmt.Errorf("generator: animation supports at most 8 directions, asset has %d", directionCount)
+	}
+	layout, ok := animationDirectionLayouts[directionCount]
+	if !ok {
+		return 0, fmt.Errorf("generator: animation asset direction count must be one of 2, 4, or 8, got %d", directionCount)
+	}
+
+	direction = strings.ToLower(strings.TrimSpace(direction))
+	if direction == "" {
+		return 0, fmt.Errorf("generator: animation direction is required; available directions: %s", strings.Join(layout, ", "))
+	}
+	index := slices.Index(layout, direction)
+	if index < 0 {
+		return 0, fmt.Errorf(
+			"generator: animation direction %q is unavailable for an asset with %d directions; available directions: %s",
+			direction,
+			directionCount,
+			strings.Join(layout, ", "),
+		)
+	}
+	return index, nil
+}
+
+func (e *executor) generateAnimation(
+	ctx context.Context,
+	payload CreateAnimationPayload,
+) (json.RawMessage, error) {
+	if payload.AssetID == 0 {
+		return nil, fmt.Errorf("generator: animation asset is required")
+	}
+	animationName := strings.TrimSpace(payload.AnimationName)
+	if animationName == "" {
+		return nil, fmt.Errorf("generator: animation name is required")
+	}
+	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: get animation asset %d: %w", payload.AssetID, err)
+	}
+	if asset.ID == 0 {
+		return nil, fmt.Errorf("generator: animation asset %d not found", payload.AssetID)
+	}
+	if payload.ProjectID != 0 && asset.ProjectID != payload.ProjectID {
+		return nil, fmt.Errorf(
+			"generator: animation asset %d belongs to project %d, not project %d",
+			payload.AssetID,
+			asset.ProjectID,
+			payload.ProjectID,
+		)
+	}
+	reference, referencePrepared, err := animationReference(asset, payload.Direction)
+	if err != nil {
+		return nil, err
+	}
+	description := strings.TrimSpace(asset.Description)
+	if description == "" {
+		description = strings.TrimSpace(asset.Name)
+	}
+	generated, err := e.animations.Generate(ctx, &AnimationGenerationRequest{
+		Description:            description,
+		Style:                  payload.Style,
+		Action:                 payload.CreativeBrief,
+		ReferenceImage:         reference,
+		ReferenceImagePrepared: referencePrepared,
+		FrameCount:             payload.FrameCount,
+		Columns:                payload.Columns,
+		FrameWidth:             payload.FrameWidth,
+		FrameHeight:            payload.FrameHeight,
+		FPS:                    payload.FPS,
+		Resolution:             payload.Resolution,
+		Duration:               payload.Duration,
+		AspectRatio:            payload.AspectRatio,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: generate animation frames: %w", err)
+	}
+	if generated == nil || len(generated.Frames) == 0 {
+		return nil, fmt.Errorf("generator: generate animation frames: empty result")
+	}
+	frames, err := e.persistAnimationFrames(ctx, generated)
+	if err != nil {
+		return nil, err
+	}
+	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, animationName, frames)
+	if err != nil {
+		return nil, fmt.Errorf("generator: create animation for asset %d: %w", payload.AssetID, err)
+	}
+	if animationID == 0 {
+		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", payload.AssetID)
+	}
+	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
+}
+
+func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
+	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
+		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
+	}
+	// Select the requested direction and resolve its -unprocessed image-hosting
+	// reference.
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
+	}
+	prototypeIndex, err := animationDirectionIndex(direction, content.DirectionCount)
+	if err != nil {
+		return "", false, err
+	}
+
+	if content.Prototype == nil || prototypeIndex >= len(*content.Prototype) {
+		return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %q", asset.ID, direction)
+	}
+	prototype := (*content.Prototype)[prototypeIndex]
+	if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
+		return "", false, fmt.Errorf("generator: animation asset %d prototype direction %q has no image URL", asset.ID, direction)
+	}
+	unprocessedURL := animationUnprocessedImageURL(strings.TrimSpace(*prototype.URL))
+	return unprocessedURL, false, nil
+}
+
+func animationUnprocessedImageURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.HasPrefix(value, "data:") {
+		return value
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return addObjectKeySuffix(value, "-unprocessed")
+	}
+	parsed.Path = addObjectKeySuffix(parsed.Path, "-unprocessed")
+	return parsed.String()
+}
+
+func (e *executor) persistAnimationFrames(
+	ctx context.Context,
+	result *AnimationGenerationResult,
+) ([]assetdomain.Frame, error) {
+	if e.references == nil {
+		return nil, ErrAnimationReferenceStoreRequired
+	}
+	frames := make([]assetdomain.Frame, len(result.Frames))
+	for index, frame := range result.Frames {
+		mediaType := strings.TrimSpace(frame.MIMEType)
+		if mediaType == "" {
+			mediaType = "image/png"
+		}
+		dataURL := "data:" + mediaType + ";base64," + frame.ImageBase64
+		objectKey, err := e.references.PersistReference(ctx, dataURL)
+		if err != nil {
+			return nil, fmt.Errorf("generator: persist animation frame %d: %w", index+1, err)
+		}
+		objectKey = strings.TrimSpace(objectKey)
+		if objectKey == "" {
+			return nil, fmt.Errorf("generator: persist animation frame %d: empty object key", index+1)
+		}
+		if strings.HasPrefix(objectKey, "data:") ||
+			strings.HasPrefix(objectKey, "http://") ||
+			strings.HasPrefix(objectKey, "https://") {
+			return nil, fmt.Errorf("generator: persist animation frame %d: storage returned a non-object-key reference", index+1)
+		}
+		frames[index] = assetdomain.Frame{
+			ID:       uint(index + 1),
+			URL:      &objectKey,
+			Duration: result.FrameDurationMS,
+		}
+	}
+	return frames, nil
+}

@@ -348,6 +348,7 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return fmt.Errorf("repository: content storage is not configured")
 	}
+	nextVersion := asset.Version + 1
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
 		AssetID: asset.ID,
 		Content: datatypes.JSON(encoded),
@@ -355,7 +356,18 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	if err != nil {
 		return err
 	}
-	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, asset.Version, contentRecord.ID)
+	if _, err := r.RecordDao.CreateAssetRecord(ctx, &dao.AssetRecord{
+		AssetID:     asset.ID,
+		Version:     nextVersion,
+		ContentID:   contentRecord.ID,
+		Name:        asset.Name,
+		Description: asset.Description,
+		Perspective: asset.Perspective,
+		Dimensions:  append(datatypes.JSON(nil), asset.Dimensions...),
+	}); err != nil {
+		return err
+	}
+	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, nextVersion, contentRecord.ID)
 }
 
 func (r *AssetRepositoryImpl) mutateAssetContent(

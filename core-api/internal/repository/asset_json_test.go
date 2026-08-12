@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"gorm.io/datatypes"
@@ -25,15 +26,48 @@ type jsonAssetRecordDaoStub struct {
 	dao.AssetRecordDao
 	records map[uint]dao.AssetRecord
 	nextID  uint
+	err     error
 }
 
 func (s *jsonAssetRecordDaoStub) CreateAssetRecord(_ context.Context, record *dao.AssetRecord) (uint, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
 	if record.ID == 0 {
 		s.nextID++
 		record.ID = s.nextID
 	}
 	s.records[record.ID] = *record
 	return record.ID, nil
+}
+
+func TestAssetRepositoryDoesNotAdvanceContentWhenRecordCreationFails(t *testing.T) {
+	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	payload, err := domain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentID := uint(11)
+	daoStub := &jsonAssetDaoStub{asset: dao.Asset{
+		ID: 7, Type: string(domain.AssetTypeCharacter), Version: 2,
+		ContentID: &contentID, Content: datatypes.JSON(payload),
+	}}
+	wantErr := errors.New("record write failed")
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao: daoStub,
+		ContentDao: &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{
+			contentID: {ID: contentID, AssetID: 7, Content: datatypes.JSON(payload)},
+		}},
+		RecordDao: &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, err: wantErr},
+	}
+
+	_, err = repo.CreateAnimation(context.Background(), 7, "idle", nil)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected record creation error, got %v", err)
+	}
+	if daoStub.updatedAsset != 0 || daoStub.updatedVersion != 0 || daoStub.updatedContent != 0 {
+		t.Fatalf("asset advanced after record failure: %+v", daoStub)
+	}
 }
 
 type jsonAssetContentDaoStub struct {
@@ -193,18 +227,24 @@ func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 	}
 	contentID := uint(11)
 	daoStub := &jsonAssetDaoStub{asset: dao.Asset{
-		ID:        7,
-		Type:      string(domain.AssetTypeCharacter),
-		ContentID: &contentID,
-		Content:   datatypes.JSON(payload),
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Type:        string(domain.AssetTypeCharacter),
+		Perspective: "Top-Down",
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &contentID,
+		Content:     datatypes.JSON(payload),
 	}}
 	contentDao := &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{
 		contentID: {ID: contentID, AssetID: 7, Content: datatypes.JSON(payload)},
 	}}
+	recordDao := &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20}
 	repo := &repository.AssetRepositoryImpl{
 		AssetDao:   daoStub,
 		ContentDao: contentDao,
-		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
+		RecordDao:  recordDao,
 	}
 
 	err = repo.UpdateAnimationFrames(
@@ -227,6 +267,13 @@ func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 	if len(animation.Frames) != 1 || animation.Frames[0].ID != 2201 || animation.Frames[0].URL == nil {
 		t.Fatalf("unexpected animation content: %+v", animation)
 	}
+	if daoStub.updatedVersion != 3 {
+		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
+	}
+	record, ok := recordDao.records[21]
+	if !ok || record.Version != 3 || record.ContentID != daoStub.updatedContent {
+		t.Fatalf("unexpected animation frame content record: %+v", recordDao.records)
+	}
 }
 
 func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
@@ -242,18 +289,24 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	}
 	contentID := uint(11)
 	daoStub := &jsonAssetDaoStub{asset: dao.Asset{
-		ID:        7,
-		Type:      string(domain.AssetTypeCharacter),
-		ContentID: &contentID,
-		Content:   datatypes.JSON(payload),
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Type:        string(domain.AssetTypeCharacter),
+		Perspective: "Top-Down",
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &contentID,
+		Content:     datatypes.JSON(payload),
 	}}
 	contentDao := &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{
 		contentID: {ID: contentID, AssetID: 7, Content: datatypes.JSON(payload)},
 	}}
+	recordDao := &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20}
 	repo := &repository.AssetRepositoryImpl{
 		AssetDao:   daoStub,
 		ContentDao: contentDao,
-		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
+		RecordDao:  recordDao,
 	}
 
 	frameURL := "uploads/hero/walk/001.png"
@@ -286,6 +339,18 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	if len(contentDao.contents) != 2 {
 		t.Fatalf("expected one content write, got %d content records", len(contentDao.contents))
 	}
+	if daoStub.updatedVersion != 3 {
+		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
+	}
+	record, ok := recordDao.records[21]
+	if !ok {
+		t.Fatalf("expected animation content record, got %+v", recordDao.records)
+	}
+	if record.AssetID != 7 || record.Version != 3 || record.ContentID != daoStub.updatedContent ||
+		record.Name != "hero" || record.Description != "main character" ||
+		record.Perspective != "Top-Down" || string(record.Dimensions) != `{"width":64,"height":64}` {
+		t.Fatalf("unexpected animation content record: %+v", record)
+	}
 }
 
 func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
@@ -299,16 +364,18 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	daoStub := &jsonAssetDaoStub{asset: dao.Asset{
 		ID:        7,
 		Type:      string(domain.AssetTypeCharacter),
+		Version:   2,
 		ContentID: &contentID,
 		Content:   datatypes.JSON(payload),
 	}}
 	contentDao := &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{
 		contentID: {ID: contentID, AssetID: 7, Content: datatypes.JSON(payload)},
 	}}
+	recordDao := &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20}
 	repo := &repository.AssetRepositoryImpl{
 		AssetDao:   daoStub,
 		ContentDao: contentDao,
-		RecordDao:  &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, nextID: 20},
+		RecordDao:  recordDao,
 	}
 
 	err = repo.UpdatePrototypeImages(context.Background(), 7, []domain.ImageResource{
@@ -332,5 +399,12 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 		if image.ID != uint(2101+index) || image.URL == nil {
 			t.Fatalf("unexpected prototype image at index %d: %+v", index, image)
 		}
+	}
+	if daoStub.updatedVersion != 3 {
+		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
+	}
+	record, ok := recordDao.records[21]
+	if !ok || record.Version != 3 || record.ContentID != daoStub.updatedContent {
+		t.Fatalf("unexpected prototype content record: %+v", recordDao.records)
 	}
 }
