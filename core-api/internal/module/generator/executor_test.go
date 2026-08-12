@@ -1,6 +1,7 @@
 package generator_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -452,6 +453,9 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 	if assets.createdRecord == nil || assets.createdRecord.AssetID != 7 {
 		t.Fatalf("expected version record for asset 7: %+v", assets.createdRecord)
 	}
+	if assets.createdRecord.ExpectedVersion != 2 || !bytes.Equal(assets.createdRecord.ExpectedContent, content) {
+		t.Fatalf("expected character edit to require its source snapshot: %+v", assets.createdRecord)
+	}
 	updated, err := (assetdomain.Asset{
 		Type: assetdomain.AssetTypeCharacter, Content: assets.createdRecord.Content,
 	}).DecodeContent()
@@ -705,6 +709,9 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 	}
 	if assets.createdRecord == nil || assets.createdRecord.AssetID != 7 {
 		t.Fatalf("expected version record for asset 7: %+v", assets.createdRecord)
+	}
+	if assets.createdRecord.ExpectedVersion != asset.Version || !bytes.Equal(assets.createdRecord.ExpectedContent, asset.Content) {
+		t.Fatalf("expected object edit to require its source snapshot: %+v", assets.createdRecord)
 	}
 	updated, err := (assetdomain.Asset{
 		Type: assetdomain.AssetTypeObject, Content: assets.createdRecord.Content,

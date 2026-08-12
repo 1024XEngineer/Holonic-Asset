@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -550,12 +551,28 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 	if err != nil {
 		return nil, err
 	}
-	content := append([]byte(nil), record.Content...)
-	if len(content) == 0 {
-		content, err = r.resolveAssetContent(ctx, asset)
+	if record.ExpectedVersion != 0 && asset.Version != record.ExpectedVersion {
+		return nil, fmt.Errorf(
+			"%w: asset %d expected version %d, current version %d",
+			domain.ErrVersionConflict,
+			asset.ID,
+			record.ExpectedVersion,
+			asset.Version,
+		)
+	}
+	var currentContent []byte
+	if len(record.ExpectedContent) != 0 || len(record.Content) == 0 {
+		currentContent, err = r.resolveAssetContent(ctx, asset)
 		if err != nil {
 			return nil, err
 		}
+	}
+	if len(record.ExpectedContent) != 0 && !bytes.Equal(currentContent, record.ExpectedContent) {
+		return nil, fmt.Errorf("%w: asset %d content changed", domain.ErrVersionConflict, asset.ID)
+	}
+	content := append([]byte(nil), record.Content...)
+	if len(content) == 0 {
+		content = currentContent
 	}
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return nil, fmt.Errorf("repository: content storage is not configured")

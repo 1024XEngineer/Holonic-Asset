@@ -228,6 +228,91 @@ func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.
 	}
 }
 
+func TestAssetRepositoryRejectsReplacementContentFromStaleVersion(t *testing.T) {
+	currentContentID := uint(5)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:        7,
+		Version:   3,
+		ContentID: &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 3, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{"version":3}`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID:         7,
+		ExpectedVersion: 2,
+		Content:         json.RawMessage(`{"version":2,"prototype":[{"id":1,"url":"stale.png"}]}`),
+	})
+	if !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("expected version conflict, got %v", err)
+	}
+	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
+		t.Fatalf("stale content was persisted: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
+	}
+	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
+		t.Fatalf("stale record was persisted: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
+	}
+	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
+		t.Fatalf("stale write moved the asset pointer: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryRejectsReplacementWhenCurrentContentChangedAtSameVersion(t *testing.T) {
+	currentContentID := uint(5)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:        7,
+		Version:   2,
+		ContentID: &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 2, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {
+				ID:      currentContentID,
+				AssetID: 7,
+				Content: datatypes.JSON(`{"version":2,"animations":[{"id":1,"name":"walk"}]}`),
+			},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID:         7,
+		ExpectedVersion: 2,
+		ExpectedContent: json.RawMessage(`{"version":2,"animations":[]}`),
+		Content:         json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"generated.png"}],"animations":[]}`),
+	})
+	if !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("expected content version conflict, got %v", err)
+	}
+	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
+		t.Fatalf("stale generated content was persisted: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
+	}
+	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
+		t.Fatalf("stale generated record was persisted: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
+	}
+	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
+		t.Fatalf("stale generated write moved the asset pointer: %+v", assetDao)
+	}
+}
+
 func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	currentContentID := uint(4)
 	assetDao := &recordAssetDaoStub{asset: dao.Asset{
@@ -255,8 +340,10 @@ func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	replacement := json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"new.png"}]}`)
 
 	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
-		AssetID: 7,
-		Content: replacement,
+		AssetID:         7,
+		ExpectedVersion: 2,
+		ExpectedContent: json.RawMessage(`{"version":2}`),
+		Content:         replacement,
 	})
 	if err != nil {
 		t.Fatalf("create replacement record: %v", err)
