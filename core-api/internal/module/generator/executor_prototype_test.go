@@ -52,11 +52,11 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 		},
 	}
 	references := &executorReferenceStoreStub{events: &events}
-	executor := generator.NewExecutor(
+	executor := generator.NewExecutorWithDependencies(
 		images,
 		&imageProcessorStub{events: &events},
 		assets,
-		references,
+		generator.ExecutorDependencies{References: references},
 	)
 
 	result, err := executor.Generate(
@@ -195,9 +195,19 @@ func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(
 
 			var executor generator.Executor
 			if test.withStore {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+				executor = generator.NewExecutorWithDependencies(
+					images,
+					&imageProcessorStub{events: &events},
+					assets,
+					generator.ExecutorDependencies{References: references},
+				)
 			} else {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+				executor = generator.NewExecutorWithDependencies(
+					images,
+					&imageProcessorStub{events: &events},
+					assets,
+					generator.ExecutorDependencies{},
+				)
 			}
 			payload := test.payload
 			if payload == nil {
@@ -248,7 +258,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assets := &generationAssetWriterStub{events: &events}
 	processor := &imageProcessorStub{events: &events}
-	executor := generator.NewExecutor(images, processor, assets)
+	executor := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{})
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -314,10 +324,11 @@ func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyIn
 		t.Run(string(test.perspective), func(t *testing.T) {
 			events := []string{}
 			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(
+			executor := generator.NewExecutorWithDependencies(
 				&imageGenerationServiceStub{events: &events, result: generatedImages()},
 				&imageProcessorStub{events: &events},
 				assets,
+				generator.ExecutorDependencies{},
 			)
 
 			payload := json.RawMessage(fmt.Sprintf(`{
@@ -346,7 +357,12 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
 	references := &executorReferenceStoreStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -403,7 +419,12 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
@@ -457,7 +478,12 @@ func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *test
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",

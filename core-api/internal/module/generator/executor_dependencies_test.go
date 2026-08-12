@@ -11,40 +11,53 @@ import (
 )
 
 func TestExecutorRequiresDependencies(t *testing.T) {
-	executor := generator.NewExecutor(nil, nil, nil)
+	executor := generator.NewExecutorWithDependencies(nil, nil, nil, generator.ExecutorDependencies{})
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrImageServiceRequired) {
 		t.Fatalf("expected image service required error, got %v", err)
 	}
 
 	events := []string{}
-	executor = generator.NewExecutor(&imageGenerationServiceStub{events: &events}, nil, nil)
+	executor = generator.NewExecutorWithDependencies(
+		&imageGenerationServiceStub{events: &events},
+		nil,
+		nil,
+		generator.ExecutorDependencies{},
+	)
 	_, err = executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrAssetWriterRequired) {
 		t.Fatalf("expected asset writer required error, got %v", err)
 	}
 
-	executor = generator.NewExecutor(
+	executor = generator.NewExecutorWithDependencies(
 		&imageGenerationServiceStub{events: &events},
 		nil,
 		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{},
 	)
 	_, err = executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrImageProcessorRequired) {
 		t.Fatalf("expected image processor required error, got %v", err)
 	}
 
-	executor = generator.NewExecutor(nil, nil, &generationAssetWriterStub{events: &events})
+	executor = generator.NewExecutorWithDependencies(
+		nil,
+		nil,
+		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{},
+	)
 	_, err = executor.Generate(context.Background(), generator.GenerateAnimation, nil)
 	if !errors.Is(err, generator.ErrAnimationServiceRequired) {
 		t.Fatalf("expected animation service required error, got %v", err)
 	}
 
-	executor = generator.NewExecutorWithAnimation(
+	executor = generator.NewExecutorWithDependencies(
 		nil,
-		&animationGenerationServiceStub{events: &events},
 		nil,
 		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{
+			Animations: &animationGenerationServiceStub{events: &events},
+		},
 	)
 	_, err = executor.Generate(context.Background(), generator.GenerateAnimation, nil)
 	if !errors.Is(err, generator.ErrAnimationReferenceStoreRequired) {
@@ -54,12 +67,14 @@ func TestExecutorRequiresDependencies(t *testing.T) {
 
 func TestExecutorRejectsMalformedAndUnsupportedTasks(t *testing.T) {
 	events := []string{}
-	executor := generator.NewExecutorWithAnimation(
+	executor := generator.NewExecutorWithDependencies(
 		&imageGenerationServiceStub{events: &events},
-		&animationGenerationServiceStub{events: &events},
 		&imageProcessorStub{events: &events},
 		&generationAssetWriterStub{events: &events},
-		&executorReferenceStoreStub{},
+		generator.ExecutorDependencies{
+			Animations: &animationGenerationServiceStub{events: &events},
+			References: &executorReferenceStoreStub{},
+		},
 	)
 	for _, taskType := range []generator.TaskType{
 		generator.GenerateCharacterProtoType,

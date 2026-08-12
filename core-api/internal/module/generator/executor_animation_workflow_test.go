@@ -29,7 +29,10 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
 	references := &executorReferenceStoreStub{}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, references)
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: references,
+	})
 	payload := json.RawMessage(`{
 		"animation_name":"  walk  ",
 		"creative_brief":"walking cycle",
@@ -122,7 +125,10 @@ func TestExecutorRejectsMissingAnimationIdentityBeforeLookup(t *testing.T) {
 			events := []string{}
 			animations := &animationGenerationServiceStub{events: &events}
 			assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
-			executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+				Animations: animations,
+				References: &executorReferenceStoreStub{},
+			})
 
 			_, err := executor.Generate(context.Background(), generator.GenerateAnimation, tt.payload)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
@@ -145,7 +151,10 @@ func TestExecutorRejectsNonObjectKeyAnimationFrameReference(t *testing.T) {
 	}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
 	references := &executorReferenceStoreStub{persistValue: "https://private.example/frame.png?token=temporary"}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, references)
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: references,
+	})
 
 	_, err := executor.Generate(
 		context.Background(),
@@ -165,7 +174,10 @@ func TestExecutorDoesNotMutateAssetsWhenAnimationGenerationFails(t *testing.T) {
 	events := []string{}
 	animations := &animationGenerationServiceStub{events: &events, err: wantErr}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err := executor.Generate(
 		context.Background(),
@@ -198,7 +210,10 @@ func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
 	parent := assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded}
 	animations := &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(
 		context.Background(),
@@ -215,7 +230,10 @@ func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
 	events = nil
 	animations = &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
 	assets = &generationAssetWriterStub{events: &events, parentAsset: parent}
-	executor = generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor = generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(
 		context.Background(),
@@ -265,7 +283,10 @@ func TestExecutorGeneratesObjectAnimationForSelectedDirection(t *testing.T) {
 		},
 	}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(
 		context.Background(),
@@ -300,7 +321,10 @@ func TestExecutorRejectsObjectAnimationWithoutDirection(t *testing.T) {
 	parent := assetdomain.Asset{ID: 8, ProjectID: 11, Type: assetdomain.AssetTypeObject, Name: "chest", Content: encoded}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 	animations := &animationGenerationServiceStub{events: &events}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(context.Background(), generator.GenerateAnimation,
 		json.RawMessage(`{"animation_name":"open","asset_id":8,"direction":""}`))
@@ -328,7 +352,10 @@ func TestExecutorRejectsUnsupportedSingleDirectionAsset(t *testing.T) {
 	}
 	animations := &animationGenerationServiceStub{events: &events}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(
 		context.Background(),
@@ -347,7 +374,10 @@ func TestExecutorRejectsAnimationDirectionOutsidePrototypeOrder(t *testing.T) {
 	events := []string{}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
 	animations := &animationGenerationServiceStub{events: &events}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err := executor.Generate(
 		context.Background(),
@@ -374,7 +404,10 @@ func TestExecutorRejectsMultiDirectionParentWithoutAnimationReference(t *testing
 	parent.Content = encoded
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 	animations := &animationGenerationServiceStub{events: &events}
-	executor := generator.NewExecutorWithAnimation(nil, animations, nil, assets, &executorReferenceStoreStub{})
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
 
 	_, err = executor.Generate(
 		context.Background(),
