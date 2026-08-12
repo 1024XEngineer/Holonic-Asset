@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { i18n } from "@/i18n";
 import { useTimeout } from "@/hooks/use-timeout";
 import {
   coreGenerationApi,
@@ -23,6 +24,8 @@ export function useEditorWorkspace({
   data: AssetWorkspaceData;
   onBack: () => void;
 }): SpriteEditorModeProps | null {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    i18n.getFixedT(null, "editor")(key as never, options);
   const { asset, projectName } = data;
   const session = useEditorSession({
     target: { projectId: asset.projectId, assetId: asset.id },
@@ -76,14 +79,21 @@ export function useEditorWorkspace({
     isGeneratingAnimation: animationMutation.isPending,
     notice,
     isDirty: snapshot.dirty,
+    labels: {
+      saving: t("savingChanges"),
+      sendingPrompt: t("sendingPrompt"),
+      generatingAnimation: t("generatingAnimationStatus"),
+      unsavedChanges: t("unsavedChanges"),
+      allChangesSaved: t("allChangesSaved"),
+    },
   });
 
   const save = async () => {
     if (!snapshot.dirty) return;
 
     const result = await session.save();
-    if (result.status === "saved") reportAction("Saved just now");
-    if (result.status === "failed") reportAction("Save failed");
+    if (result.status === "saved") reportAction(t("savedJustNow"));
+    if (result.status === "failed") reportAction(t("saveFailed"));
   };
 
   if (
@@ -120,9 +130,9 @@ export function useEditorWorkspace({
         type: "sprite.animation.generated",
         animation: result.animation,
       });
-      reportAction(`${request.label} generated`);
+      reportAction(t("animationGenerated", { name: request.label }));
     } catch {
-      reportAction("Animation generation failed");
+      reportAction(t("animationGenerationFailed"));
     } finally {
       setAnimationTask((current) => (current?.id === taskId ? null : current));
     }
@@ -150,13 +160,13 @@ export function useEditorWorkspace({
         );
       }
 
-      reportAction("Prompt sent");
+      reportAction(t("promptSent"));
       schedulePromptTaskReset(() => {
         setPromptTask((current) => (current?.id === taskId ? null : current));
       }, 1800);
     } catch (error) {
       setPromptTask((current) => (current?.id === taskId ? null : current));
-      reportAction("Prompt submission failed");
+      reportAction(t("promptSubmissionFailed"));
       throw error;
     }
   };

@@ -1,4 +1,5 @@
 import { Layers3 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 import type { SceneryLayer } from "@/model";
@@ -11,6 +12,7 @@ const layerBlendClasses: Record<SceneryLayer["blendMode"], string> = {
 };
 
 export function SceneryCanvas({ model, onEvent }: SceneryCanvasProps) {
+  const { t } = useTranslation("editor");
   const { layers, selectedLayerIds, visibleLayerIds } = model;
   const selectedLayers = new Set(selectedLayerIds);
   const visibleLayers = new Set(visibleLayerIds);
@@ -64,17 +66,20 @@ export function SceneryCanvas({ model, onEvent }: SceneryCanvasProps) {
         })}
       </div>
       <p className="sr-only" aria-live="polite">
-        {selectionLabel ? `${selectionLabel} selected` : "No layers selected"}
+        {selectionLabel
+          ? t("selectionSummary", { value: selectionLabel })
+          : t("noLayersSelected")}
       </p>
     </main>
   );
 }
 
 function EmptySceneryCanvas() {
+  const { t } = useTranslation("editor");
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#47656a]">
       <Layers3 className="size-5" aria-hidden="true" />
-      <p className="text-xs font-medium">No scenery layers</p>
+      <p className="text-xs font-medium">{t("noSceneryLayers")}</p>
     </div>
   );
 }

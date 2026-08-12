@@ -6,6 +6,15 @@ export type EditorStatusInput = {
   isGeneratingAnimation: boolean;
   notice: string | null;
   isDirty: boolean;
+  labels?: Partial<EditorStatusLabels>;
+};
+
+export type EditorStatusLabels = {
+  saving: string;
+  sendingPrompt: string;
+  generatingAnimation: string;
+  unsavedChanges: string;
+  allChangesSaved: string;
 };
 
 export function getEditorStatus({
@@ -14,12 +23,16 @@ export function getEditorStatus({
   isGeneratingAnimation,
   notice,
   isDirty,
+  labels = {},
 }: EditorStatusInput) {
-  if (saveState.phase === "saving") return "Saving changes";
-  if (isPromptSubmitting) return "Sending prompt";
-  if (isGeneratingAnimation) return "Generating animation";
+  if (saveState.phase === "saving") return labels.saving ?? "Saving changes";
+  if (isPromptSubmitting) return labels.sendingPrompt ?? "Sending prompt";
+  if (isGeneratingAnimation)
+    return labels.generatingAnimation ?? "Generating animation";
   if (notice) return notice;
   if (saveState.phase === "failed") return saveState.message;
 
-  return isDirty ? "Unsaved changes" : "All changes saved";
+  return isDirty
+    ? (labels.unsavedChanges ?? "Unsaved changes")
+    : (labels.allChangesSaved ?? "All changes saved");
 }
