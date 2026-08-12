@@ -66,10 +66,27 @@ func TestCreateAnimationPayloadRejectsNumericDirection(t *testing.T) {
 	}
 }
 
-func TestAnimationUnprocessedImageURLPreservesQuery(t *testing.T) {
-	got := animationUnprocessedImageURL("https://cdn.example.com/hero/front.png?version=7")
-	want := "https://cdn.example.com/hero/front-unprocessed.png?version=7"
-	if got != want {
-		t.Fatalf("unprocessed URL = %q, want %q", got, want)
+func TestAnimationUnprocessedImageURLAddsSuffixWithoutChangingReferenceSemantics(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{
+			name:  "URL with query",
+			value: "https://cdn.example.com/hero/front.png?version=7",
+			want:  "https://cdn.example.com/hero/front-unprocessed.png?version=7",
+		},
+		{name: "object key", value: "uploads/hero/front.png", want: "uploads/hero/front-unprocessed.png"},
+		{name: "no extension", value: "uploads/hero/front", want: "uploads/hero/front-unprocessed"},
+		{name: "data URL", value: "data:image/png;base64,parent", want: "data:image/png;base64,parent"},
+		{name: "blank", value: "  ", want: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := animationUnprocessedImageURL(test.value); got != test.want {
+				t.Fatalf("unprocessed URL = %q, want %q", got, test.want)
+			}
+		})
 	}
 }

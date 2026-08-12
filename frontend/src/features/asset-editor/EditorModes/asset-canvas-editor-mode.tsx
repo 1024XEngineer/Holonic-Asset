@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type {
   AssetKind,
@@ -168,6 +169,7 @@ function CanvasEditorFrame({
   onBack,
   children,
 }: CanvasEditorFrameProps) {
+  const { t } = useTranslation("editor");
   return (
     <>
       <EditorHeader
@@ -175,7 +177,7 @@ function CanvasEditorFrame({
         assetName={assetName}
         version={version}
         projectName={projectName}
-        status="Preview ready"
+        status={t("previewReady")}
         canUndo={false}
         canRedo={false}
         isDirty={false}

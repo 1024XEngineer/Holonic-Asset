@@ -1,12 +1,12 @@
 import { LoaderCircle } from "lucide-react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getAssetKindConfig } from "@/components/asset-kind";
 import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
@@ -36,6 +36,7 @@ export function CreateAssetForm({
   error?: Error | null;
   isSubmitting?: boolean;
 }) {
+  const { t } = useTranslation(["generation", "common"]);
   const [useProjectContext, setUseProjectContext] = useState(true);
   const [validationError, setValidationError] = useState<string>();
   const form = useForm({
@@ -72,13 +73,15 @@ export function CreateAssetForm({
     >
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
-          Asset name
+          {t("assetName")}
           <Input
             required
             placeholder={
               draft.kind === "audio"
-                ? "e.g. Orchard at Night"
-                : `e.g. ${draft.kind === "character" ? "Orchard Keeper" : "Moonlit Lantern"}`
+                ? t("audioNamePlaceholder")
+                : draft.kind === "character"
+                  ? t("characterNamePlaceholder")
+                  : t("objectNamePlaceholder")
             }
             value={draft.name}
             onChange={(event) =>
@@ -87,14 +90,14 @@ export function CreateAssetForm({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium lg:col-span-2">
-          Creative brief
+          {t("creativeBrief")}
           <Textarea
             required
             className="min-h-28 resize-none"
             placeholder={
               draft.kind === "audio"
-                ? "Describe the mood, instruments, rhythm, and intended use..."
-                : "Describe the subject, material, mood, and details to generate..."
+                ? t("audioPromptPlaceholder")
+                : t("promptPlaceholder")
             }
             value={draft.prompt}
             onChange={(event) =>
@@ -129,13 +132,13 @@ export function CreateAssetForm({
           checked={useProjectContext}
           onChange={(event) => setUseProjectContext(event.target.checked)}
         />
-        Use {project.name} project context
+        {t("useContext", { name: project.name })}
       </label>
 
       {useProjectContext ? (
         <div className="border bg-muted/40 p-4">
           <p className="text-xs font-medium text-muted-foreground">
-            Generation context
+            {t("context")}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {[project.gameType, project.style, project.platform]
@@ -156,7 +159,7 @@ export function CreateAssetForm({
 
       {error ? (
         <p className="text-sm text-destructive" role="alert">
-          {error.message || "Unable to create the asset. Please try again."}
+          {error.message || t("createError")}
         </p>
       ) : null}
 
@@ -167,13 +170,13 @@ export function CreateAssetForm({
           disabled={isSubmitting}
           onClick={onCancel}
         >
-          Cancel
+          {t("common:actions.cancel")}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <LoaderCircle className="animate-spin" /> : null}
           {isSubmitting
-            ? "Creating..."
-            : `Create ${getAssetKindConfig(kind).label}`}
+            ? t("common:actions.creating")
+            : t("createKind", { kind: t(`common:assetKinds.${kind}`) })}
         </Button>
       </div>
     </form>

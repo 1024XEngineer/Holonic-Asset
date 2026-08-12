@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   AlertDialog,
@@ -35,6 +36,7 @@ export function ProjectSidebar({
 }: {
   library: ProjectLibraryProjectModel;
 }) {
+  const { t } = useTranslation(["projects", "common"]);
   const [isOpen, setIsOpen] = useState(readProjectSidebarOpen);
   const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
@@ -88,14 +90,18 @@ export function ProjectSidebar({
           {isOpen ? (
             <div className="hidden min-w-0 md:block">
               <p className="text-xs font-semibold uppercase text-muted-foreground">
-                Projects
+                {t("project.sidebar.projects")}
               </p>
-              <h2 className="truncate text-lg font-semibold">Asset Library</h2>
+              <h2 className="truncate text-lg font-semibold">
+                {t("assetLibrary")}
+              </h2>
             </div>
           ) : null}
           <Button
             aria-label={
-              isOpen ? "Collapse project list" : "Expand project list"
+              isOpen
+                ? t("project.sidebar.collapseList")
+                : t("project.sidebar.expandList")
             }
             variant="outline"
             size="icon-sm"
@@ -122,7 +128,7 @@ export function ProjectSidebar({
               onClick={() => void create()}
             >
               <Plus data-icon="inline-start" />
-              New Project
+              {t("common:actions.newProject")}
             </Button>
             <div className="space-y-2">
               {items.map((project) => (
@@ -141,7 +147,9 @@ export function ProjectSidebar({
                     variant="ghost"
                     size="icon-sm"
                     className="pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-foreground/10 hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-foreground"
-                    aria-label={`Edit ${project.name}`}
+                    aria-label={t("project.sidebar.edit", {
+                      name: project.name,
+                    })}
                     onClick={() => setEditingProjectId(project.id)}
                   >
                     <Pencil />
@@ -153,7 +161,9 @@ export function ProjectSidebar({
                           variant="ghost"
                           size="icon-sm"
                           className="pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-destructive"
-                          aria-label={`Delete ${project.name}`}
+                          aria-label={t("project.sidebar.delete", {
+                            name: project.name,
+                          })}
                         />
                       }
                     >
@@ -162,20 +172,23 @@ export function ProjectSidebar({
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          Delete {project.name}?
+                          {t("project.sidebar.deleteConfirm", {
+                            name: project.name,
+                          })}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          This removes the project and its asset workspace from
-                          this browser. This action cannot be undone.
+                          {t("project.sidebar.deleteDescription")}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>
+                          {t("common:actions.cancel")}
+                        </AlertDialogCancel>
                         <AlertDialogAction
                           variant="destructive"
                           onClick={() => void remove(project.id)}
                         >
-                          Delete project
+                          {t("project.sidebar.deleteAction")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -188,7 +201,7 @@ export function ProjectSidebar({
           <div className="hidden min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:flex">
             <Button
               type="button"
-              aria-label="New Project"
+              aria-label={t("common:actions.newProject")}
               variant="outline"
               size="icon-lg"
               onClick={() => void create()}
@@ -202,7 +215,7 @@ export function ProjectSidebar({
         <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto py-4 md:hidden">
           <Button
             type="button"
-            aria-label="New Project"
+            aria-label={t("common:actions.newProject")}
             variant="outline"
             size="icon-lg"
             onClick={() => void create()}
