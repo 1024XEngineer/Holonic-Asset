@@ -8,6 +8,7 @@ import rehypeSlug from "rehype-slug";
 
 // https://vite.dev/config/
 export default defineConfig({
+  envPrefix: "PUBLIC_",
   plugins: [
     tanstackRouter({
       target: "react",

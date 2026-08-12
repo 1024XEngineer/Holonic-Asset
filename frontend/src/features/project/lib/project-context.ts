@@ -17,7 +17,7 @@ export const projectContextOptions = {
     "Simulation",
   ],
   perspectives: perspectiveOptions,
-  platforms: ["PC", "Mobile", "Web", "Console", "Multi-platform"],
+  platforms: ["PC", "Mobile", "Web"],
 } as const;
 
 export const editableProjectContextOptions = {
@@ -28,27 +28,31 @@ const projectGameTypeSchema = z.enum(projectContextOptions.gameTypes);
 const editableProjectGameTypeSchema = z.enum(
   editableProjectContextOptions.gameTypes,
 );
+const optionalEditableProjectGameTypeSchema = editableProjectGameTypeSchema.or(
+  z.literal(""),
+);
 const projectPlatformSchema = z.enum(projectContextOptions.platforms);
+const optionalProjectPlatformSchema = projectPlatformSchema.or(z.literal(""));
+const projectNameSchema = z.string().trim().min(1, "Project name is required.");
 
 const newProjectDraftSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required."),
+  name: projectNameSchema,
   gameType: projectGameTypeSchema,
   platform: projectPlatformSchema,
   description: z.string().trim(),
   perspective: perspectiveSchema,
   reference: z.string().trim(),
-  visualDirection: z.string().optional(),
 });
 
 const projectSettingsDraftSchema = z
   .object({
-    name: z.string().trim().min(1, "Project name is required."),
-    gameType: editableProjectGameTypeSchema,
+    name: projectNameSchema,
+    gameType: optionalEditableProjectGameTypeSchema,
     customGameType: z.string().trim(),
     perspective: perspectiveSchema,
-    platform: projectPlatformSchema,
+    platform: optionalProjectPlatformSchema,
     description: z.string(),
-    visualDirection: z.string(),
+    reference: z.string(),
   })
   .refine(
     ({ customGameType, gameType }) =>
@@ -71,7 +75,7 @@ export function createNewProjectDraft(): NewProjectDraft {
 }
 
 export function toCreateProjectInput(
-  draft: NewProjectDraft & { visualDirection?: string },
+  draft: NewProjectDraft,
 ): CreateProjectInput {
   const value = newProjectDraftSchema.parse(draft);
 
@@ -83,7 +87,18 @@ export function toCreateProjectInput(
     reference: value.reference,
     style: value.perspective,
     perspective: value.perspective,
-    visualDirection: value.visualDirection ?? "",
+  };
+}
+
+export function toCreateBlankProjectInput(name: string): CreateProjectInput {
+  return {
+    name: projectNameSchema.parse(name),
+    gameType: "",
+    platform: "",
+    description: "",
+    perspective: projectContextOptions.perspectives[0],
+    reference: "",
+    style: "",
   };
 }
 
@@ -93,14 +108,15 @@ export function createProjectSettingsDraft(
   const hasKnownGameType = projectGameTypeSchema.safeParse(
     project.gameType,
   ).success;
+  const hasSelectableGameType = project.gameType === "" || hasKnownGameType;
   return {
     name: project.name,
-    gameType: hasKnownGameType ? project.gameType : "Other",
-    customGameType: hasKnownGameType ? "" : project.gameType,
+    gameType: hasSelectableGameType ? project.gameType : "Other",
+    customGameType: hasSelectableGameType ? "" : project.gameType,
     perspective: project.perspective,
     platform: project.platform,
     description: project.description,
-    visualDirection: project.visualDirection,
+    reference: project.reference,
   };
 }
 
@@ -123,6 +139,6 @@ export function applyProjectSettings(
     style: value.perspective,
     platform: value.platform,
     description: value.description,
-    visualDirection: value.visualDirection,
+    reference: value.reference,
   };
 }

@@ -3,11 +3,13 @@ import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/model";
+import { toast } from "@/components/ui/toast";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
-import { createMockProjectPreview } from "@/model/project/mock";
+import { projectApi } from "@/model/project";
 
 import {
   createNewProjectDraft,
+  toCreateBlankProjectInput,
   toCreateProjectInput,
 } from "../lib/project-context";
 
@@ -27,6 +29,7 @@ export function useNewProjectController() {
   const [gameFile, setGameFile] = useState<File | null>(null);
   const [generatedPreview, setGeneratedPreview] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState("");
+  const [isGeneratingReference, setIsGeneratingReference] = useState(false);
   const [previewError, setPreviewError] = useState<string>();
   const previewReadController = useRef<AbortController | null>(null);
   const [previewMode, setPreviewMode] =
@@ -39,12 +42,17 @@ export function useNewProjectController() {
   const form = useForm({
     defaultValues: createNewProjectDraft(),
     onSubmit: async ({ value }) => {
+      const name = requireProjectName(value.name);
+      if (!name) return;
+
       const project = await createProject(
-        toCreateProjectInput({
-          ...value,
-          name: value.name.trim() || "Untitled game",
-          visualDirection: projectPreview,
-        }),
+        selectedStart === "blank"
+          ? toCreateBlankProjectInput(name)
+          : toCreateProjectInput({
+              ...value,
+              name,
+              reference: projectPreview,
+            }),
       );
       await navigate({
         to: "/projects/$projectId",
@@ -88,14 +96,39 @@ export function useNewProjectController() {
     else setStep(1);
   }, [selectedStart, step]);
 
-  const next = useCallback(() => {
-    if (selectedStart === "blank") void form.handleSubmit();
-    else {
-      setPreviewMode("generate");
-      setGeneratedPreview(createMockProjectPreview(form.state.values));
-      setStep(2);
+  const generateReference = useCallback(async () => {
+    if (isGeneratingReference) return;
+    const name = requireProjectName(form.state.values.name);
+    if (!name) return;
+
+    setIsGeneratingReference(true);
+    setPreviewError(undefined);
+    setPreviewMode("generate");
+    setStep(2);
+    try {
+      const reference = await projectApi.generateReference(
+        toCreateProjectInput({
+          ...form.state.values,
+          name,
+        }),
+      );
+      form.setFieldValue("reference", reference);
+      setGeneratedPreview(reference);
+    } catch {
+      setPreviewError("We couldn't generate that reference. Try again.");
+    } finally {
+      setIsGeneratingReference(false);
     }
-  }, [form, selectedStart]);
+  }, [form, isGeneratingReference]);
+
+  const next = useCallback(() => {
+    if (!requireProjectName(form.state.values.name)) return;
+    if (selectedStart === "blank") void form.handleSubmit();
+    else if (generatedPreview) {
+      setPreviewMode("generate");
+      setStep(2);
+    } else void generateReference();
+  }, [form, generateReference, generatedPreview, selectedStart]);
 
   const returnToStart = useCallback(() => {
     setStep(1);
@@ -104,40 +137,48 @@ export function useNewProjectController() {
 
   const selectGenerate = useCallback(() => {
     setPreviewMode("generate");
-    if (!generatedPreview)
-      setGeneratedPreview(createMockProjectPreview(form.state.values));
-  }, [form, generatedPreview]);
+    form.setFieldValue("reference", generatedPreview);
+    if (!generatedPreview) void generateReference();
+  }, [form, generateReference, generatedPreview]);
 
-  const selectUpload = useCallback(() => setPreviewMode("upload"), []);
+  const selectUpload = useCallback(() => {
+    setPreviewMode("upload");
+    form.setFieldValue("reference", uploadedPreview);
+  }, [form, uploadedPreview]);
 
   const generate = useCallback(
-    () => setGeneratedPreview(createMockProjectPreview(form.state.values)),
-    [form],
+    () => void generateReference(),
+    [generateReference],
   );
 
-  const setFile = useCallback((file: File) => {
-    previewReadController.current?.abort();
-    const controller = new AbortController();
-    previewReadController.current = controller;
-    setUploadedPreview("");
-    setPreviewError(undefined);
-    void readFileAsDataUrl(file, controller.signal).then(
-      (dataUrl) => {
-        if (controller.signal.aborted) return;
-        setUploadedPreview(dataUrl);
-      },
-      () => {
-        if (controller.signal.aborted) return;
-        setPreviewError("We couldn't read that image. Try another file.");
-      },
-    );
-  }, []);
+  const setFile = useCallback(
+    (file: File) => {
+      previewReadController.current?.abort();
+      const controller = new AbortController();
+      previewReadController.current = controller;
+      setUploadedPreview("");
+      setPreviewError(undefined);
+      void readFileAsDataUrl(file, controller.signal).then(
+        (dataUrl) => {
+          if (controller.signal.aborted) return;
+          setUploadedPreview(dataUrl);
+          form.setFieldValue("reference", dataUrl);
+        },
+        () => {
+          if (controller.signal.aborted) return;
+          setPreviewError("We couldn't read that image. Try another file.");
+        },
+      );
+    },
+    [form],
+  );
 
   const clear = useCallback(() => {
     previewReadController.current?.abort();
     setUploadedPreview("");
+    form.setFieldValue("reference", "");
     setPreviewError(undefined);
-  }, []);
+  }, [form]);
 
   const selectLink = useCallback(() => setImportMode("link"), []);
   const selectFile = useCallback(() => setImportMode("file"), []);
@@ -145,12 +186,12 @@ export function useNewProjectController() {
   const continueExistingGameImport = useCallback(() => {
     form.setFieldValue(
       "reference",
-      importMode === "link" ? gameUrl.trim() : (gameFile?.name ?? ""),
+      importMode === "link" ? gameUrl.trim() : "",
     );
     setImportOpen(false);
     setStep(1);
     setSelectedStart("existing");
-  }, [form, gameFile, gameUrl, importMode]);
+  }, [form, gameUrl, importMode]);
 
   const start = useMemo(
     () => ({
@@ -167,17 +208,27 @@ export function useNewProjectController() {
       instance: form,
       selectedStart,
       step,
+      isGenerating: isGeneratingReference,
       previous,
       next,
       returnToStart,
     }),
-    [form, next, previous, returnToStart, selectedStart, step],
+    [
+      form,
+      isGeneratingReference,
+      next,
+      previous,
+      returnToStart,
+      selectedStart,
+      step,
+    ],
   );
 
   const preview = useMemo(
     () => ({
       mode: previewMode,
       url: projectPreview,
+      isGenerating: isGeneratingReference,
       selectGenerate,
       selectUpload,
       generate,
@@ -188,6 +239,7 @@ export function useNewProjectController() {
     [
       clear,
       generate,
+      isGeneratingReference,
       previewError,
       previewMode,
       projectPreview,
@@ -234,3 +286,11 @@ export function useNewProjectController() {
 }
 
 export type NewProjectController = ReturnType<typeof useNewProjectController>;
+
+function requireProjectName(name: string) {
+  const value = name.trim();
+  if (value) return value;
+
+  toast.add({ title: "Project name is required.", type: "error" });
+  return undefined;
+}

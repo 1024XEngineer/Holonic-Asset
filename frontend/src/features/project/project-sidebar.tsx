@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useProjectDetailQuery } from "@/model";
 import type { ProjectSummary } from "@/model/project";
 import { ProjectSettingsDialog } from "./project-settings-dialog";
 import type { ProjectLibraryProjectModel } from "./state/use-project-library";
@@ -37,9 +38,11 @@ export function ProjectSidebar({
   const [isOpen, setIsOpen] = useState(readProjectSidebarOpen);
   const [editingProjectId, setEditingProjectId] = useState<string>();
   const { create, items, remove, select, selectedId, update } = library;
-  const editingProject = items.find(
-    (project) => project.id === editingProjectId,
-  );
+  const { data: editingProjectDetail } =
+    useProjectDetailQuery(editingProjectId);
+  const editingProject =
+    editingProjectDetail ??
+    items.find((project) => project.id === editingProjectId);
 
   const isSelected = (projectId: string) => projectId === selectedId;
   const projectButton = (project: ProjectSummary, compact = false) => (

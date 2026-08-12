@@ -79,7 +79,6 @@ function project(id: string): ProjectSummary {
     description: "",
     reference: "",
     perspective: "Top-Down",
-    visualDirection: "",
     assetCount: 0,
   };
 }

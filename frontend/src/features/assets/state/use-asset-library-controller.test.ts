@@ -89,7 +89,6 @@ const project: ProjectSummary = {
   description: "",
   reference: "",
   perspective: "Top-Down",
-  visualDirection: "",
   assetCount: 1,
 };
 

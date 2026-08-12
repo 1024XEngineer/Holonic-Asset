@@ -14,6 +14,61 @@ const assetItemBase = {
 };
 
 describe("toAssetGroups", () => {
+  it("maps API assets into typed groups with defaults and stable ordering", () => {
+    expect(
+      toAssetGroups([
+        {
+          assetId: 8,
+          projectId: 1,
+          name: "Barrel",
+          description: "Wooden prop",
+          dimensions: { width: 32, height: 32 },
+          perspective: "Top-Down",
+          type: "object",
+          version: 2,
+          tags: ["prop"],
+        },
+        {
+          assetId: 9,
+          projectId: 1,
+          name: "Ground",
+          description: "Tile set",
+          dimensions: {
+            tileSize: { width: 16, height: 16 },
+            tileAmount: { columns: 8, rows: 8 },
+          },
+          perspective: "Top-Down",
+          type: "tileSet",
+          version: 1,
+          tags: [],
+        },
+        {
+          assetId: 10,
+          projectId: 1,
+          name: "Crate",
+          description: "Another prop",
+          dimensions: { width: 24, height: 24 },
+          perspective: "Top-Down",
+          type: "object",
+          version: 3,
+          tags: null,
+        },
+      ]),
+    ).toMatchObject([
+      {
+        kind: "object",
+        assets: [
+          { id: "8", version: "v2", tags: ["prop"] },
+          { id: "10", version: "v3", tags: [] },
+        ],
+      },
+      {
+        kind: "tileset",
+        assets: [{ id: "9", version: "v1", tags: [] }],
+      },
+    ]);
+  });
+
   it("maps backend perspective and dimensions into library assets", () => {
     const groups = toAssetGroups([
       {

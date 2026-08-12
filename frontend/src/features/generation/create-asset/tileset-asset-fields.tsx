@@ -115,12 +115,9 @@ export function TilesetAssetFields({
                       <span>Reference image</span>
                       <ImageDropzone
                         className="min-h-40"
-                        fileName={item.reference?.name}
-                        onSelect={(reference) =>
+                        value={item.reference}
+                        onChange={(reference) =>
                           updateItem(index, { reference })
-                        }
-                        onClear={() =>
-                          updateItem(index, { reference: undefined })
                         }
                       />
                     </div>

@@ -143,6 +143,7 @@ export {
   removeProjectSelection,
   useCreateProjectMutation,
   useDeleteProjectMutation,
+  useProjectDetailQuery,
   useProjectListQuery,
   useUpdateProjectMutation,
 } from "./project";

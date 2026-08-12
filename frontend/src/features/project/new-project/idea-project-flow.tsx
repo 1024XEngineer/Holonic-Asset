@@ -16,7 +16,7 @@ export function IdeaProjectFlow({
   return (
     <ProjectStartCard
       title="I have an idea"
-      description="Describe the game, generate a visual direction, and refine it until it feels right."
+      description="Describe the game, generate a reference, and refine it until it feels right."
       icon={<Lightbulb size={20} />}
       onSelect={project.start.chooseIdea}
     />

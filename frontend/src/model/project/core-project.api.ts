@@ -3,6 +3,8 @@ import type {
   CreateProjectResponse,
   DeleteProjectRequest,
   DeleteProjectResponse,
+  GenerateProjectReferenceRequest,
+  GenerateProjectReferenceResponse,
   ListProjectsResponse,
   ProjectDetailResponse,
   UpdateProjectRequest,
@@ -18,6 +20,11 @@ import {
 export const coreProjectApi = {
   create: (request: CreateProjectRequest) =>
     postEnvelope<CreateProjectResponse>("/project/create", request),
+  generateReference: (request: GenerateProjectReferenceRequest) =>
+    postEnvelope<GenerateProjectReferenceResponse>(
+      "/project/reference/generate",
+      request,
+    ),
   list: (userID: number) =>
     getEnvelope<ListProjectsResponse>("/project/list", { userID }),
   detail: (projectID: number) =>

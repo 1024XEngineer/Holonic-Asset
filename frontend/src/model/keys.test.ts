@@ -10,6 +10,11 @@ import { projectKeys } from "./project/keys";
 describe("query keys", () => {
   it("builds stable, namespaced keys", () => {
     expect(projectKeys.list()).toEqual(["projects", "list"]);
+    expect(projectKeys.detail("project-1")).toEqual([
+      "projects",
+      "detail",
+      "project-1",
+    ]);
     expect(assetKeys.library("project-1")).toEqual([
       "assets",
       "library",

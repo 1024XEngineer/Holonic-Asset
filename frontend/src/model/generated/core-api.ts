@@ -374,8 +374,7 @@ export interface components {
         };
         CreateProjectRequest: {
             description?: string;
-            /** @enum {string} */
-            gameType?: "" | "RPG" | "ACT" | "SLG";
+            gameType?: string;
             name: string;
             /**
              * @default Top-Down
@@ -455,8 +454,7 @@ export interface components {
         };
         GenerateProjectReferenceRequest: {
             description?: string;
-            /** @enum {string} */
-            gameType?: "" | "RPG" | "ACT" | "SLG";
+            gameType?: string;
             name: string;
             /**
              * @default Top-Down
@@ -515,8 +513,7 @@ export interface components {
         };
         ProjectResponse: {
             description: string;
-            /** @enum {string} */
-            gameType: "" | "RPG" | "ACT" | "SLG";
+            gameType: string;
             /** Format: int64 */
             id: number;
             name: string;
@@ -783,8 +780,7 @@ export interface components {
         };
         UpdateProjectRequest: {
             description?: string;
-            /** @enum {string} */
-            gameType?: "" | "RPG" | "ACT" | "SLG";
+            gameType?: string;
             name?: string;
             /** @enum {string} */
             perspective?: "Top-Down" | "Side-On" | "Isometric";

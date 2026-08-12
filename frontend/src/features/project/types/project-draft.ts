@@ -16,5 +16,5 @@ export type ProjectSettingsDraft = {
   perspective: Perspective;
   platform: string;
   description: string;
-  visualDirection: string;
+  reference: string;
 };

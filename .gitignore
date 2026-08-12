@@ -9,6 +9,9 @@
 *.sln
 *.sw?
 
+# Environment files
+.env
+
 # Dependencies and build outputs
 node_modules/
 dist/

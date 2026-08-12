@@ -1,5 +1,6 @@
 interface ImportMetaEnv {
-  readonly VITE_CORE_API_BASE_URL?: string;
+  readonly PUBLIC_CORE_API_BASE_URL?: string;
+  readonly PUBLIC_CORE_API_USER_ID?: string;
 }
 
 interface ImportMeta {
