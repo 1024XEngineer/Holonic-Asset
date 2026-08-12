@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
+import { useAuthenticatedUserId } from "@/features/auth";
 import { useCreateProjectMutation } from "@/model";
 import { toast } from "@/components/ui/toast";
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
@@ -20,7 +21,8 @@ type ProjectPreviewMode = "generate" | "upload";
 
 export function useNewProjectController() {
   const navigate = useNavigate({ from: "/projects/new" });
-  const { mutateAsync: createProject } = useCreateProjectMutation();
+  const userID = useAuthenticatedUserId();
+  const { mutateAsync: createProject } = useCreateProjectMutation(userID);
   const [selectedStart, setSelectedStart] = useState<NewProjectStart>(null);
   const [step, setStep] = useState<NewProjectStep>(1);
   const [importOpen, setImportOpen] = useState(false);

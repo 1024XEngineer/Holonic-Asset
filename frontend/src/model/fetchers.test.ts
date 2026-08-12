@@ -3,13 +3,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataApiError } from "@/lib/data-api-error";
 
 import {
-  deleteEnvelope,
-  getEnvelope,
-  postEnvelope,
-  putEnvelope,
+  configureCoreApiAuth,
+  coreApiClient,
+  unwrapApiResponse,
 } from "./fetchers";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  configureCoreApiAuth({
+    getAccessToken: () => undefined,
+    onUnauthorized: () => undefined,
+  });
+  vi.unstubAllGlobals();
+});
 
 function response(body: unknown, init: ResponseInit = {}) {
   return new Response(body === undefined ? undefined : JSON.stringify(body), {
@@ -19,60 +24,68 @@ function response(body: unknown, init: ResponseInit = {}) {
   });
 }
 
-describe("API fetchers", () => {
-  it("serializes query primitives and repeated values", async () => {
+describe("core API client", () => {
+  it("serializes typed path, query, and repeated array parameters", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
-        response({ code: 200, message: "ok", data: { id: 7 } }),
+        response({ code: 200, message: "ok", data: { assets: [] } }),
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      getEnvelope("/assets", {
-        projectId: 12,
-        active: true,
-        tag: ["hero", "pixel art"],
-        omitted: undefined,
-        empty: null,
-      }),
-    ).resolves.toEqual({ id: 7 });
+    const result = await coreApiClient.GET("/projects/{project_id}/assets", {
+      params: {
+        path: { project_id: 12 },
+        query: {
+          query: "pixel art",
+          tags: ["hero", "featured"],
+          types: ["character", "object"],
+        },
+      },
+    });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/assets?projectId=12&active=true&tag=hero&tag=pixel+art",
-      {},
+    expect(unwrapApiResponse(result)).toEqual({ assets: [] });
+    expect(requestFrom(fetchMock).url).toBe(
+      "http://localhost/api/v1/projects/12/assets?query=pixel%20art&tags=hero&tags=featured&types=character&types=object",
     );
   });
 
-  it.each([
-    ["POST", postEnvelope],
-    ["PUT", putEnvelope],
-    ["DELETE", deleteEnvelope],
-  ] as const)("sends JSON bodies with %s", async (method, request) => {
+  it("uses native Headers and serializes JSON request bodies", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(response({ code: 200, message: "", data: "done" }));
+      .mockImplementation(() =>
+        Promise.resolve(response({ code: 200, message: "", data: {} })),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(request("/resource", { id: 3 })).resolves.toBe("done");
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/resource", {
-      method,
-      body: JSON.stringify({ id: 3 }),
-      headers: { "Content-Type": "application/json" },
+    await coreApiClient.POST("/auth/login", {
+      body: { username: "kay", password: "secret" },
+      headers: { "X-Request-ID": "login-request" },
     });
+
+    const request = requestFrom(fetchMock);
+    expect(request.method).toBe("POST");
+    expect(request.headers).toBeInstanceOf(Headers);
+    expect(request.headers.get("Content-Type")).toBe("application/json");
+    expect(request.headers.get("x-request-id")).toBe("login-request");
+    expect(await request.text()).toBe(
+      JSON.stringify({ username: "kay", password: "secret" }),
+    );
   });
 
-  it("does not add body headers when a body is omitted", async () => {
+  it("does not add content headers when a body is omitted", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(response({ code: 200, message: "", data: null }));
+      .mockImplementation(() =>
+        Promise.resolve(response({ code: 200, message: "", data: {} })),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
-    await postEnvelope("/resource");
-
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/resource", {
-      method: "POST",
+    await coreApiClient.POST("/generation-runs/{run_id}/cancel", {
+      params: { path: { run_id: 3 } },
     });
+
+    expect(requestFrom(fetchMock).headers.has("Content-Type")).toBe(false);
   });
 
   it.each([
@@ -87,7 +100,7 @@ describe("API fetchers", () => {
       vi.fn().mockResolvedValue(response({ reason: "failed" }, { status })),
     );
 
-    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+    await expect(listProjects()).rejects.toMatchObject({
       name: "DataApiError",
       code,
       message: `API request failed (${status}).`,
@@ -99,44 +112,61 @@ describe("API fetchers", () => {
     const failure = new Error("offline");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(failure));
 
-    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+    await expect(listProjects()).rejects.toMatchObject({
       code: "UNAVAILABLE",
       details: failure,
     });
   });
 
-  it("adds the current bearer token to API requests", async () => {
-    vi.stubGlobal(
-      "localStorage",
-      createAuthStorage({
-        accessToken: "signed-token",
-        tokenType: "Bearer",
-        expiresIn: 3_600,
-        expiresAt: Date.now() + 3_600_000,
-        user: { id: 7, username: "kay", email: "kay@example.com" },
-      }),
-    );
+  it("adds the current bearer token with a case-insensitive override", async () => {
+    configureCoreApiAuth({
+      getAccessToken: () => "signed-token",
+      onUnauthorized: () => undefined,
+    });
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(response({ code: 200, message: "", data: null }));
+      .mockImplementation(() =>
+        Promise.resolve(response({ code: 200, message: "", data: {} })),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
-    await getEnvelope("/resource");
+    await listProjects();
+    expect(requestFrom(fetchMock).headers.get("Authorization")).toBe(
+      "Bearer signed-token",
+    );
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/resource", {
-      headers: { Authorization: "Bearer signed-token" },
+    await coreApiClient.GET("/project/list", {
+      params: { query: { userID: 7 } },
+      headers: { authorization: "Bearer explicit-token" },
     });
+    expect(requestFrom(fetchMock, 1).headers.get("Authorization")).toBe(
+      "Bearer explicit-token",
+    );
   });
 
-  it("maps unauthorized responses and clears the session", async () => {
-    const storage = createAuthStorage({
-      accessToken: "expired-token",
-      tokenType: "Bearer",
-      expiresIn: 3_600,
-      expiresAt: Date.now() + 3_600_000,
-      user: { id: 7, username: "kay", email: "kay@example.com" },
+  it("does not attach a bearer token to login requests", async () => {
+    configureCoreApiAuth({
+      getAccessToken: () => "old-token",
+      onUnauthorized: () => undefined,
     });
-    vi.stubGlobal("localStorage", storage);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(response({ code: 200, message: "", data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await coreApiClient.POST("/auth/login", {
+      body: { username: "kay", password: "secret" },
+    });
+
+    expect(requestFrom(fetchMock).headers.has("Authorization")).toBe(false);
+  });
+
+  it("clears the session after an unauthorized response", async () => {
+    const onUnauthorized = vi.fn();
+    configureCoreApiAuth({
+      getAccessToken: () => "expired-token",
+      onUnauthorized,
+    });
     vi.stubGlobal(
       "fetch",
       vi
@@ -144,17 +174,18 @@ describe("API fetchers", () => {
         .mockResolvedValue(response({ detail: "expired" }, { status: 401 })),
     );
 
-    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+    await expect(listProjects()).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
-    expect(storage.removeItem).toHaveBeenCalledWith("holonic-auth-session");
+    expect(onUnauthorized).toHaveBeenCalledOnce();
   });
 
-  it("rejects unsuccessful API envelopes with their message", async () => {
+  it("rejects invalid and unsuccessful API envelopes", async () => {
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
+        .mockResolvedValueOnce(response({ unexpected: true }))
         .mockResolvedValueOnce(
           response({ code: 409, message: "Already exists", data: null }),
         )
@@ -163,11 +194,15 @@ describe("API fetchers", () => {
         ),
     );
 
-    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+    await expect(listProjects()).rejects.toMatchObject({
+      code: "UNKNOWN",
+      message: "Invalid API response.",
+    });
+    await expect(listProjects()).rejects.toMatchObject({
       code: "CONFLICT",
       message: "Already exists",
     });
-    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+    await expect(listProjects()).rejects.toMatchObject({
       code: "UNKNOWN",
       message: "Request failed",
     });
@@ -182,7 +217,7 @@ describe("API fetchers", () => {
     );
 
     try {
-      await getEnvelope("/resource");
+      await listProjects();
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(DataApiError);
@@ -191,15 +226,14 @@ describe("API fetchers", () => {
   });
 });
 
-function createAuthStorage(session: unknown) {
-  let value: string | null = JSON.stringify(session);
-  return {
-    getItem: vi.fn(() => value),
-    setItem: vi.fn((_key: string, nextValue: string) => {
-      value = nextValue;
+async function listProjects() {
+  return unwrapApiResponse(
+    await coreApiClient.GET("/project/list", {
+      params: { query: { userID: 7 } },
     }),
-    removeItem: vi.fn(() => {
-      value = null;
-    }),
-  };
+  );
+}
+
+function requestFrom(fetchMock: ReturnType<typeof vi.fn>, callIndex = 0) {
+  return fetchMock.mock.calls[callIndex][0] as Request;
 }

@@ -14,31 +14,45 @@ import type {
   UpdateAssetRequest,
   UpdateAssetResponse,
 } from "./asset.contract";
-import {
-  deleteEnvelope,
-  getEnvelope,
-  postEnvelope,
-  putEnvelope,
-} from "@/model/fetchers";
+import { coreApiClient, unwrapApiResponse } from "@/model/fetchers";
 
 export const coreAssetApi = {
-  list: (projectID: number, query?: ListAssetsQuery) =>
-    getEnvelope<GetAssetsResponse>(
-      `/projects/${projectID}/assets`,
-      query ? { ...query } : undefined,
+  list: async (projectID: number, query?: ListAssetsQuery) =>
+    unwrapApiResponse<GetAssetsResponse>(
+      await coreApiClient.GET("/projects/{project_id}/assets", {
+        params: { path: { project_id: projectID }, query },
+      }),
     ),
-  detail: (assetID: number) =>
-    getEnvelope<AssetDetailResponse>(`/asset/${assetID}`),
-  records: (assetID: number) =>
-    getEnvelope<GetAssetRecordsResponse>(`/asset/${assetID}/records`),
-  record: (request: RecordAssetRequest) =>
-    postEnvelope<AssetRecordResponse>("/asset/save", request),
-  copy: (request: CopyAssetRequest) =>
-    postEnvelope<CopyAssetResponse>("/asset/copy", request),
-  rollback: (request: RollBackAssetRequest) =>
-    postEnvelope<RollBackAssetResponse>("/asset/rollback", request),
-  update: (request: UpdateAssetRequest) =>
-    putEnvelope<UpdateAssetResponse>("/asset/update", request),
-  delete: (request: DeleteAssetRequest) =>
-    deleteEnvelope<DeleteAssetResponse>("/asset/delete", request),
+  detail: async (assetID: number) =>
+    unwrapApiResponse<AssetDetailResponse>(
+      await coreApiClient.GET("/asset/{asset_id}", {
+        params: { path: { asset_id: assetID } },
+      }),
+    ),
+  records: async (assetID: number) =>
+    unwrapApiResponse<GetAssetRecordsResponse>(
+      await coreApiClient.GET("/asset/{asset_id}/records", {
+        params: { path: { asset_id: assetID } },
+      }),
+    ),
+  record: async (request: RecordAssetRequest) =>
+    unwrapApiResponse<AssetRecordResponse>(
+      await coreApiClient.POST("/asset/save", { body: request }),
+    ),
+  copy: async (request: CopyAssetRequest) =>
+    unwrapApiResponse<CopyAssetResponse>(
+      await coreApiClient.POST("/asset/copy", { body: request }),
+    ),
+  rollback: async (request: RollBackAssetRequest) =>
+    unwrapApiResponse<RollBackAssetResponse>(
+      await coreApiClient.POST("/asset/rollback", { body: request }),
+    ),
+  update: async (request: UpdateAssetRequest) =>
+    unwrapApiResponse<UpdateAssetResponse>(
+      await coreApiClient.PUT("/asset/update", { body: request }),
+    ),
+  delete: async (request: DeleteAssetRequest) =>
+    unwrapApiResponse<DeleteAssetResponse>(
+      await coreApiClient.DELETE("/asset/delete", { body: request }),
+    ),
 };

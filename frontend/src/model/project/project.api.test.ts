@@ -20,7 +20,6 @@ const mocks = vi.hoisted(() => ({
   hasMockProject: vi.fn(),
   listMockProjects: vi.fn(),
   updateMockProject: vi.fn(),
-  readAuthenticatedUserId: vi.fn(() => 4927310),
 }));
 
 vi.mock("./core-project.api", () => ({ coreProjectApi: mocks.core }));
@@ -37,10 +36,6 @@ vi.mock("../asset/library/mock", () => ({
 vi.mock("../generation/run/mock", () => ({
   deleteMockProjectGenerationRuns: mocks.deleteMockProjectGenerationRuns,
 }));
-vi.mock("@/model/auth", () => ({
-  readAuthenticatedUserId: mocks.readAuthenticatedUserId,
-}));
-
 import { projectApi, toProjectSummary } from "./project.api";
 
 const input: CreateProjectInput = {
@@ -87,7 +82,7 @@ describe("projectApi", () => {
       projects: [remoteProject, { ...remoteProject, id: "local" }],
     });
 
-    await expect(projectApi.list()).resolves.toEqual([
+    await expect(projectApi.list(4927310)).resolves.toEqual([
       mockProject,
       toProjectSummary(remoteProject),
     ]);
@@ -95,12 +90,14 @@ describe("projectApi", () => {
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNAVAILABLE", "offline"),
     );
-    await expect(projectApi.list()).resolves.toEqual([mockProject]);
+    await expect(projectApi.list(4927310)).resolves.toEqual([mockProject]);
 
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNKNOWN", "invalid response"),
     );
-    await expect(projectApi.list()).rejects.toMatchObject({ code: "UNKNOWN" });
+    await expect(projectApi.list(4927310)).rejects.toMatchObject({
+      code: "UNKNOWN",
+    });
   });
 
   it("uses the correct local and remote detail, update, and deletion paths", async () => {
@@ -153,7 +150,7 @@ describe("projectApi", () => {
   });
 
   it("maps project inputs for creation and reference generation", async () => {
-    await expect(projectApi.create(input)).resolves.toEqual({
+    await expect(projectApi.create(4927310, input)).resolves.toEqual({
       ...input,
       id: "7",
     });

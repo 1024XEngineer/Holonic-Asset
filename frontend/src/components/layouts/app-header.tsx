@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, CreditCard, LogIn, LogOut, Settings } from "lucide-react";
 import { useHoverDropdown } from "./use-hover-dropdown";
@@ -16,16 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  accountProfileUpdatedEvent,
-  readAccountProfile,
-} from "@/model/account";
-import {
-  authSessionUpdatedEvent,
-  clearAuthSession,
-  readAuthSession,
-  type AuthSession,
-} from "@/model/auth";
+import { useAccountProfile } from "@/features/account";
+import { clearAuthSession, useAuthSession } from "@/features/auth";
 
 const navigationItems = [
   ["/", "home"],
@@ -43,14 +33,10 @@ function isActivePath(pathname: string, to: string) {
 function AccountMenu() {
   const { t } = useTranslation("navigation");
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [session, setSession] = useState<AuthSession | null>(readAuthSession);
-  const [avatarUrl, setAvatarUrl] = useState(
-    () => readAccountProfile().avatarUrl,
-  );
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
+  const session = useAuthSession();
+  const { avatarUrl } = useAccountProfile();
+  const location = useRouterState({ select: (state) => state.location });
+  const { href, pathname } = location;
   const {
     closeFromHover,
     isOpen,
@@ -62,29 +48,13 @@ function AccountMenu() {
   const isSettingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
 
-  useEffect(() => {
-    const syncAccount = () => {
-      setSession(readAuthSession());
-      setAvatarUrl(readAccountProfile().avatarUrl);
-    };
-    syncAccount();
-    window.addEventListener(accountProfileUpdatedEvent, syncAccount);
-    window.addEventListener(authSessionUpdatedEvent, syncAccount);
-    window.addEventListener("storage", syncAccount);
-    return () => {
-      window.removeEventListener(accountProfileUpdatedEvent, syncAccount);
-      window.removeEventListener(authSessionUpdatedEvent, syncAccount);
-      window.removeEventListener("storage", syncAccount);
-    };
-  }, []);
-
   if (!session) {
     return (
       <Button
         nativeButton={false}
         variant="outline"
         render={
-          <Link to="/login" search={{ redirect: pathname }}>
+          <Link to="/login" search={{ redirect: href }}>
             <LogIn />
             {t("login")}
           </Link>
@@ -172,10 +142,9 @@ function AccountMenu() {
           onClick={() => {
             releaseMenu();
             clearAuthSession();
-            queryClient.clear();
             void navigate({
               to: "/login",
-              search: { redirect: pathname },
+              search: { redirect: href },
               replace: true,
             });
           }}

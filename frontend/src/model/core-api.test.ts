@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("core API clients", () => {
   it("routes every operation through the expected endpoint and method", async () => {
     const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      async (_input: Request) =>
         new Response(JSON.stringify({ code: 200, message: "", data: {} })),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -42,7 +42,7 @@ describe("core API clients", () => {
     await uploadApi.createTarget({} as never);
 
     expect(fetchMock).toHaveBeenCalledTimes(21);
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(
+    expect(fetchMock.mock.calls.map(([request]) => request.url)).toEqual(
       [
         "/auth/login",
         "/project/create",
@@ -65,11 +65,9 @@ describe("core API clients", () => {
         "/generation-runs/10",
         "/generation-runs/10/cancel",
         "/uploads",
-      ].map((path) => `/api/v1${path}`),
+      ].map((path) => `http://localhost/api/v1${path}`),
     );
-    expect(
-      fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET"),
-    ).toEqual([
+    expect(fetchMock.mock.calls.map(([request]) => request.method)).toEqual([
       "POST",
       "POST",
       "POST",

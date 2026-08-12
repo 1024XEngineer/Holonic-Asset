@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 import { useTimeout } from "@/hooks/use-timeout";
-import { readAccountProfile, saveAccountProfile } from "@/model/account";
+import { readAccountProfile, saveAccountProfile } from "@/features/account";
 import {
   readThemePreference,
   saveThemePreference,

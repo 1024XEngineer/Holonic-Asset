@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { requireAuth } from "@/model/auth";
+import { requireAuth } from "@/app/auth-navigation";
 
 function GeneratePlaceholder() {
   const { t } = useTranslation("generation");

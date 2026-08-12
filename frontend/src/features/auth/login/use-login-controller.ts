@@ -2,10 +2,16 @@ import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
+import { resolveAuthRedirect } from "@/app/auth-navigation";
 import { DataApiError } from "@/lib/data-api-error";
-import { authApi, resolveAuthRedirect, saveAuthSession } from "@/model/auth";
+import { authApi } from "@/model/auth";
+import { AuthSessionPersistenceError, saveAuthSession } from "../session";
 
-export type LoginError = "invalidCredentials" | "unavailable" | "unknownError";
+export type LoginError =
+  | "invalidCredentials"
+  | "persistenceError"
+  | "unavailable"
+  | "unknownError";
 
 export function useLoginController(redirectTo?: string) {
   const navigate = useNavigate();
@@ -43,6 +49,7 @@ export function useLoginController(redirectTo?: string) {
 export type LoginController = ReturnType<typeof useLoginController>;
 
 function loginError(error: unknown): LoginError {
+  if (error instanceof AuthSessionPersistenceError) return "persistenceError";
   if (error instanceof DataApiError) {
     if (error.code === "UNAUTHORIZED") return "invalidCredentials";
     if (error.code === "UNAVAILABLE") return "unavailable";

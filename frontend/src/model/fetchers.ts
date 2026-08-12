@@ -1,125 +1,97 @@
+import createClient, { type Middleware } from "openapi-fetch";
+
 import { DataApiError } from "@/lib/data-api-error";
-import {
-  clearAuthSession,
-  readAccessToken,
-} from "@/model/auth/auth-session.storage";
+import type { paths } from "@/model/generated/core-api";
 
-type QueryPrimitive = string | number | boolean;
-type QueryValue = QueryPrimitive | readonly QueryPrimitive[] | null | undefined;
-
-export type ApiResponse<T> = {
+type ApiResponse = {
   code: number;
   message: string;
-  data: T;
+  data: unknown;
 };
 
-function apiBaseUrl() {
-  return import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
+type ApiResult = {
+  data?: unknown;
+  error?: unknown;
+  response: Response;
+};
+
+type CoreApiAuth = {
+  getAccessToken: () => string | undefined;
+  onUnauthorized: () => void;
+};
+
+let coreApiAuth: CoreApiAuth = {
+  getAccessToken: () => undefined,
+  onUnauthorized: () => undefined,
+};
+
+export function configureCoreApiAuth(auth: CoreApiAuth) {
+  coreApiAuth = auth;
 }
 
-function getJson<T>(
-  path: string,
-  query?: Record<string, QueryValue>,
-): Promise<T> {
-  return requestJson<T>(withQuery(path, query));
-}
+export const coreApiClient = createClient<paths>({
+  baseUrl: apiBaseUrl(),
+  fetch: (request) => fetch(request),
+});
 
-function postJson<T>(path: string, body?: unknown): Promise<T> {
-  return requestJson<T>(path, { method: "POST" }, body);
-}
+const authMiddleware: Middleware = {
+  onRequest({ request, schemaPath }) {
+    if (schemaPath === "/auth/login") return;
 
-export async function getEnvelope<T>(
-  path: string,
-  query?: Record<string, QueryValue>,
-): Promise<T> {
-  return unwrapEnvelope(await getJson<ApiResponse<T>>(path, query));
-}
+    const accessToken = coreApiAuth.getAccessToken();
+    if (accessToken && !request.headers.has("Authorization")) {
+      request.headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+  },
+  onResponse({ response }) {
+    if (response.status === 401) coreApiAuth.onUnauthorized();
+  },
+  onError({ error }) {
+    return new DataApiError("UNAVAILABLE", "Unable to reach the API.", error);
+  },
+};
 
-export async function postEnvelope<T>(
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  return unwrapEnvelope(await postJson<ApiResponse<T>>(path, body));
-}
+coreApiClient.use(authMiddleware);
 
-export async function putEnvelope<T>(path: string, body?: unknown): Promise<T> {
-  return unwrapEnvelope(
-    await requestJson<ApiResponse<T>>(path, { method: "PUT" }, body),
-  );
-}
-
-export async function deleteEnvelope<T>(
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  return unwrapEnvelope(
-    await requestJson<ApiResponse<T>>(path, { method: "DELETE" }, body),
-  );
-}
-
-function asyncRequestInit(body?: unknown): RequestInit {
-  return body === undefined
-    ? {}
-    : {
-        body: JSON.stringify(body),
-        headers: { "Content-Type": "application/json" },
-      };
-}
-
-async function requestJson<T>(
-  path: string,
-  init: RequestInit = {},
-  body?: unknown,
-): Promise<T> {
-  let response: Response;
-  try {
-    const bodyInit = asyncRequestInit(body);
-    const headers = requestHeaders(bodyInit.headers, init.headers);
-    response = await fetch(`${apiBaseUrl()}${path}`, {
-      ...bodyInit,
-      ...init,
-      ...(headers ? { headers } : {}),
-    });
-  } catch (error) {
-    throw new DataApiError("UNAVAILABLE", "Unable to reach the API.", error);
-  }
-
-  const responseBody = await parseResponse(response);
-
+export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
   if (!response.ok) {
-    if (response.status === 401) clearAuthSession();
     throw new DataApiError(
       dataApiErrorCodeForStatus(response.status),
       `API request failed (${response.status}).`,
-      responseBody,
+      error,
     );
   }
 
-  return responseBody as T;
-}
-
-async function parseResponse(response: Response): Promise<unknown> {
-  if (response.status === 204) return undefined;
-
-  const text = await response.text();
-  if (!text) return undefined;
-
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
+  if (!isApiResponse(data)) {
+    throw new DataApiError("UNKNOWN", "Invalid API response.", data);
   }
-}
-
-function unwrapEnvelope<T>(response: ApiResponse<T>): T {
-  if (response.code !== 200) {
+  if (data.code !== 200) {
     throw new DataApiError(
-      dataApiErrorCodeForStatus(response.code),
-      response.message || "Request failed",
-      response,
+      dataApiErrorCodeForStatus(data.code),
+      data.message || "Request failed",
+      data,
     );
   }
-  return response.data;
+  return data.data as T;
+}
+
+function apiBaseUrl() {
+  const configuredUrl = import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
+  if (/^https?:\/\//i.test(configuredUrl)) return configuredUrl;
+
+  const origin =
+    typeof location === "undefined" ? "http://localhost" : location.origin;
+  return new URL(configuredUrl, origin).toString();
+}
+
+function isApiResponse(value: unknown): value is ApiResponse {
+  if (!value || typeof value !== "object") return false;
+  const response = value as Partial<ApiResponse>;
+  return (
+    typeof response.code === "number" &&
+    typeof response.message === "string" &&
+    "data" in response
+  );
 }
 
 function dataApiErrorCodeForStatus(status: number) {
@@ -128,59 +100,4 @@ function dataApiErrorCodeForStatus(status: number) {
   if (status === 404) return "NOT_FOUND" as const;
   if (status === 409) return "CONFLICT" as const;
   return "UNKNOWN" as const;
-}
-
-function requestHeaders(
-  bodyHeaders: HeadersInit | undefined,
-  initHeaders: HeadersInit | undefined,
-): Record<string, string> | undefined {
-  const headers: Record<string, string> = {};
-  appendHeaders(headers, bodyHeaders);
-  appendHeaders(headers, initHeaders);
-
-  const accessToken = readAccessToken();
-  const hasAuthorization = Object.keys(headers).some(
-    (key) => key.toLowerCase() === "authorization",
-  );
-  if (accessToken && !hasAuthorization) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  return Object.keys(headers).length === 0 ? undefined : headers;
-}
-
-function appendHeaders(
-  target: Record<string, string>,
-  source: HeadersInit | undefined,
-) {
-  if (!source) return;
-  if (source instanceof Headers) {
-    source.forEach((value, key) => {
-      target[key] = value;
-    });
-    return;
-  }
-  if (Array.isArray(source)) {
-    for (const [key, value] of source) target[key] = value;
-    return;
-  }
-  Object.assign(target, source);
-}
-
-function withQuery(
-  path: string,
-  query: Record<string, QueryValue> | undefined,
-) {
-  if (!query) return path;
-
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (Array.isArray(value)) {
-      for (const item of value) params.append(key, String(item));
-      continue;
-    }
-    if (value !== undefined && value !== null) params.set(key, String(value));
-  }
-  const search = params.toString();
-  return search ? `${path}?${search}` : path;
 }

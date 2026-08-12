@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
+import { useAuthenticatedUserId } from "@/features/auth";
 import { CreateAssetForm } from "@/features/generation/create-asset-form";
 import { assetKindSchema } from "@/model/asset";
 import { useEnqueueGenerationMutation } from "@/model/generation";
@@ -16,7 +17,8 @@ export function CreateAssetPage({
 }) {
   const { t } = useTranslation(["generation", "common", "projects"]);
   const navigate = useNavigate();
-  const { data: projects = [] } = useProjectListQuery();
+  const userID = useAuthenticatedUserId();
+  const { data: projects = [] } = useProjectListQuery(userID);
   const {
     error: enqueueError,
     isPending: isEnqueuePending,

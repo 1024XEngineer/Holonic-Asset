@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
+import { useAuthenticatedUserId } from "@/features/auth";
 import {
   reconcileProjectSelection,
   removeProjectSelection,
@@ -35,8 +36,9 @@ export function useProjectLibrary(
   selectedProjectId?: string,
 ): ProjectLibraryController {
   const navigate = useNavigate();
+  const userID = useAuthenticatedUserId();
   const { data: projectData, isSuccess: projectsLoaded } =
-    useProjectListQuery();
+    useProjectListQuery(userID);
   const { data: projectDetail } = useProjectDetailQuery(selectedProjectId);
   const projects = projectData ?? EMPTY_PROJECTS;
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
