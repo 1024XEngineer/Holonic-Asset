@@ -105,6 +105,51 @@ describe("API fetchers", () => {
     });
   });
 
+  it("adds the current bearer token to API requests", async () => {
+    vi.stubGlobal(
+      "localStorage",
+      createAuthStorage({
+        accessToken: "signed-token",
+        tokenType: "Bearer",
+        expiresIn: 3_600,
+        expiresAt: Date.now() + 3_600_000,
+        user: { id: 7, username: "kay", email: "kay@example.com" },
+      }),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(response({ code: 200, message: "", data: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getEnvelope("/resource");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/resource", {
+      headers: { Authorization: "Bearer signed-token" },
+    });
+  });
+
+  it("maps unauthorized responses and clears the session", async () => {
+    const storage = createAuthStorage({
+      accessToken: "expired-token",
+      tokenType: "Bearer",
+      expiresIn: 3_600,
+      expiresAt: Date.now() + 3_600_000,
+      user: { id: 7, username: "kay", email: "kay@example.com" },
+    });
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(response({ detail: "expired" }, { status: 401 })),
+    );
+
+    await expect(getEnvelope("/resource")).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    expect(storage.removeItem).toHaveBeenCalledWith("holonic-auth-session");
+  });
+
   it("rejects unsuccessful API envelopes with their message", async () => {
     vi.stubGlobal(
       "fetch",
@@ -145,3 +190,16 @@ describe("API fetchers", () => {
     }
   });
 });
+
+function createAuthStorage(session: unknown) {
+  let value: string | null = JSON.stringify(session);
+  return {
+    getItem: vi.fn(() => value),
+    setItem: vi.fn((_key: string, nextValue: string) => {
+      value = nextValue;
+    }),
+    removeItem: vi.fn(() => {
+      value = null;
+    }),
+  };
+}

@@ -1,4 +1,8 @@
 import { DataApiError } from "@/lib/data-api-error";
+import {
+  clearAuthSession,
+  readAccessToken,
+} from "@/model/auth/auth-session.storage";
 
 type QueryPrimitive = string | number | boolean;
 type QueryValue = QueryPrimitive | readonly QueryPrimitive[] | null | undefined;
@@ -69,9 +73,12 @@ async function requestJson<T>(
 ): Promise<T> {
   let response: Response;
   try {
+    const bodyInit = asyncRequestInit(body);
+    const headers = requestHeaders(bodyInit.headers, init.headers);
     response = await fetch(`${apiBaseUrl()}${path}`, {
-      ...asyncRequestInit(body),
+      ...bodyInit,
       ...init,
+      ...(headers ? { headers } : {}),
     });
   } catch (error) {
     throw new DataApiError("UNAVAILABLE", "Unable to reach the API.", error);
@@ -80,6 +87,7 @@ async function requestJson<T>(
   const responseBody = await parseResponse(response);
 
   if (!response.ok) {
+    if (response.status === 401) clearAuthSession();
     throw new DataApiError(
       dataApiErrorCodeForStatus(response.status),
       `API request failed (${response.status}).`,
@@ -116,9 +124,47 @@ function unwrapEnvelope<T>(response: ApiResponse<T>): T {
 
 function dataApiErrorCodeForStatus(status: number) {
   if (status === 400 || status === 422) return "BAD_REQUEST" as const;
+  if (status === 401) return "UNAUTHORIZED" as const;
   if (status === 404) return "NOT_FOUND" as const;
   if (status === 409) return "CONFLICT" as const;
   return "UNKNOWN" as const;
+}
+
+function requestHeaders(
+  bodyHeaders: HeadersInit | undefined,
+  initHeaders: HeadersInit | undefined,
+): Record<string, string> | undefined {
+  const headers: Record<string, string> = {};
+  appendHeaders(headers, bodyHeaders);
+  appendHeaders(headers, initHeaders);
+
+  const accessToken = readAccessToken();
+  const hasAuthorization = Object.keys(headers).some(
+    (key) => key.toLowerCase() === "authorization",
+  );
+  if (accessToken && !hasAuthorization) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return Object.keys(headers).length === 0 ? undefined : headers;
+}
+
+function appendHeaders(
+  target: Record<string, string>,
+  source: HeadersInit | undefined,
+) {
+  if (!source) return;
+  if (source instanceof Headers) {
+    source.forEach((value, key) => {
+      target[key] = value;
+    });
+    return;
+  }
+  if (Array.isArray(source)) {
+    for (const [key, value] of source) target[key] = value;
+    return;
+  }
+  Object.assign(target, source);
 }
 
 function withQuery(

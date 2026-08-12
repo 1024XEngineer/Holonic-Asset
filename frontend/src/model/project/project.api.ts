@@ -1,4 +1,5 @@
 import { DataApiError } from "@/lib/data-api-error";
+import { readAuthenticatedUserId } from "@/model/auth";
 
 import {
   deleteMockProject,
@@ -49,7 +50,7 @@ export const projectApi: ProjectApi = {
     const mockProjects = await listMockProjects();
     const mockProjectIds = new Set(mockProjects.map((project) => project.id));
     try {
-      const response = await coreProjectApi.list(coreApiUserId);
+      const response = await coreProjectApi.list(readAuthenticatedUserId());
       const remoteProjects = response.projects
         .map((project) => toProjectSummary(project))
         .filter((project) => !mockProjectIds.has(project.id));
@@ -69,7 +70,7 @@ export const projectApi: ProjectApi = {
   },
   create: async (input: CreateProjectInput) => {
     const response = await coreProjectApi.create({
-      userID: coreApiUserId,
+      userID: readAuthenticatedUserId(),
       ...toCoreProjectFields(input),
     });
 
@@ -110,10 +111,6 @@ export const projectApi: ProjectApi = {
     await coreProjectApi.delete({ projectID: Number(projectId) });
   },
 };
-
-const coreApiUserId = Number(
-  import.meta.env.PUBLIC_CORE_API_USER_ID ?? "4927310",
-);
 
 function toCoreProjectFields(
   input: CreateProjectInput,

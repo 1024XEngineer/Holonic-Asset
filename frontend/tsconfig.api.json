@@ -6,6 +6,8 @@
   "files": [
     "src/env.d.ts",
     "src/model/generated/core-api.ts",
+    "src/model/auth/auth.contract.ts",
+    "src/model/auth/auth.api.ts",
     "src/model/project/project.contract.ts",
     "src/model/project/core-project.api.ts",
     "src/model/generation/run/generation.contract.ts",

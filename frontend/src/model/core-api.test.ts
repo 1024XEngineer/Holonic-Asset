@@ -4,6 +4,7 @@ import { coreAssetApi } from "./asset/library/core-asset.api";
 import { coreGenerationApi } from "./generation/run/core-generation.api";
 import { coreProjectApi } from "./project/core-project.api";
 import { uploadApi } from "./upload/upload.api";
+import { authApi } from "./auth/auth.api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,6 +15,8 @@ describe("core API clients", () => {
         new Response(JSON.stringify({ code: 200, message: "", data: {} })),
     );
     vi.stubGlobal("fetch", fetchMock);
+
+    await authApi.login({ username: "kay", password: "secret" });
 
     await coreProjectApi.create({} as never);
     await coreProjectApi.generateReference({} as never);
@@ -38,9 +41,10 @@ describe("core API clients", () => {
     await coreGenerationApi.cancel(10);
     await uploadApi.createTarget({} as never);
 
-    expect(fetchMock).toHaveBeenCalledTimes(20);
+    expect(fetchMock).toHaveBeenCalledTimes(21);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(
       [
+        "/auth/login",
         "/project/create",
         "/project/reference/generate",
         "/project/list?userID=7",
@@ -66,6 +70,7 @@ describe("core API clients", () => {
     expect(
       fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET"),
     ).toEqual([
+      "POST",
       "POST",
       "POST",
       "GET",

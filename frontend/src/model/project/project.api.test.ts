@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   hasMockProject: vi.fn(),
   listMockProjects: vi.fn(),
   updateMockProject: vi.fn(),
+  readAuthenticatedUserId: vi.fn(() => 4927310),
 }));
 
 vi.mock("./core-project.api", () => ({ coreProjectApi: mocks.core }));
@@ -35,6 +36,9 @@ vi.mock("../asset/library/mock", () => ({
 }));
 vi.mock("../generation/run/mock", () => ({
   deleteMockProjectGenerationRuns: mocks.deleteMockProjectGenerationRuns,
+}));
+vi.mock("@/model/auth", () => ({
+  readAuthenticatedUserId: mocks.readAuthenticatedUserId,
 }));
 
 import { projectApi, toProjectSummary } from "./project.api";

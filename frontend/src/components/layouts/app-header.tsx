@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, CreditCard, LogOut, Settings } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { ChevronDown, CreditCard, LogIn, LogOut, Settings } from "lucide-react";
 import { useHoverDropdown } from "./use-hover-dropdown";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,10 +18,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   accountProfileUpdatedEvent,
-  defaultAccountProfile,
   readAccountProfile,
-  type AccountProfile,
 } from "@/model/account";
+import {
+  authSessionUpdatedEvent,
+  clearAuthSession,
+  readAuthSession,
+  type AuthSession,
+} from "@/model/auth";
 
 const navigationItems = [
   ["/", "home"],
@@ -36,7 +42,12 @@ function isActivePath(pathname: string, to: string) {
 
 function AccountMenu() {
   const { t } = useTranslation("navigation");
-  const [profile, setProfile] = useState<AccountProfile>(defaultAccountProfile);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState<AuthSession | null>(readAuthSession);
+  const [avatarUrl, setAvatarUrl] = useState(
+    () => readAccountProfile().avatarUrl,
+  );
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -52,15 +63,35 @@ function AccountMenu() {
     pathname === "/settings" || pathname.startsWith("/settings/");
 
   useEffect(() => {
-    const syncProfile = () => setProfile(readAccountProfile());
-    syncProfile();
-    window.addEventListener(accountProfileUpdatedEvent, syncProfile);
-    window.addEventListener("storage", syncProfile);
+    const syncAccount = () => {
+      setSession(readAuthSession());
+      setAvatarUrl(readAccountProfile().avatarUrl);
+    };
+    syncAccount();
+    window.addEventListener(accountProfileUpdatedEvent, syncAccount);
+    window.addEventListener(authSessionUpdatedEvent, syncAccount);
+    window.addEventListener("storage", syncAccount);
     return () => {
-      window.removeEventListener(accountProfileUpdatedEvent, syncProfile);
-      window.removeEventListener("storage", syncProfile);
+      window.removeEventListener(accountProfileUpdatedEvent, syncAccount);
+      window.removeEventListener(authSessionUpdatedEvent, syncAccount);
+      window.removeEventListener("storage", syncAccount);
     };
   }, []);
+
+  if (!session) {
+    return (
+      <Button
+        nativeButton={false}
+        variant="outline"
+        render={
+          <Link to="/login" search={{ redirect: pathname }}>
+            <LogIn />
+            {t("login")}
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
@@ -94,17 +125,17 @@ function AccountMenu() {
             <div className="flex items-center gap-3">
               <div className="grid size-9 place-items-center overflow-hidden rounded-lg border border-border bg-transparent">
                 <img
-                  src={profile.avatarUrl ?? "/setting/images.jpg"}
+                  src={avatarUrl ?? "/setting/images.jpg"}
                   alt={t("profileImageAlt")}
                   className="size-full object-cover"
                 />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-popover-foreground">
-                  {profile.name}
+                  {session.user.username}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {profile.email}
+                  {session.user.email}
                 </p>
               </div>
             </div>
@@ -136,7 +167,19 @@ function AccountMenu() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={releaseMenu}>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            releaseMenu();
+            clearAuthSession();
+            queryClient.clear();
+            void navigate({
+              to: "/login",
+              search: { redirect: pathname },
+              replace: true,
+            });
+          }}
+        >
           <LogOut />
           {t("logout")}
         </DropdownMenuItem>
