@@ -522,7 +522,7 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 		},
 	}
 	references := &executorReferenceStoreStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+	executor := generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, references)
 
 	result, err := executor.Generate(
 		context.Background(),
@@ -656,9 +656,9 @@ func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *
 
 			var executor generator.Executor
 			if test.withStore {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+				executor = generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, references)
 			} else {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+				executor = generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, nil)
 			}
 			payload := test.payload
 			if payload == nil {
