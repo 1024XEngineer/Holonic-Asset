@@ -76,6 +76,37 @@ func (s *assetManagerStub) UpdateAsset(_ context.Context, assetID uint, update *
 	return &domain.Asset{ID: assetID}, s.updateErr
 }
 
+type assetReferenceStoreStub struct {
+	resolved     map[string]string
+	persisted    map[string]string
+	resolveCalls []string
+	persistCalls []string
+	resolveErr   error
+	persistErr   error
+}
+
+func (s *assetReferenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.resolveCalls = append(s.resolveCalls, reference)
+	if s.resolveErr != nil {
+		return "", s.resolveErr
+	}
+	if value, ok := s.resolved[reference]; ok {
+		return value, nil
+	}
+	return "signed:" + reference, nil
+}
+
+func (s *assetReferenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persistCalls = append(s.persistCalls, reference)
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
+	if value, ok := s.persisted[reference]; ok {
+		return value, nil
+	}
+	return reference, nil
+}
+
 func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	managerStub := &assetManagerStub{assets: []domain.Asset{{
 		ID:          7,
@@ -183,16 +214,150 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 	}}
 	h := handler.NewHandler(managerStub)
 
-	response, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7})
+	content := json.RawMessage(`{"prototype":[{"id":2,"url":"new.png"}]}`)
+	response, err := h.Record(context.Background(), dto.RecordAssetRequest{
+		AssetID: 7,
+		Content: content,
+	})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
-	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 {
+	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 ||
+		string(managerStub.recordRequest.Content) != string(content) {
 		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
 	data := response.Data
 	if data.RecordID != 15 || data.AssetID != 7 || data.Version != 3 || data.ContentID != 21 {
 		t.Fatalf("unexpected record response: %+v", response.Data)
+	}
+}
+
+func TestAssetHandlerRecordRequiresContent(t *testing.T) {
+	h := handler.NewHandler(&assetManagerStub{})
+
+	for _, content := range []json.RawMessage{nil, json.RawMessage(`null`), json.RawMessage(`  null  `)} {
+		_, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7, Content: content})
+		if !errors.Is(err, echo.ErrBadRequest) {
+			t.Fatalf("expected bad request for content %q, got %v", content, err)
+		}
+	}
+}
+
+func TestAssetHandlerRecordPersistsImageReferencesAsObjectKeys(t *testing.T) {
+	const (
+		prototypeURL = "https://cdn.example.com/uploads/prototype.png?e=123&token=signed"
+		frameKey     = "uploads/frame.png"
+		tileDataURL  = "data:image/png;base64,aGVsbG8="
+		layerURL     = "https://cdn.example.com/uploads/background.png?e=123&token=signed"
+	)
+	content := json.RawMessage(`{
+		"prototype":[{"id":1,"url":"` + prototypeURL + `","futureField":{"keep":true}}],
+		"animations":[{"id":2,"frames":[{"id":3,"url":"` + frameKey + `"}]}],
+		"items":[{"name":"floor","tiles":[{"url":"` + tileDataURL + `","position":{"x":0,"y":0}}]}],
+		"layers":[{"id":4,"resource":"` + layerURL + `","custom":"kept"}],
+		"customTopLevel":{"nested":"kept"}
+	}`)
+	managerStub := &assetManagerStub{record: &domain.AssetRecord{ID: 15, AssetID: 7, Version: 3, ContentID: 21}}
+	references := &assetReferenceStoreStub{persisted: map[string]string{
+		prototypeURL: "uploads/prototype.png",
+		frameKey:     frameKey,
+		tileDataURL:  "uploads/tile.png",
+		layerURL:     "uploads/background.png",
+	}}
+	h := handler.NewHandler(managerStub, references)
+
+	if _, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7, Content: content}); err != nil {
+		t.Fatalf("record asset: %v", err)
+	}
+	if managerStub.recordRequest == nil {
+		t.Fatal("expected CreateRecord to be called")
+	}
+	if len(references.persistCalls) != 4 {
+		t.Fatalf("expected four persisted references, got %v", references.persistCalls)
+	}
+
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(managerStub.recordRequest.Content, &decoded); err != nil {
+		t.Fatalf("decode persisted content: %v", err)
+	}
+	if string(decoded["customTopLevel"]) != `{"nested":"kept"}` {
+		t.Fatalf("top-level fields changed: %s", managerStub.recordRequest.Content)
+	}
+	var prototype []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["prototype"], &prototype); err != nil {
+		t.Fatalf("decode prototype: %v", err)
+	}
+	if string(prototype[0]["url"]) != `"uploads/prototype.png"` ||
+		string(prototype[0]["futureField"]) != `{"keep":true}` {
+		t.Fatalf("prototype was not normalized safely: %s", decoded["prototype"])
+	}
+	var animations []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["animations"], &animations); err != nil {
+		t.Fatalf("decode animations: %v", err)
+	}
+	var frames []map[string]json.RawMessage
+	if err := json.Unmarshal(animations[0]["frames"], &frames); err != nil {
+		t.Fatalf("decode frames: %v", err)
+	}
+	if string(frames[0]["url"]) != `"uploads/frame.png"` {
+		t.Fatalf("frame key changed unexpectedly: %s", animations[0]["frames"])
+	}
+	var items []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["items"], &items); err != nil {
+		t.Fatalf("decode items: %v", err)
+	}
+	var tiles []map[string]json.RawMessage
+	if err := json.Unmarshal(items[0]["tiles"], &tiles); err != nil {
+		t.Fatalf("decode tiles: %v", err)
+	}
+	if string(tiles[0]["url"]) != `"uploads/tile.png"` {
+		t.Fatalf("data URL was not persisted as an object key: %s", items[0]["tiles"])
+	}
+	var layers []map[string]json.RawMessage
+	if err := json.Unmarshal(decoded["layers"], &layers); err != nil {
+		t.Fatalf("decode layers: %v", err)
+	}
+	if string(layers[0]["resource"]) != `"uploads/background.png"` ||
+		string(layers[0]["custom"]) != `"kept"` {
+		t.Fatalf("layer was not normalized safely: %s", decoded["layers"])
+	}
+}
+
+func TestAssetHandlerRecordRejectsReferencesThatAreNotObjectKeys(t *testing.T) {
+	for _, reference := range []string{
+		"https://images.example.org/external.png",
+		"/assets/local-preview.png",
+	} {
+		t.Run(reference, func(t *testing.T) {
+			managerStub := &assetManagerStub{}
+			references := &assetReferenceStoreStub{}
+			h := handler.NewHandler(managerStub, references)
+			content := json.RawMessage(`{"prototype":[{"id":1,"url":"` + reference + `"}]}`)
+
+			_, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7, Content: content})
+			var httpErr *echo.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.Code != 400 {
+				t.Fatalf("expected bad request for %q, got %v", reference, err)
+			}
+			if managerStub.recordRequest != nil {
+				t.Fatalf("CreateRecord called with invalid reference: %+v", managerStub.recordRequest)
+			}
+		})
+	}
+}
+
+func TestAssetHandlerRecordPropagatesReferencePersistenceFailure(t *testing.T) {
+	wantErr := errors.New("storage unavailable")
+	managerStub := &assetManagerStub{}
+	h := handler.NewHandler(managerStub, &assetReferenceStoreStub{persistErr: wantErr})
+	content := json.RawMessage(`{"prototype":[{"id":1,"url":"data:image/png;base64,aGVsbG8="}]}`)
+
+	_, err := h.Record(context.Background(), dto.RecordAssetRequest{AssetID: 7, Content: content})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected persistence error %v, got %v", wantErr, err)
+	}
+	if managerStub.recordRequest != nil {
+		t.Fatalf("CreateRecord called after persistence failure: %+v", managerStub.recordRequest)
 	}
 }
 

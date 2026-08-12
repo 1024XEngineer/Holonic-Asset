@@ -564,6 +564,7 @@ export interface components {
         RecordAssetRequest: {
             /** Format: int64 */
             assetId: number;
+            content: unknown;
         };
         RecordAssetResponse: {
             /** Format: int64 */
