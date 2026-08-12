@@ -10,5 +10,7 @@
   "starter": "入门版",
   "settings": "设置",
   "billing": "账单与积分",
-  "logout": "退出登录"
+  "logout": "退出登录",
+  "mainNavigation": "主导航",
+  "homeAriaLabel": "Holonic Asset 首页"
 }

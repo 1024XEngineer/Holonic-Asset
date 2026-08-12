@@ -4,7 +4,7 @@ import { I18nextProvider } from "react-i18next";
 
 import type { router as appRouter } from "@/app/router";
 import { queryClient } from "@/app/query-client";
-import i18n from "@/i18n";
+import { i18n } from "@/i18n";
 
 export function AppProviders({ router }: { router: typeof appRouter }) {
   return (

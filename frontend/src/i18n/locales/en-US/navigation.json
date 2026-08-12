@@ -10,5 +10,7 @@
   "starter": "Starter",
   "settings": "Settings",
   "billing": "Billing & credits",
-  "logout": "Log out"
+  "logout": "Log out",
+  "mainNavigation": "Main navigation",
+  "homeAriaLabel": "Holonic Asset home"
 }
