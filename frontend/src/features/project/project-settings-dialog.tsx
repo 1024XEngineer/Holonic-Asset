@@ -35,7 +35,7 @@ export function ProjectSettingsDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (project: ProjectSummary) => void;
 }) {
-  const { t } = useTranslation("projects");
+  const { t } = useTranslation(["projects", "common"]);
   const [imageError, setImageError] = useState<string>();
   const imageReadController = useRef<AbortController | null>(null);
   const form = useForm({
@@ -190,7 +190,7 @@ export function ProjectSettingsDialog({
           </form.Field>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
-              Cancel
+              {t("common:actions.cancel")}
             </DialogClose>
             <Button type="submit">{t("save")}</Button>
           </DialogFooter>

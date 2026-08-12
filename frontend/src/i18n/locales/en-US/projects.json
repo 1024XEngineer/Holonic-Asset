@@ -1,5 +1,17 @@
 {
   "assetLibrary": "Asset Library",
+  "project": {
+    "sidebar": {
+      "projects": "Projects",
+      "collapseList": "Collapse project list",
+      "expandList": "Expand project list",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "deleteConfirm": "Delete {{name}}?",
+      "deleteDescription": "This action cannot be undone.",
+      "deleteAction": "Delete project"
+    }
+  },
   "edit": "Edit project",
   "reference": "Reference",
   "save": "Save changes",
