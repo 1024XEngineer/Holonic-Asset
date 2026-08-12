@@ -3,7 +3,7 @@
 --
 -- Example:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
---     -v password_hash="$BOOTSTRAP_PASSWORD_HASH" -f seed.sql
+--     -v password_hash="$BOOTSTRAP_PASSWORD_HASH" -f scripts/seed.sql
 --
 -- password_hash must be a bcrypt hash generated for the deployment-specific
 -- bootstrap password. Existing usernames are left untouched.

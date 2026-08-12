@@ -70,7 +70,7 @@ hash, export it as `BOOTSTRAP_PASSWORD_HASH`, and apply the SQL seed from the
 
 ```shell
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -v password_hash="$BOOTSTRAP_PASSWORD_HASH" -f seed.sql
+  -v password_hash="$BOOTSTRAP_PASSWORD_HASH" -f scripts/seed.sql
 ```
 
 The seed is idempotent by username and does not replace existing passwords.
