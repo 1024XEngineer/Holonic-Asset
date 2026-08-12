@@ -18,6 +18,9 @@ export function AnimatedSpriteCanvas({
     model,
     actions: createAnimatedSpriteCanvasActions(onEvent),
   };
+  const selectionLabel = model.selection.nodeIds
+    .map((nodeId) => getAnimatedSpriteNodeLabel(nodeId, model.animations))
+    .join(", ");
 
   useEffect(() => {
     const host = hostRef.current;
@@ -50,8 +53,8 @@ export function AnimatedSpriteCanvas({
       <div ref={hostRef} className="size-full cursor-default" />
       {loading ? <AnimatedSpriteCanvasLoading /> : null}
       <p className="sr-only" aria-live="polite">
-        {model.selection.nodeIds.length > 0
-          ? `${model.selection.nodeIds.map((nodeId) => getAnimatedSpriteNodeLabel(nodeId, model.animations)).join(", ")} selected`
+        {selectionLabel
+          ? t("selectionSummary", { value: selectionLabel })
           : t("noCanvasItems")}
       </p>
     </main>
