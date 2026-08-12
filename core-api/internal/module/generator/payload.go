@@ -13,6 +13,14 @@ type CreateCharacterPrototypePayload struct {
 	ProjectID     uint             `json:"project_id"`
 }
 
+// EditCharacterPrototypePayload is the self-contained input consumed by the
+// character prototype edit task handler.
+type EditCharacterPrototypePayload struct {
+	AssetID          uint   `json:"asset_id"`
+	ProjectID        uint   `json:"project_id"`
+	EditInstructions string `json:"edit_instructions"`
+}
+
 // CreateAnimationPayload is the common input consumed by character and object
 // animation generation.
 type CreateAnimationPayload struct {

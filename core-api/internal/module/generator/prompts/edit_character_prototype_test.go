@@ -9,14 +9,17 @@ import (
 
 func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testing.T) {
 	prompt := prompts.EditCharacterPrototype(
+		"a red dragon knight with a steel spear",
 		"change only the exposed scales to light blue",
 		"Side-On",
+		2,
 		prompts.SolidMatteBackground("#00FF00"),
 	)
 
 	for _, expected := range []string{
-		"Reference image 1, the first supplied image, is always the original character prototype",
-		"Reference image 2 and every later supplied image are project reference images",
+		"Reference images 1 through 2 are the current character prototype direction views",
+		"No separate user or project reference image is supplied",
+		"a red dragon knight with a steel spear",
 		"Minor edit",
 		"exactly 2 direction views",
 		"1 row x 2 column sheet",
@@ -37,36 +40,42 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 
 func TestEditCharacterPrototypeDerivesDirectionLayoutFromPerspective(t *testing.T) {
 	tests := []struct {
-		name        string
-		perspective string
-		direction   string
-		expected    []string
+		name               string
+		perspective        string
+		direction          string
+		originalReferences uint
+		expected           []string
 	}{
 		{
-			name:        "side on",
-			perspective: "Side-On",
-			direction:   "2",
-			expected:    []string{"Side-on perspective", "exactly 2 direction views", "1 row x 2 column sheet"},
+			name:               "side on",
+			perspective:        "Side-On",
+			direction:          "2",
+			originalReferences: 2,
+			expected:           []string{"Side-on perspective", "exactly 2 direction views", "1 row x 2 column sheet"},
 		},
 		{
-			name:        "top down",
-			perspective: "Top-Down",
-			direction:   "4",
-			expected:    []string{"Top-down perspective", "exactly 4 direction views", "2 row x 2 column sheet"},
+			name:               "top down",
+			perspective:        "Top-Down",
+			direction:          "4",
+			originalReferences: 4,
+			expected:           []string{"Top-down perspective", "exactly 4 direction views", "2 row x 2 column sheet"},
 		},
 		{
-			name:        "isometric",
-			perspective: "Isometric",
-			direction:   "8",
-			expected:    []string{"Isometric perspective", "exactly 8 direction views", "2 row x 4 column sheet"},
+			name:               "isometric",
+			perspective:        "Isometric",
+			direction:          "8",
+			originalReferences: 8,
+			expected:           []string{"Isometric perspective", "exactly 8 direction views", "2 row x 4 column sheet"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			prompt := prompts.EditCharacterPrototype(
+				"a caped knight",
 				"change the cape to blue",
 				test.perspective,
+				test.originalReferences,
 				prompts.TransparentBackground(),
 			)
 			for _, expected := range test.expected {
