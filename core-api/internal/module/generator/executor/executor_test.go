@@ -1,0 +1,375 @@
+package executor_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"testing"
+
+	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	generatorexecutor "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/executor"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+)
+
+type imageGenerationServiceStub struct {
+	events  *[]string
+	request *imageclient.GenerateRequest
+	result  *imageclient.GenerateResult
+	err     error
+}
+
+type animationGenerationServiceStub struct {
+	events  *[]string
+	request *generatorexecutor.AnimationGenerationRequest
+	result  *generatorexecutor.AnimationGenerationResult
+	err     error
+}
+
+func (s *animationGenerationServiceStub) Generate(
+	_ context.Context,
+	request *generatorexecutor.AnimationGenerationRequest,
+) (*generatorexecutor.AnimationGenerationResult, error) {
+	*s.events = append(*s.events, "generate_animation")
+	copy := *request
+	s.request = &copy
+	return s.result, s.err
+}
+
+type imageProcessorStub struct {
+	events         *[]string
+	resizeRequests []*imageprocessor.ResizeRequest
+	err            error
+}
+
+type referenceUpload struct {
+	key       string
+	reference string
+}
+
+type referenceStoreStub struct {
+	resolved     []string
+	persisted    []string
+	persistValue string
+	uploads      []referenceUpload
+	events       *[]string
+	resolveErr   error
+	persistErr   error
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.resolved = append(s.resolved, reference)
+	if s.resolveErr != nil {
+		return "", s.resolveErr
+	}
+	return "signed:" + reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persisted = append(s.persisted, reference)
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
+	if s.persistValue != "" {
+		return s.persistValue, nil
+	}
+	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
+}
+
+func (s *referenceStoreStub) NewObjectKey(_ string) (string, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "allocate_key")
+	}
+	return "uploads/prototype.png", nil
+}
+
+func (s *referenceStoreStub) PersistReferenceAt(_ context.Context, key, reference string) error {
+	if s.events != nil {
+		*s.events = append(*s.events, "persist:"+key)
+	}
+	s.uploads = append(s.uploads, referenceUpload{key: key, reference: reference})
+	if s.persistErr != nil {
+		return s.persistErr
+	}
+	return nil
+}
+
+func (s *imageProcessorStub) RemoveBackground(
+	_ context.Context,
+	request *imageprocessor.RemoveBackgroundRequest,
+) (*imageprocessor.RemoveBackgroundResult, error) {
+	*s.events = append(*s.events, "process_image")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.RemoveBackgroundResult{
+		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+	}, nil
+}
+
+func (s *imageProcessorStub) Resize(
+	_ context.Context,
+	request *imageprocessor.ResizeRequest,
+) (*imageprocessor.ResizeResult, error) {
+	*s.events = append(*s.events, "resize_image")
+	s.resizeRequests = append(s.resizeRequests, request)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.ResizeResult{ImageBase64: request.ImageBase64, MIMEType: "image/png"}, nil
+}
+
+func (s *imageProcessorStub) Verify(
+	_ context.Context,
+	_ *imageprocessor.VerifyRequest,
+) (*imageprocessor.VerificationReport, error) {
+	return &imageprocessor.VerificationReport{Passed: true}, nil
+}
+
+func (s *imageProcessorStub) SplitImage(
+	_ context.Context,
+	request *imageprocessor.SplitImageRequest,
+) (*imageprocessor.SplitImageResult, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "split_image")
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	regionCount := request.Columns * request.Rows
+	regions := make([]imageprocessor.ImageRegion, regionCount)
+	for index := range regions {
+		regions[index] = imageprocessor.ImageRegion{
+			Index: index, ImageBase64: fmt.Sprintf("direction-%d", index), MIMEType: "image/png",
+		}
+	}
+	return &imageprocessor.SplitImageResult{Regions: regions}, nil
+}
+
+func (s *imageGenerationServiceStub) Generate(
+	_ context.Context,
+	request *imageclient.GenerateRequest,
+) (*imageclient.GenerateResult, error) {
+	*s.events = append(*s.events, "generate_image")
+	s.request = &imageclient.GenerateRequest{
+		Prompt:          request.Prompt,
+		ReferenceImages: append([]string(nil), request.ReferenceImages...),
+		Model:           request.Model,
+		Size:            request.Size,
+		Params:          request.Params,
+	}
+	return s.result, s.err
+}
+
+type generationAssetWriterStub struct {
+	events           *[]string
+	parentAsset      assetdomain.Asset
+	getDetailErr     error
+	characterAsset   *assetdomain.Asset
+	objectAsset      *assetdomain.Asset
+	prototypeAssetID uint
+	prototypeImages  []assetdomain.ImageResource
+	createdRecord    *assetdomain.AssetRecord
+	recordVersion    uint
+	animationAssetID uint
+	animationName    string
+	animationID      uint
+	frames           []assetdomain.Frame
+	err              error
+	detailErr        error
+	recordErr        error
+	detailResult     *assetdomain.Asset
+	nilRecord        bool
+	emptyRecord      bool
+	asset            assetdomain.Asset
+}
+
+func (s *generationAssetWriterStub) GetDetail(
+	_ context.Context,
+	assetID uint,
+) (assetdomain.Asset, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "get_asset")
+	}
+	if s.getDetailErr != nil {
+		return assetdomain.Asset{}, s.getDetailErr
+	}
+	if s.detailErr != nil {
+		return assetdomain.Asset{}, s.detailErr
+	}
+	if s.err != nil {
+		return assetdomain.Asset{}, s.err
+	}
+	if s.parentAsset.ID == assetID {
+		return s.parentAsset, nil
+	}
+	if s.detailResult != nil {
+		return *s.detailResult, nil
+	}
+	if s.asset.ID != 0 {
+		return s.asset, nil
+	}
+	return assetdomain.Asset{}, nil
+}
+
+func (s *generationAssetWriterStub) CreateCharacterAsset(
+	_ context.Context,
+	value *assetdomain.Asset,
+) (*assetdomain.Asset, error) {
+	*s.events = append(*s.events, "create_character_asset")
+	s.characterAsset = value
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &assetdomain.Asset{ID: 41}, nil
+}
+
+func (s *generationAssetWriterStub) CreateObjectAsset(
+	_ context.Context,
+	value *assetdomain.Asset,
+) (uint, error) {
+	*s.events = append(*s.events, "create_object_asset")
+	s.objectAsset = value
+	if s.err != nil {
+		return 0, s.err
+	}
+	return 42, nil
+}
+
+func (s *generationAssetWriterStub) CreateAnimation(
+	_ context.Context,
+	assetID uint,
+	name string,
+	frames []assetdomain.Frame,
+) (uint, error) {
+	*s.events = append(*s.events, "create_animation")
+	s.animationAssetID = assetID
+	s.animationName = name
+	s.frames = append([]assetdomain.Frame(nil), frames...)
+	if s.err != nil {
+		return 0, s.err
+	}
+	s.animationID = 3
+	return 3, nil
+}
+
+func (s *generationAssetWriterStub) UpdatePrototypeImages(
+	_ context.Context,
+	assetID uint,
+	images []assetdomain.ImageResource,
+) error {
+	*s.events = append(*s.events, "update_prototype")
+	s.prototypeAssetID = assetID
+	s.prototypeImages = append([]assetdomain.ImageResource(nil), images...)
+	return s.err
+}
+
+func (s *generationAssetWriterStub) CreateRecord(
+	_ context.Context,
+	record *assetdomain.AssetRecord,
+) (*assetdomain.AssetRecord, error) {
+	*s.events = append(*s.events, "create_record")
+	if record != nil {
+		copy := *record
+		copy.Content = append(json.RawMessage(nil), record.Content...)
+		s.createdRecord = &copy
+	}
+	if s.recordErr != nil {
+		return nil, s.recordErr
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.nilRecord {
+		return nil, nil //nolint:nilnil // Exercise the executor's defensive empty-result check.
+	}
+	version := s.recordVersion
+	if version == 0 && !s.emptyRecord {
+		version = 2
+	}
+	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
+}
+
+func (s *generationAssetWriterStub) UpdateAnimationFrames(
+	_ context.Context,
+	assetID uint,
+	animationID uint,
+	frames []assetdomain.Frame,
+) error {
+	*s.events = append(*s.events, "update_animation_frames")
+	s.animationAssetID = assetID
+	s.animationID = animationID
+	s.frames = append([]assetdomain.Frame(nil), frames...)
+	return s.err
+}
+
+func animationParentAsset(t *testing.T) assetdomain.Asset {
+	t.Helper()
+	animationReference := "data:image/png;base64,legacy-multi-direction-source"
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.DirectionCount = 8
+	content.Metadata = map[string]any{"animation_reference": animationReference}
+	prototype := make(assetdomain.Prototype, 0, content.DirectionCount)
+	for direction := range content.DirectionCount {
+		reference := fmt.Sprintf("https://cdn.example.com/hero/direction_%02d.png?version=7", direction)
+		prototype = append(prototype, assetdomain.ImageResource{ID: uint(direction) + 1, URL: &reference})
+	}
+	content.Prototype = &prototype
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode animation parent content: %v", err)
+	}
+	return assetdomain.Asset{
+		ID:          7,
+		ProjectID:   11,
+		Type:        assetdomain.AssetTypeCharacter,
+		Name:        "hero",
+		Description: "silver-haired knight",
+		Content:     encoded,
+	}
+}
+
+func generatedImages() *imageclient.GenerateResult {
+	return &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{
+		{Base64: "sheet", MediaType: "image/png"},
+	}}
+}
+
+func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset, wantCount int) {
+	t.Helper()
+	if asset == nil {
+		t.Fatal("expected created asset")
+	}
+	content, err := asset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode asset content: %v", err)
+	}
+	if content.Prototype == nil || len(*content.Prototype) != wantCount {
+		t.Fatalf("unexpected prototype: %+v", content.Prototype)
+	}
+	prototype := *content.Prototype
+	for index, resource := range prototype {
+		if resource.ID != uint(index+1) || resource.URL == nil ||
+			*resource.URL != fmt.Sprintf("data:image/png;base64,direction-%d", index) {
+			t.Fatalf("unexpected prototype resource at %d: %+v", index, resource)
+		}
+	}
+}
+
+func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.ExecutionResult) {
+	t.Helper()
+	var got generator.ExecutionResult
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("decode execution result: %v", err)
+	}
+	if got != want {
+		t.Fatalf("unexpected execution result: got %+v want %+v", got, want)
+	}
+}
+
+var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)
+var _ generatorexecutor.AnimationGenerationService = (*animationGenerationServiceStub)(nil)
+var _ imageprocessor.Processor = (*imageProcessorStub)(nil)
+var _ generatorexecutor.AssetWriter = (*generationAssetWriterStub)(nil)

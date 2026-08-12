@@ -1,4 +1,4 @@
-package generator
+package video
 
 import (
 	"image"
@@ -17,7 +17,7 @@ func TestValidateExtractedAnimationFrameCountRejectsExcessFrames(t *testing.T) {
 }
 
 func TestValidateExtractedAnimationFrameConfigsAcceptsDefaultVideoBudget(t *testing.T) {
-	configs := make([]image.Config, animationCandidateFPS*5)
+	configs := make([]image.Config, defaultCandidateFPS*5)
 	for index := range configs {
 		configs[index] = image.Config{Width: 720, Height: 720}
 	}
@@ -28,7 +28,7 @@ func TestValidateExtractedAnimationFrameConfigsAcceptsDefaultVideoBudget(t *test
 }
 
 func TestValidateExtractedAnimationFrameConfigsRejectsDecodedMemorySpike(t *testing.T) {
-	configs := make([]image.Config, animationCandidateFPS*5)
+	configs := make([]image.Config, defaultCandidateFPS*5)
 	for index := range configs {
 		configs[index] = image.Config{Width: 1024, Height: 1024}
 	}

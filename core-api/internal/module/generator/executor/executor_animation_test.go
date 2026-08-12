@@ -1,6 +1,8 @@
-package generator
+package executor
 
 import (
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+
 	"encoding/json"
 	"strings"
 	"testing"
@@ -13,13 +15,13 @@ func TestAnimationDirectionIndexUsesAssetDirectionLayout(t *testing.T) {
 		directionCount uint
 		want           int
 	}{
-		{name: "two left", direction: AnimationDirectionLeft, directionCount: 2, want: 0},
-		{name: "two right", direction: AnimationDirectionRight, directionCount: 2, want: 1},
-		{name: "four right", direction: AnimationDirectionRight, directionCount: 4, want: 1},
-		{name: "four left", direction: AnimationDirectionLeft, directionCount: 4, want: 3},
-		{name: "eight front right", direction: AnimationDirectionFrontRight, directionCount: 8, want: 1},
-		{name: "eight back right", direction: AnimationDirectionBackRight, directionCount: 8, want: 3},
-		{name: "eight front left", direction: AnimationDirectionFrontLeft, directionCount: 8, want: 7},
+		{name: "two left", direction: generator.AnimationDirectionLeft, directionCount: 2, want: 0},
+		{name: "two right", direction: generator.AnimationDirectionRight, directionCount: 2, want: 1},
+		{name: "four right", direction: generator.AnimationDirectionRight, directionCount: 4, want: 1},
+		{name: "four left", direction: generator.AnimationDirectionLeft, directionCount: 4, want: 3},
+		{name: "eight front right", direction: generator.AnimationDirectionFrontRight, directionCount: 8, want: 1},
+		{name: "eight back right", direction: generator.AnimationDirectionBackRight, directionCount: 8, want: 3},
+		{name: "eight front left", direction: generator.AnimationDirectionFrontLeft, directionCount: 8, want: 7},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -42,11 +44,11 @@ func TestAnimationDirectionIndexRejectsInvalidLayoutsAndNames(t *testing.T) {
 		want           string
 	}{
 		{name: "missing multi direction", directionCount: 8, want: "direction is required"},
-		{name: "diagonal unavailable in four directions", direction: AnimationDirectionFrontRight, directionCount: 4, want: "is unavailable"},
+		{name: "diagonal unavailable in four directions", direction: generator.AnimationDirectionFrontRight, directionCount: 4, want: "is unavailable"},
 		{name: "unknown direction", direction: "up", directionCount: 8, want: "is unavailable"},
-		{name: "more than eight", direction: AnimationDirectionFront, directionCount: 9, want: "at most 8 directions"},
-		{name: "single direction unsupported", direction: AnimationDirectionFront, directionCount: 1, want: "must be one of 2, 4, or 8"},
-		{name: "unsupported count", direction: AnimationDirectionFront, directionCount: 3, want: "must be one of 2, 4, or 8"},
+		{name: "more than eight", direction: generator.AnimationDirectionFront, directionCount: 9, want: "at most 8 directions"},
+		{name: "single direction unsupported", direction: generator.AnimationDirectionFront, directionCount: 1, want: "must be one of 2, 4, or 8"},
+		{name: "unsupported count", direction: generator.AnimationDirectionFront, directionCount: 3, want: "must be one of 2, 4, or 8"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -59,7 +61,7 @@ func TestAnimationDirectionIndexRejectsInvalidLayoutsAndNames(t *testing.T) {
 }
 
 func TestCreateAnimationPayloadRejectsNumericDirection(t *testing.T) {
-	var payload CreateAnimationPayload
+	var payload generator.CreateAnimationPayload
 	err := json.Unmarshal([]byte(`{"direction":3}`), &payload)
 	if err == nil {
 		t.Fatal("numeric animation direction should be rejected")
