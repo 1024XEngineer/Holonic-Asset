@@ -89,6 +89,23 @@ func TestResolveConfigPathUsesEnvironmentOverride(t *testing.T) {
 	}
 }
 
+func TestLoadAppConfigUsesJWTSecretEnvironmentOverride(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("auth:\n  jwtSecret: file-secret\n  tokenExpiry: 1h\n"), 0o600); err != nil {
+		t.Fatalf("write config fixture: %v", err)
+	}
+
+	const envSecret = "environment-jwt-secret-0123456789"
+	t.Setenv("HOLONIC_AUTH_JWT_SECRET", envSecret)
+	loaded, err := LoadAppConfig(path)
+	if err != nil {
+		t.Fatalf("load app config: %v", err)
+	}
+	if loaded.Auth.JWTSecret != envSecret {
+		t.Fatalf("expected environment JWT secret, got %q", loaded.Auth.JWTSecret)
+	}
+}
+
 func TestInitRouterRegistersApplicationRoutes(t *testing.T) {
 	projectStore := repository.NewProjectRepository(&projectDaoStub{})
 	workspaceModule := workspace.New(projectStore, &assetStoreStub{}, nil)
@@ -192,6 +209,9 @@ db:
   dsn: ""
 queue:
   databaseURL: postgres://localhost/holonic
+http:
+  allowedOrigins:
+    - http://localhost:5173
 log:
   path: ./logs/app.log
 `)
