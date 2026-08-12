@@ -110,7 +110,7 @@ describe("generationApi", () => {
   it("rejects malformed canvas dimensions before enqueueing", async () => {
     await expect(
       toCreateGenerationRequest(creationRequest({ canvasSize: "large" })),
-    ).rejects.toThrow("positive width × height");
+    ).rejects.toThrow("Canvas size must use a positive width × height value.");
   });
 });
 
