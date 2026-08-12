@@ -50,9 +50,9 @@ func Register(
 	return e
 }
 
-func skipPath(middleware echo.MiddlewareFunc, path string) echo.MiddlewareFunc {
+func skipPath(mw echo.MiddlewareFunc, path string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		secured := middleware(next)
+		secured := mw(next)
 		return func(c echo.Context) error {
 			if c.Request().URL.Path == path {
 				return next(c)
