@@ -39,6 +39,13 @@ const articles: Record<ArticleId, Article> = {
   tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
 };
 
+const articleTitleKeys = {
+  reference: "referenceTitle",
+  perspective: "perspectiveTitle",
+  directions: "directionsTitle",
+  tilesets: "tilesetsTitle",
+} as const;
+
 export function isArticleId(value: unknown): value is ArticleId {
   return articleIdSchema.safeParse(value).success;
 }
@@ -125,14 +132,7 @@ export function Docs({ articleId }: DocsProps) {
                       active && "font-semibold text-neutral-950",
                     )}
                   >
-                    {t(
-                      {
-                        reference: "referenceTitle",
-                        perspective: "perspectiveTitle",
-                        directions: "directionsTitle",
-                        tilesets: "tilesetsTitle",
-                      }[id],
-                    )}
+                    {t(articleTitleKeys[id])}
                   </Link>
                 );
               })}
