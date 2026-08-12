@@ -1,0 +1,112 @@
+name: CI/CD
+description: Report a CI/CD failure or propose a scoped improvement to build, test, coverage, or delivery automation.
+title: "[CI/CD]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for repository automation covering build, lint, test, coverage, release, or deployment workflows. Describe the observable problem or desired outcome before proposing implementation details.
+
+        Every CI/CD issue needs a reproducible trigger or a clearly defined goal, controlled scope, and verifiable acceptance criteria. Never include secrets, tokens, or unredacted private logs.
+  - type: dropdown
+    id: issue_kind
+    attributes:
+      label: CI/CD issue type
+      description: Select the primary type of work.
+      options:
+        - Workflow failure or regression
+        - Workflow reliability or speed improvement
+        - Build, test, or coverage automation
+        - Release or deployment automation
+        - Other CI/CD tooling
+    validations:
+      required: true
+  - type: dropdown
+    id: workflow_area
+    attributes:
+      label: Affected workflow area
+      description: Select the workflow or automation area involved.
+      options:
+        - Frontend CI
+        - Backend CI
+        - Frontend coverage
+        - Backend coverage
+        - Release or deployment
+        - Shared GitHub Actions configuration
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and problem or goal
+      description: What is failing, unreliable, missing, or unnecessarily costly? Describe the impact on contributors, reviewers, releases, or users.
+    validations:
+      required: true
+  - type: textarea
+    id: trigger_conditions
+    attributes:
+      label: Trigger conditions and reproduction steps
+      description: For failures, include the event, branch, changed paths, commit or pull request, and exact steps or commands needed to reproduce the result. For proposals, describe the trigger or workflow that should be supported.
+      placeholder: |
+        1. On a pull request or push to ...
+        2. Change ... or run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current behavior and evidence
+      description: Describe the observed result and attach a GitHub Actions run URL, screenshots, timing data, or other evidence. Keep links and images here so they remain clickable and render correctly. Do not include secrets, tokens, or unredacted private logs; put redacted command output in the optional logs field below.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Command output or logs (optional)
+      description: Paste only redacted command output, stack traces, or workflow logs here. Never include secrets, tokens, or unredacted private logs.
+      render: shell
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior or target
+      description: What should the workflow do instead? Include measurable reliability, duration, coverage, artifact, release, or deployment targets when applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and versions
+      description: Include the affected commit or version, event type, runner OS, frontend or backend runtime versions, package or action versions, and relevant configuration. Mention the last known good version when known.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: Identify the workflows, modules, paths, jobs, actions, secrets, permissions, artifacts, or environments in scope. State what this issue will not change.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable and testable conditions that prove the issue is complete.
+      placeholder: |
+        - The affected workflow succeeds for ...
+        - Failures provide an actionable error and preserve ...
+        - Existing frontend/backend checks and coverage behavior remain ...
+        - No credentials or sensitive values are exposed in logs.
+    validations:
+      required: true
+  - type: textarea
+    id: risks_dependencies
+    attributes:
+      label: Risks and dependencies (optional)
+      description: Describe required secrets, permissions, external providers, runner constraints, compatibility concerns, migration steps, or rollout risks.
+  - type: textarea
+    id: related_context
+    attributes:
+      label: Related issues and references (optional)
+      description: Link related issues, pull requests, workflow runs, commits, documentation, or experiments.
