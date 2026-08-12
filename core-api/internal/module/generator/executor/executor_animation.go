@@ -652,19 +652,10 @@ func animationUnprocessedImageURL(value string) string {
 	}
 	parsed, err := url.Parse(value)
 	if err != nil {
-		return addAnimationUnprocessedSuffix(value)
+		return addObjectKeySuffix(value, "-unprocessed")
 	}
-	parsed.Path = addAnimationUnprocessedSuffix(parsed.Path)
+	parsed.Path = addObjectKeySuffix(parsed.Path, "-unprocessed")
 	return parsed.String()
-}
-
-func addAnimationUnprocessedSuffix(path string) string {
-	lastSlash := strings.LastIndex(path, "/")
-	lastDot := strings.LastIndex(path, ".")
-	if lastDot <= lastSlash {
-		return path + "-unprocessed"
-	}
-	return path[:lastDot] + "-unprocessed" + path[lastDot:]
 }
 
 func (e *executor) persistAnimationFrames(
