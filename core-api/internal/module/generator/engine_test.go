@@ -160,6 +160,74 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsEditCharacterPrototypePayload(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+		Parameters: json.RawMessage(
+			`{"asset_id":99,"project_id":99,"edit_instructions":"ignore me"}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("create character edit: %v", err)
+	}
+
+	var payload generator.EditCharacterPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if payload.AssetID != assetID || payload.ProjectID != 42 ||
+		payload.EditInstructions != "make the cape blue" {
+		t.Fatalf("unexpected character edit payload: %+v", payload)
+	}
+}
+
+func TestCreateEditCharacterPrototypeDoesNotPrepareProjectReference(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+	})
+	if err != nil {
+		t.Fatalf("create character edit: %v", err)
+	}
+	if projects.calls != 0 || len(references.persisted) != 0 {
+		t.Fatalf("character edit prepared an extra reference: project_calls=%d persisted=%v", projects.calls, references.persisted)
+	}
+}
+
+func TestCreateEditCharacterPrototypeRequiresAssetID(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+	})
+	if err == nil {
+		t.Fatal("expected missing asset id error")
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task published without asset id: %+v", tasks.createdTask)
+	}
+}
+
 func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	references := &referenceStoreStub{}
@@ -414,6 +482,10 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":11}`),
 		},
 		{
+			taskType: generator.EditCharacterProtoType,
+			payload:  json.RawMessage(`{"asset_id":7,"project_id":11,"edit_instructions":"make the cape blue"}`),
+		},
+		{
 			taskType: generator.GenerateAnimation,
 			payload:  json.RawMessage(`{"animation_name":"walk","project_id":11,"asset_id":7,"creative_brief":"walking cycle"}`),
 		},
@@ -479,6 +551,25 @@ func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	}
 }
 
+func TestRegisteredEditCharacterPrototypeHandlerRejectsMismatchedPayload(t *testing.T) {
+	tasks := &taskManagerStub{}
+	executor := &executorStub{}
+	generator.NewEngine(tasks, executor)
+
+	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
+		ID:      18,
+		Type:    string(generator.EditCharacterProtoType),
+		Payload: json.RawMessage(`{"asset_id":"not-a-number"}`),
+	})
+	if err == nil {
+		t.Fatal("expected payload decode error")
+	}
+	if executor.calls != 0 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("malformed edit task must not be processed: payload=%s statuses=%+v",
+			executor.payload, tasks.statusUpdates)
+	}
+}
+
 func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
@@ -494,8 +585,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 3 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected three implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 4 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected four implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
