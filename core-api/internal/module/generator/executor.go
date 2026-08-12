@@ -27,6 +27,7 @@ type AssetWriter interface {
 	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
 	UpdatePrototypeImages(context.Context, uint, []assetdomain.ImageResource) error
 	CreateRecord(context.Context, *assetdomain.AssetRecord) (*assetdomain.AssetRecord, error)
+	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
 }
 
 // ReferenceStore is the object-storage boundary used by the worker. It keeps
@@ -102,6 +103,15 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateCharacterPrototype(ctx, request)
+	case EditCharacterProtoType:
+		if err := e.requirePrototypeDependencies(); err != nil {
+			return nil, err
+		}
+		request := EditCharacterPrototypePayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editCharacterPrototype(ctx, request)
 	case EditObjectProtoType:
 		if err := e.requirePrototypeDependencies(); err != nil {
 			return nil, err
@@ -200,6 +210,123 @@ func (e *executor) generateCharacterPrototype(
 	return encodeExecutionResult(ExecutionResult{AssetID: created.ID})
 }
 
+func (e *executor) editCharacterPrototype(
+	ctx context.Context,
+	payload EditCharacterPrototypePayload,
+) (json.RawMessage, error) {
+	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: load character asset %d: %w", payload.AssetID, err)
+	}
+	if asset.ID == 0 {
+		return nil, fmt.Errorf("generator: character asset %d not found", payload.AssetID)
+	}
+	if asset.Type != assetdomain.AssetTypeCharacter {
+		return nil, fmt.Errorf("generator: character prototype edit is unsupported for asset type %q", asset.Type)
+	}
+	if !asset.Perspective.Valid() {
+		return nil, fmt.Errorf("generator: invalid perspective %q", asset.Perspective)
+	}
+	var dimensions assetdomain.Size
+	if err := json.Unmarshal(asset.Dimensions, &dimensions); err != nil {
+		return nil, fmt.Errorf("generator: decode asset %d dimensions: %w", asset.ID, err)
+	}
+	if err := assetdomain.ValidateDimensions(asset.Type, asset.Dimensions); err != nil {
+		return nil, err
+	}
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("generator: decode character asset %d content: %w", asset.ID, err)
+	}
+	originalReferences, err := prototypeReferences(content.Prototype)
+	if err != nil {
+		return nil, fmt.Errorf("generator: load character asset %d prototype: %w", asset.ID, err)
+	}
+	directionCount := asset.Perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
+		ctx,
+		EditCharacterProtoType,
+		prompts.EditCharacterPrototype(
+			asset.Description,
+			payload.EditInstructions,
+			string(asset.Perspective),
+			uint(len(originalReferences)),
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
+		dimensions,
+		directionCount,
+		originalReferences,
+	)
+	if err != nil {
+		return nil, err
+	}
+	prototype := assetdomain.Prototype(resources)
+	content.Prototype = &prototype
+	content.DirectionCount = directionCount
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		return nil, fmt.Errorf("generator: encode edited character asset %d content: %w", asset.ID, err)
+	}
+	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
+		AssetID: asset.ID,
+		Content: encoded,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: create character asset %d version: %w", asset.ID, err)
+	}
+	if record == nil || record.Version == 0 {
+		return nil, fmt.Errorf("generator: create character asset %d version: empty result", asset.ID)
+	}
+	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
+}
+
+func (e *executor) generateObjectPrototype(
+	ctx context.Context,
+	payload CreateObjectPrototypePayload,
+) (json.RawMessage, error) {
+	perspective, err := parsePerspective(payload.Perspective)
+	if err != nil {
+		return nil, err
+	}
+	directionCount := perspective.CharacterDirectionCount()
+	resources, err := e.generatePrototypeResources(
+		ctx,
+		GenerateObjectProtoType,
+		prompts.ObjectPrototype(
+			payload.CreativeBrief,
+			payload.Perspective,
+			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+		),
+		payload.Dimensions,
+		directionCount,
+		referenceImages(payload.Reference),
+	)
+	if err != nil {
+		return nil, err
+	}
+	value, err := newPrototypeAsset(
+		assetdomain.AssetTypeObject,
+		payload.AssetName,
+		payload.ProjectID,
+		payload.CreativeBrief,
+		perspective,
+		payload.Dimensions,
+		directionCount,
+		resources,
+	)
+	if err != nil {
+		return nil, err
+	}
+	assetID, err := e.assets.CreateObjectAsset(ctx, value)
+	if err != nil {
+		return nil, fmt.Errorf("generator: create object asset: %w", err)
+	}
+	if assetID == 0 {
+		return nil, fmt.Errorf("generator: create object asset: empty result")
+	}
+	return encodeExecutionResult(ExecutionResult{AssetID: assetID})
+}
+
 func (e *executor) editObjectPrototype(
 	ctx context.Context,
 	payload EditObjectPrototypePayload,
@@ -268,53 +395,6 @@ func (e *executor) editObjectPrototype(
 		return nil, fmt.Errorf("generator: create object asset %d version: empty result", asset.ID)
 	}
 	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
-}
-
-func (e *executor) generateObjectPrototype(
-	ctx context.Context,
-	payload CreateObjectPrototypePayload,
-) (json.RawMessage, error) {
-	perspective, err := parsePerspective(payload.Perspective)
-	if err != nil {
-		return nil, err
-	}
-	directionCount := perspective.CharacterDirectionCount()
-	resources, err := e.generatePrototypeResources(
-		ctx,
-		GenerateObjectProtoType,
-		prompts.ObjectPrototype(
-			payload.CreativeBrief,
-			payload.Perspective,
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
-		),
-		payload.Dimensions,
-		directionCount,
-		referenceImages(payload.Reference),
-	)
-	if err != nil {
-		return nil, err
-	}
-	value, err := newPrototypeAsset(
-		assetdomain.AssetTypeObject,
-		payload.AssetName,
-		payload.ProjectID,
-		payload.CreativeBrief,
-		perspective,
-		payload.Dimensions,
-		directionCount,
-		resources,
-	)
-	if err != nil {
-		return nil, err
-	}
-	assetID, err := e.assets.CreateObjectAsset(ctx, value)
-	if err != nil {
-		return nil, fmt.Errorf("generator: create object asset: %w", err)
-	}
-	if assetID == 0 {
-		return nil, fmt.Errorf("generator: create object asset: empty result")
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: assetID})
 }
 
 func (e *executor) generateAnimation(
@@ -452,13 +532,13 @@ func (e *executor) generatePrototypeResources(
 	if err != nil {
 		return nil, err
 	}
-	references, err = e.resolveReferences(ctx, taskType, references)
+	resolvedReferences, err := e.resolveReferences(ctx, taskType, references)
 	if err != nil {
 		return nil, err
 	}
 	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
 		Prompt:          prompt,
-		ReferenceImages: references,
+		ReferenceImages: resolvedReferences,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)

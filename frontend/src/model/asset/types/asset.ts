@@ -1,5 +1,5 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
-import { perspectiveSchema, type Perspective } from "../../project/types";
+import { perspectiveSchema, type Perspective } from "@/model/project";
 import { z } from "zod";
 
 export type CharacterSpriteSheet = {
