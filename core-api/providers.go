@@ -9,6 +9,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	generatorexecutor "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/executor"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
@@ -78,9 +79,9 @@ func InitImageProcessor() imageprocessor.Processor {
 func InitGeneratorExecutor(
 	images imageclient.ImageGenerationService,
 	processor imageprocessor.Processor,
-	assets generator.AssetWriter,
+	assets generatorexecutor.AssetWriter,
 ) generator.Executor {
-	return generator.NewExecutor(images, processor, assets)
+	return generatorexecutor.NewExecutor(images, processor, assets)
 }
 
 // InitGeneratorEngine creates the generator module and registers its task handlers.

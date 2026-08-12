@@ -15,6 +15,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	generatorexecutor "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/executor"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
@@ -138,8 +139,8 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	})
 	videos := videoclient.NewVideoGenerationService(videoProvider)
 	imageProcessor := InitImageProcessor()
-	animations := generator.NewAnimationGenerationService(videos, imageProcessor, references)
-	generatorExecutor := generator.NewExecutorWithAnimation(
+	animations := generatorexecutor.NewAnimationGenerationService(videos, imageProcessor, references)
+	generatorExecutor := generatorexecutor.NewExecutorWithAnimation(
 		imageService,
 		animations,
 		imageProcessor,
