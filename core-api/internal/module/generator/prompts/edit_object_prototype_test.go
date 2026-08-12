@@ -9,14 +9,18 @@ import (
 
 func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
 	prompt := prompts.EditObjectPrototype(
+		"a wooden chest",
 		"change only the chest trim to silver",
 		"Top-Down",
+		4,
 		prompts.SolidMatteBackground("#00FF00"),
 	)
 
 	for _, expected := range []string{
-		"Reference image 1, the first supplied image, is always the original object prototype",
-		"Reference image 2 and every later supplied image are project reference images",
+		"backend supplied exactly 4 current prototype direction image(s)",
+		"Treat every supplied reference image as part of the original object prototype",
+		"No user or project reference image is supplied",
+		"a wooden chest",
 		"Minor edit",
 		"Major edit",
 		"Mixed edit",

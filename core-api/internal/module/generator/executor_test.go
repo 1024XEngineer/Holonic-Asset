@@ -170,6 +170,7 @@ type generationAssetWriterStub struct {
 	objectAsset      *assetdomain.Asset
 	createdRecord    *assetdomain.AssetRecord
 	recordVersion    uint
+	expectedVersion  uint
 	animationAssetID uint
 	animationName    string
 	animationID      uint
@@ -255,7 +256,9 @@ func (s *generationAssetWriterStub) CreateAnimation(
 func (s *generationAssetWriterStub) CreateRecord(
 	_ context.Context,
 	record *assetdomain.AssetRecord,
+	expectedVersion uint,
 ) (*assetdomain.AssetRecord, error) {
+	s.expectedVersion = expectedVersion
 	*s.events = append(*s.events, "create_record")
 	if record != nil {
 		copy := *record

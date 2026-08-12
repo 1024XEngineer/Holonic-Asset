@@ -37,7 +37,7 @@ type AssetWriter interface {
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
-	CreateRecord(context.Context, *assetdomain.AssetRecord) (*assetdomain.AssetRecord, error)
+	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
 type executor struct {
@@ -98,6 +98,15 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.editCharacterPrototype(ctx, request)
+	case EditObjectProtoType:
+		if err := e.requirePrototypeDependencies(); err != nil {
+			return nil, err
+		}
+		request := EditObjectPrototypePayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editObjectPrototype(ctx, request)
 	case GenerateObjectProtoType:
 		if err := e.requirePrototypeDependencies(); err != nil {
 			return nil, err

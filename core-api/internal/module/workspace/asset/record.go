@@ -2,8 +2,11 @@ package asset
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 )
+
+var ErrVersionConflict = errors.New("asset version conflict")
 
 type AssetRecord struct {
 	ID          uint

@@ -36,7 +36,7 @@ type assetManagerStub struct {
 	deleteErr       error
 }
 
-func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, _ uint) (*domain.AssetRecord, error) {
 	s.recordRequest = record
 	return s.record, nil
 }

@@ -541,7 +541,7 @@ func (r *AssetRepositoryImpl) UpdatePrototypeImages(
 	})
 }
 
-func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	if record == nil {
 		return nil, fmt.Errorf("repository: asset record is nil")
 	}
@@ -549,7 +549,7 @@ func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.A
 	var snapshot *domain.AssetRecord
 	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
 		var err error
-		snapshot, err = transactionRepository.createRecord(ctx, &recordCopy)
+		snapshot, err = transactionRepository.createRecord(ctx, &recordCopy, expectedVersion)
 		return err
 	}); err != nil {
 		return nil, err
@@ -557,17 +557,30 @@ func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.A
 	return snapshot, nil
 }
 
-func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	asset, err := r.AssetDao.GetAssetForUpdate(ctx, record.AssetID)
 	if err != nil {
 		return nil, err
 	}
-	content := append([]byte(nil), record.Content...)
-	if len(content) == 0 {
-		content, err = r.resolveAssetContent(ctx, asset)
+	if expectedVersion != 0 && asset.Version != expectedVersion {
+		return nil, fmt.Errorf(
+			"%w: asset %d expected version %d, current version %d",
+			domain.ErrVersionConflict,
+			asset.ID,
+			expectedVersion,
+			asset.Version,
+		)
+	}
+	var currentContent []byte
+	if len(record.Content) == 0 {
+		currentContent, err = r.resolveAssetContent(ctx, asset)
 		if err != nil {
 			return nil, err
 		}
+	}
+	content := append([]byte(nil), record.Content...)
+	if len(content) == 0 {
+		content = currentContent
 	}
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return nil, fmt.Errorf("repository: content storage is not configured")
