@@ -52,6 +52,32 @@ func DefaultResizeOptions(width, height int) ResizeOptions {
 	}
 }
 
+// AnimationFrameMargin returns the shared safety margin used by canonical
+// prototype frames and generated animation frames. Keeping this policy in the
+// processor prevents the prototype and animation pipelines from choosing
+// different subject scales. A quarter-frame margin leaves the centre half of
+// the frame available for the canonical pose while leaving room for held
+// objects and their motion.
+func AnimationFrameMargin(width, height int) int {
+	margin := min(width, height) / 4
+	if margin < 1 {
+		return 1
+	}
+	return margin
+}
+
+// AnimationFrameResizeOptions returns the canonical padded-frame layout. The
+// source is cropped to its visible subject, then placed on a fixed canvas using
+// the proportional margin expected by the animation generator. Animation
+// splitting can then preserve that full canvas instead of fitting action
+// bounds. Callers may still change Mode, PaletteSize, or HardAlpha for
+// pixel-art output.
+func AnimationFrameResizeOptions(width, height int) ResizeOptions {
+	options := DefaultResizeOptions(width, height)
+	options.Margin = AnimationFrameMargin(width, height)
+	return options
+}
+
 type ResizeReport struct {
 	InputWidth       int        `json:"input_width"`
 	InputHeight      int        `json:"input_height"`

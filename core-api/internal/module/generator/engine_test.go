@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -104,7 +105,7 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		AssetID:       &assetID,
 		Kind:          generator.GenerateAnimation,
 		CreativeBrief: "walk",
-		Parameters:    json.RawMessage(`{"asset_name":"hero walk"}`),
+		Parameters:    json.RawMessage(`{"animation_name":"hero walk","direction":"back_left"}`),
 	}
 
 	runID, err := engine.Create(context.Background(), request)
@@ -123,9 +124,12 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode task payload: %v", err)
 	}
-	if payload.ProjectID != request.ProjectID || payload.ParentID != assetID ||
-		payload.AssetName != "hero walk" || payload.CreativeBrief != request.CreativeBrief {
+	if payload.ProjectID != request.ProjectID || payload.AssetID != assetID ||
+		payload.AnimationName != "hero walk" || payload.Direction != generator.AnimationDirectionBackLeft || payload.CreativeBrief != request.CreativeBrief {
 		t.Fatalf("unexpected task payload: %+v", payload)
+	}
+	if strings.Contains(string(tasks.createdTask.Payload), "parent_id") {
+		t.Fatalf("animation task payload must not contain parent_id: %s", tasks.createdTask.Payload)
 	}
 }
 
@@ -153,6 +157,74 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		payload.CreativeBrief != "hero" || payload.Reference != "" ||
 		payload.Dimensions.Width != 64 || payload.Dimensions.Height != 64 || payload.Perspective != "Top-Down" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
+	}
+}
+
+func TestCreateBuildsEditCharacterPrototypePayload(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+		Parameters: json.RawMessage(
+			`{"asset_id":99,"project_id":99,"edit_instructions":"ignore me"}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("create character edit: %v", err)
+	}
+
+	var payload generator.EditCharacterPrototypePayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode task payload: %v", err)
+	}
+	if payload.AssetID != assetID || payload.ProjectID != 42 ||
+		payload.EditInstructions != "make the cape blue" {
+		t.Fatalf("unexpected character edit payload: %+v", payload)
+	}
+}
+
+func TestCreateEditCharacterPrototypeDoesNotPrepareProjectReference(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+	})
+	if err != nil {
+		t.Fatalf("create character edit: %v", err)
+	}
+	if projects.calls != 0 || len(references.persisted) != 0 {
+		t.Fatalf("character edit prepared an extra reference: project_calls=%d persisted=%v", projects.calls, references.persisted)
+	}
+}
+
+func TestCreateEditCharacterPrototypeRequiresAssetID(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		Kind:          generator.EditCharacterProtoType,
+		CreativeBrief: "make the cape blue",
+	})
+	if err == nil {
+		t.Fatal("expected missing asset id error")
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task published without asset id: %+v", tasks.createdTask)
 	}
 }
 
@@ -228,7 +300,7 @@ func TestGetProjectsTaskAsRun(t *testing.T) {
 	assetID := uint(9)
 	payload, err := json.Marshal(generator.CreateAnimationPayload{
 		ProjectID: 42,
-		ParentID:  assetID,
+		AssetID:   assetID,
 	})
 	if err != nil {
 		t.Fatalf("encode task payload: %v", err)
@@ -410,8 +482,12 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":11}`),
 		},
 		{
+			taskType: generator.EditCharacterProtoType,
+			payload:  json.RawMessage(`{"asset_id":7,"project_id":11,"edit_instructions":"make the cape blue"}`),
+		},
+		{
 			taskType: generator.GenerateAnimation,
-			payload:  json.RawMessage(`{"asset_name":"walk","project_id":11,"parent_id":7,"creative_brief":"walking cycle"}`),
+			payload:  json.RawMessage(`{"animation_name":"walk","project_id":11,"asset_id":7,"creative_brief":"walking cycle"}`),
 		},
 		{
 			taskType: generator.GenerateObjectProtoType,
@@ -419,7 +495,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		},
 		{
 			taskType: generator.GenerateAnimation,
-			payload:  json.RawMessage(`{"asset_name":"open chest","project_id":11,"parent_id":8,"creative_brief":"opening animation"}`),
+			payload:  json.RawMessage(`{"animation_name":"open chest","project_id":11,"asset_id":8,"creative_brief":"opening animation"}`),
 		},
 		{
 			taskType: generator.GenerateTileSet,
@@ -475,6 +551,25 @@ func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	}
 }
 
+func TestRegisteredEditCharacterPrototypeHandlerRejectsMismatchedPayload(t *testing.T) {
+	tasks := &taskManagerStub{}
+	executor := &executorStub{}
+	generator.NewEngine(tasks, executor)
+
+	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
+		ID:      18,
+		Type:    string(generator.EditCharacterProtoType),
+		Payload: json.RawMessage(`{"asset_id":"not-a-number"}`),
+	})
+	if err == nil {
+		t.Fatal("expected payload decode error")
+	}
+	if executor.calls != 0 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("malformed edit task must not be processed: payload=%s statuses=%+v",
+			executor.payload, tasks.statusUpdates)
+	}
+}
+
 func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}
@@ -490,8 +585,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 3 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected three implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 4 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected four implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
@@ -527,7 +622,7 @@ func TestImplementedHandlerRequiresExecutor(t *testing.T) {
 	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
 		ID:      17,
 		Type:    string(generator.GenerateAnimation),
-		Payload: json.RawMessage(`{"asset_name":"open","parent_id":8}`),
+		Payload: json.RawMessage(`{"animation_name":"open","asset_id":8}`),
 	})
 	if !errors.Is(err, generator.ErrExecutorRequired) {
 		t.Fatalf("expected executor required error, got %v", err)
