@@ -3,6 +3,7 @@ module github.com/1024XEngineer/Holonic-Asset
 go 1.26.5
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/aws/aws-sdk-go-v2 v1.43.0
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
