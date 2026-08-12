@@ -29,17 +29,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
-import { changeLanguage } from "@/i18n";
 import {
-  readLanguagePreference,
-  supportedLanguages,
-  type Language,
-} from "@/lib/language-preference";
+  changeLanguage,
+  defaultLanguage,
+  isSupportedLanguage,
+  languages,
+} from "@/i18n";
 
 const emailSchema = z.string().trim().email();
 
 export function Settings() {
-  const { t } = useTranslation(["settings", "common", "navigation"]);
+  const { t, i18n } = useTranslation(["settings", "common", "navigation"]);
   const [profile] = useState(readAccountProfile);
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
@@ -47,11 +47,13 @@ export function Settings() {
   const [avatarUrl, setAvatarUrl] = useState<string>();
   const [profileSaved, setProfileSaved] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
-  const [language, setLanguage] = useState<Language>(readLanguagePreference);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schedule } = useTimeout();
   const hasValidEmail = emailSchema.safeParse(email).success;
+  const language = isSupportedLanguage(i18n.resolvedLanguage ?? "")
+    ? i18n.resolvedLanguage
+    : defaultLanguage;
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -228,22 +230,21 @@ export function Settings() {
                       />
                     }
                   >
-                    {t(`common:languages.${language}`)}
+                    {languages.find(({ code }) => code === language)?.name}
                     <ChevronDown className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-40">
                     <DropdownMenuRadioGroup
                       value={language}
                       onValueChange={(value) => {
-                        const nextLanguage = value as Language;
-                        setLanguage(nextLanguage);
-                        void changeLanguage(nextLanguage);
+                        if (!isSupportedLanguage(value)) return;
+                        void changeLanguage(value);
                         setLanguageMenuOpen(false);
                       }}
                     >
-                      {supportedLanguages.map((value) => (
-                        <DropdownMenuRadioItem key={value} value={value}>
-                          {t(`common:languages.${value}`)}
+                      {languages.map(({ code, name }) => (
+                        <DropdownMenuRadioItem key={code} value={code}>
+                          {name}
                         </DropdownMenuRadioItem>
                       ))}
                     </DropdownMenuRadioGroup>

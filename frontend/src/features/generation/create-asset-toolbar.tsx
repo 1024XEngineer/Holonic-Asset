@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import { AssetKindIcon } from "@/components/asset-kind";
 import type { CreatableAssetKind } from "@/model/asset";
 import type { ProjectSummary } from "@/model/project";
 
@@ -15,7 +15,7 @@ export function CreateAssetToolbar({
   assetKinds: CreatableAssetKind[];
   project: ProjectSummary;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["generation", "common"]);
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -61,7 +61,7 @@ export function CreateAssetToolbar({
         onClick={() => setPinned((current) => !current)}
       >
         <Plus data-icon="inline-start" />
-        {t("generation.newAsset")}
+        {t("newAsset")}
         <ChevronDown
           className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
           aria-hidden="true"
@@ -94,8 +94,8 @@ export function CreateAssetToolbar({
                 }}
               >
                 <AssetKindIcon kind={kind} className="size-4" />
-                {t("generation.createKind", {
-                  kind: getAssetKindConfig(kind).label,
+                {t("createKind", {
+                  kind: t(`common:assetKinds.${kind}`),
                 })}
               </Button>
             ))}

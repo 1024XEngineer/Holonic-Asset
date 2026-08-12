@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
 export function HomeClosingCta() {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation("home");
   return (
     <section
       aria-labelledby="closing-cta-heading"
@@ -14,13 +14,13 @@ export function HomeClosingCta() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,color-mix(in_oklch,var(--foreground)_8%,transparent)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:radial-gradient(circle_at_center,black,transparent_68%)]" />
       <div className="relative mx-auto max-w-[100rem] px-5 py-24 text-center sm:px-8 sm:py-36 lg:px-10 lg:py-44">
         <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground">
-          {t("home.closingEyebrow")}
+          {t("closingEyebrow")}
         </p>
         <h2
           id="closing-cta-heading"
           className="mx-auto mt-6 max-w-5xl text-5xl leading-[0.92] font-semibold tracking-[-0.065em] text-balance sm:text-7xl lg:text-8xl"
         >
-          {t("home.closingTitle")}
+          {t("closingTitle")}
         </h2>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Button
@@ -29,7 +29,7 @@ export function HomeClosingCta() {
             render={<Link to="/projects/new" />}
           >
             <Plus data-icon="inline-start" />
-            {t("home.startProject")}
+            {t("startProject")}
           </Button>
           <Button
             nativeButton={false}
@@ -37,7 +37,7 @@ export function HomeClosingCta() {
             variant="outline"
             render={<Link to="/generate" />}
           >
-            {t("home.tryGeneration")}
+            {t("tryGeneration")}
             <ArrowRight data-icon="inline-end" />
           </Button>
         </div>

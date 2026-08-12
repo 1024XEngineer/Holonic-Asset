@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 export function HomeFooter() {
-  const { t } = useTranslation(["workspace", "navigation"]);
+  const { t } = useTranslation(["home", "navigation"]);
   const footerLinks = [
     { label: t("navigation:home"), to: "/" },
     { label: t("navigation:image"), to: "/generate" },
@@ -16,11 +16,11 @@ export function HomeFooter() {
             Holonic Asset
           </p>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-            {t("workspace:home.footerDescription")}
+            {t("footerDescription")}
           </p>
         </div>
         <nav
-          aria-label={t("workspace:home.footerNavigation")}
+          aria-label={t("footerNavigation")}
           className="flex flex-wrap gap-5"
         >
           {footerLinks.map(({ label, to }) => (

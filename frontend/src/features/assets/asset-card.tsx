@@ -20,7 +20,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import { AssetKindIcon } from "@/components/asset-kind";
 import type { AssetLibraryItem } from "@/model/asset";
 
 import { AssetPreview } from "./asset-preview";
@@ -44,8 +44,7 @@ export function AssetCard({
   onOpenEditor?: () => void;
   projectId?: string;
 }) {
-  const { t } = useTranslation("workspace");
-  const kindConfig = getAssetKindConfig(asset.kind);
+  const { t } = useTranslation(["assets", "common"]);
 
   return (
     <Card
@@ -71,9 +70,7 @@ export function AssetCard({
               />
             }
           />
-          <TooltipContent side="bottom">
-            {t("assets.openEditor")}
-          </TooltipContent>
+          <TooltipContent side="bottom">{t("openEditor")}</TooltipContent>
         </Tooltip>
       ) : null}
       <div className="min-w-0">
@@ -88,7 +85,7 @@ export function AssetCard({
               {asset.tags.length > 0 ? (
                 <div
                   className="mt-2 flex flex-wrap gap-1"
-                  aria-label={t("assets.tags")}
+                  aria-label={t("tags")}
                 >
                   {asset.tags.map((tag) => (
                     <Badge
@@ -109,7 +106,9 @@ export function AssetCard({
           <div className="flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
             <span className="flex min-w-0 items-center gap-1.5">
               <AssetKindIcon kind={asset.kind} className="size-3.5" />
-              <span className="truncate">{kindConfig.label}</span>
+              <span className="truncate">
+                {t(`common:assetKinds.${asset.kind}`)}
+              </span>
             </span>
             <span className="shrink-0">{asset.canvasSize}</span>
           </div>
@@ -133,7 +132,7 @@ export function AssetCard({
           >
             {isCopying ? <LoaderCircle className="animate-spin" /> : <Copy />}
           </TooltipTrigger>
-          <TooltipContent>{t("assets.copy")}</TooltipContent>
+          <TooltipContent>{t("copy")}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -154,7 +153,7 @@ export function AssetCard({
           >
             <Pencil />
           </TooltipTrigger>
-          <TooltipContent>{t("assets.editDetails")}</TooltipContent>
+          <TooltipContent>{t("editDetails")}</TooltipContent>
         </Tooltip>
         <AlertDialog>
           <Tooltip>
@@ -173,21 +172,23 @@ export function AssetCard({
                 <Trash2 />
               </AlertDialogTrigger>
             </TooltipTrigger>
-            <TooltipContent>{t("actions.delete")}</TooltipContent>
+            <TooltipContent>{t("common:actions.delete")}</TooltipContent>
           </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {t("assets.deleteConfirm", { name: asset.name })}
+                {t("deleteConfirm", { name: asset.name })}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {t("assets.deleteDescription")}
+                {t("deleteDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
+              <AlertDialogCancel>
+                {t("common:actions.cancel")}
+              </AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={onDelete}>
-                {t("actions.delete")}
+                {t("common:actions.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

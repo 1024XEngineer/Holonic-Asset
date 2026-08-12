@@ -12,13 +12,13 @@ export function IdeaProjectFlow({
   active: boolean;
   project: NewProjectController;
 }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation("projects");
   if (active) return <GuidedProjectFlow project={project} />;
 
   return (
     <ProjectStartCard
-      title={t("project.idea")}
-      description={t("project.ideaDescription")}
+      title={t("idea")}
+      description={t("ideaDescription")}
       icon={<Lightbulb size={20} />}
       onSelect={project.start.chooseIdea}
     />

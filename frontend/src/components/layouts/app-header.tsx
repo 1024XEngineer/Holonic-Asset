@@ -21,6 +21,13 @@ import {
   type AccountProfile,
 } from "@/model/account";
 
+const navigationItems = [
+  ["/", "home"],
+  ["/generate", "image"],
+  ["/projects", "project"],
+  ["/docs", "docs"],
+] as const;
+
 function isActivePath(pathname: string, to: string) {
   return to === "/"
     ? pathname === "/"
@@ -147,13 +154,13 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
       <nav
-        aria-label="Main navigation"
+        aria-label={t("mainNavigation")}
         className="grid min-h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 sm:px-6"
       >
         <div className="flex min-w-0 items-center">
           <Link
             to="/"
-            aria-label="Holonic Asset home"
+            aria-label={t("homeAriaLabel")}
             className="inline-flex shrink-0 rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <img
@@ -169,12 +176,7 @@ export function AppHeader() {
           </Link>
         </div>
         <div className="flex items-center justify-center gap-1 sm:gap-2">
-          {[
-            ["/", "home"],
-            ["/generate", "image"],
-            ["/projects", "project"],
-            ["/docs", "docs"],
-          ].map(([to, key]) => {
+          {navigationItems.map(([to, key]) => {
             const active = isActivePath(pathname, to);
             return (
               <Link

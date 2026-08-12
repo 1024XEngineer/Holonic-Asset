@@ -1,12 +1,12 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import { AssetKindIcon } from "@/components/asset-kind";
 import { Badge } from "@/components/ui/badge";
 import { isGenerationRunActive, type GenerationRun } from "@/model/generation";
 
 export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
-  const { t } = useTranslation("workspace");
+  const { t } = useTranslation(["generation", "common"]);
   if (runs.length === 0) return null;
   const hasActiveRuns = runs.some(isGenerationRunActive);
 
@@ -22,13 +22,10 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
           ) : (
             <AlertCircle className="size-4 text-destructive" />
           )}
-          {t("generation.queue")}
+          {t("queue")}
         </h2>
         <Badge variant="secondary">
-          {runs.length}{" "}
-          {t(
-            runs.length === 1 ? "generation.task_one" : "generation.task_other",
-          )}
+          {runs.length} {t(runs.length === 1 ? "task_one" : "task_other")}
         </Badge>
       </div>
       <div className="mt-3 divide-y border-y" aria-live="polite">
@@ -47,7 +44,7 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
                 </p>
               </div>
               <span className="hidden shrink-0 text-xs text-muted-foreground md:block">
-                {getAssetKindConfig(run.kind).label}
+                {t(`common:assetKinds.${run.kind}`)}
               </span>
               <Badge variant={isFailed ? "destructive" : "outline"}>
                 {isFailed ? (
@@ -55,7 +52,7 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
                 ) : (
                   <LoaderCircle className="animate-spin" />
                 )}
-                {run.status === "failed" ? t("generation.failed") : run.status}
+                {run.status === "failed" ? t("failed") : run.status}
               </Badge>
             </div>
           );
