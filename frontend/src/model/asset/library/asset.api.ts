@@ -1,15 +1,7 @@
-import {
-  copyMockAsset,
-  deleteMockAsset,
-  listMockAssetGroups,
-  saveMockAssetRevision,
-  updateMockAsset,
-} from "./mock";
 import { coreAssetApi } from "./core-asset.api";
 import type { AssetListItemResponse } from "./asset.contract";
 import { resolveAssetCanvasSize } from "./asset-canvas-size";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
-import { hasMockProject } from "../../project/mock";
 
 export { coreAssetApi } from "./core-asset.api";
 
@@ -22,20 +14,14 @@ export type SaveAssetRevisionInput<Payload> = {
 
 export const assetApi = {
   listGroups: async (projectId: string) => {
-    if (hasMockProject(projectId)) return listMockAssetGroups(projectId);
-
     const response = await coreAssetApi.list(coreProjectId(projectId));
     return toAssetGroups(response.assets);
   },
   copy: async (projectId: string, assetId: string) => {
-    if (hasMockProject(projectId)) return copyMockAsset(projectId, assetId);
-
     await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
     return assetApi.listGroups(projectId);
   },
   delete: async (projectId: string, assetId: string) => {
-    if (hasMockProject(projectId)) return deleteMockAsset(projectId, assetId);
-
     await coreAssetApi.delete({ assetId: coreAssetId(assetId) });
     return assetApi.listGroups(projectId);
   },
@@ -44,10 +30,6 @@ export const assetApi = {
     assetId: string,
     metadata: AssetMetadataUpdate,
   ) => {
-    if (hasMockProject(projectId)) {
-      return updateMockAsset(projectId, assetId, metadata);
-    }
-
     await coreAssetApi.update({
       assetId: coreAssetId(assetId),
       name: metadata.name,
@@ -58,16 +40,7 @@ export const assetApi = {
     });
     return assetApi.listGroups(projectId);
   },
-  saveRevision: <Payload>({
-    projectId,
-    assetId,
-    description,
-    payload,
-  }: SaveAssetRevisionInput<Payload>) => {
-    if (hasMockProject(projectId)) {
-      return saveMockAssetRevision(projectId, assetId, description, payload);
-    }
-
+  saveRevision: <Payload>(_input: SaveAssetRevisionInput<Payload>) => {
     return Promise.reject(
       new Error(
         "Asset revisions cannot be saved through the Core API until the save payload is supported.",

@@ -5,12 +5,6 @@ const mocks = vi.hoisted(() => ({
   coreCopy: vi.fn(),
   coreDelete: vi.fn(),
   coreUpdate: vi.fn(),
-  hasMockProject: vi.fn(),
-  listMockAssetGroups: vi.fn(),
-  copyMockAsset: vi.fn(),
-  deleteMockAsset: vi.fn(),
-  saveMockAssetRevision: vi.fn(),
-  updateMockAsset: vi.fn(),
 }));
 
 vi.mock("./core-asset.api", () => ({
@@ -21,17 +15,6 @@ vi.mock("./core-asset.api", () => ({
     update: mocks.coreUpdate,
   },
 }));
-vi.mock("./mock", () => ({
-  copyMockAsset: mocks.copyMockAsset,
-  deleteMockAsset: mocks.deleteMockAsset,
-  listMockAssetGroups: mocks.listMockAssetGroups,
-  saveMockAssetRevision: mocks.saveMockAssetRevision,
-  updateMockAsset: mocks.updateMockAsset,
-}));
-vi.mock("../../project/mock", () => ({
-  hasMockProject: mocks.hasMockProject,
-}));
-
 import { assetApi } from "./asset.api";
 
 const remoteAssets = {
@@ -52,26 +35,14 @@ const remoteAssets = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.hasMockProject.mockReturnValue(false);
   mocks.coreList.mockResolvedValue(remoteAssets);
   mocks.coreCopy.mockResolvedValue({ newAssetId: 9 });
   mocks.coreDelete.mockResolvedValue({ assetId: 8 });
   mocks.coreUpdate.mockResolvedValue({});
-  mocks.listMockAssetGroups.mockResolvedValue([]);
 });
 
-describe("assetApi project routing", () => {
-  it("loads seeded assets from the local mock project", async () => {
-    const groups = [{ kind: "object", assets: [] }];
-    mocks.hasMockProject.mockReturnValue(true);
-    mocks.listMockAssetGroups.mockResolvedValue(groups);
-
-    await expect(assetApi.listGroups("moonlit-orchard")).resolves.toBe(groups);
-    expect(mocks.listMockAssetGroups).toHaveBeenCalledWith("moonlit-orchard");
-    expect(mocks.coreList).not.toHaveBeenCalled();
-  });
-
-  it("loads and maps assets from the Core API for remote projects", async () => {
+describe("assetApi Core routing", () => {
+  it("loads and maps assets from the Core API", async () => {
     await expect(assetApi.listGroups("42")).resolves.toEqual([
       expect.objectContaining({
         kind: "object",
@@ -88,7 +59,6 @@ describe("assetApi project routing", () => {
 
     expect(mocks.coreCopy).toHaveBeenCalledWith({ assetId: 8 });
     expect(mocks.coreList).toHaveBeenCalledWith(42);
-    expect(mocks.copyMockAsset).not.toHaveBeenCalled();
   });
 
   it("uses Core API delete and refreshes the remote library", async () => {
@@ -96,7 +66,6 @@ describe("assetApi project routing", () => {
 
     expect(mocks.coreDelete).toHaveBeenCalledWith({ assetId: 8 });
     expect(mocks.coreList).toHaveBeenCalledWith(42);
-    expect(mocks.deleteMockAsset).not.toHaveBeenCalled();
   });
 
   it("maps metadata updates to the Core API dimensions shape", async () => {
@@ -117,42 +86,6 @@ describe("assetApi project routing", () => {
       dimensions: { width: 48, height: 64 },
     });
     expect(mocks.coreList).toHaveBeenCalledWith(42);
-    expect(mocks.updateMockAsset).not.toHaveBeenCalled();
-  });
-
-  it("keeps CRUD operations on the local mock for seeded projects", async () => {
-    const groups = [{ kind: "object", assets: [] }];
-    mocks.hasMockProject.mockReturnValue(true);
-    mocks.copyMockAsset.mockResolvedValue(groups);
-    mocks.deleteMockAsset.mockResolvedValue(groups);
-    mocks.updateMockAsset.mockResolvedValue(groups);
-
-    await assetApi.copy("moonlit-orchard", "barrel");
-    await assetApi.delete("moonlit-orchard", "barrel");
-    await assetApi.update("moonlit-orchard", "barrel", {
-      name: "Barrel",
-      description: "",
-      tags: [],
-      canvasSize: "32 × 32 px",
-      perspective: "Top-Down",
-    });
-
-    expect(mocks.copyMockAsset).toHaveBeenCalledWith(
-      "moonlit-orchard",
-      "barrel",
-    );
-    expect(mocks.deleteMockAsset).toHaveBeenCalledWith(
-      "moonlit-orchard",
-      "barrel",
-    );
-    expect(mocks.updateMockAsset).toHaveBeenCalledWith(
-      "moonlit-orchard",
-      "barrel",
-      expect.any(Object),
-    );
-    expect(mocks.coreCopy).not.toHaveBeenCalled();
-    expect(mocks.coreDelete).not.toHaveBeenCalled();
-    expect(mocks.coreUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects remote operations with non-persisted asset ids", async () => {
