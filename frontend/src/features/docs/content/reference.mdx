@@ -1,41 +1,46 @@
 export const metadata = { title: "Why references matter" };
 
 import { ReferenceComparison } from "@/features/docs/reference-comparison";
+import { DocHeading, DocImage, DocText } from "../doc-text";
 
-## A reference is a visual constraint, not just inspiration.
+<DocHeading level={2} id="reference-constraint" i18nKey="reference.heading" />
 
-### Introduction
+<DocHeading level={3} id="introduction" i18nKey="reference.introTitle" />
 
-A clear reference tells the generator which proportions, colour treatment, silhouette, and equipment must remain consistent. Start with one primary image that establishes the result you want.
+<DocText i18nKey="reference.introBody" />
 
-<img
+<DocImage
   src="/project/reference.png"
-  alt="Pixel-art farm scene reference showing paths, buildings, crops, trees, and water"
+  altKey="reference.imageAlt"
   className="mt-6 block h-auto w-full border border-neutral-950/10 bg-[#f0eee7]"
 />
 
-### Choose references that answer a specific question
+<DocHeading level={3} id="choose-references" i18nKey="reference.chooseTitle" />
 
-- Keep the character's proportions, clothing silhouette, and key equipment.
-- Match lighting direction and colour treatment to the target asset.
-- Use a clean image with an unobstructed, generously framed subject.
-- Add supporting references only for local material or equipment detail.
-- When images disagree, state which one defines the final result.
+- <DocText i18nKey="reference.choose1" />
+- <DocText i18nKey="reference.choose2" />
+- <DocText i18nKey="reference.choose3" />
+- <DocText i18nKey="reference.choose4" />
+- <DocText i18nKey="reference.choose5" />
 
-### Keep the prompt explicit
+<DocHeading level={3} id="explicit-prompt" i18nKey="reference.promptTitle" />
 
-Use the reference to establish the visual language, then name the details that cannot change. If a weapon, hairstyle, or colour matters, include it in the prompt. This keeps a supporting image from accidentally changing the primary reference's perspective or style.
+<DocText i18nKey="reference.promptBody" />
 
-## See the difference
+<DocHeading
+  level={2}
+  id="reference-comparison"
+  i18nKey="reference.differenceTitle"
+/>
 
-This reference defines the target character's identity and visual style. The two results below target the same role.
+<DocText i18nKey="reference.differenceBody" />
 
-<img
+<DocImage
   src="/project/reference/reference-exp.png"
-  alt="Pixel-art farming game reference for a character generation example"
+  altKey="reference.resultImageAlt"
   className="mt-6 block h-auto w-full border border-neutral-950/10 bg-[#f0eee7]"
 />
 
-Both results use the same prompt. The first uses the prompt alone; the second adds this image as a reference, producing stronger visual consistency.
+<DocText i18nKey="reference.resultNote" />
 
 <ReferenceComparison />

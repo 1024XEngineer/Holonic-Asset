@@ -12,6 +12,7 @@
       "@/lib/*": ["src/lib/*"]
     },
     "allowArbitraryExtensions": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
 
     /* Bundler mode */

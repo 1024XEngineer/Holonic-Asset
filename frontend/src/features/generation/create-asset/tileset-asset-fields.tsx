@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
@@ -27,6 +28,7 @@ export function TilesetAssetFields({
   draft: TilesetAssetCreationDraft<File>;
   onChange: (draft: TilesetAssetCreationDraft<File>) => void;
 }) {
+  const { t } = useTranslation("generation");
   const [expandedItems, setExpandedItems] = useState(
     () => new Set(draft.tiles.map((_, index) => index)),
   );
@@ -69,15 +71,19 @@ export function TilesetAssetFields({
             <section
               key={index}
               className="grid gap-5 rounded-lg border p-4"
-              aria-label={`Tileset item ${index + 1}`}
+              aria-label={t("tilesetItem", { number: index + 1 })}
             >
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">Item {index + 1}</h3>
+                <h3 className="text-sm font-semibold">
+                  {t("item", { number: index + 1 })}
+                </h3>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`${expanded ? "Collapse" : "Expand"} item ${index + 1}`}
+                  aria-label={t(expanded ? "collapseItem" : "expandItem", {
+                    number: index + 1,
+                  })}
                   aria-expanded={expanded}
                   onClick={() =>
                     setExpandedItems((current) => {
@@ -96,7 +102,7 @@ export function TilesetAssetFields({
               {expanded ? (
                 <>
                   <label className="grid gap-2 text-sm font-medium">
-                    Item {index + 1} description
+                    {t("itemDescription", { number: index + 1 })}
                     <Textarea
                       required
                       className="resize-none"
@@ -112,15 +118,12 @@ export function TilesetAssetFields({
                       onChange={(shape) => updateItem(index, { shape })}
                     />
                     <div className="grid gap-2 text-sm font-medium">
-                      <span>Reference image</span>
+                      <span>{t("referenceImage")}</span>
                       <ImageDropzone
                         className="min-h-40"
-                        fileName={item.reference?.name}
-                        onSelect={(reference) =>
+                        value={item.reference}
+                        onChange={(reference) =>
                           updateItem(index, { reference })
-                        }
-                        onClear={() =>
-                          updateItem(index, { reference: undefined })
                         }
                       />
                     </div>
@@ -142,11 +145,12 @@ function CountSelect({
   value: number;
   onChange: (count: number) => void;
 }) {
+  const { t } = useTranslation("generation");
   const [open, setOpen] = useState(false);
 
   return (
     <label className="grid gap-2 text-sm font-medium">
-      Item count
+      {t("itemCount")}
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           render={

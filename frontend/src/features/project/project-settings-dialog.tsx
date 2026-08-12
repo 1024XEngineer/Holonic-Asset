@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "@tanstack/react-form";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function ProjectSettingsDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (project: ProjectSummary) => void;
 }) {
+  const { t } = useTranslation(["projects", "common"]);
   const [imageError, setImageError] = useState<string>();
   const imageReadController = useRef<AbortController | null>(null);
   const form = useForm({
@@ -52,7 +54,7 @@ export function ProjectSettingsDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit project</DialogTitle>
+          <DialogTitle>{t("edit")}</DialogTitle>
           <DialogDescription>
             These defaults guide every asset generated inside this project.
           </DialogDescription>
@@ -80,7 +82,7 @@ export function ProjectSettingsDialog({
             <form.Field name="gameType">
               {(field) => (
                 <DropdownField
-                  label="Game type"
+                  label={t("gameType")}
                   value={field.state.value}
                   options={[...editableProjectContextOptions.gameTypes]}
                   onChange={(value) => {
@@ -94,7 +96,7 @@ export function ProjectSettingsDialog({
             <form.Field name="perspective">
               {(field) => (
                 <DropdownField
-                  label="Perspective"
+                  label={t("perspective")}
                   value={field.state.value}
                   options={projectContextOptions.perspectives}
                   onChange={(value) => {
@@ -114,7 +116,7 @@ export function ProjectSettingsDialog({
                         Custom game type
                         <Input
                           required
-                          placeholder="Describe the game type"
+                          placeholder={t("describeGameType")}
                           value={field.state.value}
                           onChange={(event) =>
                             field.handleChange(event.target.value)
@@ -130,7 +132,7 @@ export function ProjectSettingsDialog({
               <form.Field name="platform">
                 {(field) => (
                   <DropdownField
-                    label="Target platform"
+                    label={t("platform")}
                     value={field.state.value}
                     options={[...projectContextOptions.platforms]}
                     onChange={field.handleChange}
@@ -151,19 +153,24 @@ export function ProjectSettingsDialog({
               )}
             </form.Field>
           </div>
-          <form.Field name="visualDirection">
+          <form.Field name="reference">
             {(field) => (
               <div>
-                <p className="text-sm font-medium">Reference</p>
+                <p className="text-sm font-medium">{t("reference")}</p>
                 <ImageDropzone
                   className="mt-2 h-28"
-                  previewUrl={field.state.value || undefined}
+                  value={field.state.value || undefined}
                   error={imageError}
-                  onSelect={(file) => {
+                  onChange={(file) => {
                     imageReadController.current?.abort();
+                    setImageError(undefined);
+                    if (!file) {
+                      field.handleChange("");
+                      return;
+                    }
+
                     const controller = new AbortController();
                     imageReadController.current = controller;
-                    setImageError(undefined);
                     void readFileAsDataUrl(file, controller.signal).then(
                       (dataUrl) => {
                         if (controller.signal.aborted) return;
@@ -177,20 +184,15 @@ export function ProjectSettingsDialog({
                       },
                     );
                   }}
-                  onClear={() => {
-                    imageReadController.current?.abort();
-                    setImageError(undefined);
-                    field.handleChange("");
-                  }}
                 />
               </div>
             )}
           </form.Field>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
-              Cancel
+              {t("common:actions.cancel")}
             </DialogClose>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit">{t("save")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

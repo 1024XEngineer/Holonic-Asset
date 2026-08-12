@@ -1,4 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 
 import { projectApi } from "./project.api";
 import type { ProjectSummary } from "./types";
@@ -9,12 +13,18 @@ export function useUpdateProjectMutation() {
 
   return useMutation({
     mutationFn: projectApi.update,
-    onSuccess: (project) => {
-      queryClient.setQueryData<ProjectSummary[]>(
-        projectKeys.list(),
-        (current = []) =>
-          current.map((item) => (item.id === project.id ? project : item)),
-      );
-    },
+    onSuccess: (project) => updateProjectCache(queryClient, project),
   });
+}
+
+export function updateProjectCache(
+  queryClient: QueryClient,
+  project: ProjectSummary,
+) {
+  queryClient.setQueryData<ProjectSummary[]>(
+    projectKeys.list(),
+    (current = []) =>
+      current.map((item) => (item.id === project.id ? project : item)),
+  );
+  queryClient.setQueryData(projectKeys.detail(project.id), project);
 }

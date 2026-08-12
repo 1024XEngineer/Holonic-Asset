@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
 )
@@ -27,6 +29,10 @@ func main() {
 		handler.NewProjectHandler(nil),
 		handler.NewGenerationHandler(nil),
 		handler.NewUploadHandler(nil),
+		router.Authentication{
+			Router:     handler.NewAuthHandler(nil),
+			Middleware: func(next echo.HandlerFunc) echo.HandlerFunc { return next },
+		},
 	)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/openapi.json", nil)
 	response := httptest.NewRecorder()

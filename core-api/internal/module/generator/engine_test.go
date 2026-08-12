@@ -89,6 +89,31 @@ type projectReaderStub struct {
 	calls   int
 }
 
+type referenceStoreStub struct {
+	persisted  []string
+	persistErr error
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	return reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persisted = append(s.persisted, reference)
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
+	return "uploads/generated-1.png", nil
+}
+
+func (s *referenceStoreStub) NewObjectKey(string) (string, error) {
+	return "uploads/generated.png", nil
+}
+
+func (s *referenceStoreStub) PersistReferenceAt(context.Context, string, string) error {
+	return nil
+}
+
 func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
 	s.calls++
 	return s.project, s.err
@@ -406,6 +431,12 @@ func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 			Status:  taskdomain.StatusPending,
 			Payload: json.RawMessage(`{"project_id":99}`),
 		},
+		{
+			ID:      15,
+			Type:    string(generator.GenerateCharacterProtoType),
+			Status:  taskdomain.StatusFailed,
+			Payload: json.RawMessage(`{"project_id":42}`),
+		},
 	}}
 	engine := generator.NewEngine(tasks, nil)
 
@@ -431,7 +462,8 @@ func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 	if !reflect.DeepEqual(tasks.listFilter.Types, wantTypes) {
 		t.Fatalf("unexpected project task types: %v", tasks.listFilter.Types)
 	}
-	if len(page.Runs) != 1 || page.Runs[0].ID != 17 || page.Runs[0].ProjectID != 42 {
+	if len(page.Runs) != 2 || page.Runs[0].ID != 17 || page.Runs[0].ProjectID != 42 ||
+		page.Runs[1].ID != 15 || page.Runs[1].Status != taskdomain.StatusFailed {
 		t.Fatalf("unexpected project runs: %+v", page)
 	}
 }
