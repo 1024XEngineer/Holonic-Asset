@@ -126,6 +126,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
 	imageService := InitImageService(cfg.Image)
+	llmService := InitLLMService(cfg.LLM)
 	uploadStore, err := InitUploadStore(cfg.QiNiu)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
@@ -150,12 +151,15 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	videos := videoclient.NewVideoGenerationService(videoProvider)
 	imageProcessor := InitImageProcessor()
 	animations := generator.NewAnimationGenerationService(videos, imageProcessor, references)
-	generatorExecutor := generator.NewExecutorWithAnimation(
+	generatorExecutor := generator.NewExecutorWithDependencies(
 		imageService,
-		animations,
 		imageProcessor,
 		workspaceModule.Assets,
-		references,
+		generator.ExecutorDependencies{
+			References: references,
+			LLM:        llmService,
+			Animations: animations,
+		},
 	)
 	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,

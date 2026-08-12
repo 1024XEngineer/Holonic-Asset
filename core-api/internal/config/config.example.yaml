@@ -32,6 +32,11 @@ image:
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
 
+llm:
+  baseURL: ""
+  apiKey: ""
+  defaultModel: ""
+
 video:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
