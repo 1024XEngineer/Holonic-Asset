@@ -1,14 +1,15 @@
 import {
-  addMockAsset,
   copyMockAsset,
   deleteMockAsset,
   listMockAssetGroups,
   saveMockAssetRevision,
   updateMockAsset,
 } from "./mock";
+import { coreAssetApi } from "./core-asset.api";
 import type { AssetListItemResponse } from "./asset.contract";
 import { resolveAssetCanvasSize } from "./asset-canvas-size";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
+import { hasMockProject } from "../../project/mock";
 
 export { coreAssetApi } from "./core-asset.api";
 
@@ -20,22 +21,59 @@ export type SaveAssetRevisionInput<Payload> = {
 };
 
 export const assetApi = {
-  listGroups: (projectId: string) => listMockAssetGroups(projectId),
-  add: (projectId: string, kind: AssetKind, asset: ProjectAsset) =>
-    addMockAsset(projectId, kind, asset),
-  copy: (projectId: string, assetId: string) =>
-    copyMockAsset(projectId, assetId),
-  delete: (projectId: string, assetId: string) =>
-    deleteMockAsset(projectId, assetId),
-  update: (projectId: string, assetId: string, metadata: AssetMetadataUpdate) =>
-    updateMockAsset(projectId, assetId, metadata),
+  listGroups: async (projectId: string) => {
+    if (hasMockProject(projectId)) return listMockAssetGroups(projectId);
+
+    const response = await coreAssetApi.list(coreProjectId(projectId));
+    return toAssetGroups(response.assets);
+  },
+  copy: async (projectId: string, assetId: string) => {
+    if (hasMockProject(projectId)) return copyMockAsset(projectId, assetId);
+
+    await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
+    return assetApi.listGroups(projectId);
+  },
+  delete: async (projectId: string, assetId: string) => {
+    if (hasMockProject(projectId)) return deleteMockAsset(projectId, assetId);
+
+    await coreAssetApi.delete({ assetId: coreAssetId(assetId) });
+    return assetApi.listGroups(projectId);
+  },
+  update: async (
+    projectId: string,
+    assetId: string,
+    metadata: AssetMetadataUpdate,
+  ) => {
+    if (hasMockProject(projectId)) {
+      return updateMockAsset(projectId, assetId, metadata);
+    }
+
+    await coreAssetApi.update({
+      assetId: coreAssetId(assetId),
+      name: metadata.name,
+      description: metadata.description,
+      tags: metadata.tags,
+      perspective: metadata.perspective,
+      dimensions: parseAssetDimensions(metadata.canvasSize),
+    });
+    return assetApi.listGroups(projectId);
+  },
   saveRevision: <Payload>({
     projectId,
     assetId,
     description,
     payload,
-  }: SaveAssetRevisionInput<Payload>) =>
-    saveMockAssetRevision(projectId, assetId, description, payload),
+  }: SaveAssetRevisionInput<Payload>) => {
+    if (hasMockProject(projectId)) {
+      return saveMockAssetRevision(projectId, assetId, description, payload);
+    }
+
+    return Promise.reject(
+      new Error(
+        "Asset revisions cannot be saved through the Core API until the save payload is supported.",
+      ),
+    );
+  },
 };
 
 export function toAssetGroups(items: AssetListItemResponse[]) {
@@ -59,4 +97,29 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
+}
+
+function coreProjectId(projectId: string) {
+  const value = Number(projectId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Asset loading requires a persisted Core API project.");
+  }
+  return value;
+}
+
+function coreAssetId(assetId: string) {
+  const value = Number(assetId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Asset operations require a persisted Core API asset.");
+  }
+  return value;
+}
+
+function parseAssetDimensions(canvasSize: string) {
+  const match = canvasSize.match(/^\s*(\d+)\s*(?:×|x)\s*(\d+)\s*(?:px)?\s*$/i);
+  if (!match) {
+    throw new Error("Canvas size must use the format WIDTH × HEIGHT px.");
+  }
+
+  return { width: Number(match[1]), height: Number(match[2]) };
 }

@@ -10,7 +10,6 @@ const commonAssetCreationDraftShape = {
   name: z.string().trim().min(1, "Asset name is required."),
   prompt: z.string().trim().min(1, "Creative brief is required."),
   canvasSize: z.string().trim().min(1, "Canvas size is required."),
-  useProjectContext: z.boolean(),
 };
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
@@ -70,7 +69,6 @@ export function createAssetCreationDraft<Reference = unknown>(
     name: "",
     prompt: initialPrompt.trim(),
     canvasSize: getDefaultAssetCanvasSize(kind),
-    useProjectContext: true,
   };
 
   switch (kind) {
@@ -117,7 +115,6 @@ export function toCreationRequest<Reference>(
     name: draft.name.trim(),
     prompt: draft.prompt.trim(),
     canvasSize: draft.canvasSize,
-    useProjectContext: draft.useProjectContext,
   };
 
   switch (draft.kind) {

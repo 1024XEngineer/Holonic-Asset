@@ -21,7 +21,6 @@ describe("asset creation", () => {
       kind,
       name: "",
       prompt: "Initial prompt",
-      useProjectContext: true,
     });
     expect(draft.canvasSize).toMatch(/px$/);
   });

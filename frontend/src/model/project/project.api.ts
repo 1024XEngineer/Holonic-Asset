@@ -8,7 +8,6 @@ import {
   updateMockProject,
 } from "./mock";
 import { deleteMockProjectAssets } from "../asset/library/mock";
-import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
 import { coreProjectApi } from "./core-project.api";
 import type {
   GenerateProjectReferenceRequest,
@@ -103,7 +102,6 @@ export const projectApi: ProjectApi = {
     if (hasMockProject(projectId)) {
       await deleteMockProject(projectId);
       deleteMockProjectAssets(projectId);
-      deleteMockProjectGenerationRuns(projectId);
       return;
     }
 

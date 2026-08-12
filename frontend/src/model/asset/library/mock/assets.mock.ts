@@ -1,4 +1,4 @@
-import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../../types";
+import type { AssetMetadataUpdate } from "../../types";
 import { createAssetLibraryCollection } from "../asset-library-collection";
 import type { AssetGroupsByProject } from "../types";
 import { assetGroupsByProject as seededAssetGroups } from "./assets.seed";
@@ -11,22 +11,6 @@ function createAssetState(): AssetGroupsByProject {
 
 export async function listMockAssetGroups(projectId: string) {
   return structuredClone(assetGroupsByProject[projectId] ?? []);
-}
-
-export async function addMockAsset(
-  projectId: string,
-  kind: AssetKind,
-  asset: ProjectAsset,
-) {
-  const groups = assetGroupsByProject[projectId] ?? [];
-  const collection = createAssetLibraryCollection(groups, { projectId });
-  const updatedGroups = collection.append(kind, structuredClone(asset));
-
-  assetGroupsByProject = {
-    ...assetGroupsByProject,
-    [projectId]: updatedGroups,
-  };
-  return structuredClone(updatedGroups);
 }
 
 export async function copyMockAsset(projectId: string, assetId: string) {

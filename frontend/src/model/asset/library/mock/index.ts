@@ -1,5 +1,4 @@
 export {
-  addMockAsset,
   copyMockAsset,
   deleteMockAsset,
   deleteMockProjectAssets,

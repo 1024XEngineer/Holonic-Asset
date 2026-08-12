@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   },
   deleteMockProject: vi.fn(),
   deleteMockProjectAssets: vi.fn(),
-  deleteMockProjectGenerationRuns: vi.fn(),
   getMockProject: vi.fn(),
   hasMockProject: vi.fn(),
   listMockProjects: vi.fn(),
@@ -32,9 +31,6 @@ vi.mock("./mock", () => ({
 }));
 vi.mock("../asset/library/mock", () => ({
   deleteMockProjectAssets: mocks.deleteMockProjectAssets,
-}));
-vi.mock("../generation/run/mock", () => ({
-  deleteMockProjectGenerationRuns: mocks.deleteMockProjectGenerationRuns,
 }));
 
 import { projectApi, toProjectSummary } from "./project.api";
@@ -142,8 +138,6 @@ describe("projectApi", () => {
     mocks.hasMockProject.mockReturnValueOnce(true);
     await projectApi.delete("local");
     expect(mocks.deleteMockProjectAssets).toHaveBeenCalledWith("local");
-    expect(mocks.deleteMockProjectGenerationRuns).toHaveBeenCalledWith("local");
-
     await projectApi.delete("7");
     expect(mocks.core.delete).toHaveBeenCalledWith({ projectID: 7 });
   });

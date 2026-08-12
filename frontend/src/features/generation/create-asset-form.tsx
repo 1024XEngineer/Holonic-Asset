@@ -2,14 +2,12 @@ import { LoaderCircle } from "lucide-react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getAssetKindConfig } from "@/components/asset-kind";
 import type { CreatableAssetKind } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
-import type { ProjectSummary } from "@/model/project";
 import {
   assetCreationDraftSchema,
   createAssetCreationDraft,
@@ -25,24 +23,20 @@ export function CreateAssetForm({
   kind,
   onCancel,
   onCreate,
-  project,
   error,
   isSubmitting = false,
 }: {
   kind: CreatableAssetKind;
   onCancel: () => void;
   onCreate: (request: CreationRequest<File>) => void | Promise<void>;
-  project: ProjectSummary;
   error?: Error | null;
   isSubmitting?: boolean;
 }) {
-  const [useProjectContext, setUseProjectContext] = useState(true);
   const [validationError, setValidationError] = useState<string>();
   const form = useForm({
     defaultValues: { draft: createAssetCreationDraft<File>(kind) },
     onSubmit: async ({ value }) => {
-      const submittedDraft = { ...value.draft, useProjectContext };
-      const result = assetCreationDraftSchema.safeParse(submittedDraft);
+      const result = assetCreationDraftSchema.safeParse(value.draft);
       if (!result.success) {
         setValidationError(
           [...new Set(result.error.issues.map((issue) => issue.message))].join(
@@ -53,7 +47,7 @@ export function CreateAssetForm({
       }
 
       setValidationError(undefined);
-      await onCreate(toCreationRequest(submittedDraft));
+      await onCreate(toCreationRequest(value.draft));
     },
   });
   const draft = useStore(form.store, (state) => state.values.draft);
@@ -120,38 +114,6 @@ export function CreateAssetForm({
         <p className="text-sm text-destructive" role="alert">
           {validationError}
         </p>
-      ) : null}
-
-      <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        <input
-          type="checkbox"
-          className="size-4 accent-primary"
-          checked={useProjectContext}
-          onChange={(event) => setUseProjectContext(event.target.checked)}
-        />
-        Use {project.name} project context
-      </label>
-
-      {useProjectContext ? (
-        <div className="border bg-muted/40 p-4">
-          <p className="text-xs font-medium text-muted-foreground">
-            Generation context
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {[project.gameType, project.style, project.platform]
-              .filter(Boolean)
-              .map((item) => (
-                <Badge key={item} variant="secondary">
-                  {item}
-                </Badge>
-              ))}
-          </div>
-          {project.description ? (
-            <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {project.description}
-            </p>
-          ) : null}
-        </div>
       ) : null}
 
       {error ? (
