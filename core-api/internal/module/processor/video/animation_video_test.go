@@ -32,7 +32,7 @@ func TestProcessorPropagatesExtractionAndSelectionErrors(t *testing.T) {
 		processor Processor
 		want      string
 	}{
-		{name: "missing extractor", processor: newProcessor(nil), want: "video frame extractor is required"},
+		{name: "missing extractor", processor: newProcessor(nil), want: "video: video frame extractor is required"},
 		{name: "extract failure", processor: newProcessor(frameExtractorStub{err: wantErr}), want: wantErr.Error()},
 		{name: "insufficient frames", processor: newProcessor(frameExtractorStub{frames: animationTestVideoFrames(2)}), want: "need at least 5"},
 	}
@@ -140,7 +140,7 @@ func TestDecodeAnimationFrameConfigAndResolveFFmpeg(t *testing.T) {
 
 func TestValidateExtractedAnimationFrameConfigsRejectsInvalidDimensions(t *testing.T) {
 	err := validateExtractedAnimationFrameConfigs([]image.Config{{Width: 0, Height: 24}})
-	if err == nil || !strings.Contains(err.Error(), "invalid dimensions") {
+	if err == nil || !strings.Contains(err.Error(), "video: extracted animation frame 1 has invalid dimensions") {
 		t.Fatalf("expected invalid dimension error, got %v", err)
 	}
 	if err := validateExtractedAnimationFrameCount(maxAnimationExtractedFrames); err != nil {

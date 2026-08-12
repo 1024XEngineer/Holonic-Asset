@@ -13,15 +13,15 @@ import (
 func validateAnimationMotionSafeAreaAtIndices(frames []image.Image, indices []int) error {
 	for _, sourceIndex := range indices {
 		if sourceIndex < 0 || sourceIndex >= len(frames) {
-			return fmt.Errorf("generator: sampled animation frame index %d is out of range", sourceIndex)
+			return fmt.Errorf("video: sampled animation frame index %d is out of range", sourceIndex)
 		}
 		frame := frames[sourceIndex]
 		bounds, ok := animationRawForegroundBounds(frame)
 		if !ok {
-			return &AnimationVideoQualityError{Kind: "subject", Message: fmt.Sprintf("generator: video frame %d has no detectable subject on the green screen", sourceIndex)}
+			return &AnimationVideoQualityError{Kind: "subject", Message: fmt.Sprintf("video: video frame %d has no detectable subject on the green screen", sourceIndex)}
 		}
 		if !animationBoundsInsideSafetyBand(frame, bounds) {
-			return &AnimationVideoQualityError{Kind: "framing", Message: fmt.Sprintf("generator: character, limb, or held object enters the outer 2.5%% safety band in source frame %d", sourceIndex)}
+			return &AnimationVideoQualityError{Kind: "framing", Message: fmt.Sprintf("video: character, limb, or held object enters the outer 2.5%% safety band in source frame %d", sourceIndex)}
 		}
 	}
 	return nil

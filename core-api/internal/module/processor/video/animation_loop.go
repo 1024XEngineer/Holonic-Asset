@@ -37,7 +37,7 @@ func selectAnimationLoopFrames(
 	fps int,
 ) ([]int, AnimationLoopSelection, error) {
 	if count <= 0 || len(frames) < count+1 {
-		return nil, AnimationLoopSelection{}, fmt.Errorf("generator: video has %d candidate frames; need at least %d", len(frames), count+1)
+		return nil, AnimationLoopSelection{}, fmt.Errorf("video: video has %d candidate frames; need at least %d", len(frames), count+1)
 	}
 	descriptors := make([]animationFrameDescriptor, len(frames))
 	var union [animationAnalysisSize * animationAnalysisSize]bool
@@ -56,7 +56,7 @@ func selectAnimationLoopFrames(
 	if float64(unionArea)/float64(len(union)) < .05 {
 		return nil, AnimationLoopSelection{}, &AnimationVideoQualityError{
 			Kind:    "subject",
-			Message: fmt.Sprintf("generator: green-screen subject separation failed: foreground ratio %.3f", float64(unionArea)/float64(len(union))),
+			Message: fmt.Sprintf("video: green-screen subject separation failed: foreground ratio %.3f", float64(unionArea)/float64(len(union))),
 		}
 	}
 
@@ -112,7 +112,7 @@ func selectAnimationLoopFrames(
 	if len(pairs) == 0 {
 		return nil, AnimationLoopSelection{}, &AnimationVideoQualityError{
 			Kind:    "framing",
-			Message: fmt.Sprintf("generator: no full-action interval has %d sampled frames inside the outer 2.5%% safety band; interval still needs at least %.0f%% of the source duration", count, animationMinLoopSpanRatio*100),
+			Message: fmt.Sprintf("video: no full-action interval has %d sampled frames inside the outer 2.5%% safety band; interval still needs at least %.0f%% of the source duration", count, animationMinLoopSpanRatio*100),
 		}
 	}
 	// Frame zero is the canonical pose supplied to the video model. If it can
@@ -204,7 +204,7 @@ func selectAnimationLoopFrames(
 		}
 	}
 	if math.IsInf(best.score, -1) {
-		return nil, AnimationLoopSelection{}, fmt.Errorf("generator: full-action loop search produced no candidate")
+		return nil, AnimationLoopSelection{}, fmt.Errorf("video: full-action loop search produced no candidate")
 	}
 	warning := ""
 	if best.seamMSE > .015 {

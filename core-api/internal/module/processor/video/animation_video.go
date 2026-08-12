@@ -82,7 +82,7 @@ func newProcessor(extractor frameExtractor) Processor {
 
 func (p *processor) Process(ctx context.Context, source []byte, frameCount int) (*Result, error) {
 	if p.extractor == nil {
-		return nil, fmt.Errorf("generator: video frame extractor is required")
+		return nil, fmt.Errorf("video: video frame extractor is required")
 	}
 	frames, err := p.extractor.Extract(ctx, source, defaultCandidateFPS)
 	if err != nil {
@@ -117,7 +117,7 @@ func (e ffmpegFrameExtractor) Extract(
 	}
 	temp, err := os.MkdirTemp("", "holonic-animation-video-*")
 	if err != nil {
-		return nil, fmt.Errorf("generator: create video frame temp directory: %w", err)
+		return nil, fmt.Errorf("video: create video frame temp directory: %w", err)
 	}
 	defer func() {
 		_ = os.RemoveAll(temp)
@@ -125,7 +125,7 @@ func (e ffmpegFrameExtractor) Extract(
 
 	input := filepath.Join(temp, "input.mp4")
 	if err := os.WriteFile(input, video, 0o600); err != nil {
-		return nil, fmt.Errorf("generator: write temporary video: %w", err)
+		return nil, fmt.Errorf("video: write temporary video: %w", err)
 	}
 	pattern := filepath.Join(temp, "frame_%05d.png")
 	// The executable is either an explicitly configured ffmpeg binary or the
@@ -146,11 +146,11 @@ func (e ffmpegFrameExtractor) Extract(
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("generator: ffmpeg extract animation frames: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("video: ffmpeg extract animation frames: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	paths, err := filepath.Glob(filepath.Join(temp, "frame_*.png"))
 	if err != nil {
-		return nil, fmt.Errorf("generator: list extracted animation frames: %w", err)
+		return nil, fmt.Errorf("video: list extracted animation frames: %w", err)
 	}
 	sort.Strings(paths)
 	if err := validateExtractedAnimationFrameCount(len(paths)); err != nil {
@@ -173,20 +173,20 @@ func (e ffmpegFrameExtractor) Extract(
 		// paths only contains entries produced by filepath.Glob inside temp.
 		file, openErr := os.Open(path) //nolint:gosec // The path is constrained to the private temporary directory.
 		if openErr != nil {
-			return nil, fmt.Errorf("generator: open extracted animation frame: %w", openErr)
+			return nil, fmt.Errorf("video: open extracted animation frame: %w", openErr)
 		}
 		frame, _, decodeErr := image.Decode(file)
 		closeErr := file.Close()
 		if decodeErr != nil {
-			return nil, fmt.Errorf("generator: decode extracted animation frame: %w", decodeErr)
+			return nil, fmt.Errorf("video: decode extracted animation frame: %w", decodeErr)
 		}
 		if closeErr != nil {
-			return nil, fmt.Errorf("generator: close extracted animation frame: %w", closeErr)
+			return nil, fmt.Errorf("video: close extracted animation frame: %w", closeErr)
 		}
 		frames = append(frames, frame)
 	}
 	if len(frames) < 2 {
-		return nil, fmt.Errorf("generator: video yielded only %d decodable frame(s)", len(frames))
+		return nil, fmt.Errorf("video: video yielded only %d decodable frame(s)", len(frames))
 	}
 	return frames, nil
 }
@@ -196,7 +196,7 @@ var _ Processor = (*processor)(nil)
 func validateExtractedAnimationFrameCount(count int) error {
 	if count > maxAnimationExtractedFrames {
 		return fmt.Errorf(
-			"generator: video yielded %d animation frames; limit is %d",
+			"video: video yielded %d animation frames; limit is %d",
 			count,
 			maxAnimationExtractedFrames,
 		)
@@ -208,15 +208,15 @@ func decodeAnimationFrameConfig(path string) (image.Config, error) {
 	// path is produced by filepath.Glob inside the private temporary directory.
 	file, err := os.Open(path) //nolint:gosec // The path is constrained to the private temporary directory.
 	if err != nil {
-		return image.Config{}, fmt.Errorf("generator: open extracted animation frame metadata: %w", err)
+		return image.Config{}, fmt.Errorf("video: open extracted animation frame metadata: %w", err)
 	}
 	config, _, decodeErr := image.DecodeConfig(file)
 	closeErr := file.Close()
 	if decodeErr != nil {
-		return image.Config{}, fmt.Errorf("generator: decode extracted animation frame metadata: %w", decodeErr)
+		return image.Config{}, fmt.Errorf("video: decode extracted animation frame metadata: %w", decodeErr)
 	}
 	if closeErr != nil {
-		return image.Config{}, fmt.Errorf("generator: close extracted animation frame metadata: %w", closeErr)
+		return image.Config{}, fmt.Errorf("video: close extracted animation frame metadata: %w", closeErr)
 	}
 	return config, nil
 }
@@ -226,7 +226,7 @@ func validateExtractedAnimationFrameConfigs(configs []image.Config) error {
 	for index, config := range configs {
 		if config.Width < 1 || config.Height < 1 {
 			return fmt.Errorf(
-				"generator: extracted animation frame %d has invalid dimensions %dx%d",
+				"video: extracted animation frame %d has invalid dimensions %dx%d",
 				index+1,
 				config.Width,
 				config.Height,
@@ -234,7 +234,7 @@ func validateExtractedAnimationFrameConfigs(configs []image.Config) error {
 		}
 		if config.Width > maxAnimationFrameDimension || config.Height > maxAnimationFrameDimension {
 			return fmt.Errorf(
-				"generator: extracted animation frame %d dimensions %dx%d exceed limit %dx%d",
+				"video: extracted animation frame %d dimensions %dx%d exceed limit %dx%d",
 				index+1,
 				config.Width,
 				config.Height,
@@ -247,7 +247,7 @@ func validateExtractedAnimationFrameConfigs(configs []image.Config) error {
 		frameBytes := framePixels * animationDecodedBytesPerPixel
 		if frameBytes > maxAnimationDecodedFrameBytes-estimatedBytes {
 			return fmt.Errorf(
-				"generator: decoded animation frames exceed %d MiB memory budget at frame %d (%dx%d)",
+				"video: decoded animation frames exceed %d MiB memory budget at frame %d (%dx%d)",
 				maxAnimationDecodedFrameBytes>>20,
 				index+1,
 				config.Width,
@@ -270,11 +270,11 @@ func resolveFFmpeg(configured string) (string, error) {
 		if err == nil && !info.IsDir() {
 			return path, nil
 		}
-		return "", fmt.Errorf("generator: FFMPEG_PATH does not point to a file: %s", path)
+		return "", fmt.Errorf("video: FFMPEG_PATH does not point to a file: %s", path)
 	}
 	found, err := exec.LookPath("ffmpeg")
 	if err != nil {
-		return "", fmt.Errorf("generator: ffmpeg is required for video frame extraction; install it or set FFMPEG_PATH")
+		return "", fmt.Errorf("video: ffmpeg is required for video frame extraction; install it or set FFMPEG_PATH")
 	}
 	return found, nil
 }
