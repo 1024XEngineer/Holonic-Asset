@@ -16,19 +16,19 @@ func TestValidateExtractedAnimationFrameCountRejectsExcessFrames(t *testing.T) {
 	}
 }
 
-func TestValidateExtractedAnimationFrameConfigsAcceptsDefaultVideoBudget(t *testing.T) {
-	configs := make([]image.Config, defaultCandidateFPS*5)
+func TestValidateExtractedAnimationFrameConfigsAcceptsSelectedFrameBudget(t *testing.T) {
+	configs := make([]image.Config, 32)
 	for index := range configs {
-		configs[index] = image.Config{Width: 720, Height: 720}
+		configs[index] = image.Config{Width: 1024, Height: 1024}
 	}
 
 	if err := validateExtractedAnimationFrameConfigs(configs); err != nil {
-		t.Fatalf("expected default 5-second 720p animation to fit memory budget: %v", err)
+		t.Fatalf("expected maximum selected frame set to fit memory budget: %v", err)
 	}
 }
 
 func TestValidateExtractedAnimationFrameConfigsRejectsDecodedMemorySpike(t *testing.T) {
-	configs := make([]image.Config, defaultCandidateFPS*5)
+	configs := make([]image.Config, 33)
 	for index := range configs {
 		configs[index] = image.Config{Width: 1024, Height: 1024}
 	}

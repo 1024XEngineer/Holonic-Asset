@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -71,12 +72,69 @@ cp "$TEST_FRAME_SOURCE" "$(printf "$output" 2)"
 `)
 	t.Setenv("TEST_FRAME_SOURCE", framePath)
 
-	frames, err := (ffmpegFrameExtractor{path: script}).Extract(context.Background(), []byte("video"), 12)
+	frames, err := (ffmpegFrameExtractor{path: script}).Extract(
+		context.Background(),
+		[]byte("video"),
+		12,
+		func(analyses []animationFrameAnalysis) ([]int, error) {
+			if len(analyses) != 2 {
+				t.Fatalf("unexpected analysis frame count: %d", len(analyses))
+			}
+			return []int{0, 1}, nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("extract generated frames: %v", err)
 	}
 	if len(frames) != 2 || frames[0].Bounds().Dx() != 32 || frames[0].Bounds().Dy() != 24 {
 		t.Fatalf("unexpected extracted frames: %+v", frames)
+	}
+}
+
+func TestProcessorStreamsHighResolutionCandidates(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping FFmpeg integration test in short mode")
+	}
+	ffmpeg, err := resolveFFmpeg("")
+	if err != nil {
+		t.Skipf("FFmpeg is unavailable: %v", err)
+	}
+	directory := t.TempDir()
+	videoPath := filepath.Join(directory, "source.mkv")
+	command := exec.CommandContext( //nolint:gosec // The executable path is resolved by resolveFFmpeg.
+		context.Background(),
+		ffmpeg,
+		"-hide_banner", "-loglevel", "error",
+		"-f", "lavfi",
+		"-i", "color=c=0x00ff00:s=960x960:r=12:d=4",
+		"-vf", "drawbox=x=320:y=240:w=320:h=560:color=red:t=fill",
+		"-frames:v", "48",
+		"-c:v", "ffv1",
+		videoPath,
+	)
+	if output, commandErr := command.CombinedOutput(); commandErr != nil {
+		t.Fatalf("generate high-resolution test video: %v: %s", commandErr, strings.TrimSpace(string(output)))
+	}
+	video, err := os.ReadFile(videoPath) //nolint:gosec // Test path is created inside t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := newProcessor(ffmpegFrameExtractor{path: ffmpeg}).Process(
+		context.Background(),
+		video,
+		16,
+	)
+	if err != nil {
+		t.Fatalf("process high-resolution candidates: %v", err)
+	}
+	if len(result.Frames) != 16 {
+		t.Fatalf("unexpected selected frame count: %d", len(result.Frames))
+	}
+	for index, frame := range result.Frames {
+		if frame.Bounds().Dx() != 960 || frame.Bounds().Dy() != 960 {
+			t.Fatalf("selected frame %d dimensions = %v", index, frame.Bounds().Size())
+		}
 	}
 }
 
@@ -91,13 +149,18 @@ func TestFFmpegFrameExtractorReportsCommandAndOutputErrors(t *testing.T) {
 exit 7`, want: "provider failed"},
 		{name: "no frames", body: `exit 0`, want: "only 0 decodable frame(s)"},
 		{name: "invalid frame", body: `for output do :; done
-printf "not-a-png" > "$(printf "$output" 1)"`, want: "decode extracted animation frame metadata"},
+printf "not-a-png" > "$(printf "$output" 1)"`, want: "decode extracted animation analysis frame"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			script := writeFakeFFmpeg(t, directory, test.body)
-			_, err := (ffmpegFrameExtractor{path: script}).Extract(context.Background(), []byte("video"), 12)
+			_, err := (ffmpegFrameExtractor{path: script}).Extract(
+				context.Background(),
+				[]byte("video"),
+				12,
+				func([]animationFrameAnalysis) ([]int, error) { return []int{0}, nil },
+			)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}

@@ -10,6 +10,27 @@ import (
 	"sort"
 )
 
+func validateSelectedAnimationMotionSafeArea(frames []image.Image, sourceIndices []int) error {
+	if len(frames) != len(sourceIndices) {
+		return fmt.Errorf(
+			"video: decoded %d selected animation frames; expected %d",
+			len(frames),
+			len(sourceIndices),
+		)
+	}
+	for index, frame := range frames {
+		sourceIndex := sourceIndices[index]
+		bounds, ok := animationRawForegroundBounds(frame)
+		if !ok {
+			return &AnimationVideoQualityError{Kind: "subject", Message: fmt.Sprintf("video: video frame %d has no detectable subject on the green screen", sourceIndex)}
+		}
+		if !animationBoundsInsideSafetyBand(frame, bounds) {
+			return &AnimationVideoQualityError{Kind: "framing", Message: fmt.Sprintf("video: character, limb, or held object enters the outer 2.5%% safety band in source frame %d", sourceIndex)}
+		}
+	}
+	return nil
+}
+
 func validateAnimationMotionSafeAreaAtIndices(frames []image.Image, indices []int) error {
 	for _, sourceIndex := range indices {
 		if sourceIndex < 0 || sourceIndex >= len(frames) {

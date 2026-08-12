@@ -19,6 +19,11 @@ type animationFrameDescriptor struct {
 	foreground int
 }
 
+type animationFrameAnalysis struct {
+	descriptor animationFrameDescriptor
+	safe       bool
+}
+
 type animationLoopCandidate struct {
 	start             int
 	end               int
@@ -32,17 +37,17 @@ type animationLoopCandidate struct {
 }
 
 func selectAnimationLoopFrames(
-	frames []image.Image,
+	analyses []animationFrameAnalysis,
 	count int,
 	fps int,
 ) ([]int, AnimationLoopSelection, error) {
-	if count <= 0 || len(frames) < count+1 {
-		return nil, AnimationLoopSelection{}, fmt.Errorf("video: video has %d candidate frames; need at least %d", len(frames), count+1)
+	if count <= 0 || len(analyses) < count+1 {
+		return nil, AnimationLoopSelection{}, fmt.Errorf("video: video has %d candidate frames; need at least %d", len(analyses), count+1)
 	}
-	descriptors := make([]animationFrameDescriptor, len(frames))
+	descriptors := make([]animationFrameDescriptor, len(analyses))
 	var union [animationAnalysisSize * animationAnalysisSize]bool
-	for index := range frames {
-		descriptors[index] = describeAnimationFrame(frames[index])
+	for index := range analyses {
+		descriptors[index] = analyses[index].descriptor
 		for pixel, visible := range descriptors[index].mask {
 			union[pixel] = union[pixel] || visible
 		}
@@ -69,26 +74,26 @@ func selectAnimationLoopFrames(
 		}
 	}
 
-	minSpan := animationMaxInt(count, animationMaxInt(4, int(math.Ceil(float64(len(frames))*animationMinLoopSpanRatio))))
+	minSpan := animationMaxInt(count, animationMaxInt(4, int(math.Ceil(float64(len(analyses))*animationMinLoopSpanRatio))))
 	// Framing is part of loop selection, not a post-selection rejection. The
 	// selector also stays near the beginning of the source video so the output
 	// preserves the provider's intended order: initial pose, preparation, main
 	// action, follow-through, and recovery. Searching the whole video can find a
 	// mathematically similar later interval and make the animation start in the
 	// middle of the action.
-	unsafePrefix := make([]int, len(frames)+1)
-	for index, frame := range frames {
+	unsafePrefix := make([]int, len(analyses)+1)
+	for index, analysis := range analyses {
 		unsafePrefix[index+1] = unsafePrefix[index]
-		if !animationFrameInsideSafetyBand(frame) {
+		if !analysis.safe {
 			unsafePrefix[index+1]++
 		}
 	}
 	type pair struct{ start, end int }
-	pairs := make([]pair, 0, len(frames)*len(frames)/2)
+	pairs := make([]pair, 0, len(analyses)*len(analyses)/2)
 	endpointMSE := make([]float64, 0, cap(pairs))
-	initialWindow := animationMaxInt(1, int(math.Ceil(float64(len(frames))*animationInitialWindowRatio)))
-	for start := 0; start < len(frames) && start <= initialWindow; start++ {
-		for end := start + minSpan; end < len(frames); end++ {
+	initialWindow := animationMaxInt(1, int(math.Ceil(float64(len(analyses))*animationInitialWindowRatio)))
+	for start := 0; start < len(analyses) && start <= initialWindow; start++ {
+		for end := start + minSpan; end < len(analyses); end++ {
 			// The source video may contain a transient clipped or blurred frame at
 			// full extension. It must not be exported, but it should not invalidate
 			// an otherwise complete action interval. Require only the frames that
@@ -140,8 +145,8 @@ func selectAnimationLoopFrames(
 		pairs, endpointMSE = filteredPairs, filteredEndpointMSE
 	}
 	threshold := animationQuantile(endpointMSE, .35)
-	adjacent := make([]float64, 0, len(frames)-1)
-	for index := 0; index+1 < len(frames); index++ {
+	adjacent := make([]float64, 0, len(analyses)-1)
+	for index := 0; index+1 < len(analyses); index++ {
 		adjacent = append(adjacent, mse[index][index+1])
 	}
 	richnessScale := math.Max(animationQuantile(adjacent, .90), 1e-6)
@@ -178,7 +183,7 @@ func selectAnimationLoopFrames(
 		translationBonus := animationStableTranslationBonus(descriptors[pair.start : pair.end+1])
 		endpointSimilarity := 1 - endpointMSE[index]
 		initialSimilarity := animationClampFloat(1-mse[0][pair.start], 0, 1)
-		spanRatio := float64(pair.end-pair.start) / float64(len(frames)-1)
+		spanRatio := float64(pair.end-pair.start) / float64(len(analyses)-1)
 		poseCoverage := math.Min(animationDescriptorVariation(descriptors[pair.start:pair.end+1])/globalVariation, 1)
 		// A complete cycle is still sampled in source order. The duration score is
 		// deliberately stronger than before: once the endpoint has returned to
@@ -187,7 +192,7 @@ func selectAnimationLoopFrames(
 		// longer. This is the main protection against [start, action, idle] being
 		// uniformly reduced to a few confusing poses.
 		endpointMotion := 0.0
-		if pair.end+1 < len(frames) {
+		if pair.end+1 < len(analyses) {
 			endpointMotion = animationClampFloat(mse[pair.end][pair.end+1]/richnessScale, 0, 1)
 		}
 		recoveryStability := 1 - endpointMotion

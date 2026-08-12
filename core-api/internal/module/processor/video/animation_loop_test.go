@@ -14,8 +14,31 @@ type frameExtractorStub struct {
 	err    error
 }
 
-func (s frameExtractorStub) Extract(context.Context, []byte, int) ([]image.Image, error) {
-	return s.frames, s.err
+func (s frameExtractorStub) Extract(
+	_ context.Context,
+	_ []byte,
+	_ int,
+	selectFrames frameSelector,
+) ([]image.Image, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	analyses := make([]animationFrameAnalysis, 0, len(s.frames))
+	for _, frame := range s.frames {
+		analyses = append(analyses, animationFrameAnalysis{
+			descriptor: describeAnimationFrame(frame),
+			safe:       animationFrameInsideSafetyBand(frame),
+		})
+	}
+	indices, err := selectFrames(analyses)
+	if err != nil {
+		return nil, err
+	}
+	selected := make([]image.Image, 0, len(indices))
+	for _, index := range indices {
+		selected = append(selected, s.frames[index])
+	}
+	return selected, nil
 }
 
 func TestProcessorSelectsCompleteLongCycle(t *testing.T) {
