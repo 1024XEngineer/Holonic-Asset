@@ -34,7 +34,10 @@ func (User) TableName() string {
 
 func (d *GormUserDao) FindByUsername(ctx context.Context, username string) (*User, error) {
 	var user User
-	if err := d.db.WithContext(ctx).Where("username = ?", username).First(&user).Error; err != nil {
+	if err := d.db.WithContext(ctx).
+		Select("userid", "username", "password", "email").
+		Where("username = ?", username).
+		First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
