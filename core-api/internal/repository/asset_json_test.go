@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"gorm.io/datatypes"
@@ -25,15 +26,48 @@ type jsonAssetRecordDaoStub struct {
 	dao.AssetRecordDao
 	records map[uint]dao.AssetRecord
 	nextID  uint
+	err     error
 }
 
 func (s *jsonAssetRecordDaoStub) CreateAssetRecord(_ context.Context, record *dao.AssetRecord) (uint, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
 	if record.ID == 0 {
 		s.nextID++
 		record.ID = s.nextID
 	}
 	s.records[record.ID] = *record
 	return record.ID, nil
+}
+
+func TestAssetRepositoryDoesNotAdvanceContentWhenRecordCreationFails(t *testing.T) {
+	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	payload, err := domain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentID := uint(11)
+	daoStub := &jsonAssetDaoStub{asset: dao.Asset{
+		ID: 7, Type: string(domain.AssetTypeCharacter), Version: 2,
+		ContentID: &contentID, Content: datatypes.JSON(payload),
+	}}
+	wantErr := errors.New("record write failed")
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao: daoStub,
+		ContentDao: &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{
+			contentID: {ID: contentID, AssetID: 7, Content: datatypes.JSON(payload)},
+		}},
+		RecordDao: &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, err: wantErr},
+	}
+
+	_, err = repo.CreateAnimation(context.Background(), 7, "idle", nil)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected record creation error, got %v", err)
+	}
+	if daoStub.updatedAsset != 0 || daoStub.updatedVersion != 0 || daoStub.updatedContent != 0 {
+		t.Fatalf("asset advanced after record failure: %+v", daoStub)
+	}
 }
 
 type jsonAssetContentDaoStub struct {
