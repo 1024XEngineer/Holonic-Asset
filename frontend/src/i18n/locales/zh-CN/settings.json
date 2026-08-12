@@ -1,0 +1,28 @@
+{
+  "profile": {
+    "title": "个人资料",
+    "description": "在 Holonic Asset 工作区中展示的账户信息。",
+    "changePhoto": "更换头像",
+    "displayName": "显示名称",
+    "email": "邮箱",
+    "invalidEmail": "请输入有效的邮箱地址。",
+    "saved": "个人资料已保存。",
+    "save": "保存资料"
+  },
+  "preferences": {
+    "title": "偏好设置",
+    "description": "选择工作区的外观和打开方式。",
+    "appearance": "外观",
+    "appearanceDescription": "使用浅色或深色外观。",
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "language": { "description": "选择工作区使用的语言。" },
+  "plan": {
+    "title": "方案与积分",
+    "description": "快速查看此账户可用的生成资源。",
+    "current": "当前方案",
+    "available": "可用积分",
+    "manage": "管理方案"
+  }
+}

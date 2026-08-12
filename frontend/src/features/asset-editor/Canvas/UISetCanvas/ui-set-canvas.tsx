@@ -1,4 +1,5 @@
 import { PanelsTopLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ export type UISetCanvasProps = {
 };
 
 export function UISetCanvas({ model, onEvent }: UISetCanvasProps) {
+  const { t } = useTranslation("editor");
   const selectedComponents = new Set(model.selectedComponentIds);
   const selectionLabel = model.components
     .filter((component) => selectedComponents.has(component.id))
@@ -29,7 +31,7 @@ export function UISetCanvas({ model, onEvent }: UISetCanvasProps) {
   return (
     <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#eeece7] p-4 sm:p-6 lg:p-8">
       <section
-        aria-label="UI Set canvas"
+        aria-label={t("uiSetCanvas")}
         className="flex h-full min-h-[24rem] items-center justify-center lg:min-h-[36rem]"
       >
         <div className="relative aspect-video w-full max-w-[72rem] overflow-hidden border border-[#51493f]/25 bg-[#1f343a] shadow-[0_18px_50px_rgb(45_41_35/0.16)]">
@@ -69,8 +71,8 @@ export function UISetCanvas({ model, onEvent }: UISetCanvasProps) {
       </section>
       <p className="sr-only" aria-live="polite">
         {selectionLabel
-          ? `${selectionLabel} selected`
-          : "No UI Set components selected"}
+          ? t("componentsSelected", { value: selectionLabel })
+          : t("noComponentsSelected")}
       </p>
     </main>
   );
@@ -124,10 +126,11 @@ function clampPercent(value: number) {
 }
 
 function EmptyUISetCanvas() {
+  const { t } = useTranslation("editor");
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#a8c5c6]">
       <PanelsTopLeft className="size-5" aria-hidden="true" />
-      <p className="text-xs font-medium">No UI Set components</p>
+      <p className="text-xs font-medium">{t("noUISetComponents")}</p>
     </div>
   );
 }

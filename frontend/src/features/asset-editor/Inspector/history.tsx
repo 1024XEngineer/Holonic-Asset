@@ -1,14 +1,16 @@
 import { History } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import type { AssetRevision } from "@/model";
 
 export function InspectorHistory({ entries }: { entries: AssetRevision[] }) {
+  const { t } = useTranslation("editor");
   if (entries.length === 0) {
     return (
       <div className="py-8 text-center text-xs text-muted-foreground">
         <History className="mx-auto mb-2 size-6" />
-        No saved records
+        {t("noSavedRecords")}
       </div>
     );
   }
@@ -26,7 +28,7 @@ export function InspectorHistory({ entries }: { entries: AssetRevision[] }) {
               {entry.version}
             </span>
             {entry.isCurrent ? (
-              <Badge variant="secondary">Current</Badge>
+              <Badge variant="secondary">{t("current")}</Badge>
             ) : null}
           </div>
           <p className="mt-2 text-xs font-medium leading-5">
