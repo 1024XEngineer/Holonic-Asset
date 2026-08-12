@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      frontend:
+        flags:
+          - frontend
+        target: auto
+        threshold: 0%
+        informational: true
+      backend:
+        flags:
+          - backend
+        target: auto
+        threshold: 0%
+        informational: false

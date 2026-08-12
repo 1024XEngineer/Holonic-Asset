@@ -18,6 +18,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/middleware"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
@@ -142,9 +143,16 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 
 	// Business modules.
 	workspaceModule := workspace.New(projectStore, assetStore, imageService, references)
+	videoProvider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL: cfg.Video.BaseURL,
+		APIKey:  cfg.Video.APIKey,
+	})
+	videos := videoclient.NewVideoGenerationService(videoProvider)
 	imageProcessor := InitImageProcessor()
-	generatorExecutor := generator.NewExecutor(
+	animations := generator.NewAnimationGenerationService(videos, imageProcessor, references)
+	generatorExecutor := generator.NewExecutorWithAnimation(
 		imageService,
+		animations,
 		imageProcessor,
 		workspaceModule.Assets,
 		references,

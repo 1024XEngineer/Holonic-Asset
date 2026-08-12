@@ -8,7 +8,7 @@ db:
 queue:
   databaseURL: postgres://postgres:postgres@localhost:5432/holonic_asset?sslmode=disable
   maxWorkers: 10
-  jobTimeout: 5m
+  jobTimeout: 30m
 
 auth:
   jwtSecret: "replace-with-a-long-random-secret"

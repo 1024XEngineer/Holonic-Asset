@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/riverqueue/river/rivertype"
@@ -75,7 +77,7 @@ func TestManagerExecutionDoesNotInvokeHandlerWhenProcessingTransitionFails(t *te
 	}
 }
 
-func TestQueueErrorHandlerMarksTaskFailedAfterFinalAttempt(t *testing.T) {
+func TestQueueErrorHandlerMarksTaskFailedImmediately(t *testing.T) {
 	store := &taskStoreStub{}
 	handler := &queueErrorHandler{repo: store}
 	job := &rivertype.JobRow{
@@ -85,14 +87,37 @@ func TestQueueErrorHandlerMarksTaskFailedAfterFinalAttempt(t *testing.T) {
 		EncodedArgs: []byte(`{"task":{"id":7}}`),
 	}
 
-	handler.markFailed(context.Background(), job)
-	if len(store.statusUpdates) != 0 {
-		t.Fatalf("task must remain processing while River retries: %v", store.statusUpdates)
+	result := handler.HandleError(context.Background(), job, errors.New("handler failure"))
+	if result == nil || !result.SetCancelled {
+		t.Fatalf("handler failure must stop River retries, got %+v", result)
 	}
-
-	job.Attempt = job.MaxAttempts
-	handler.markFailed(context.Background(), job)
 	if len(store.statusUpdates) != 1 || store.statusUpdates[0] != StatusFailed {
-		t.Fatalf("unexpected final failure status updates: %v", store.statusUpdates)
+		t.Fatalf("unexpected failure status updates: %v", store.statusUpdates)
+	}
+	if store.failure != "handler failure" {
+		t.Fatalf("persisted failure = %q, want handler failure", store.failure)
+	}
+}
+
+func TestQueueErrorHandlerMarksTimedOutTaskFailedImmediately(t *testing.T) {
+	store := &taskStoreStub{}
+	handler := &queueErrorHandler{repo: store}
+	job := &rivertype.JobRow{
+		Kind:        queueTaskKind,
+		Attempt:     1,
+		MaxAttempts: 3,
+		EncodedArgs: []byte(`{"task":{"id":19}}`),
+	}
+	timeoutErr := fmt.Errorf("generate animation: %w", context.DeadlineExceeded)
+
+	result := handler.HandleError(context.Background(), job, timeoutErr)
+	if result == nil || !result.SetCancelled {
+		t.Fatalf("timeout must stop River retries, got %+v", result)
+	}
+	if len(store.statusUpdates) != 1 || store.statusUpdates[0] != StatusFailed {
+		t.Fatalf("unexpected timeout status updates: %v", store.statusUpdates)
+	}
+	if !strings.Contains(store.failure, context.DeadlineExceeded.Error()) {
+		t.Fatalf("persisted failure = %q", store.failure)
 	}
 }

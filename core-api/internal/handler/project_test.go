@@ -132,7 +132,7 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 
 	request := dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
-		GameType:       domain.GameTypeRPG,
+		GameType:       "RPG",
 		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 		Description:    "A small village adventure",
@@ -169,7 +169,7 @@ func TestGenerateReferencePropagatesServiceError(t *testing.T) {
 
 	response, err := projectHandler.GenerateReference(context.Background(), dto.GenerateProjectReferenceRequest{
 		Name:           "Prototype",
-		GameType:       domain.GameType(""),
+		GameType:       "",
 		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 	})
