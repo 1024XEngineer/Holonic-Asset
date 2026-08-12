@@ -87,7 +87,7 @@ export function ProjectSidebar({
           {isOpen ? (
             <div className="hidden min-w-0 md:block">
               <p className="text-xs font-semibold uppercase text-muted-foreground">
-                Projects
+                {t("project.sidebar.projects")}
               </p>
               <h2 className="truncate text-lg font-semibold">
                 {t("project.assetLibrary")}
@@ -96,7 +96,9 @@ export function ProjectSidebar({
           ) : null}
           <Button
             aria-label={
-              isOpen ? "Collapse project list" : "Expand project list"
+              isOpen
+                ? t("project.sidebar.collapseList")
+                : t("project.sidebar.expandList")
             }
             variant="outline"
             size="icon-sm"
@@ -142,7 +144,9 @@ export function ProjectSidebar({
                     variant="ghost"
                     size="icon-sm"
                     className="pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-foreground/10 hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-foreground"
-                    aria-label={`Edit ${project.name}`}
+                    aria-label={t("project.sidebar.edit", {
+                      name: project.name,
+                    })}
                     onClick={() => setEditingProjectId(project.id)}
                   >
                     <Pencil />
@@ -154,7 +158,9 @@ export function ProjectSidebar({
                           variant="ghost"
                           size="icon-sm"
                           className="pointer-events-none opacity-0 text-muted-foreground transition-all group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-destructive"
-                          aria-label={`Delete ${project.name}`}
+                          aria-label={t("project.sidebar.delete", {
+                            name: project.name,
+                          })}
                         />
                       }
                     >
@@ -163,11 +169,12 @@ export function ProjectSidebar({
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          Delete {project.name}?
+                          {t("project.sidebar.deleteConfirm", {
+                            name: project.name,
+                          })}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          This removes the project and its asset workspace from
-                          this browser. This action cannot be undone.
+                          {t("project.sidebar.deleteDescription")}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -178,7 +185,7 @@ export function ProjectSidebar({
                           variant="destructive"
                           onClick={() => void remove(project.id)}
                         >
-                          Delete project
+                          {t("project.sidebar.deleteAction")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
