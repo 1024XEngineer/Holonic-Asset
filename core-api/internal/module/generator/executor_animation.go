@@ -1,4 +1,4 @@
-package executor
+package generator
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -137,13 +136,13 @@ func (s *animationGenerationService) Generate(
 	request *AnimationGenerationRequest,
 ) (*AnimationGenerationResult, error) {
 	if s.videos == nil {
-		return nil, generator.ErrVideoServiceRequired
+		return nil, ErrVideoServiceRequired
 	}
 	if s.processor == nil {
-		return nil, generator.ErrImageProcessorRequired
+		return nil, ErrImageProcessorRequired
 	}
 	if s.videoProcessor == nil {
-		return nil, generator.ErrVideoFrameExtractorRequired
+		return nil, ErrVideoFrameExtractorRequired
 	}
 	options, err := normalizeAnimationGenerationRequest(request)
 	if err != nil {
@@ -504,24 +503,24 @@ var _ AnimationGenerationService = (*animationGenerationService)(nil)
 
 var animationDirectionLayouts = map[uint][]string{
 	2: {
-		generator.AnimationDirectionLeft,
-		generator.AnimationDirectionRight,
+		AnimationDirectionLeft,
+		AnimationDirectionRight,
 	},
 	4: {
-		generator.AnimationDirectionFront,
-		generator.AnimationDirectionRight,
-		generator.AnimationDirectionBack,
-		generator.AnimationDirectionLeft,
+		AnimationDirectionFront,
+		AnimationDirectionRight,
+		AnimationDirectionBack,
+		AnimationDirectionLeft,
 	},
 	8: {
-		generator.AnimationDirectionFront,
-		generator.AnimationDirectionFrontRight,
-		generator.AnimationDirectionRight,
-		generator.AnimationDirectionBackRight,
-		generator.AnimationDirectionBack,
-		generator.AnimationDirectionBackLeft,
-		generator.AnimationDirectionLeft,
-		generator.AnimationDirectionFrontLeft,
+		AnimationDirectionFront,
+		AnimationDirectionFrontRight,
+		AnimationDirectionRight,
+		AnimationDirectionBackRight,
+		AnimationDirectionBack,
+		AnimationDirectionBackLeft,
+		AnimationDirectionLeft,
+		AnimationDirectionFrontLeft,
 	},
 }
 
@@ -552,7 +551,7 @@ func animationDirectionIndex(direction string, directionCount uint) (int, error)
 
 func (e *executor) generateAnimation(
 	ctx context.Context,
-	payload generator.CreateAnimationPayload,
+	payload CreateAnimationPayload,
 ) (json.RawMessage, error) {
 	if payload.AssetID == 0 {
 		return nil, fmt.Errorf("generator: animation asset is required")
@@ -616,7 +615,7 @@ func (e *executor) generateAnimation(
 	if animationID == 0 {
 		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", payload.AssetID)
 	}
-	return encodeExecutionResult(generator.ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
+	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
 }
 
 func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
@@ -663,7 +662,7 @@ func (e *executor) persistAnimationFrames(
 	result *AnimationGenerationResult,
 ) ([]assetdomain.Frame, error) {
 	if e.references == nil {
-		return nil, generator.ErrAnimationReferenceStoreRequired
+		return nil, ErrAnimationReferenceStoreRequired
 	}
 	frames := make([]assetdomain.Frame, len(result.Frames))
 	for index, frame := range result.Frames {

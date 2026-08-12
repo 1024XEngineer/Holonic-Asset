@@ -1,4 +1,4 @@
-package executor
+package generator
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 )
@@ -29,15 +28,15 @@ func TestAnimationGenerationRequiresDependencies(t *testing.T) {
 		service *animationGenerationService
 		want    error
 	}{
-		{name: "video service", service: &animationGenerationService{}, want: generator.ErrVideoServiceRequired},
-		{name: "image processor", service: &animationGenerationService{videos: &animationVideoServiceStub{}}, want: generator.ErrImageProcessorRequired},
+		{name: "video service", service: &animationGenerationService{}, want: ErrVideoServiceRequired},
+		{name: "image processor", service: &animationGenerationService{videos: &animationVideoServiceStub{}}, want: ErrImageProcessorRequired},
 		{
 			name: "video processor",
 			service: &animationGenerationService{
 				videos:    &animationVideoServiceStub{},
 				processor: &animationProcessorStub{},
 			},
-			want: generator.ErrVideoFrameExtractorRequired,
+			want: ErrVideoFrameExtractorRequired,
 		},
 	}
 

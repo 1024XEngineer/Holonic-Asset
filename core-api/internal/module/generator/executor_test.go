@@ -1,4 +1,4 @@
-package executor_test
+package generator_test
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
-	generatorexecutor "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/executor"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
@@ -22,15 +21,15 @@ type imageGenerationServiceStub struct {
 
 type animationGenerationServiceStub struct {
 	events  *[]string
-	request *generatorexecutor.AnimationGenerationRequest
-	result  *generatorexecutor.AnimationGenerationResult
+	request *generator.AnimationGenerationRequest
+	result  *generator.AnimationGenerationResult
 	err     error
 }
 
 func (s *animationGenerationServiceStub) Generate(
 	_ context.Context,
-	request *generatorexecutor.AnimationGenerationRequest,
-) (*generatorexecutor.AnimationGenerationResult, error) {
+	request *generator.AnimationGenerationRequest,
+) (*generator.AnimationGenerationResult, error) {
 	*s.events = append(*s.events, "generate_animation")
 	copy := *request
 	s.request = &copy
@@ -48,7 +47,7 @@ type referenceUpload struct {
 	reference string
 }
 
-type referenceStoreStub struct {
+type executorReferenceStoreStub struct {
 	resolved     []string
 	persisted    []string
 	persistValue string
@@ -58,7 +57,7 @@ type referenceStoreStub struct {
 	persistErr   error
 }
 
-func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+func (s *executorReferenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	s.resolved = append(s.resolved, reference)
 	if s.resolveErr != nil {
 		return "", s.resolveErr
@@ -66,7 +65,7 @@ func (s *referenceStoreStub) ResolveReference(_ context.Context, reference strin
 	return "signed:" + reference, nil
 }
 
-func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+func (s *executorReferenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
 	s.persisted = append(s.persisted, reference)
 	if s.persistErr != nil {
 		return "", s.persistErr
@@ -77,14 +76,14 @@ func (s *referenceStoreStub) PersistReference(_ context.Context, reference strin
 	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
 }
 
-func (s *referenceStoreStub) NewObjectKey(_ string) (string, error) {
+func (s *executorReferenceStoreStub) NewObjectKey(_ string) (string, error) {
 	if s.events != nil {
 		*s.events = append(*s.events, "allocate_key")
 	}
 	return "uploads/prototype.png", nil
 }
 
-func (s *referenceStoreStub) PersistReferenceAt(_ context.Context, key, reference string) error {
+func (s *executorReferenceStoreStub) PersistReferenceAt(_ context.Context, key, reference string) error {
 	if s.events != nil {
 		*s.events = append(*s.events, "persist:"+key)
 	}
@@ -344,6 +343,6 @@ func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.Exe
 }
 
 var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)
-var _ generatorexecutor.AnimationGenerationService = (*animationGenerationServiceStub)(nil)
+var _ generator.AnimationGenerationService = (*animationGenerationServiceStub)(nil)
 var _ imageprocessor.Processor = (*imageProcessorStub)(nil)
-var _ generatorexecutor.AssetWriter = (*generationAssetWriterStub)(nil)
+var _ generator.AssetWriter = (*generationAssetWriterStub)(nil)

@@ -1,4 +1,4 @@
-package executor_test
+package generator_test
 
 import (
 	"context"
@@ -8,24 +8,23 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
-	generatorexecutor "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/executor"
 )
 
 func TestExecutorRequiresDependencies(t *testing.T) {
-	executor := generatorexecutor.NewExecutor(nil, nil, nil)
+	executor := generator.NewExecutor(nil, nil, nil)
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrImageServiceRequired) {
 		t.Fatalf("expected image service required error, got %v", err)
 	}
 
 	events := []string{}
-	executor = generatorexecutor.NewExecutor(&imageGenerationServiceStub{events: &events}, nil, nil)
+	executor = generator.NewExecutor(&imageGenerationServiceStub{events: &events}, nil, nil)
 	_, err = executor.Generate(context.Background(), generator.GenerateObjectProtoType, nil)
 	if !errors.Is(err, generator.ErrAssetWriterRequired) {
 		t.Fatalf("expected asset writer required error, got %v", err)
 	}
 
-	executor = generatorexecutor.NewExecutor(
+	executor = generator.NewExecutor(
 		&imageGenerationServiceStub{events: &events},
 		nil,
 		&generationAssetWriterStub{events: &events},
@@ -35,13 +34,13 @@ func TestExecutorRequiresDependencies(t *testing.T) {
 		t.Fatalf("expected image processor required error, got %v", err)
 	}
 
-	executor = generatorexecutor.NewExecutor(nil, nil, &generationAssetWriterStub{events: &events})
+	executor = generator.NewExecutor(nil, nil, &generationAssetWriterStub{events: &events})
 	_, err = executor.Generate(context.Background(), generator.GenerateAnimation, nil)
 	if !errors.Is(err, generator.ErrAnimationServiceRequired) {
 		t.Fatalf("expected animation service required error, got %v", err)
 	}
 
-	executor = generatorexecutor.NewExecutorWithAnimation(
+	executor = generator.NewExecutorWithAnimation(
 		nil,
 		&animationGenerationServiceStub{events: &events},
 		nil,
@@ -55,12 +54,12 @@ func TestExecutorRequiresDependencies(t *testing.T) {
 
 func TestExecutorRejectsMalformedAndUnsupportedTasks(t *testing.T) {
 	events := []string{}
-	executor := generatorexecutor.NewExecutorWithAnimation(
+	executor := generator.NewExecutorWithAnimation(
 		&imageGenerationServiceStub{events: &events},
 		&animationGenerationServiceStub{events: &events},
 		&imageProcessorStub{events: &events},
 		&generationAssetWriterStub{events: &events},
-		&referenceStoreStub{},
+		&executorReferenceStoreStub{},
 	)
 	for _, taskType := range []generator.TaskType{
 		generator.GenerateCharacterProtoType,

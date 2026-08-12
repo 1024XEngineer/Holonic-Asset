@@ -1,4 +1,4 @@
-package executor
+package generator
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -15,7 +14,7 @@ import (
 
 func (e *executor) generateCharacterPrototype(
 	ctx context.Context,
-	payload generator.CreateCharacterPrototypePayload,
+	payload CreateCharacterPrototypePayload,
 ) (json.RawMessage, error) {
 	perspective, err := parsePerspective(payload.Perspective)
 	if err != nil {
@@ -24,7 +23,7 @@ func (e *executor) generateCharacterPrototype(
 	directionCount := perspective.CharacterDirectionCount()
 	resources, err := e.generatePrototypeResources(
 		ctx,
-		generator.GenerateCharacterProtoType,
+		GenerateCharacterProtoType,
 		prompts.CharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
@@ -57,12 +56,12 @@ func (e *executor) generateCharacterPrototype(
 	if created == nil || created.ID == 0 {
 		return nil, fmt.Errorf("generator: create character asset: empty result")
 	}
-	return encodeExecutionResult(generator.ExecutionResult{AssetID: created.ID})
+	return encodeExecutionResult(ExecutionResult{AssetID: created.ID})
 }
 
 func (e *executor) editCharacterPrototype(
 	ctx context.Context,
-	payload generator.EditCharacterPrototypePayload,
+	payload EditCharacterPrototypePayload,
 ) (json.RawMessage, error) {
 	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
 	if err != nil {
@@ -95,7 +94,7 @@ func (e *executor) editCharacterPrototype(
 	directionCount := asset.Perspective.CharacterDirectionCount()
 	resources, err := e.generatePrototypeResources(
 		ctx,
-		generator.EditCharacterProtoType,
+		EditCharacterProtoType,
 		prompts.EditCharacterPrototype(
 			asset.Description,
 			payload.EditInstructions,
@@ -127,12 +126,12 @@ func (e *executor) editCharacterPrototype(
 	if record == nil || record.Version == 0 {
 		return nil, fmt.Errorf("generator: create character asset %d version: empty result", asset.ID)
 	}
-	return encodeExecutionResult(generator.ExecutionResult{AssetID: asset.ID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
 }
 
 func (e *executor) generateObjectPrototype(
 	ctx context.Context,
-	payload generator.CreateObjectPrototypePayload,
+	payload CreateObjectPrototypePayload,
 ) (json.RawMessage, error) {
 	perspective, err := parsePerspective(payload.Perspective)
 	if err != nil {
@@ -141,7 +140,7 @@ func (e *executor) generateObjectPrototype(
 	directionCount := perspective.CharacterDirectionCount()
 	resources, err := e.generatePrototypeResources(
 		ctx,
-		generator.GenerateObjectProtoType,
+		GenerateObjectProtoType,
 		prompts.ObjectPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
@@ -174,12 +173,12 @@ func (e *executor) generateObjectPrototype(
 	if assetID == 0 {
 		return nil, fmt.Errorf("generator: create object asset: empty result")
 	}
-	return encodeExecutionResult(generator.ExecutionResult{AssetID: assetID})
+	return encodeExecutionResult(ExecutionResult{AssetID: assetID})
 }
 
 func (e *executor) generatePrototypeResources(
 	ctx context.Context,
-	taskType generator.TaskType,
+	taskType TaskType,
 	prompt string,
 	dimensions assetdomain.Size,
 	directionCount uint,
@@ -207,7 +206,7 @@ func (e *executor) generatePrototypeResources(
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
 	}
 	if result == nil || len(result.Images) == 0 {
-		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, generator.ErrImageResultRequired)
+		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
 	}
 	if len(result.Images) != 1 {
 		return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
@@ -307,7 +306,7 @@ func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 
 func (e *executor) resolveReferences(
 	ctx context.Context,
-	taskType generator.TaskType,
+	taskType TaskType,
 	references []string,
 ) ([]string, error) {
 	resolved := append([]string(nil), references...)
