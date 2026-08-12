@@ -46,7 +46,11 @@
   "queue": "生成队列",
   "task_one": "个任务",
   "task_other": "个任务",
-  "failed": "失败",
+  "status": {
+    "pending": "待处理",
+    "processing": "处理中",
+    "failed": "失败"
+  },
   "pageTitle": "创建{{kind}}",
   "pageDescription": "设置新资产的制作详情和生成上下文。",
   "placeholderTitle": "图像生成",

@@ -52,7 +52,7 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
                 ) : (
                   <LoaderCircle className="animate-spin" />
                 )}
-                {run.status === "failed" ? t("failed") : run.status}
+                {t(`status.${run.status}`)}
               </Badge>
             </div>
           );

@@ -46,7 +46,11 @@
   "queue": "Generation queue",
   "task_one": "task",
   "task_other": "tasks",
-  "failed": "failed",
+  "status": {
+    "pending": "Pending",
+    "processing": "Processing",
+    "failed": "Failed"
+  },
   "pageTitle": "Create {{kind}}",
   "pageDescription": "Set the production details and generation context for this new asset.",
   "placeholderTitle": "Image generation",
