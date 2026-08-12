@@ -10,11 +10,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.repository == '1024XEngineer/Holonic-Asset'
+    
     env:
       SSH_HOST: ${{ secrets.DEV_BACKEND_SSH_HOST }}
       SSH_PORT: ${{ secrets.DEV_BACKEND_SSH_PORT || '22' }}
       SSH_USER: ${{ secrets.DEV_BACKEND_SSH_USER }}
-      SSH_PASSWORD: ${{ secrets.DEV_BACKEND_SSH_PASSWORD }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEV_BACKEND_SSH_PRIVATE_KEY }}
       DEPLOY_DIR: "/usr/local/bin/holonic-asset"
       SYSTEMD_SERVICE: "holonic-asset.service"
 
@@ -32,19 +33,21 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o dist/app .
 
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
+      - name: Configure SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
       - name: Upload binary and restart service
         run: |
-          sshpass -p "$SSH_PASSWORD" scp \
+          scp \
             -P "$SSH_PORT" \
             -o StrictHostKeyChecking=no \
             core-api/dist/app \
             "${SSH_USER}@${SSH_HOST}:${DEPLOY_DIR}/app.incoming"
 
-
-          sshpass -p "$SSH_PASSWORD" ssh \
+          ssh \
             -p "$SSH_PORT" \
             -o StrictHostKeyChecking=no \
             "${SSH_USER}@${SSH_HOST}" \
