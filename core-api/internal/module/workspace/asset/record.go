@@ -13,7 +13,6 @@ type AssetRecord struct {
 	AssetID         uint
 	Version         uint
 	ExpectedVersion uint
-	ExpectedContent json.RawMessage
 	ContentID       uint
 	CreatedAt       time.Time
 	Name            string

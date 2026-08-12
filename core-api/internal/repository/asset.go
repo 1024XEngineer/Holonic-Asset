@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -573,14 +572,11 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		)
 	}
 	var currentContent []byte
-	if len(record.ExpectedContent) != 0 || len(record.Content) == 0 {
+	if len(record.Content) == 0 {
 		currentContent, err = r.resolveAssetContent(ctx, asset)
 		if err != nil {
 			return nil, err
 		}
-	}
-	if len(record.ExpectedContent) != 0 && !bytes.Equal(currentContent, record.ExpectedContent) {
-		return nil, fmt.Errorf("%w: asset %d content changed", domain.ErrVersionConflict, asset.ID)
 	}
 	content := append([]byte(nil), record.Content...)
 	if len(content) == 0 {

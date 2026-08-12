@@ -457,7 +457,6 @@ func (e *executor) editObjectPrototype(
 	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
 		AssetID:         asset.ID,
 		ExpectedVersion: asset.Version,
-		ExpectedContent: append(json.RawMessage(nil), asset.Content...),
 		Content:         encoded,
 	})
 	if err != nil {
