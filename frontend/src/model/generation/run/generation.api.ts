@@ -1,5 +1,6 @@
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 
+import { assetCanvasSizeDimensionsSchema } from "../../asset/library/asset-canvas-size";
 import { coreGenerationApi } from "./core-generation.api";
 import type {
   CreateGenerationRequest,
@@ -79,7 +80,7 @@ export async function toCreateGenerationRequest(
     creative_brief: request.prompt,
     parameters: {
       asset_name: request.name,
-      dimensions: parseCanvasSize(request.canvasSize),
+      dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
       perspective: request.perspective,
       reference: await resolveReference(request.reference),
     },
@@ -119,21 +120,6 @@ function isVisibleGenerationStatus(
   status: GenerationRunListItemResponse["status"],
 ): status is GenerationRun["status"] {
   return status === "pending" || status === "processing" || status === "failed";
-}
-
-function parseCanvasSize(value: string) {
-  const match = value.match(/^\s*(\d+)\s*(?:×|x)\s*(\d+)\s*(?:px)?\s*$/i);
-  const width = Number(match?.[1]);
-  const height = Number(match?.[2]);
-  if (
-    !Number.isSafeInteger(width) ||
-    width <= 0 ||
-    !Number.isSafeInteger(height) ||
-    height <= 0
-  ) {
-    throw new Error("Canvas size must use a positive width × height value.");
-  }
-  return { width, height };
 }
 
 async function resolveReference(reference: unknown) {

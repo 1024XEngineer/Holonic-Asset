@@ -1,6 +1,9 @@
 import { coreAssetApi } from "./core-asset.api";
 import type { AssetListItemResponse } from "./asset.contract";
-import { resolveAssetCanvasSize } from "./asset-canvas-size";
+import {
+  assetCanvasSizeDimensionsSchema,
+  resolveAssetCanvasSize,
+} from "./asset-canvas-size";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
@@ -36,7 +39,7 @@ export const assetApi = {
       description: metadata.description,
       tags: metadata.tags,
       perspective: metadata.perspective,
-      dimensions: parseAssetDimensions(metadata.canvasSize),
+      dimensions: assetCanvasSizeDimensionsSchema.parse(metadata.canvasSize),
     });
     return assetApi.listGroups(projectId);
   },
@@ -86,13 +89,4 @@ function coreAssetId(assetId: string) {
     throw new Error("Asset operations require a persisted Core API asset.");
   }
   return value;
-}
-
-function parseAssetDimensions(canvasSize: string) {
-  const match = canvasSize.match(/^\s*(\d+)\s*(?:×|x)\s*(\d+)\s*(?:px)?\s*$/i);
-  if (!match) {
-    throw new Error("Canvas size must use the format WIDTH × HEIGHT px.");
-  }
-
-  return { width: Number(match[1]), height: Number(match[2]) };
 }

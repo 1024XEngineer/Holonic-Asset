@@ -1,4 +1,5 @@
 import type { CreatableAssetKind } from "@/model/asset";
+import { assetCanvasSizeSchema } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import { getDefaultAssetCanvasSize } from "@/model";
 import { perspectiveOptions, perspectiveSchema } from "@/model/project";
@@ -9,7 +10,7 @@ import type { AssetCreationDraft } from "../types";
 const commonAssetCreationDraftShape = {
   name: z.string().trim().min(1, "Asset name is required."),
   prompt: z.string().trim().min(1, "Creative brief is required."),
-  canvasSize: z.string().trim().min(1, "Canvas size is required."),
+  canvasSize: assetCanvasSizeSchema,
 };
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
