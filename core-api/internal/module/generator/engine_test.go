@@ -363,6 +363,12 @@ func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 			Status:  taskdomain.StatusPending,
 			Payload: json.RawMessage(`{"project_id":99}`),
 		},
+		{
+			ID:      15,
+			Type:    string(generator.GenerateCharacterProtoType),
+			Status:  taskdomain.StatusFailed,
+			Payload: json.RawMessage(`{"project_id":42}`),
+		},
 	}}
 	engine := generator.NewEngine(tasks, nil)
 
@@ -388,7 +394,8 @@ func TestListBuildsProjectScopeTaskFilter(t *testing.T) {
 	if !reflect.DeepEqual(tasks.listFilter.Types, wantTypes) {
 		t.Fatalf("unexpected project task types: %v", tasks.listFilter.Types)
 	}
-	if len(page.Runs) != 1 || page.Runs[0].ID != 17 || page.Runs[0].ProjectID != 42 {
+	if len(page.Runs) != 2 || page.Runs[0].ID != 17 || page.Runs[0].ProjectID != 42 ||
+		page.Runs[1].ID != 15 || page.Runs[1].Status != taskdomain.StatusFailed {
 		t.Fatalf("unexpected project runs: %+v", page)
 	}
 }
