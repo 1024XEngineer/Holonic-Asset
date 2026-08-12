@@ -636,6 +636,25 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	}
 }
 
+func TestRegisteredEditObjectPrototypeHandlerRejectsMismatchedPayload(t *testing.T) {
+	tasks := &taskManagerStub{}
+	executor := &executorStub{}
+	generator.NewEngine(tasks, executor)
+
+	_, err := tasks.dispatch(context.Background(), &taskdomain.Task{
+		ID:      19,
+		Type:    string(generator.EditObjectProtoType),
+		Payload: json.RawMessage(`{"asset_id":"not-a-number"}`),
+	})
+	if err == nil {
+		t.Fatal("expected payload decode error")
+	}
+	if executor.calls != 0 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("malformed object edit task must not be processed: payload=%s statuses=%+v",
+			executor.payload, tasks.statusUpdates)
+	}
+}
+
 func TestRegisteredGeneratorTaskHandlerRejectsMismatchedPayload(t *testing.T) {
 	tasks := &taskManagerStub{}
 	executor := &executorStub{}

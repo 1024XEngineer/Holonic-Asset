@@ -36,7 +36,7 @@ type AssetWriter interface {
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
-	CreateRecord(context.Context, *assetdomain.AssetRecord) (*assetdomain.AssetRecord, error)
+	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
 type executor struct {

@@ -119,7 +119,7 @@ func (e *executor) editCharacterPrototype(
 	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
 		AssetID: asset.ID,
 		Content: encoded,
-	})
+	}, asset.Version)
 	if err != nil {
 		return nil, fmt.Errorf("generator: create character asset %d version: %w", asset.ID, err)
 	}
@@ -455,10 +455,9 @@ func (e *executor) editObjectPrototype(
 		return nil, fmt.Errorf("generator: encode edited object asset %d content: %w", asset.ID, err)
 	}
 	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID:         asset.ID,
-		ExpectedVersion: asset.Version,
-		Content:         encoded,
-	})
+		AssetID: asset.ID,
+		Content: encoded,
+	}, asset.Version)
 	if err != nil {
 		return nil, fmt.Errorf("generator: create object asset %d version: %w", asset.ID, err)
 	}

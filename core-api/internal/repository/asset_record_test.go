@@ -191,7 +191,7 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	}
 	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
 
-	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7})
+	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
 	if err != nil {
 		t.Fatalf("create record: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.
 		RecordDao:  &recordDaoStub{records: map[uint]dao.AssetRecord{}},
 	}
 
-	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7})
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected content lookup error %v, got %v", wantErr, err)
 	}
@@ -250,10 +250,9 @@ func TestAssetRepositoryRejectsReplacementContentFromStaleVersion(t *testing.T) 
 	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
 
 	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
-		AssetID:         7,
-		ExpectedVersion: 2,
-		Content:         json.RawMessage(`{"version":2,"prototype":[{"id":1,"url":"stale.png"}]}`),
-	})
+		AssetID: 7,
+		Content: json.RawMessage(`{"version":2,"prototype":[{"id":1,"url":"stale.png"}]}`),
+	}, 2)
 	if !errors.Is(err, domain.ErrVersionConflict) {
 		t.Fatalf("expected version conflict, got %v", err)
 	}
@@ -295,10 +294,9 @@ func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	replacement := json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"new.png"}]}`)
 
 	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
-		AssetID:         7,
-		ExpectedVersion: 2,
-		Content:         replacement,
-	})
+		AssetID: 7,
+		Content: replacement,
+	}, 2)
 	if err != nil {
 		t.Fatalf("create replacement record: %v", err)
 	}
