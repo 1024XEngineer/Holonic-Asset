@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { assetKeys } from "../../asset/library/keys";
 import { projectKeys } from "../../project/keys";
-import { generationApi } from "./generation.api";
+import { generationApi, pruneGenerationRequests } from "./generation.api";
 import { generationKeys } from "./keys";
 import {
   findSettledGenerationRunIds,
@@ -30,6 +30,11 @@ export function useGenerationRunsQuery(projectId: string | undefined) {
       return;
     }
     if (!projectId || !query.data) return;
+
+    pruneGenerationRequests(
+      projectId,
+      query.data.map((run) => run.id),
+    );
 
     const settledRunIds = findSettledGenerationRunIds(
       previousRuns.current.runs,

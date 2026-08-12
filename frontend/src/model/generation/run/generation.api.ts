@@ -8,6 +8,11 @@ import type {
 } from "./generation.contract";
 import type { CreationRequest, GenerationInput, GenerationRun } from "./types";
 
+type GenerationRequestMetadata = Pick<
+  CreationRequest,
+  "kind" | "name" | "prompt" | "canvasSize" | "perspective"
+>;
+
 export type { GenerationInput } from "./types";
 
 export { coreGenerationApi } from "./core-generation.api";
@@ -48,17 +53,35 @@ export const generationApi: GenerationApi = {
       request,
     );
     const run: GenerationRun = {
-      ...input.request,
+      ...toGenerationRequestMetadata(input.request),
       id: String(response.generationRunId),
       projectId: input.projectId,
       status: "pending",
     };
-    generationRequests.set(runKey(input.projectId, run.id), input.request);
+    generationRequests.set(
+      runKey(input.projectId, run.id),
+      toGenerationRequestMetadata(input.request),
+    );
     return run;
   },
 };
 
-const generationRequests = new Map<string, CreationRequest>();
+const generationRequests = new Map<string, GenerationRequestMetadata>();
+
+export function pruneGenerationRequests(
+  projectId: string,
+  visibleRunIds: string[],
+) {
+  const visibleKeys = new Set(
+    visibleRunIds.map((runId) => runKey(projectId, runId)),
+  );
+  const projectPrefix = `${projectId}:`;
+  for (const key of generationRequests.keys()) {
+    if (key.startsWith(projectPrefix) && !visibleKeys.has(key)) {
+      generationRequests.delete(key);
+    }
+  }
+}
 
 export async function toCreateGenerationRequest(
   request: CreationRequest,
@@ -89,7 +112,7 @@ export async function toCreateGenerationRequest(
 
 function toGenerationRun(
   item: GenerationRunListItemResponse,
-  request: CreationRequest | undefined,
+  request: GenerationRequestMetadata | undefined,
 ): GenerationRun | undefined {
   const kind = generationKindToAssetKind(item.kind);
   if (!kind || !isVisibleGenerationStatus(item.status)) return undefined;
@@ -100,7 +123,6 @@ function toGenerationRun(
     prompt: request?.prompt ?? "",
     canvasSize: request?.canvasSize ?? "32 × 32 px",
     perspective: request?.perspective,
-    reference: request?.reference,
     id: String(item.id),
     projectId: String(item.projectId),
     status: item.status,
@@ -129,6 +151,13 @@ async function resolveReference(reference: unknown) {
     return readFileAsDataUrl(reference);
   }
   throw new Error("Reference must be an image file or URL.");
+}
+
+function toGenerationRequestMetadata(
+  request: CreationRequest,
+): GenerationRequestMetadata {
+  const { kind, name, prompt, canvasSize, perspective } = request;
+  return { kind, name, prompt, canvasSize, perspective };
 }
 
 function runKey(projectId: string, runId: string | number) {
