@@ -89,6 +89,31 @@ type projectReaderStub struct {
 	calls   int
 }
 
+type referenceStoreStub struct {
+	persisted  []string
+	persistErr error
+}
+
+func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	return reference, nil
+}
+
+func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.persisted = append(s.persisted, reference)
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
+	return "uploads/generated-1.png", nil
+}
+
+func (s *referenceStoreStub) NewObjectKey(string) (string, error) {
+	return "uploads/generated.png", nil
+}
+
+func (s *referenceStoreStub) PersistReferenceAt(context.Context, string, string) error {
+	return nil
+}
+
 func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
 	s.calls++
 	return s.project, s.err
