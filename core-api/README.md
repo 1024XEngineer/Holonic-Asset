@@ -61,6 +61,9 @@ Files under `frontend/src/model/generated/` must not be edited by hand.
 ## Authentication
 
 Configure `auth.jwtSecret` and `auth.tokenExpiry` before starting the API. The
+JWT secret must be replaced with a deployment-specific value of at least 32
+bytes. `HOLONIC_AUTH_JWT_SECRET` overrides `auth.jwtSecret` from the YAML config
+and is the preferred way to supply the secret in deployed environments. The
 application only provides login and token verification; it does not create
 initial users during startup.
 
