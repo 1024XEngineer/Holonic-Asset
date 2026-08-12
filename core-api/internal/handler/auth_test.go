@@ -14,15 +14,16 @@ import (
 )
 
 type authManagerStub struct {
+	result   *auth.LoginResult
 	loginErr error
 }
 
 func (s authManagerStub) Login(context.Context, string, string) (*auth.LoginResult, error) {
-	return nil, s.loginErr
+	return s.result, s.loginErr
 }
 
 func (authManagerStub) VerifyToken(string) (*auth.Claims, error) {
-	return nil, nil
+	return &auth.Claims{}, nil
 }
 
 func TestAuthHandlerLoginMapsInvalidCredentialsToUnauthorized(t *testing.T) {
@@ -39,6 +40,32 @@ func TestAuthHandlerLoginHidesInternalErrors(t *testing.T) {
 
 	_, err := handler.Login(context.Background(), dto.LoginRequest{})
 	assertHTTPError(t, err, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), cause)
+}
+
+func TestAuthHandlerLoginReturnsTokenAndUser(t *testing.T) {
+	handler := NewAuthHandler(authManagerStub{result: &auth.LoginResult{
+		AccessToken: "access-token",
+		ExpiresIn:   3600,
+		User: auth.User{
+			ID:       7,
+			Username: "login-test-user",
+			Email:    "login-test-user@example.com",
+		},
+	}})
+
+	response, err := handler.Login(context.Background(), dto.LoginRequest{
+		Username: "login-test-user",
+		Password: "login-test-password",
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if response.Data.AccessToken != "access-token" || response.Data.TokenType != "Bearer" || response.Data.ExpiresIn != 3600 {
+		t.Fatalf("unexpected token response: %+v", response.Data)
+	}
+	if response.Data.User.ID != 7 || response.Data.User.Username != "login-test-user" || response.Data.User.Email != "login-test-user@example.com" {
+		t.Fatalf("unexpected user response: %+v", response.Data.User)
+	}
 }
 
 func assertHTTPError(t *testing.T, err error, status int, message string, internal error) {
