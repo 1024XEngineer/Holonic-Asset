@@ -29,6 +29,7 @@ func (s *imageGenerationService) Generate(
 		Prompt:          request.Prompt,
 		ReferenceImages: append([]string(nil), request.ReferenceImages...),
 		MaskImage:       request.MaskImage,
+		N:               request.N,
 		Model:           request.Model,
 		Size:            request.Size,
 		Params:          copyParams(request.Params),
