@@ -45,7 +45,6 @@ export function HomeHero() {
                   alt={t("previewAlt")}
                   fetchPriority="high"
                   decoding="async"
-                  sizes="(min-width: 1024px) 49vw, 100vw"
                   className="absolute inset-0 size-full object-cover"
                 />
                 <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/90 to-transparent" />
