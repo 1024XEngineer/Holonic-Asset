@@ -94,6 +94,10 @@ func (s *executorReferenceStoreStub) PersistReferenceAt(_ context.Context, key, 
 	return nil
 }
 
+func (s *executorReferenceStoreStub) DeleteObjects(context.Context, []string) error {
+	return nil
+}
+
 func (s *imageProcessorStub) RemoveBackground(
 	_ context.Context,
 	request *imageprocessor.RemoveBackgroundRequest,
@@ -239,6 +243,17 @@ func (s *generationAssetWriterStub) CreateObjectAsset(
 		return 0, s.err
 	}
 	return 42, nil
+}
+
+func (s *generationAssetWriterStub) CreateTileSetAsset(
+	_ context.Context,
+	value *assetdomain.Asset,
+) (uint, error) {
+	s.asset = *value
+	if s.err != nil {
+		return 0, s.err
+	}
+	return 43, nil
 }
 
 func (s *generationAssetWriterStub) CreateAnimation(
