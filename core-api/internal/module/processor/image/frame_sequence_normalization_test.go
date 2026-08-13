@@ -9,7 +9,7 @@ import (
 
 func TestNormalizeAnimationImageStabilizesFramesWithSharedCrop(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
-	// The same body is displaced differently in each generated cell.
+	// The same foreground shape is displaced differently in each source cell.
 	fillRect(src, image.Rect(7, 8, 19, 34), color.NRGBA{R: 220, G: 70, B: 40, A: 255})
 	fillRect(src, image.Rect(57, 4, 69, 30), color.NRGBA{R: 220, G: 70, B: 40, A: 255})
 	// A moving arm changes the silhouette but must not become a per-frame crop.
@@ -33,7 +33,7 @@ func TestNormalizeAnimationImageStabilizesFramesWithSharedCrop(t *testing.T) {
 		t.Fatalf("output anchors still drift: %+v", result.Report.OutputAnchorRange)
 	}
 	if result.Frames[0].Translation == (AnimationOffset{}) || result.Frames[1].Translation == (AnimationOffset{}) {
-		t.Fatalf("expected generated displacement to be corrected: %+v %+v", result.Frames[0].Translation, result.Frames[1].Translation)
+		t.Fatalf("expected source displacement to be corrected: %+v %+v", result.Frames[0].Translation, result.Frames[1].Translation)
 	}
 	for i, frame := range result.Frames {
 		decoded, err := DecodeBase64Image(frame.ImageBase64)
@@ -177,7 +177,7 @@ func solidRedBounds(input image.Image) (image.Rectangle, bool) {
 func TestNormalizeAnimationImageCanNormalizeStaticDirectionContentScale(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 80, 50))
 	colorValue := color.NRGBA{R: 200, G: 90, B: 40, A: 255}
-	// The same static object was generated at two visibly different heights.
+	// The same static foreground appears at two visibly different heights.
 	// It is also placed much higher in the second tall cell. Direction-sheet
 	// normalization should correct both errors before rendering.
 	fillRect(src, image.Rect(12, 10, 28, 40), colorValue)

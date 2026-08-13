@@ -12,8 +12,8 @@ import (
 	"testing"
 )
 
-func TestAnimationVideoQualityErrorReturnsMessage(t *testing.T) {
-	err := &AnimationVideoQualityError{Kind: "framing", Message: "unsafe frame"}
+func TestQualityErrorReturnsMessage(t *testing.T) {
+	err := &QualityError{Kind: "framing", Message: "unsafe frame"}
 	if err.Error() != "unsafe frame" {
 		t.Fatalf("unexpected quality error: %q", err.Error())
 	}
@@ -28,19 +28,26 @@ func TestNewProcessorProvidesFFmpegExtractor(t *testing.T) {
 
 func TestProcessorPropagatesExtractionAndSelectionErrors(t *testing.T) {
 	wantErr := errors.New("extract failed")
+	validOptions := ProcessOptions{
+		ChromaKey: testGreenChromaKey,
+		Select:    func(FrameSequenceAnalysis) ([]int, error) { return []int{0}, nil },
+	}
 	tests := []struct {
 		name      string
 		processor Processor
+		options   ProcessOptions
 		want      string
 	}{
-		{name: "missing extractor", processor: newProcessor(nil), want: "video: video frame extractor is required"},
-		{name: "extract failure", processor: newProcessor(frameExtractorStub{err: wantErr}), want: wantErr.Error()},
-		{name: "insufficient frames", processor: newProcessor(frameExtractorStub{frames: animationTestVideoFrames(2)}), want: "need at least 5"},
+		{name: "missing extractor", processor: newProcessor(nil), options: validOptions, want: "video: video frame extractor is required"},
+		{name: "missing selector", processor: newProcessor(frameExtractorStub{}), options: ProcessOptions{ChromaKey: testGreenChromaKey}, want: "video: frame selector is required"},
+		{name: "invalid chroma key", processor: newProcessor(frameExtractorStub{}), options: ProcessOptions{Select: validOptions.Select}, want: "video: valid chroma key settings are required"},
+		{name: "invalid FPS", processor: newProcessor(frameExtractorStub{}), options: ProcessOptions{AnalysisFPS: -1, ChromaKey: testGreenChromaKey, Select: validOptions.Select}, want: "video: analysis FPS must be positive"},
+		{name: "extract failure", processor: newProcessor(frameExtractorStub{err: wantErr}), options: validOptions, want: wantErr.Error()},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := test.processor.Process(context.Background(), []byte("video"), 4)
+			_, err := test.processor.Process(context.Background(), []byte("video"), test.options)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
@@ -48,23 +55,26 @@ func TestProcessorPropagatesExtractionAndSelectionErrors(t *testing.T) {
 	}
 }
 
-func TestProcessorRejectsFramesWithoutSubject(t *testing.T) {
+func TestProcessorRejectsFramesWithoutForeground(t *testing.T) {
 	frames := make([]image.Image, 6)
 	for index := range frames {
-		frames[index] = greenAnimationFrame(96, 96)
+		frames[index] = greenFrame(96, 96)
 	}
 
-	_, err := newProcessor(frameExtractorStub{frames: frames}).Process(context.Background(), []byte("video"), 4)
-	var qualityErr *AnimationVideoQualityError
-	if !errors.As(err, &qualityErr) || qualityErr.Kind != "subject" {
-		t.Fatalf("expected subject quality error, got %v", err)
+	_, err := newProcessor(frameExtractorStub{frames: frames}).Process(context.Background(), []byte("video"), ProcessOptions{
+		ChromaKey: testGreenChromaKey,
+		Select:    func(FrameSequenceAnalysis) ([]int, error) { return []int{0}, nil },
+	})
+	var qualityErr *QualityError
+	if !errors.As(err, &qualityErr) || qualityErr.Kind != "foreground" {
+		t.Fatalf("expected foreground quality error, got %v", err)
 	}
 }
 
-func TestFFmpegFrameExtractorDecodesGeneratedFrames(t *testing.T) {
+func TestFFmpegFrameExtractorDecodesSelectedFrames(t *testing.T) {
 	directory := t.TempDir()
 	framePath := filepath.Join(directory, "source.png")
-	writeAnimationPNG(t, framePath, greenAnimationFrame(32, 24))
+	writeFramePNG(t, framePath, greenFrame(32, 24))
 	script := writeFakeFFmpeg(t, directory, `
 for output do :; done
 cp "$TEST_FRAME_SOURCE" "$(printf "$output" 1)"
@@ -72,21 +82,22 @@ cp "$TEST_FRAME_SOURCE" "$(printf "$output" 2)"
 `)
 	t.Setenv("TEST_FRAME_SOURCE", framePath)
 
-	frames, err := (ffmpegFrameExtractor{path: script}).Extract(
+	frames, indices, err := (ffmpegFrameExtractor{path: script}).Extract(
 		context.Background(),
 		[]byte("video"),
 		12,
-		func(analyses []animationFrameAnalysis) ([]int, error) {
-			if len(analyses) != 2 {
-				t.Fatalf("unexpected analysis frame count: %d", len(analyses))
+		testGreenChromaKey,
+		func(analysis FrameSequenceAnalysis) ([]int, error) {
+			if len(analysis.Frames) != 2 {
+				t.Fatalf("unexpected analysis frame count: %d", len(analysis.Frames))
 			}
 			return []int{0, 1}, nil
 		},
 	)
 	if err != nil {
-		t.Fatalf("extract generated frames: %v", err)
+		t.Fatalf("extract selected frames: %v", err)
 	}
-	if len(frames) != 2 || frames[0].Bounds().Dx() != 32 || frames[0].Bounds().Dy() != 24 {
+	if len(indices) != 2 || len(frames) != 2 || frames[0].Bounds().Dx() != 32 || frames[0].Bounds().Dy() != 24 {
 		t.Fatalf("unexpected extracted frames: %+v", frames)
 	}
 }
@@ -123,7 +134,17 @@ func TestProcessorStreamsHighResolutionCandidates(t *testing.T) {
 	result, err := newProcessor(ffmpegFrameExtractor{path: ffmpeg}).Process(
 		context.Background(),
 		video,
-		16,
+		ProcessOptions{
+			AnalysisFPS: 12,
+			ChromaKey:   testGreenChromaKey,
+			Select: func(analysis FrameSequenceAnalysis) ([]int, error) {
+				indices := make([]int, 16)
+				for index := range indices {
+					indices[index] = index * (len(analysis.Frames) - 1) / (len(indices) - 1)
+				}
+				return indices, nil
+			},
+		},
 	)
 	if err != nil {
 		t.Fatalf("process high-resolution candidates: %v", err)
@@ -145,21 +166,22 @@ func TestFFmpegFrameExtractorReportsCommandAndOutputErrors(t *testing.T) {
 		body string
 		want string
 	}{
-		{name: "command failure", body: `echo "provider failed" >&2
-exit 7`, want: "provider failed"},
+		{name: "command failure", body: `echo "decoder failed" >&2
+exit 7`, want: "decoder failed"},
 		{name: "no frames", body: `exit 0`, want: "only 0 decodable frame(s)"},
 		{name: "invalid frame", body: `for output do :; done
-printf "not-a-png" > "$(printf "$output" 1)"`, want: "decode extracted animation analysis frame"},
+printf "not-a-png" > "$(printf "$output" 1)"`, want: "decode extracted analysis frame"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			script := writeFakeFFmpeg(t, directory, test.body)
-			_, err := (ffmpegFrameExtractor{path: script}).Extract(
+			_, _, err := (ffmpegFrameExtractor{path: script}).Extract(
 				context.Background(),
 				[]byte("video"),
 				12,
-				func([]animationFrameAnalysis) ([]int, error) { return []int{0}, nil },
+				testGreenChromaKey,
+				func(FrameSequenceAnalysis) ([]int, error) { return []int{0}, nil },
 			)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
@@ -168,16 +190,16 @@ printf "not-a-png" > "$(printf "$output" 1)"`, want: "decode extracted animation
 	}
 }
 
-func TestDecodeAnimationFrameConfigAndResolveFFmpeg(t *testing.T) {
+func TestDecodeFrameConfigAndResolveFFmpeg(t *testing.T) {
 	directory := t.TempDir()
 	framePath := filepath.Join(directory, "frame.png")
-	writeAnimationPNG(t, framePath, greenAnimationFrame(17, 19))
+	writeFramePNG(t, framePath, greenFrame(17, 19))
 
-	config, err := decodeAnimationFrameConfig(framePath)
+	config, err := decodeFrameConfig(framePath)
 	if err != nil || config.Width != 17 || config.Height != 19 {
 		t.Fatalf("unexpected frame config: %+v, err=%v", config, err)
 	}
-	if _, err := decodeAnimationFrameConfig(filepath.Join(directory, "missing.png")); err == nil {
+	if _, err := decodeFrameConfig(filepath.Join(directory, "missing.png")); err == nil {
 		t.Fatal("expected missing frame metadata error")
 	}
 
@@ -201,17 +223,17 @@ func TestDecodeAnimationFrameConfigAndResolveFFmpeg(t *testing.T) {
 	}
 }
 
-func TestValidateExtractedAnimationFrameConfigsRejectsInvalidDimensions(t *testing.T) {
-	err := validateExtractedAnimationFrameConfigs([]image.Config{{Width: 0, Height: 24}})
-	if err == nil || !strings.Contains(err.Error(), "video: extracted animation frame 1 has invalid dimensions") {
+func TestValidateExtractedFrameConfigsRejectsInvalidDimensions(t *testing.T) {
+	err := validateExtractedFrameConfigs([]image.Config{{Width: 0, Height: 24}})
+	if err == nil || !strings.Contains(err.Error(), "video: extracted frame 1 has invalid dimensions") {
 		t.Fatalf("expected invalid dimension error, got %v", err)
 	}
-	if err := validateExtractedAnimationFrameCount(maxAnimationExtractedFrames); err != nil {
+	if err := validateExtractedFrameCount(maxExtractedFrames); err != nil {
 		t.Fatalf("expected frame limit boundary to pass: %v", err)
 	}
 }
 
-func greenAnimationFrame(width, height int) *image.NRGBA {
+func greenFrame(width, height int) *image.NRGBA {
 	frame := image.NewNRGBA(image.Rect(0, 0, width, height))
 	for index := 0; index < len(frame.Pix); index += 4 {
 		frame.Pix[index+1] = 255
@@ -220,7 +242,7 @@ func greenAnimationFrame(width, height int) *image.NRGBA {
 	return frame
 }
 
-func writeAnimationPNG(t *testing.T, path string, frame image.Image) {
+func writeFramePNG(t *testing.T, path string, frame image.Image) {
 	t.Helper()
 	file, err := os.Create(path) //nolint:gosec // Test paths are created inside t.TempDir.
 	if err != nil {
