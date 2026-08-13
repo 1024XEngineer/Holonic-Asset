@@ -79,7 +79,10 @@ export function drawAnimatedSpriteNode({
         unavailableTextureUrls,
       ),
     );
-  } else if (node === "prototype" && hasAvailablePrototypeFrame(prototype, unavailableTextureUrls)) {
+  } else if (
+    node === "prototype" &&
+    hasAvailablePrototypeFrame(prototype, unavailableTextureUrls)
+  ) {
     drawSpriteSheetPreview(
       container,
       frameTextures,
