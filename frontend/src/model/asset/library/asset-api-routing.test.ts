@@ -100,11 +100,11 @@ describe("assetApi Core routing", () => {
     expect(mocks.coreList).toHaveBeenCalledWith(42);
   });
 
-  it("uses Core API delete and refreshes the remote library", async () => {
-    await assetApi.delete("42", "8");
+  it("uses Core API delete without blocking on a library refresh", async () => {
+    await assetApi.delete("8");
 
     expect(mocks.coreDelete).toHaveBeenCalledWith({ assetId: 8 });
-    expect(mocks.coreList).toHaveBeenCalledWith(42);
+    expect(mocks.coreList).not.toHaveBeenCalled();
   });
 
   it("maps metadata updates to the Core API dimensions shape", async () => {
@@ -159,7 +159,7 @@ describe("assetApi Core routing", () => {
   });
 
   it("rejects remote operations with non-persisted asset ids", async () => {
-    await expect(assetApi.delete("42", "barrel")).rejects.toThrow(
+    await expect(assetApi.delete("barrel")).rejects.toThrow(
       "persisted Core API asset",
     );
     expect(mocks.coreDelete).not.toHaveBeenCalled();

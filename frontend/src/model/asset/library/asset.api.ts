@@ -28,9 +28,8 @@ export const assetApi = {
     await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
     return assetApi.listGroups(projectId);
   },
-  delete: async (projectId: string, assetId: string) => {
-    await coreAssetApi.delete({ assetId: coreAssetId(assetId) });
-    return assetApi.listGroups(projectId);
+  delete: async (assetId: string) => {
+    return coreAssetApi.delete({ assetId: coreAssetId(assetId) });
   },
   update: async (
     projectId: string,
