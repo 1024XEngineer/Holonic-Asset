@@ -79,11 +79,7 @@ export function drawAnimatedSpriteNode({
         unavailableTextureUrls,
       ),
     );
-  } else if (
-    node === "prototype" &&
-    prototype.imageUrl &&
-    !unavailableTextureUrls?.has(prototype.imageUrl)
-  ) {
+  } else if (node === "prototype" && hasAvailablePrototypeFrame(prototype, unavailableTextureUrls)) {
     drawSpriteSheetPreview(
       container,
       frameTextures,
@@ -141,6 +137,16 @@ export function drawAnimatedSpriteNode({
   return container;
 }
 
+function hasAvailablePrototypeFrame(
+  prototype: CharacterSpriteSheet,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  const urls = prototype.frameUrls?.length
+    ? prototype.frameUrls
+    : [prototype.imageUrl];
+  return urls.some((url) => url && !unavailableTextureUrls?.has(url));
+}
+
 function drawLabel(
   container: Container,
   value: string,
@@ -192,10 +198,8 @@ function drawFrame(
         )
         .stroke({ color: STAGE_ACCENT, width: 2 }),
     );
-  if (
-    spriteSheet?.imageUrl &&
-    !unavailableTextureUrls?.has(spriteSheet.imageUrl)
-  ) {
+  const imageUrl = spriteSheet?.frameUrls?.[index] ?? spriteSheet?.imageUrl;
+  if (spriteSheet && imageUrl && !unavailableTextureUrls?.has(imageUrl)) {
     drawSpriteSheetFrame({
       container,
       frameTextures,

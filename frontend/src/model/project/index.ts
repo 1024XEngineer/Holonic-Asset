@@ -9,7 +9,11 @@ export {
 } from "./project-selection";
 export { useUpdateProjectMutation } from "./project-update.mutation";
 export { projectApi } from "./project.api";
-export { isPerspective, perspectiveOptions, perspectiveSchema } from "./types";
+export {
+  isPerspective,
+  perspectiveOptions,
+  perspectiveSchema,
+} from "./types";
 export type {
   CreateProjectInput,
   Perspective,

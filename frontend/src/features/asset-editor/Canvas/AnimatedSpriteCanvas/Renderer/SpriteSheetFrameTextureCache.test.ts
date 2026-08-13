@@ -28,6 +28,21 @@ describe("SpriteSheetFrameTextureCache", () => {
     expect(createTexture).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the matching source URL for independent direction frames", () => {
+    const createTexture = vi.fn(
+      () => ({ destroy: vi.fn() }) as unknown as Texture,
+    );
+    const cache = new SpriteSheetFrameTextureCache(createTexture);
+    const sheet = {
+      ...spriteSheet("front.png"),
+      frameUrls: ["front.png", "back.png"],
+    };
+
+    cache.get(sheet, 1);
+
+    expect(createTexture).toHaveBeenCalledWith(sheet, 1, 0, "back.png");
+  });
+
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {
     const created: Array<{ destroy: ReturnType<typeof vi.fn> }> = [];
     const cache = new SpriteSheetFrameTextureCache(() => {

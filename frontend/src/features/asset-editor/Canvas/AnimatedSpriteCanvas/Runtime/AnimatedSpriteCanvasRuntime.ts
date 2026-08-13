@@ -147,6 +147,7 @@ export class AnimatedSpriteCanvasRuntime {
     const urls = new Set(
       [
         model.prototype.imageUrl,
+        ...(model.prototype.frameUrls ?? []),
         ...model.animations.flatMap((animation) =>
           animation.spriteSheet?.imageUrl
             ? [animation.spriteSheet.imageUrl]

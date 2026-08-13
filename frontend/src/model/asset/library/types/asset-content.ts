@@ -1,4 +1,10 @@
 import type { Perspective } from "@/model/project";
+import type {
+  DirectionCountByPerspective,
+  DirectionCountForPerspective,
+} from "../../types/perspective-direction";
+
+export type { DirectionCountByPerspective, DirectionCountForPerspective };
 
 export type AssetContentMetadata = Record<string, unknown>;
 
@@ -31,16 +37,6 @@ export type AssetAnimationResponse = {
   name: string;
   frames: AssetAnimationFrameResponse[];
 };
-
-export type DirectionCountByPerspective = {
-  "Side-On": 2;
-  "Top-Down": 4;
-  Isometric: 8;
-};
-
-export type DirectionCountForPerspective<
-  View extends Perspective = Perspective,
-> = DirectionCountByPerspective[View];
 
 type DirectionalAssetContent<View extends Perspective> = AssetContentBase & {
   directionCount: DirectionCountForPerspective<View>;

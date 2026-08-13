@@ -8,6 +8,7 @@ type CreateFrameTexture = (
   spriteSheet: CharacterSpriteSheet,
   column: number,
   row: number,
+  frameURL?: string,
 ) => Texture;
 
 type FrameTextureEntry = {
@@ -27,14 +28,15 @@ export class SpriteSheetFrameTextureCache {
 
   get(spriteSheet: CharacterSpriteSheet, frame: number) {
     const { column, row } = getSpriteSheetFramePosition(frame, spriteSheet);
+    const frameURL = spriteSheet.frameUrls?.[frame];
     const spriteSheetKey = getSpriteSheetKey(spriteSheet);
-    const cacheKey = `${spriteSheetKey}:${column}:${row}`;
+    const cacheKey = `${spriteSheetKey}:${frameURL ?? "sheet"}:${column}:${row}`;
     let entry = this.textures.get(cacheKey);
 
     if (!entry) {
       entry = {
         spriteSheetKey,
-        texture: this.createTexture(spriteSheet, column, row),
+        texture: this.createTexture(spriteSheet, column, row, frameURL),
       };
       this.textures.set(cacheKey, entry);
     }
@@ -67,6 +69,7 @@ function getSpriteSheetKey(spriteSheet: CharacterSpriteSheet) {
     spriteSheet.columns,
     spriteSheet.rows,
     spriteSheet.row,
+    spriteSheet.frameUrls?.join(","),
   ].join(":");
 }
 
@@ -74,7 +77,11 @@ function createSpriteSheetFrameTexture(
   spriteSheet: CharacterSpriteSheet,
   column: number,
   row: number,
+  frameURL?: string,
 ) {
+  if (frameURL) {
+    return new Texture({ source: Texture.from(frameURL).source });
+  }
   return new Texture({
     source: Texture.from(spriteSheet.imageUrl).source,
     frame: new Rectangle(

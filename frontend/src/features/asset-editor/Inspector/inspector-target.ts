@@ -26,16 +26,21 @@ export function getInspectorTargetSummary(
       selectedFrame?.index ?? 0,
       spriteSheet,
     );
+    const frameImageUrl = spriteSheet.frameUrls?.[selectedFrame?.index ?? 0];
     return {
       label: nodeId
         ? `${getAnimatedSpriteNodeLabel(nodeId, animations)} - ${frameLabel} ${frames}`
         : `${frameLabel} ${frames}`,
       detail: "Selected on canvas",
       thumbnail: {
-        imageUrl: spriteSheet.imageUrl,
-        ...position,
-        columns: spriteSheet.columns,
-        rows: spriteSheet.rows,
+        imageUrl: frameImageUrl ?? spriteSheet.imageUrl,
+        ...(frameImageUrl
+          ? { column: 0, row: 0, columns: 1, rows: 1 }
+          : {
+              ...position,
+              columns: spriteSheet.columns,
+              rows: spriteSheet.rows,
+            }),
       },
     };
   }
@@ -49,11 +54,11 @@ export function getInspectorTargetSummary(
         .join(", "),
       detail: "Selected item",
       thumbnail: {
-        imageUrl: spriteSheet.imageUrl,
+        imageUrl: spriteSheet.frameUrls?.[0] ?? spriteSheet.imageUrl,
         column: 0,
-        row: spriteSheet.row ?? 0,
-        columns: spriteSheet.columns,
-        rows: spriteSheet.rows,
+        row: spriteSheet.frameUrls ? 0 : (spriteSheet.row ?? 0),
+        columns: spriteSheet.frameUrls ? 1 : spriteSheet.columns,
+        rows: spriteSheet.frameUrls ? 1 : spriteSheet.rows,
       },
     };
   }

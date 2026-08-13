@@ -43,6 +43,21 @@ describe("asset record defaults", () => {
     expect(objectRecord.object.animations).toEqual([]);
   });
 
+  it("creates one prototype frame per remote direction image", () => {
+    const directionalAsset = {
+      ...asset,
+      prototypeUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
+    };
+    const record = createDefaultAssetRecord("character", directionalAsset);
+
+    expect(record.character.prototype).toMatchObject({
+      imageUrl: "/front.png",
+      frameUrls: directionalAsset.prototypeUrls,
+      columns: 2,
+      rows: 2,
+    });
+  });
+
   it("merges object records without crossing the character boundary", () => {
     const fallback = createDefaultAssetRecord("object", asset);
     const saved = structuredClone(fallback);
