@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,6 +13,271 @@ import (
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
+
+func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
+	events := []string{}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{
+				{ImageBase64: "edited-first", MIMEType: "image/png"},
+				{ImageBase64: "edited-second", MIMEType: "image/png"},
+			},
+			FrameDurationMS: 83,
+		},
+	}
+	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{
+		Direction:   "back_right",
+		Style:       "painted pixel art",
+		FrameCount:  8,
+		Columns:     4,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FPS:         12,
+		Resolution:  "1080p",
+		Duration:    8,
+		AspectRatio: "1:1",
+	})
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	references := &executorReferenceStoreStub{}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: references,
+	})
+
+	result, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,
+		"animation_id":3,
+		"project_id":11,
+		"creative_brief":"attack with sword"
+	}`))
+	if err != nil {
+		t.Fatalf("edit animation: %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "update_animation_frames"}) {
+		t.Fatalf("unexpected edit workflow order: %v", events)
+	}
+	wantRequest := &generator.AnimationGenerationRequest{
+		Description:            "silver-haired knight",
+		Style:                  "painted pixel art",
+		Action:                 "attack with sword",
+		ReferenceImage:         "https://cdn.example.com/hero/direction_03-unprocessed.png?version=7",
+		ReferenceImagePrepared: false,
+		FrameCount:             8,
+		Columns:                4,
+		FrameWidth:             128,
+		FrameHeight:            128,
+		FPS:                    12,
+		Resolution:             "1080p",
+		Duration:               8,
+		AspectRatio:            "1:1",
+	}
+	if !reflect.DeepEqual(animations.request, wantRequest) {
+		t.Fatalf("unexpected edit animation request: got %+v want %+v", animations.request, wantRequest)
+	}
+	if assets.animationAssetID != 0 || assets.animationID != 0 {
+		t.Fatalf("edit animation must not create a new animation: %+v", assets)
+	}
+	if assets.updatedAnimationAssetID != 7 || assets.updatedAnimationID != 3 || len(assets.updatedFrames) != 2 {
+		t.Fatalf("unexpected edited animation update: %+v", assets)
+	}
+	if assets.updatedFrames[0].ID != 1 || assets.updatedFrames[0].URL == nil ||
+		*assets.updatedFrames[0].URL != "uploads/generated-1.png" || assets.updatedFrames[0].Duration != 83 ||
+		assets.updatedFrames[1].ID != 2 || assets.updatedFrames[1].URL == nil ||
+		*assets.updatedFrames[1].URL != "uploads/generated-2.png" {
+		t.Fatalf("unexpected replacement frames: %+v", assets.updatedFrames)
+	}
+	if len(references.persisted) != 2 ||
+		references.persisted[0] != "data:image/png;base64,edited-first" ||
+		references.persisted[1] != "data:image/png;base64,edited-second" {
+		t.Fatalf("unexpected persisted edited frames: %#v", references.persisted)
+	}
+	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
+}
+
+func TestExecutorEditAnimationRejectsMissingGeneration(t *testing.T) {
+	events := []string{}
+	parent := animationParentAssetWithAnimation(t, nil)
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
+
+	_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,"animation_id":3,"project_id":11,"creative_brief":"attack"
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "has no generation configuration") {
+		t.Fatalf("expected missing generation configuration error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset"}) {
+		t.Fatalf("edit must stop before generation when metadata is missing: %v", events)
+	}
+}
+
+func TestExecutorEditAnimationRejectsUnknownAnimationAndProjectMismatch(t *testing.T) {
+	tests := []struct {
+		name    string
+		project uint
+		id      uint
+		want    string
+	}{
+		{name: "unknown animation", project: 11, id: 99, want: "animation 99 not found"},
+		{name: "project mismatch", project: 12, id: 3, want: "belongs to project 11, not project 12"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := []string{}
+			parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{Direction: "front"})
+			assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+			animations := &animationGenerationServiceStub{events: &events}
+			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+				Animations: animations,
+				References: &executorReferenceStoreStub{},
+			})
+			payload := fmt.Sprintf(`{"asset_id":7,"animation_id":%d,"project_id":%d,"creative_brief":"attack"}`, tt.id, tt.project)
+			_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(payload))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+			if !reflect.DeepEqual(events, []string{"get_asset"}) {
+				t.Fatalf("edit must stop before generation: %v", events)
+			}
+		})
+	}
+}
+
+func TestExecutorEditAnimationKeepsExistingFramesWhenRegenerationFails(t *testing.T) {
+	events := []string{}
+	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{Direction: "front"})
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	wantErr := errors.New("video provider unavailable")
+	animations := &animationGenerationServiceStub{events: &events, err: wantErr}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
+
+	_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,"animation_id":3,"project_id":11,"creative_brief":"attack"
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "regenerate animation frames") {
+		t.Fatalf("expected regeneration error, got %v", err)
+	}
+	if len(assets.updatedFrames) != 0 || len(events) != 2 {
+		t.Fatalf("existing frames should not be updated on generation failure: events=%v assets=%+v", events, assets)
+	}
+}
+
+func TestExecutorEditAnimationValidatesIdentityAndPromptBeforeLookup(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload json.RawMessage
+		want    string
+	}{
+		{name: "asset id", payload: json.RawMessage(`{"animation_id":3,"creative_brief":"attack"}`), want: "animation asset is required"},
+		{name: "animation id", payload: json.RawMessage(`{"asset_id":7,"creative_brief":"attack"}`), want: "animation id is required"},
+		{name: "creative brief", payload: json.RawMessage(`{"asset_id":7,"animation_id":3,"creative_brief":"   "}`), want: "animation creative brief is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := []string{}
+			assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+				Animations: &animationGenerationServiceStub{events: &events},
+				References: &executorReferenceStoreStub{},
+			})
+			_, err := executor.Generate(context.Background(), generator.EditAnimation, tt.payload)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+			if len(events) != 0 {
+				t.Fatalf("edit validation must happen before lookup: %v", events)
+			}
+		})
+	}
+}
+
+func TestExecutorEditAnimationDoesNotReplaceFramesWhenPersistenceFails(t *testing.T) {
+	events := []string{}
+	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{Direction: "front"})
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited", MIMEType: "image/png"}},
+		},
+	}
+	references := &executorReferenceStoreStub{persistErr: errors.New("storage unavailable")}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: references,
+	})
+
+	_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,"animation_id":3,"project_id":11,"creative_brief":"attack"
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "persist animation frame 1") {
+		t.Fatalf("expected persistence error, got %v", err)
+	}
+	if assets.updatedAnimationID != 0 || !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
+		t.Fatalf("existing frames should not be updated on persistence failure: events=%v assets=%+v", events, assets)
+	}
+}
+
+func TestExecutorEditAnimationReportsFrameUpdateFailure(t *testing.T) {
+	events := []string{}
+	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{Direction: "front"})
+	assets := &generationAssetWriterStub{
+		events:             &events,
+		parentAsset:        parent,
+		updateAnimationErr: errors.New("write conflict"),
+	}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited", MIMEType: "image/png"}},
+		},
+	}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
+
+	_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,"animation_id":3,"project_id":11,"creative_brief":"attack"
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "update animation 3 frames for asset 7") {
+		t.Fatalf("expected frame update error, got %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "update_animation_frames"}) {
+		t.Fatalf("unexpected update failure workflow: %v", events)
+	}
+}
+
+func animationParentAssetWithAnimation(t *testing.T, generation *assetdomain.AnimationGenerationConfig) assetdomain.Asset {
+	t.Helper()
+	parent := animationParentAsset(t)
+	content, err := parent.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode animation parent content: %v", err)
+	}
+	oldURL := "uploads/old-frame.png"
+	content.Animations = []assetdomain.Animation{{
+		ID:   3,
+		Name: "walk",
+		Frames: []assetdomain.Frame{{
+			ID: 1, URL: &oldURL, Duration: 100,
+		}},
+		Generation: generation,
+	}}
+	parent.Content, err = assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode animation parent content with animation: %v", err)
+	}
+	return parent
+}
 
 func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	events := []string{}

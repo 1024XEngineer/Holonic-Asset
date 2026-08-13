@@ -37,6 +37,7 @@ type AssetWriter interface {
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error)
+	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
 	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
@@ -131,6 +132,21 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateAnimation(ctx, request)
+	case EditAnimation:
+		if e.assets == nil {
+			return nil, ErrAssetWriterRequired
+		}
+		if e.animations == nil {
+			return nil, ErrAnimationServiceRequired
+		}
+		if e.references == nil {
+			return nil, ErrAnimationReferenceStoreRequired
+		}
+		request := EditAnimationPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editAnimation(ctx, request)
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, taskType)
 	}
