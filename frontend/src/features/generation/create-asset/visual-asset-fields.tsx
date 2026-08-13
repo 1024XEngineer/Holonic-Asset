@@ -53,7 +53,11 @@ export function VisualAssetFields({
   const updateCustomSize = (nextWidth: string, nextHeight: string) => {
     setWidth(nextWidth);
     setHeight(nextHeight);
-    onChange({ ...draft, canvasSize: `${nextWidth} × ${nextHeight} px` });
+    if (nextWidth && nextHeight) {
+      onChange({ ...draft, canvasSize: `${nextWidth} × ${nextHeight} px` });
+    } else if (draft.canvasSize) {
+      onChange({ ...draft, canvasSize: "" });
+    }
   };
 
   return (
