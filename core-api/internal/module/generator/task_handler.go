@@ -131,7 +131,7 @@ func decodeTileSetTaskPayload(message *taskdomain.Task, payload any) error {
 		return ErrTaskRequired
 	}
 	request := &Request{Kind: TaskType(message.Type), Parameters: message.Payload}
-	if err := decodeTileSetParameters(request, payload); err != nil {
+	if err := decodeStrictParameters(request, payload); err != nil {
 		return fmt.Errorf("generator: decode %s task %d payload: %w", message.Type, message.ID, err)
 	}
 	return nil

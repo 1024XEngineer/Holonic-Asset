@@ -120,10 +120,6 @@ const (
 	maxItemNameLength         = 200
 	maxItemDescriptionLength  = 2000
 	maxReferenceLength        = 8 << 20
-
-	// MaxTileSetItemConcurrency bounds the per-task fan-out used by the item
-	// generation workflow implemented in the next phase.
-	MaxTileSetItemConcurrency = 4
 )
 
 // TileSetEditTarget identifies an occupied global Tileset cell. Execution
@@ -174,7 +170,7 @@ func validateCreateTileSetPayload(payload *CreateTileSetPayload) error {
 			return err
 		}
 		totalTiles += len(item.Shape)
-		if totalTiles > maxTileSetGridTiles || uint64(totalTiles) > tileSetGridCapacity(payload) {
+		if uint64(totalTiles) > tileSetGridCapacity(payload) {
 			return invalidTaskPayload("items contain more occupied Tiles than the Tileset grid supports")
 		}
 	}
@@ -306,11 +302,11 @@ func validateOptionalReference(reference string) error {
 	if reference == "" {
 		return nil
 	}
-	if strings.TrimSpace(reference) == "" {
-		return invalidTaskPayload("reference must not be blank")
-	}
 	if len(reference) > maxReferenceLength {
 		return invalidTaskPayload("reference exceeds maximum length of %d bytes", maxReferenceLength)
+	}
+	if strings.TrimSpace(reference) == "" {
+		return invalidTaskPayload("reference must not be blank")
 	}
 	for _, r := range reference {
 		if unicode.IsControl(r) {

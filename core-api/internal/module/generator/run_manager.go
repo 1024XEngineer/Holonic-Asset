@@ -71,6 +71,16 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		}
 		return resolved, nil
 	}
+	persistEditReference := func(reference string) (string, error) {
+		if reference == "" || e.references == nil {
+			return reference, nil
+		}
+		persisted, err := e.references.PersistReference(ctx, reference)
+		if err != nil {
+			return "", fmt.Errorf("generator: persist edit reference: %w", err)
+		}
+		return persisted, nil
+	}
 
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
@@ -84,25 +94,13 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	case CreateTileSetPayload:
 		return value, nil
 	case EditTilesetItemPayload:
-		if value.Reference == "" || e.references == nil {
-			return value, nil
-		}
-		persisted, err := e.references.PersistReference(ctx, value.Reference)
-		if err != nil {
-			return nil, fmt.Errorf("generator: persist edit reference: %w", err)
-		}
-		value.Reference = persisted
-		return value, nil
+		var err error
+		value.Reference, err = persistEditReference(value.Reference)
+		return value, err
 	case EditTilesPayload:
-		if value.Reference == "" || e.references == nil {
-			return value, nil
-		}
-		persisted, err := e.references.PersistReference(ctx, value.Reference)
-		if err != nil {
-			return nil, fmt.Errorf("generator: persist edit reference: %w", err)
-		}
-		value.Reference = persisted
-		return value, nil
+		var err error
+		value.Reference, err = persistEditReference(value.Reference)
+		return value, err
 	default:
 		return payload, nil
 	}
@@ -168,7 +166,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if request.AssetID != nil || len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("generate_tileset does not accept assetId or targetAssetPaths")
 		}
-		if err := decodeTileSetParameters(request, &parameters); err != nil {
+		if err := decodeStrictParameters(request, &parameters); err != nil {
 			return nil, err
 		}
 		payload := CreateTileSetPayload{
@@ -190,7 +188,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tileset_item does not accept targetAssetPaths")
 		}
-		if err := decodeTileSetParameters(request, &parameters); err != nil {
+		if err := decodeStrictParameters(request, &parameters); err != nil {
 			return nil, err
 		}
 		payload := EditTilesetItemPayload{
@@ -214,7 +212,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tiles does not accept targetAssetPaths")
 		}
-		if err := decodeTileSetParameters(request, &parameters); err != nil {
+		if err := decodeStrictParameters(request, &parameters); err != nil {
 			return nil, err
 		}
 		payload := EditTilesPayload{
@@ -239,7 +237,7 @@ func buildTaskPayload(request *Request) (any, error) {
 	}
 }
 
-func decodeTileSetParameters(request *Request, payload any) error {
+func decodeStrictParameters(request *Request, payload any) error {
 	if len(bytes.TrimSpace(request.Parameters)) == 0 {
 		return nil
 	}
