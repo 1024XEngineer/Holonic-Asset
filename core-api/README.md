@@ -87,6 +87,21 @@ S3 endpoint such as `https://bucket.s3.cn-east-1.qiniucs.com`.
 `qiniu.uploadURL` defaults to `https://upload.qiniup.com`, the upload token
 defaults to one hour, and private download URLs default to 30 minutes.
 
+Local asset previews read signed object URLs directly from Qiniu, so the bucket
+must allow the frontend development origin. Add this rule in the Qiniu Kodo
+bucket CORS settings while preserving any unrelated existing rules:
+
+| Setting | Value |
+| --- | --- |
+| Allowed origins | `http://localhost:5173` |
+| Allowed methods | `GET`, `HEAD` |
+| Allowed headers | `*` |
+| Exposed headers | `ETag`, `Content-Type` |
+| Max age | `1800` seconds |
+
+This is object-storage configuration. It does not require changing API CORS,
+signed URL generation, or frontend asset-detail field mapping.
+
 `POST /api/v1/uploads` accepts `contentType` and `contentLength`. It returns a
 server-generated object key, temporary private object URL, Qiniu upload
 endpoint, and a short-lived upload token. Upload the file to `uploadURL` as
