@@ -18,22 +18,35 @@ vi.mock("@tanstack/react-router", () => ({
 describe("home image loading", () => {
   it("prioritizes the above-the-fold hero image", () => {
     const { container } = render(<HomeHero />);
-    const image = container.querySelector("img");
+    const image = container.querySelector(
+      'img[src="/project/reference/reference-exp.png"]',
+    );
 
+    expect(image).not.toBeNull();
     expect(image?.getAttribute("fetchpriority")).toBe("high");
     expect(image?.getAttribute("decoding")).toBe("async");
-    expect(image?.getAttribute("loading")).not.toBe("lazy");
+    expect([null, "eager"]).toContain(image?.getAttribute("loading"));
   });
 
   it("defers capability images below the fold", () => {
     const { container } = render(<HomeCapabilities />);
+    const images = [...container.querySelectorAll("img")];
 
-    expect(container.querySelectorAll("img")).toHaveLength(7);
-    container.querySelectorAll("img").forEach((image) => {
-      expect(image.getAttribute("loading")).toBe("lazy");
-      expect(image.getAttribute("decoding")).toBe("async");
-      expect(image.getAttribute("fetchpriority")).toBe("low");
-    });
+    const firstCapabilityImage = container.querySelector(
+      'img[src="/assets/characters/basketballPlayer/running-4-frames_south.gif"]',
+    );
+
+    expect(images).toHaveLength(7);
+    expect(firstCapabilityImage).not.toBeNull();
+    expect(firstCapabilityImage?.getAttribute("loading")).toBe("eager");
+    expect(firstCapabilityImage?.getAttribute("fetchpriority")).toBe("high");
+    images
+      .filter((image) => image !== firstCapabilityImage)
+      .forEach((image) => {
+        expect(image.getAttribute("loading")).toBe("lazy");
+        expect(image.getAttribute("decoding")).toBe("async");
+        expect(image.getAttribute("fetchpriority")).toBe("low");
+      });
   });
 
   it("defers the interactive project scene layers", () => {
