@@ -38,9 +38,22 @@ describe("SpriteSheetFrameTextureCache", () => {
       frameUrls: ["front.png", "back.png"],
     };
 
-    cache.get(sheet, 1);
+    expect(cache.get(sheet, 1)).toBe(cache.get(sheet, 1));
 
     expect(createTexture).toHaveBeenCalledWith(sheet, 1, 0, "back.png");
+    expect(createTexture).toHaveBeenCalledOnce();
+  });
+
+  it("passes no independent URL for existing sprite-sheet frames", () => {
+    const createTexture = vi.fn(
+      () => ({ destroy: vi.fn() }) as unknown as Texture,
+    );
+    const cache = new SpriteSheetFrameTextureCache(createTexture);
+    const sheet = spriteSheet("idle.png");
+
+    cache.get(sheet, 1);
+
+    expect(createTexture).toHaveBeenCalledWith(sheet, 1, 0, undefined);
   });
 
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {

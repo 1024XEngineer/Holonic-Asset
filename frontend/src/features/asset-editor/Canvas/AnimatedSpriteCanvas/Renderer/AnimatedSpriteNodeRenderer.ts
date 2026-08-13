@@ -89,6 +89,7 @@ export function drawAnimatedSpriteNode({
       prototype,
       layout.bounds.width,
       pixelScale,
+      unavailableTextureUrls,
     );
   } else if (
     spriteSheet?.imageUrl &&
@@ -144,10 +145,21 @@ function hasAvailablePrototypeFrame(
   prototype: CharacterSpriteSheet,
   unavailableTextureUrls?: ReadonlySet<string>,
 ) {
-  const urls = prototype.frameUrls?.length
-    ? prototype.frameUrls
-    : [prototype.imageUrl];
-  return urls.some((url) => url && !unavailableTextureUrls?.has(url));
+  return Array.from(
+    { length: getSpriteSheetFrameCount(prototype) },
+    (_, frame) => frame,
+  ).some((frame) =>
+    isSpriteSheetFrameAvailable(prototype, frame, unavailableTextureUrls),
+  );
+}
+
+export function isSpriteSheetFrameAvailable(
+  spriteSheet: CharacterSpriteSheet,
+  frame: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  const imageUrl = spriteSheet.frameUrls?.[frame] ?? spriteSheet.imageUrl;
+  return Boolean(imageUrl) && !unavailableTextureUrls?.has(imageUrl);
 }
 
 function drawLabel(
@@ -201,8 +213,10 @@ function drawFrame(
         )
         .stroke({ color: STAGE_ACCENT, width: 2 }),
     );
-  const imageUrl = spriteSheet?.frameUrls?.[index] ?? spriteSheet?.imageUrl;
-  if (spriteSheet && imageUrl && !unavailableTextureUrls?.has(imageUrl)) {
+  if (
+    spriteSheet &&
+    isSpriteSheetFrameAvailable(spriteSheet, index, unavailableTextureUrls)
+  ) {
     drawSpriteSheetFrame({
       container,
       frameTextures,
@@ -220,6 +234,7 @@ function drawSpriteSheetPreview(
   spriteSheet: CharacterSpriteSheet,
   containerWidth: number,
   pixelScale: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
 ) {
   const frameCount = getSpriteSheetFrameCount(spriteSheet);
   const columns = frameCount === 1 ? 1 : 2;
@@ -230,7 +245,11 @@ function drawSpriteSheetPreview(
   const startX = (containerWidth - width) / 2;
   const startY =
     frameCount === 1 ? COLLAPSED_PREVIEW_Y : 48 + (200 - height) / 2;
-  for (let frame = 0; frame < frameCount; frame += 1)
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    if (
+      !isSpriteSheetFrameAvailable(spriteSheet, frame, unavailableTextureUrls)
+    )
+      continue;
     drawSpriteSheetFrame({
       container,
       frameTextures,
@@ -244,6 +263,7 @@ function drawSpriteSheetPreview(
       },
       pixelScale,
     });
+  }
 }
 
 function drawControl(
