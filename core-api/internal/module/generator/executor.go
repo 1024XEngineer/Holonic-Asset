@@ -46,12 +46,14 @@ type executor struct {
 	animations AnimationGenerationService
 	processor  imageprocessor.Processor
 	assets     AssetWriter
+	projects   ProjectReader
 	references ReferenceStore
 }
 
 // ExecutorDependencies contains optional workflow integrations.
 type ExecutorDependencies struct {
 	References ReferenceStore
+	Projects   ProjectReader
 	LLM        llmclient.LLMService
 	Animations AnimationGenerationService
 }
@@ -70,6 +72,7 @@ func NewExecutorWithDependencies(
 		animations: dependencies.Animations,
 		processor:  processor,
 		assets:     assets,
+		projects:   dependencies.Projects,
 		references: dependencies.References,
 	}
 }
