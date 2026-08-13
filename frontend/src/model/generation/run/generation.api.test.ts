@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CreationRequest } from "./types";
 
@@ -22,12 +22,15 @@ import {
 } from "./generation.api";
 
 beforeEach(() => {
+  vi.stubGlobal("localStorage", createStorage());
   pruneGenerationRequests("42", []);
   vi.clearAllMocks();
   mocks.core.create.mockResolvedValue({ generationRunId: 17 });
   mocks.core.list.mockResolvedValue({ items: [] });
   mocks.readFileAsDataUrl.mockResolvedValue("data:image/png;base64,reference");
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("generationApi", () => {
   it.each([
@@ -102,6 +105,28 @@ describe("generationApi", () => {
     ]);
   });
 
+  it("restores generation metadata from browser storage", async () => {
+    const request = creationRequest();
+    await generationApi.enqueue({ projectId: "42", request });
+
+    vi.resetModules();
+    const reloaded = await import("./generation.api");
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 17,
+          projectId: 42,
+          kind: "generate_character_prototype",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(reloaded.generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({ name: request.name, prompt: request.prompt }),
+    ]);
+  });
+
   it("retains metadata for failed runs while pruning runs no longer listed", async () => {
     const request = creationRequest();
     await generationApi.enqueue({ projectId: "42", request });
@@ -168,5 +193,14 @@ function creationRequest(
     canvasSize: "48 × 64 px",
     perspective: "Isometric",
     ...overrides,
+  };
+}
+
+function createStorage() {
+  const values = new Map<string, string>();
+  return {
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+    removeItem: vi.fn((key: string) => values.delete(key)),
   };
 }

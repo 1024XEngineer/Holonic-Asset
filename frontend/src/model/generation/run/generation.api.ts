@@ -1,6 +1,9 @@
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 
-import { assetCanvasSizeDimensionsSchema } from "../../asset/library/asset-canvas-size";
+import {
+  assetCanvasSizeDimensionsSchema,
+  defaultAssetCanvasSize,
+} from "../../asset/library/asset-canvas-size";
 import { coreGenerationApi } from "./core-generation.api";
 import type {
   CreateGenerationRequest,
@@ -38,13 +41,20 @@ export const generationApi: GenerationApi = {
     const response = await coreGenerationApi.list(coreProjectId(projectId), {
       status: "active",
     });
-    return response.items.flatMap((item) => {
+    const storedMetadata = readGenerationRequests();
+    const runs = response.items.flatMap((item) => {
       const run = toGenerationRun(
         item,
-        generationRequests.get(runKey(projectId, item.id)),
+        generationRequests.get(runKey(projectId, item.id)) ??
+          storedMetadata[runKey(projectId, item.id)],
       );
       return run ? [run] : [];
     });
+    pruneGenerationRequests(
+      projectId,
+      runs.map((run) => run.id),
+    );
+    return runs;
   },
   enqueue: async (input) => {
     const request = await toCreateGenerationRequest(input.request);
@@ -58,15 +68,15 @@ export const generationApi: GenerationApi = {
       projectId: input.projectId,
       status: "pending",
     };
-    generationRequests.set(
-      runKey(input.projectId, run.id),
-      toGenerationRequestMetadata(input.request),
-    );
+    const metadata = toGenerationRequestMetadata(input.request);
+    generationRequests.set(runKey(input.projectId, run.id), metadata);
+    writeGenerationRequest(runKey(input.projectId, run.id), metadata);
     return run;
   },
 };
 
 const generationRequests = new Map<string, GenerationRequestMetadata>();
+const generationRequestsStorageKey = "holonic-generation-requests";
 
 export function pruneGenerationRequests(
   projectId: string,
@@ -76,11 +86,18 @@ export function pruneGenerationRequests(
     visibleRunIds.map((runId) => runKey(projectId, runId)),
   );
   const projectPrefix = `${projectId}:`;
-  for (const key of generationRequests.keys()) {
+  const storedRequests = readGenerationRequests();
+  const keys = new Set([
+    ...generationRequests.keys(),
+    ...Object.keys(storedRequests),
+  ]);
+  for (const key of keys) {
     if (key.startsWith(projectPrefix) && !visibleKeys.has(key)) {
       generationRequests.delete(key);
+      delete storedRequests[key];
     }
   }
+  writeGenerationRequests(storedRequests);
 }
 
 export async function toCreateGenerationRequest(
@@ -121,7 +138,7 @@ function toGenerationRun(
     kind,
     name: request?.name ?? `New ${kind}`,
     prompt: request?.prompt ?? "",
-    canvasSize: request?.canvasSize ?? "32 × 32 px",
+    canvasSize: request?.canvasSize ?? defaultAssetCanvasSize,
     perspective: request?.perspective,
     id: String(item.id),
     projectId: String(item.projectId),
@@ -170,4 +187,46 @@ function coreProjectId(projectId: string) {
     throw new Error("Asset generation requires a persisted Core API project.");
   }
   return value;
+}
+
+function readGenerationRequests() {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const value = JSON.parse(
+      localStorage.getItem(generationRequestsStorageKey) ?? "{}",
+    );
+    return value && typeof value === "object"
+      ? (value as Record<string, GenerationRequestMetadata>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGenerationRequest(
+  key: string,
+  metadata: GenerationRequestMetadata,
+) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const requests = readGenerationRequests();
+    requests[key] = metadata;
+    writeGenerationRequests(requests);
+  } catch {
+    // Metadata is an enhancement; generation itself must still succeed.
+  }
+}
+
+function writeGenerationRequests(
+  requests: Record<string, GenerationRequestMetadata>,
+) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(
+      generationRequestsStorageKey,
+      JSON.stringify(requests),
+    );
+  } catch {
+    // Ignore storage failures; the in-memory map is still pruned.
+  }
 }
