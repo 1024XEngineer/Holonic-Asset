@@ -14,9 +14,13 @@ type Params map[string]string
 type GenerateRequest struct {
 	Prompt          string
 	ReferenceImages []string
-	Model           string
-	Size            string
-	Params          Params
+	// MaskImage optionally constrains image editing. It must match the input
+	// image dimensions; transparent pixels are editable and opaque pixels are
+	// protected.
+	MaskImage string
+	Model     string
+	Size      string
+	Params    Params
 }
 
 // GeneratedImage is one normalized image returned by a model provider.

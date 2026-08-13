@@ -87,6 +87,7 @@ export function SpriteEditorMode({
           selectedFrames={selection.frames}
           onClearSelection={clearInspectorSelection}
           animations={animations}
+          prototype={sprite.prototype}
         />
       </div>
     </>

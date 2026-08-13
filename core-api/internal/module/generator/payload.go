@@ -53,13 +53,9 @@ type CreateAnimationPayload struct {
 	CreativeBrief string `json:"creative_brief"`
 	Style         string `json:"style,omitempty"`
 	FrameCount    int    `json:"frame_count,omitempty"`
-	Columns       int    `json:"columns,omitempty"`
-	FrameWidth    int    `json:"frame_width,omitempty"`
-	FrameHeight   int    `json:"frame_height,omitempty"`
 	FPS           int    `json:"fps,omitempty"`
 	Resolution    string `json:"resolution,omitempty"`
 	Duration      int    `json:"duration,omitempty"`
-	AspectRatio   string `json:"aspect_ratio,omitempty"`
 }
 
 // EditAnimationPayload is the self-contained input consumed by the animation

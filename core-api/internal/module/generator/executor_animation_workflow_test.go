@@ -334,7 +334,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		ReferenceImage:         "https://cdn.example.com/hero/direction_03-unprocessed.png?version=7",
 		ReferenceImagePrepared: false,
 		FrameCount:             8,
-		Columns:                4,
+		Columns:                3,
 		FrameWidth:             128,
 		FrameHeight:            128,
 		FPS:                    12,
@@ -353,7 +353,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		Direction:   "back_right",
 		Style:       "painted pixel art",
 		FrameCount:  8,
-		Columns:     4,
+		Columns:     3,
 		FrameWidth:  128,
 		FrameHeight: 128,
 		FPS:         12,
@@ -411,8 +411,8 @@ func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
 		Style:       "finely drawn production-quality 2D game asset art",
 		FrameCount:  16,
 		Columns:     4,
-		FrameWidth:  256,
-		FrameHeight: 256,
+		FrameWidth:  128,
+		FrameHeight: 128,
 		FPS:         10,
 		Resolution:  "720p",
 		Duration:    5,
@@ -527,7 +527,7 @@ func TestExecutorMapsTwoDirectionAssetLeftRight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parent := assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Content: encoded}
+	parent := assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Dimensions: json.RawMessage(`{"width":128,"height":128}`), Content: encoded}
 	animations := &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame"}}}}
 	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
@@ -594,6 +594,7 @@ func TestExecutorGeneratesObjectAnimationForSelectedDirection(t *testing.T) {
 		Type:        assetdomain.AssetTypeObject,
 		Name:        "chest",
 		Description: "wooden treasure chest",
+		Dimensions:  json.RawMessage(`{"width":48,"height":64}`),
 		Content:     encoded,
 	}
 	animations := &animationGenerationServiceStub{

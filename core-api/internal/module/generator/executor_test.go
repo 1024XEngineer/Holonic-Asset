@@ -339,6 +339,7 @@ func animationParentAsset(t *testing.T) assetdomain.Asset {
 		Type:        assetdomain.AssetTypeCharacter,
 		Name:        "hero",
 		Description: "silver-haired knight",
+		Dimensions:  json.RawMessage(`{"width":128,"height":128}`),
 		Content:     encoded,
 	}
 }

@@ -28,6 +28,7 @@ export function useInspectorEdit({
   selectedFrames,
   prompt,
   animations,
+  prototype,
   onPromptChange,
   onSubmit,
   isSubmitting = false,
@@ -37,6 +38,7 @@ export function useInspectorEdit({
   | "selectedFrames"
   | "prompt"
   | "animations"
+  | "prototype"
   | "onPromptChange"
   | "onSubmit"
   | "isSubmitting"
@@ -148,6 +150,7 @@ export function useInspectorEdit({
       selectedNodes,
       selectedFrames,
       animations,
+      prototype,
     ),
   };
 }
