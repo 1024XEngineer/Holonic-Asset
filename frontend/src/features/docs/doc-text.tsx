@@ -35,11 +35,22 @@ export function DocImage({
   src,
   altKey,
   className,
+  priority = false,
 }: {
   src: string;
   altKey: DocsKey;
   className?: string;
+  priority?: boolean;
 }) {
   const { t } = useTranslation("docs");
-  return <img src={src} alt={t(altKey)} className={className} />;
+  return (
+    <img
+      src={src}
+      alt={t(altKey)}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      fetchPriority={priority ? "high" : "low"}
+      className={className}
+    />
+  );
 }
