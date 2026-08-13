@@ -24,6 +24,9 @@ export function ReferenceComparison() {
             <img
               src={`/project/reference/${image}`}
               alt={t("reference.comparison.imageAlt", { title })}
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
               className="block aspect-square w-full object-contain [image-rendering:pixelated]"
             />
             <p className="flex-1 border-t border-neutral-950/10 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
