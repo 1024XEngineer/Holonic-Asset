@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DocImage } from "./doc-text";
 import { TwoDirectionExample } from "./direction-examples";
+import { PerspectiveExample } from "./perspective-examples";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -32,7 +33,7 @@ describe("docs image loading", () => {
     expect(image?.getAttribute("fetchpriority")).toBe("high");
   });
 
-  it("prioritizes only the first two-direction example image", () => {
+  it("prioritizes both above-the-fold two-direction images", () => {
     const { container } = render(<TwoDirectionExample priority />);
     const firstImage = container.querySelector(
       'img[src="/assets/characters/swordsman/idle-left.png"]',
@@ -43,7 +44,20 @@ describe("docs image loading", () => {
 
     expect(firstImage?.getAttribute("loading")).toBe("eager");
     expect(firstImage?.getAttribute("fetchpriority")).toBe("high");
-    expect(secondImage?.getAttribute("loading")).toBe("lazy");
-    expect(secondImage?.getAttribute("fetchpriority")).toBe("low");
+    expect(secondImage?.getAttribute("loading")).toBe("eager");
+    expect(secondImage?.getAttribute("fetchpriority")).toBe("high");
+  });
+
+  it("reserves intrinsic space for perspective images", () => {
+    const { container } = render(
+      <PerspectiveExample
+        image="isometric.png"
+        altKey="perspective.isometricAlt"
+      />,
+    );
+    const image = container.querySelector("img");
+
+    expect(image?.getAttribute("width")).toBe("1403");
+    expect(image?.getAttribute("height")).toBe("814");
   });
 });

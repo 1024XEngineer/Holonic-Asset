@@ -8,8 +8,8 @@ const fourDirections = [
 ] as const;
 
 const twoDirections = [
-  ["left", "idle-left.png"],
-  ["right", "idle-right.png"],
+  ["left", "idle-left.png", true],
+  ["right", "idle-right.png", true],
 ] as const;
 
 const eightDirections = [
@@ -31,7 +31,7 @@ export function TwoDirectionExample({
   const { t } = useTranslation("docs");
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {twoDirections.map(([direction, fileName], index) => (
+      {twoDirections.map(([direction, fileName, shouldPrioritize]) => (
         <div
           key={direction}
           className="relative grid aspect-square place-items-start overflow-hidden border border-neutral-950/10 bg-[#f0eee7]"
@@ -41,9 +41,9 @@ export function TwoDirectionExample({
             alt={t("directions.labels.swordsmanAlt", {
               label: t(`directions.labels.${direction}`),
             })}
-            loading={priority && index === 0 ? "eager" : "lazy"}
+            loading={priority && shouldPrioritize ? "eager" : "lazy"}
             decoding="async"
-            fetchPriority={priority && index === 0 ? "high" : "low"}
+            fetchPriority={priority && shouldPrioritize ? "high" : "low"}
             className="h-full max-w-none w-auto [image-rendering:pixelated]"
           />
           <span className="absolute right-2 bottom-2 border border-neutral-950/15 bg-white/85 px-2 py-1 font-mono text-[10px] font-semibold tracking-[0.1em] text-neutral-700">
