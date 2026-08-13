@@ -14,6 +14,7 @@ type Params map[string]string
 type GenerateRequest struct {
 	Prompt          string
 	ReferenceImages []string
+	MaskImage       string
 	Model           string
 	Size            string
 	Params          Params
