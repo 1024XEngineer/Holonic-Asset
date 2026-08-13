@@ -11,18 +11,56 @@ type tileSetPlacement struct {
 // assignTileSetLayout places Items in request order using only their occupied
 // Shape cells. Model output never influences the resulting grid positions.
 func assignTileSetLayout(request CreateTileSetPayload) ([]tileSetPlacement, error) {
-	columns := int(request.Dimensions.TileAmount.Columns)
-	rows := int(request.Dimensions.TileAmount.Rows)
-	if columns <= 0 || rows <= 0 {
+	tileAmount := request.Dimensions.TileAmount
+	if tileAmount.Columns == 0 || tileAmount.Rows == 0 {
 		return nil, fmt.Errorf("generator: Tileset layout requires a positive grid")
 	}
+	if tileAmount.Rows > maxTileSetGridTiles ||
+		tileAmount.Columns > maxTileSetGridTiles/tileAmount.Rows {
+		return nil, fmt.Errorf(
+			"generator: Tileset layout must not exceed %d cells",
+			maxTileSetGridTiles,
+		)
+	}
+	if len(request.Items) == 0 || len(request.Items) > maxTileSetItems {
+		return nil, fmt.Errorf(
+			"generator: Tileset layout requires between 1 and %d Items",
+			maxTileSetItems,
+		)
+	}
+	columns := int(tileAmount.Columns)
+	rows := int(tileAmount.Rows)
+	capacity := columns * rows
 
-	occupied := make(map[TileSetCoordinate]struct{})
+	occupied := make(map[TileSetCoordinate]struct{}, capacity)
 	placements := make([]tileSetPlacement, len(request.Items))
+	totalTiles := 0
 	for itemIndex, item := range request.Items {
+		if len(item.Shape) == 0 || len(item.Shape) > maxTilesPerItem {
+			return nil, fmt.Errorf(
+				"generator: Tileset Item %d Shape must contain between 1 and %d cells",
+				itemIndex,
+				maxTilesPerItem,
+			)
+		}
+		totalTiles += len(item.Shape)
+		if totalTiles > capacity {
+			return nil, fmt.Errorf("generator: Tileset layout has more occupied cells than the grid")
+		}
 		localShape, err := normalizeTileSetShape(item.Shape)
 		if err != nil {
 			return nil, fmt.Errorf("generator: normalize Tileset Item %d Shape: %w", itemIndex, err)
+		}
+		for _, cell := range localShape {
+			if cell[0] >= columns || cell[1] >= rows {
+				return nil, fmt.Errorf(
+					"generator: Tileset Item %d (%q) Shape cannot fit inside the %dx%d grid",
+					itemIndex,
+					item.Name,
+					columns,
+					rows,
+				)
+			}
 		}
 		origin, positions, found := findFirstTileSetPlacement(localShape, occupied, columns, rows)
 		if !found {
