@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, CreditCard, LogIn, LogOut, Settings } from "lucide-react";
@@ -14,8 +15,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAccountProfile } from "@/features/account";
-import { clearAuthSession, useAuthSession } from "@/features/auth";
+import { useAccountProfile } from "@/hooks/use-account-profile";
+import {
+  clearAuthSession,
+  readAuthSession,
+  subscribeAuthSession,
+} from "@/model/auth";
 
 const navigationItems = [
   ["/", "home"],
@@ -33,7 +38,11 @@ function isActivePath(pathname: string, to: string) {
 function AccountMenu() {
   const { t } = useTranslation("navigation");
   const navigate = useNavigate();
-  const session = useAuthSession();
+  const session = useSyncExternalStore(
+    subscribeAuthSession,
+    readAuthSession,
+    readAuthSession,
+  );
   const { avatarUrl } = useAccountProfile();
   const location = useRouterState({ select: (state) => state.location });
   const { href, pathname } = location;

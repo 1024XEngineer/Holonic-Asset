@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataApiError } from "@/lib/data-api-error";
-import { AuthSessionPersistenceError } from "../session";
+import { AuthSessionPersistenceError } from "@/model/auth";
 
 import { LoginForm } from "./login-form";
 import { useLoginController } from "./use-login-controller";
@@ -38,17 +38,13 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/model/auth", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/model/auth")>()),
-  authApi: { login: mocks.login },
-}));
-
 vi.mock("@/app/auth-navigation", () => ({
   resolveAuthRedirect: mocks.resolveAuthRedirect,
 }));
 
-vi.mock("../session", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../session")>()),
+vi.mock("@/model/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/model/auth")>()),
+  authApi: { login: mocks.login },
   saveAuthSession: mocks.saveAuthSession,
 }));
 

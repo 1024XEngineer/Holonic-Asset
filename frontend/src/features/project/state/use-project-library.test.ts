@@ -30,9 +30,6 @@ vi.mock("react", async (importOriginal) => {
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mocks.navigate,
 }));
-vi.mock("@/features/auth", () => ({
-  useAuthenticatedUserId: () => 4927310,
-}));
 
 vi.mock("@/model", () => ({
   reconcileProjectSelection: mocks.reconcile,

@@ -4,8 +4,11 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { resolveAuthRedirect } from "@/app/auth-navigation";
 import { DataApiError } from "@/lib/data-api-error";
-import { authApi } from "@/model/auth";
-import { AuthSessionPersistenceError, saveAuthSession } from "../session";
+import {
+  authApi,
+  AuthSessionPersistenceError,
+  saveAuthSession,
+} from "@/model/auth";
 
 export type LoginError =
   | "invalidCredentials"

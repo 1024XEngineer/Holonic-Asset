@@ -49,9 +49,6 @@ vi.mock("@tanstack/react-form", () => ({
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mocks.navigate,
 }));
-vi.mock("@/features/auth", () => ({
-  useAuthenticatedUserId: () => 4927310,
-}));
 vi.mock("@/model", () => ({
   useCreateProjectMutation: () => ({ mutateAsync: mocks.createProject }),
 }));

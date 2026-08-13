@@ -1,6 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 
-import { readAuthSession } from "@/features/auth/session";
+import { readAuthSession } from "@/model/auth";
 
 export function requireAuth(redirectTo: string) {
   if (readAuthSession()) return;
