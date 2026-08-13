@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { LoginResponse } from "@/model/auth";
+import type { LoginResponse } from "../auth.contract";
 
 export type AuthSession = LoginResponse & {
   expiresAt: number;
@@ -115,6 +115,12 @@ export function subscribeAuthSession(listener: () => void) {
 
 export function readAccessToken(): string | undefined {
   return readAuthSession()?.accessToken;
+}
+
+export function readAuthenticatedUserId(): number {
+  const session = readAuthSession();
+  if (!session) throw new Error("Authentication is required.");
+  return session.user.id;
 }
 
 function updateSnapshot(

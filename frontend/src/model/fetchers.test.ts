@@ -5,6 +5,7 @@ import { DataApiError } from "@/lib/data-api-error";
 import {
   configureCoreApiAuth,
   coreApiClient,
+  publicCoreApiClient,
   unwrapApiResponse,
 } from "./fetchers";
 
@@ -58,7 +59,7 @@ describe("core API client", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    await coreApiClient.POST("/auth/login", {
+    await publicCoreApiClient.POST("/auth/login", {
       body: { username: "kay", password: "secret" },
       headers: { "X-Request-ID": "login-request" },
     });
@@ -144,7 +145,7 @@ describe("core API client", () => {
     );
   });
 
-  it("does not attach a bearer token to login requests", async () => {
+  it("does not attach a bearer token to public requests", async () => {
     configureCoreApiAuth({
       getAccessToken: () => "old-token",
       onUnauthorized: () => undefined,
@@ -154,7 +155,7 @@ describe("core API client", () => {
       .mockResolvedValue(response({ code: 200, message: "", data: {} }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await coreApiClient.POST("/auth/login", {
+    await publicCoreApiClient.POST("/auth/login", {
       body: { username: "kay", password: "secret" },
     });
 

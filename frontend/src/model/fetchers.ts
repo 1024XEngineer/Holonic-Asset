@@ -29,15 +29,14 @@ export function configureCoreApiAuth(auth: CoreApiAuth) {
   coreApiAuth = auth;
 }
 
-export const coreApiClient = createClient<paths>({
-  baseUrl: apiBaseUrl(),
-  fetch: (request) => fetch(request),
-});
+const unavailableMiddleware: Middleware = {
+  onError({ error }) {
+    return new DataApiError("UNAVAILABLE", "Unable to reach the API.", error);
+  },
+};
 
 const authMiddleware: Middleware = {
-  onRequest({ request, schemaPath }) {
-    if (schemaPath === "/auth/login") return;
-
+  onRequest({ request }) {
     const accessToken = coreApiAuth.getAccessToken();
     if (accessToken && !request.headers.has("Authorization")) {
       request.headers.set("Authorization", `Bearer ${accessToken}`);
@@ -46,12 +45,20 @@ const authMiddleware: Middleware = {
   onResponse({ response }) {
     if (response.status === 401) coreApiAuth.onUnauthorized();
   },
-  onError({ error }) {
-    return new DataApiError("UNAVAILABLE", "Unable to reach the API.", error);
-  },
 };
 
-coreApiClient.use(authMiddleware);
+export const publicCoreApiClient = createCoreApiClient();
+export const coreApiClient = createCoreApiClient(authMiddleware);
+
+function createCoreApiClient(middleware?: Middleware) {
+  const client = createClient<paths>({
+    baseUrl: apiBaseUrl(),
+    fetch: (request) => fetch(request),
+  });
+  client.use(unavailableMiddleware);
+  if (middleware) client.use(middleware);
+  return client;
+}
 
 export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
   if (!response.ok) {
