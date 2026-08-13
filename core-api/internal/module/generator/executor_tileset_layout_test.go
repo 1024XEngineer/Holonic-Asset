@@ -93,6 +93,64 @@ func TestAssignTileSetLayoutRejectsOverlapWhenNoShapePlacementFits(t *testing.T)
 	}
 }
 
+func TestAssignTileSetLayoutRejectsUnboundedInputs(t *testing.T) {
+	tests := []struct {
+		name    string
+		request CreateTileSetPayload
+		want    string
+	}{
+		{
+			name: "oversized grid",
+			request: CreateTileSetPayload{
+				Dimensions: assetdomain.TileSetDimensions{
+					TileAmount: assetdomain.TileAmount{Columns: maxTileSetGridTiles, Rows: 2},
+				},
+				Items: []TileSetItemDefinition{{Shape: []TileSetCoordinate{{0, 0}}}},
+			},
+			want: "must not exceed 4096 cells",
+		},
+		{
+			name: "too many Items",
+			request: CreateTileSetPayload{
+				Dimensions: assetdomain.TileSetDimensions{
+					TileAmount: assetdomain.TileAmount{Columns: 8, Rows: 8},
+				},
+				Items: make([]TileSetItemDefinition, maxTileSetItems+1),
+			},
+			want: "between 1 and 64 Items",
+		},
+		{
+			name: "oversized Shape",
+			request: CreateTileSetPayload{
+				Dimensions: assetdomain.TileSetDimensions{
+					TileAmount: assetdomain.TileAmount{Columns: 64, Rows: 64},
+				},
+				Items: []TileSetItemDefinition{{Shape: make([]TileSetCoordinate, maxTilesPerItem+1)}},
+			},
+			want: "between 1 and 256 cells",
+		},
+		{
+			name: "Shape wider than grid",
+			request: CreateTileSetPayload{
+				Dimensions: assetdomain.TileSetDimensions{
+					TileAmount: assetdomain.TileAmount{Columns: 2, Rows: 2},
+				},
+				Items: []TileSetItemDefinition{{Name: "Wide", Shape: []TileSetCoordinate{{4, 3}, {6, 3}}}},
+			},
+			want: "Shape cannot fit inside the 2x2 grid",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := assignTileSetLayout(test.request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected error containing %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
 func TestNormalizeTileSetShapeRejectsInvalidCells(t *testing.T) {
 	for _, shape := range [][]TileSetCoordinate{
 		{},
