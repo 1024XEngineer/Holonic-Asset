@@ -6,6 +6,7 @@ import "context"
 type ProviderRequest struct {
 	Prompt          string
 	ReferenceImages []string
+	MaskImage       string
 	Model           string
 	Size            string
 	Params          Params
