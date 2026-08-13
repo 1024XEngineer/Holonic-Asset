@@ -24,7 +24,7 @@ func assignTileSetLayout(request CreateTileSetPayload) ([]tileSetPlacement, erro
 		if err != nil {
 			return nil, fmt.Errorf("generator: normalize Tileset Item %d Shape: %w", itemIndex, err)
 		}
-		origin, positions, found := findNearestTileSetPlacement(localShape, occupied, columns, rows)
+		origin, positions, found := findFirstTileSetPlacement(localShape, occupied, columns, rows)
 		if !found {
 			return nil, fmt.Errorf(
 				"generator: Tileset Item %d (%q) does not fit in the remaining %dx%d grid",
@@ -70,9 +70,9 @@ func normalizeTileSetShape(shape []TileSetCoordinate) ([]TileSetCoordinate, erro
 	return local, nil
 }
 
-// findNearestTileSetPlacement scans candidates in row-major order. This makes
-// the first valid origin the deterministic nearest free position to the top-left.
-func findNearestTileSetPlacement(
+// findFirstTileSetPlacement returns the first valid origin in row-major order,
+// scanning top-to-bottom and left-to-right.
+func findFirstTileSetPlacement(
 	shape []TileSetCoordinate,
 	occupied map[TileSetCoordinate]struct{},
 	columns int,
@@ -84,9 +84,8 @@ func findNearestTileSetPlacement(
 	for y := range rows {
 		for x := range columns {
 			origin := TileSetCoordinate{x, y}
-			positions := make([]TileSetCoordinate, len(shape))
 			valid := true
-			for index, cell := range shape {
+			for _, cell := range shape {
 				position := TileSetCoordinate{origin[0] + cell[0], origin[1] + cell[1]}
 				if position[0] < 0 || position[0] >= columns || position[1] < 0 || position[1] >= rows {
 					valid = false
@@ -96,9 +95,12 @@ func findNearestTileSetPlacement(
 					valid = false
 					break
 				}
-				positions[index] = position
 			}
 			if valid {
+				positions := make([]TileSetCoordinate, len(shape))
+				for index, cell := range shape {
+					positions[index] = TileSetCoordinate{origin[0] + cell[0], origin[1] + cell[1]}
+				}
 				return origin, positions, true
 			}
 		}
