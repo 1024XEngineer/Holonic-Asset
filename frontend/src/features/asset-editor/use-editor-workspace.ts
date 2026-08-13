@@ -210,8 +210,7 @@ export function useEditorWorkspace({
       prompt: inspectorPrompt,
       history: asset.history,
       isSubmitting: promptTask !== null,
-      onPromptChange: (value) =>
-        setInspectorPrompt(value),
+      onPromptChange: (value) => setInspectorPrompt(value),
       onSubmit: submitInspectorPrompt,
     },
   };

@@ -55,7 +55,9 @@ export function InspectorEdit(props: InspectorEditProps) {
               <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 {t("target")}
               </p>
-              <p className="truncate font-semibold">{controller.target.label}</p>
+              <p className="truncate font-semibold">
+                {controller.target.label}
+              </p>
             </div>
             <Tooltip>
               <TooltipTrigger
