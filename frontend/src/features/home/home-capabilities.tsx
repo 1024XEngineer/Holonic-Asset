@@ -137,9 +137,9 @@ export function HomeCapabilities() {
                 <img
                   src={preview.src}
                   alt={t(`capabilities.${key}.alt`)}
-                  loading={index === 0 ? "eager" : "lazy"}
+                  loading="lazy"
                   decoding="async"
-                  fetchPriority={index === 0 ? "high" : "low"}
+                  fetchPriority="low"
                   className={`aspect-square object-contain [image-rendering:pixelated] ${title === "Objects" ? "w-[62%] sm:w-[68%]" : "w-[76%] sm:w-[82%]"}`}
                 />
               ) : (

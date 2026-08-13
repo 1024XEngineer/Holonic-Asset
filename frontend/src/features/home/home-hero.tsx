@@ -43,6 +43,7 @@ export function HomeHero() {
                 <img
                   src="/project/reference/reference-exp.png"
                   alt={t("previewAlt")}
+                  loading="eager"
                   fetchPriority="high"
                   decoding="async"
                   className="absolute inset-0 size-full object-cover"
