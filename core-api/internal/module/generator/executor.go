@@ -36,7 +36,7 @@ type AssetWriter interface {
 	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
-	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
+	CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error)
 	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
