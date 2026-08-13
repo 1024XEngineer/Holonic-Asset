@@ -83,6 +83,21 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		assets.animationName != "walk" || len(assets.frames) != 2 {
 		t.Fatalf("unexpected animation update: %+v", assets)
 	}
+	wantGeneration := &assetdomain.AnimationGenerationConfig{
+		Direction:   "back_right",
+		Style:       "painted pixel art",
+		FrameCount:  8,
+		Columns:     4,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FPS:         12,
+		Resolution:  "1080p",
+		Duration:    8,
+		AspectRatio: "1:1",
+	}
+	if !reflect.DeepEqual(assets.animation.Generation, wantGeneration) {
+		t.Fatalf("unexpected persisted animation generation config: got %+v want %+v", assets.animation.Generation, wantGeneration)
+	}
 	if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
 		*assets.frames[0].URL != "uploads/generated-1.png" ||
 		assets.frames[0].Duration != 100 ||
@@ -101,6 +116,45 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		t.Fatalf("unexpected persisted animation frame inputs: %v", references.persisted)
 	}
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
+}
+
+func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
+	events := []string{}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "frame", MIMEType: "image/png"}},
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: animationParentAsset(t)}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
+
+	_, err := executor.Generate(
+		context.Background(),
+		generator.GenerateAnimation,
+		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":" FRONT "}`),
+	)
+	if err != nil {
+		t.Fatalf("generate animation with defaults: %v", err)
+	}
+	want := &assetdomain.AnimationGenerationConfig{
+		Direction:   "front",
+		Style:       "finely drawn production-quality 2D game asset art",
+		FrameCount:  16,
+		Columns:     4,
+		FrameWidth:  256,
+		FrameHeight: 256,
+		FPS:         10,
+		Resolution:  "720p",
+		Duration:    5,
+		AspectRatio: "1:1",
+	}
+	if !reflect.DeepEqual(assets.animation.Generation, want) {
+		t.Fatalf("unexpected persisted animation generation defaults: got %+v want %+v", assets.animation.Generation, want)
+	}
 }
 
 func TestExecutorRejectsMissingAnimationIdentityBeforeLookup(t *testing.T) {

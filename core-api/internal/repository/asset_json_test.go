@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"gorm.io/datatypes"
@@ -61,7 +62,7 @@ func TestAssetRepositoryDoesNotAdvanceContentWhenRecordCreationFails(t *testing.
 		RecordDao: &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}, err: wantErr},
 	}
 
-	_, err = repo.CreateAnimation(context.Background(), 7, "idle", nil)
+	_, err = repo.CreateAnimation(context.Background(), 7, domain.Animation{Name: "idle"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected record creation error, got %v", err)
 	}
@@ -310,11 +311,26 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	}
 
 	frameURL := "uploads/hero/walk/001.png"
+	generation := &domain.AnimationGenerationConfig{
+		Direction:   "front",
+		Style:       "painted pixel art",
+		FrameCount:  8,
+		Columns:     4,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FPS:         12,
+		Resolution:  "1080p",
+		Duration:    8,
+		AspectRatio: "1:1",
+	}
 	animationID, err := repo.CreateAnimation(
 		context.Background(),
 		7,
-		"walk",
-		[]domain.Frame{{ID: 1, URL: &frameURL, Duration: 100}},
+		domain.Animation{
+			Name:       "walk",
+			Frames:     []domain.Frame{{ID: 1, URL: &frameURL, Duration: 100}},
+			Generation: generation,
+		},
 	)
 	if err != nil {
 		t.Fatalf("create animation: %v", err)
@@ -328,7 +344,8 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	}
 	if len(updated.Animations) != 1 || updated.Animations[0].Name != "walk" ||
 		len(updated.Animations[0].Frames) != 1 || updated.Animations[0].Frames[0].URL == nil ||
-		*updated.Animations[0].Frames[0].URL != frameURL {
+		*updated.Animations[0].Frames[0].URL != frameURL ||
+		!reflect.DeepEqual(updated.Animations[0].Generation, generation) {
 		t.Fatalf("unexpected animation content: %+v", updated.Animations)
 	}
 	if updated.DirectionCount != content.DirectionCount || updated.Prototype == nil ||

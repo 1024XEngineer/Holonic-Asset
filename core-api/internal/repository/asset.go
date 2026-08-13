@@ -508,20 +508,23 @@ func (r *AssetRepositoryImpl) CreateSceneryAsset(ctx context.Context, asset *dom
 func (r *AssetRepositoryImpl) CreateAnimation(
 	ctx context.Context,
 	assetID uint,
-	name string,
-	frames []domain.Frame,
+	animation domain.Animation,
 ) (uint, error) {
-	if name == "" {
+	animation.Name = strings.TrimSpace(animation.Name)
+	if animation.Name == "" {
 		return 0, fmt.Errorf("repository: animation name is empty")
 	}
 	var animationID uint
 	if err := r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
 		animationID = nextAnimationID(content.Animations)
-		content.Animations = append(content.Animations, domain.Animation{
-			ID:     animationID,
-			Name:   name,
-			Frames: append([]domain.Frame(nil), frames...),
-		})
+		value := animation
+		value.ID = animationID
+		value.Frames = append([]domain.Frame(nil), animation.Frames...)
+		if animation.Generation != nil {
+			generation := *animation.Generation
+			value.Generation = &generation
+		}
+		content.Animations = append(content.Animations, value)
 		return nil
 	}); err != nil {
 		return 0, err
