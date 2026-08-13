@@ -128,18 +128,24 @@ type AnimationGenerationRequest struct {
 	// asset that does not need image-model redrawing. The executor selects one
 	// character or object direction before this service is called.
 	ReferenceImagePrepared bool
-	FrameCount             int
-	Columns                int
-	FrameWidth             int
-	FrameHeight            int
-	FPS                    int
-	Resolution             string
-	Duration               int
-	AspectRatio            string
+	// ReferenceImageContext marks an ordered context strip used for local frame edits.
+	ReferenceImageContext bool
+	FrameCount            int
+	Columns               int
+	FrameWidth            int
+	FrameHeight           int
+	FPS                   int
+	Resolution            string
+	Duration              int
+	AspectRatio           string
 }
 
 type AnimationGenerationResult struct {
-	Frames          []imageprocessor.ImageRegion
+	Frames []imageprocessor.ImageRegion
+	// RawFrames contains the sampled video frames before background removal and
+	// normalization. They are persisted beside processed frames with the
+	// -unprocessed suffix for future frame edits.
+	RawFrames       []imageprocessor.ImageRegion
 	Spritesheet     string
 	MIMEType        string
 	Normalization   *imageprocessor.AnimationNormalizationReport
@@ -217,10 +223,11 @@ func (s *animationGenerationService) Generate(
 		return nil, err
 	}
 	promptOptions := prompts.AnimationOptions{
-		Description: options.Description,
-		Style:       options.Style,
-		Action:      options.Action,
-		FrameCount:  options.FrameCount,
+		Description:  options.Description,
+		Style:        options.Style,
+		Action:       options.Action,
+		FrameCount:   options.FrameCount,
+		ContextSheet: options.ReferenceImageContext,
 	}
 	greenReference, err := s.prepareAnimationReference(
 		ctx,
@@ -504,6 +511,17 @@ func (s *animationGenerationService) processVideo(
 			BrightSaturationMin: animationChromaBrightSaturationMin, BrightValueMin: animationChromaBrightValueMin,
 		},
 		Select: func(analysis videoprocessor.FrameSequenceAnalysis) ([]int, error) {
+			if request.ReferenceImageContext {
+				indices, selectErr := selectEditFrameContextIndices(analysis, request.FrameCount)
+				if selectErr != nil {
+					return nil, selectErr
+				}
+				loop = AnimationLoopSelection{
+					CandidateFPS: analysis.FPS, StartFrame: indices[0], EndFrame: indices[len(indices)-1],
+					SpanFrames: indices[len(indices)-1] - indices[0], Method: "ordered_context_segment",
+				}
+				return indices, nil
+			}
 			selected, selectErr := videoprocessor.SelectFrameInterval(
 				analysis,
 				animationFrameSelectionOptions(request.FrameCount),
@@ -517,6 +535,16 @@ func (s *animationGenerationService) processVideo(
 	})
 	if err != nil {
 		return nil, err
+	}
+	rawFrames := make([]imageprocessor.ImageRegion, 0, len(processed.Frames))
+	for index, frame := range processed.Frames {
+		encodedFrame, encodeErr := imageprocessor.EncodePNGBase64(frame)
+		if encodeErr != nil {
+			return nil, fmt.Errorf("generator: encode raw animation frame %d: %w", index+1, encodeErr)
+		}
+		rawFrames = append(rawFrames, imageprocessor.ImageRegion{
+			Index: index, ImageBase64: encodedFrame, MIMEType: "image/png",
+		})
 	}
 	rawSheet, err := packAnimationVideoFrames(processed.Frames, request.Columns)
 	if err != nil {
@@ -550,10 +578,41 @@ func (s *animationGenerationService) processVideo(
 		return nil, fmt.Errorf("generator: normalize sampled animation frames: empty or incomplete result")
 	}
 	return &AnimationGenerationResult{
-		Frames: normalized.Regions, Spritesheet: normalized.ImageBase64,
+		Frames: normalized.Regions, RawFrames: rawFrames, Spritesheet: normalized.ImageBase64,
 		MIMEType: normalized.MIMEType, Normalization: normalized.AnimationReport,
 		Loop: loop,
 	}, nil
+}
+
+func selectEditFrameContextIndices(analysis videoprocessor.FrameSequenceAnalysis, frameCount int) ([]int, error) {
+	if frameCount < 1 {
+		return nil, fmt.Errorf("generator: edit frame count must be positive")
+	}
+	if analysis.ForegroundRatio < animationMinForegroundRatio {
+		return nil, &videoprocessor.QualityError{
+			Kind: "foreground", Message: fmt.Sprintf("generator: chroma-key separation failed: foreground ratio %.3f", analysis.ForegroundRatio),
+		}
+	}
+	if len(analysis.Frames) < frameCount {
+		return nil, fmt.Errorf("generator: video has %d candidate frames; need at least %d", len(analysis.Frames), frameCount)
+	}
+	indices := make([]int, frameCount)
+	if frameCount == 1 {
+		indices[0] = (len(analysis.Frames) - 1) / 2
+	} else {
+		last := len(analysis.Frames) - 1
+		for index := range frameCount {
+			indices[index] = (index*last + (frameCount-1)/2) / (frameCount - 1)
+		}
+	}
+	for _, index := range indices {
+		if !analysis.Frames[index].Safe {
+			return nil, &videoprocessor.QualityError{
+				Kind: "framing", Message: fmt.Sprintf("generator: edit context candidate frame %d violates the framing safety band", index),
+			}
+		}
+	}
+	return indices, nil
 }
 
 func animationFrameSelectionError(
@@ -965,6 +1024,12 @@ func (e *executor) persistAnimationFrames(
 	if e.references == nil {
 		return nil, ErrAnimationReferenceStoreRequired
 	}
+	if result == nil {
+		return nil, fmt.Errorf("generator: animation generation result is required")
+	}
+	if len(result.RawFrames) != 0 && len(result.RawFrames) != len(result.Frames) {
+		return nil, fmt.Errorf("generator: raw animation frame count %d does not match processed frame count %d", len(result.RawFrames), len(result.Frames))
+	}
 	frames := make([]assetdomain.Frame, len(result.Frames))
 	for index, frame := range result.Frames {
 		mediaType := strings.TrimSpace(frame.MIMEType)
@@ -984,6 +1049,20 @@ func (e *executor) persistAnimationFrames(
 			strings.HasPrefix(objectKey, "http://") ||
 			strings.HasPrefix(objectKey, "https://") {
 			return nil, fmt.Errorf("generator: persist animation frame %d: storage returned a non-object-key reference", index+1)
+		}
+		if len(result.RawFrames) != 0 {
+			raw := result.RawFrames[index]
+			if strings.TrimSpace(raw.ImageBase64) == "" {
+				return nil, fmt.Errorf("generator: raw animation frame %d is empty", index+1)
+			}
+			rawMediaType := strings.TrimSpace(raw.MIMEType)
+			if rawMediaType == "" {
+				rawMediaType = "image/png"
+			}
+			rawDataURL := "data:" + rawMediaType + ";base64," + raw.ImageBase64
+			if err := e.references.PersistReferenceAt(ctx, addObjectKeySuffix(objectKey, "-unprocessed"), rawDataURL); err != nil {
+				return nil, fmt.Errorf("generator: persist raw animation frame %d: %w", index+1, err)
+			}
 		}
 		frames[index] = assetdomain.Frame{
 			ID:       uint(index + 1),

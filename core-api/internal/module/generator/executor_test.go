@@ -48,19 +48,23 @@ type referenceUpload struct {
 }
 
 type executorReferenceStoreStub struct {
-	resolved     []string
-	persisted    []string
-	persistValue string
-	uploads      []referenceUpload
-	events       *[]string
-	resolveErr   error
-	persistErr   error
+	resolved      []string
+	resolveValues map[string]string
+	persisted     []string
+	persistValue  string
+	uploads       []referenceUpload
+	events        *[]string
+	resolveErr    error
+	persistErr    error
 }
 
 func (s *executorReferenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	s.resolved = append(s.resolved, reference)
 	if s.resolveErr != nil {
 		return "", s.resolveErr
+	}
+	if value, ok := s.resolveValues[reference]; ok {
+		return value, nil
 	}
 	return "signed:" + reference, nil
 }
@@ -187,6 +191,7 @@ type generationAssetWriterStub struct {
 	updatedAnimationID      uint
 	updatedFrames           []assetdomain.Frame
 	updateAnimationErr      error
+	updateCalls             int
 	err                     error
 	detailErr               error
 	recordErr               error
@@ -213,6 +218,9 @@ func (s *generationAssetWriterStub) GetDetail(
 		return assetdomain.Asset{}, s.err
 	}
 	if s.parentAsset.ID == assetID {
+		if s.updateCalls > 0 && s.detailResult != nil {
+			return *s.detailResult, nil
+		}
 		return s.parentAsset, nil
 	}
 	if s.detailResult != nil {
@@ -303,7 +311,12 @@ func (s *generationAssetWriterStub) UpdateAnimationFrames(
 	s.updatedAnimationAssetID = assetID
 	s.updatedAnimationID = animationID
 	s.updatedFrames = append([]assetdomain.Frame(nil), frames...)
-	return s.updateAnimationErr
+	s.frames = append([]assetdomain.Frame(nil), frames...)
+	s.updateCalls++
+	if s.updateAnimationErr != nil {
+		return s.updateAnimationErr
+	}
+	return s.err
 }
 
 func (s *generationAssetWriterStub) CreateRecord(

@@ -36,6 +36,29 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 	}
 }
 
+func TestBuildAnimationVideoUsesTemporalContextInstructionsForFrameEdits(t *testing.T) {
+	prompt := BuildAnimationVideo(AnimationOptions{
+		Description:  "travelling alchemist",
+		Style:        "painted 2D game art",
+		Action:       "make the flask glow",
+		FrameCount:   9,
+		ContextSheet: true,
+	})
+	for _, expected := range []string{
+		"ordered contact sheet of neighboring animation frames",
+		"LOCAL FRAME EDIT",
+		"do not restart the full action",
+		"boundaries can be inserted back into the original animation",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("context prompt does not contain %q:\n%s", expected, prompt)
+		}
+	}
+	if strings.Contains(prompt, "show one complete cycle from the initial pose") {
+		t.Fatalf("frame edit prompt must not request a new full cycle:\n%s", prompt)
+	}
+}
+
 func TestAnimationVideoPromptsStayInsideProviderLimit(t *testing.T) {
 	longText := strings.Repeat("长动作描述", 1000)
 	prompt := BuildAnimationVideo(AnimationOptions{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -143,6 +144,36 @@ func TestProcessAnimationVideoRejectsInvalidProcessorResults(t *testing.T) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
 		})
+	}
+}
+
+func TestSelectEditFrameContextIndicesSamplesOrderedFullSegment(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: make([]videoprocessor.FrameObservation, 10),
+	}
+	for index := range analysis.Frames {
+		analysis.Frames[index].Safe = true
+	}
+	indices, err := selectEditFrameContextIndices(analysis, 4)
+	if err != nil {
+		t.Fatalf("select context indices: %v", err)
+	}
+	want := []int{0, 3, 6, 9}
+	if !reflect.DeepEqual(indices, want) {
+		t.Fatalf("indices = %v, want %v", indices, want)
+	}
+}
+
+func TestSelectEditFrameContextIndicesRejectsUnsafeFrame(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{{Safe: true}, {Safe: false}, {Safe: true}},
+	}
+	_, err := selectEditFrameContextIndices(analysis, 3)
+	var qualityError *videoprocessor.QualityError
+	if !errors.As(err, &qualityError) || qualityError.Kind != "framing" {
+		t.Fatalf("expected framing quality error, got %v", err)
 	}
 }
 

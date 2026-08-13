@@ -288,6 +288,10 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 				{Index: 0, ImageBase64: "first", MIMEType: "image/png"},
 				{Index: 1, ImageBase64: "second", MIMEType: "image/png"},
 			},
+			RawFrames: []imageprocessor.ImageRegion{
+				{Index: 0, ImageBase64: "raw-first", MIMEType: "image/png"},
+				{Index: 1, ImageBase64: "raw-second", MIMEType: "image/png"},
+			},
 			VideoRequestID:  "request-1",
 			VideoAttempts:   1,
 			FrameDurationMS: 100,
@@ -380,6 +384,12 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		"data:image/png;base64,second",
 	}) {
 		t.Fatalf("unexpected persisted animation frame inputs: %v", references.persisted)
+	}
+	if !reflect.DeepEqual(references.uploads, []referenceUpload{
+		{key: "uploads/generated-1-unprocessed.png", reference: "data:image/png;base64,raw-first"},
+		{key: "uploads/generated-2-unprocessed.png", reference: "data:image/png;base64,raw-second"},
+	}) {
+		t.Fatalf("unexpected persisted raw animation frames: %+v", references.uploads)
 	}
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
 }

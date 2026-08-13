@@ -16,10 +16,11 @@ const (
 )
 
 type AnimationOptions struct {
-	Description string
-	Style       string
-	Action      string
-	FrameCount  int
+	Description  string
+	Style        string
+	Action       string
+	FrameCount   int
+	ContextSheet bool
 }
 
 // BuildAnimationVideo converts the user's semantic action specification into
@@ -32,6 +33,28 @@ func BuildAnimationVideo(options AnimationOptions) string {
 	action := limit(options.Action, maxAnimationActionLength)
 	if style == "" {
 		style = DefaultAnimationStyle
+	}
+	referenceInstructions := `REFERENCE IMAGE:
+- the input is exactly ONE isolated canonical subject view from the high-resolution prototype or direction sheet
+- use that subject for identity, scale, and orientation; never turn, mirror, switch views, or invent another direction
+- preserve identity, proportions, details, materials, palette, and art style`
+	actionInstructions := `ACTION:
+- interpret the requested action by its actual meaning; do not map it to a generic motion preset
+- show one complete cycle from the initial pose back to the same pose
+- include preparation, every semantically required intermediate stage, the main extreme, complete follow-through and recovery
+- strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
+- do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose`
+	if options.ContextSheet {
+		referenceInstructions = `TEMPORAL CONTEXT REFERENCE:
+- the input is an ordered contact sheet of neighboring animation frames, read left-to-right then top-to-bottom
+- use it only as temporal context; the output must be a normal video and must never reproduce the sheet layout
+- preserve the subject's exact identity, proportions, details, materials, palette, art style, orientation, scale, camera, and root position
+- preserve the original pose progression and make the first and last generated poses compatible with their neighboring context frames`
+		actionInstructions = `LOCAL FRAME EDIT:
+- apply the requested change while following the same ordered motion segment shown by the temporal context
+- preserve timing and pose progression outside the requested local change
+- do not restart the full action, invent a new cycle, reverse time, loop early, or jump between motion phases
+- produce a smooth ordered segment whose boundaries can be inserted back into the original animation`
 	}
 	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image.
 
@@ -46,17 +69,9 @@ USER SPECIFICATION — AUTHORITATIVE:
 - requested action: %s
 - the system will extract %d ordered frames later; do not render those frames as a sheet
 
-REFERENCE IMAGE:
-- the input is exactly ONE isolated canonical subject view from the high-resolution prototype or direction sheet
-- use that subject for identity, scale, and orientation; never turn, mirror, switch views, or invent another direction
-- preserve identity, proportions, details, materials, palette, and art style
+%s
 
-ACTION:
-- interpret the requested action by its actual meaning; do not map it to a generic motion preset
-- show one complete cycle from the initial pose back to the same pose
-- include preparation, every semantically required intermediate stage, the main extreme, complete follow-through and recovery
-- strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
-- do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose
+%s
 
 CONTINUITY:
 - preserve silhouette, proportions, details, materials, equipment, and attached-part geometry
@@ -67,7 +82,7 @@ FRAMING AND BACKGROUND:
 - keep the whole subject and props inside the inner 70%%; maintain at least 15%% uninterrupted empty space on every side
 - keep long parts, weapons, or tool tips inside the central area; reduce amplitude rather than reaching toward an edge
 - background is perfectly uniform pure chroma green #00FF00: no floor, shadow, gradient, scenery, lighting change, particles, text, audio, trails, or motion graphics`,
-		description, style, action, options.FrameCount))
+		description, style, action, options.FrameCount, referenceInstructions, actionInstructions))
 	return limit(prompt, MaxAnimationVideoCharacters)
 }
 
