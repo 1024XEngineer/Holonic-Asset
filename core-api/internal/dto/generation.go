@@ -49,6 +49,7 @@ type GetGenerationRequest struct {
 type GenerationResult struct {
 	AssetID     uint `json:"asset_id,omitempty" minimum:"1"`
 	AnimationID uint `json:"animation_id,omitempty" minimum:"1"`
+	Version     uint `json:"version,omitempty" minimum:"1"`
 }
 
 type GetGenerationResponse struct {
