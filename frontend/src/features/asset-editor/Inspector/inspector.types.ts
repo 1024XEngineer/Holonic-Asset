@@ -1,4 +1,8 @@
-import type { AssetRevision, CharacterAnimation } from "@/model";
+import type {
+  AssetRevision,
+  CharacterAnimation,
+  CharacterSpriteSheet,
+} from "@/model";
 import { z } from "zod";
 
 import type { AnimatedSpriteNodeId } from "../Canvas/AnimatedSpriteCanvas";
@@ -47,6 +51,7 @@ export type InspectorProps = {
   onPromptChange: (value: string) => void;
   history: AssetRevision[];
   animations: CharacterAnimation[];
+  prototype: CharacterSpriteSheet;
   onSubmit: (request: InspectorSubmitRequest) => void | Promise<void>;
   onClearSelection: () => void;
   isSubmitting?: boolean;
@@ -57,4 +62,11 @@ export type InspectorEditProps = Omit<InspectorProps, "history">;
 export type InspectorTargetSummary = {
   label: string;
   detail: string;
+  thumbnail: {
+    imageUrl: string;
+    column: number;
+    row: number;
+    columns: number;
+    rows: number;
+  };
 };

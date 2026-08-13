@@ -58,6 +58,15 @@ const animations = [
   { kind: "clip" as const, id: "walk", label: "Walk", frameCount: 4 },
 ];
 
+const prototype = {
+  format: "png-sprite-sheet" as const,
+  imageUrl: "/prototype.png",
+  frameWidth: 32,
+  frameHeight: 32,
+  columns: 4,
+  rows: 1,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cleanups.length = 0;
@@ -82,6 +91,7 @@ describe("useInspectorEdit", () => {
       selectedFrames: [{ nodeId: "walk", index: 1 }],
       prompt: "Refine the walk",
       animations,
+      prototype,
       onPromptChange,
       onSubmit,
     });
@@ -114,6 +124,7 @@ describe("useInspectorEdit", () => {
       selectedFrames: [],
       prompt: "Edit prototype",
       animations,
+      prototype,
       onPromptChange: vi.fn(),
       onSubmit,
     });
@@ -153,6 +164,7 @@ describe("useInspectorEdit", () => {
         selectedFrames: [],
         prompt,
         animations,
+        prototype,
         onPromptChange: vi.fn(),
         onSubmit,
         isSubmitting,
@@ -171,6 +183,7 @@ describe("useInspectorEdit", () => {
       selectedFrames: [],
       prompt: "Prompt",
       animations,
+      prototype,
       onPromptChange: vi.fn(),
       onSubmit: vi.fn(),
     });
@@ -206,6 +219,7 @@ describe("useInspectorEdit", () => {
       selectedFrames: [],
       prompt: "Prompt",
       animations,
+      prototype,
       onPromptChange: vi.fn(),
       onSubmit,
     });

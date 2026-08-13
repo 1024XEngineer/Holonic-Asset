@@ -36,6 +36,7 @@ export function useEditorWorkspace({
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
     null,
   );
+  const [inspectorPrompt, setInspectorPrompt] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const { schedule: scheduleNoticeReset } = useTimeout();
   const { schedule: schedulePromptTaskReset } = useTimeout();
@@ -44,6 +45,7 @@ export function useEditorWorkspace({
     setNotice(null);
     setAnimationTask(null);
     setPromptTask(null);
+    setInspectorPrompt("");
   }, [asset.id, asset.projectId]);
 
   const generationTasks = useMemo<EditorGenerationTask[]>(
@@ -205,11 +207,10 @@ export function useEditorWorkspace({
         }),
     },
     inspector: {
-      prompt: snapshot.record.prompt,
+      prompt: inspectorPrompt,
       history: asset.history,
       isSubmitting: promptTask !== null,
-      onPromptChange: (value) =>
-        session.dispatch({ type: "prompt.set", value }),
+      onPromptChange: (value) => setInspectorPrompt(value),
       onSubmit: submitInspectorPrompt,
     },
   };
