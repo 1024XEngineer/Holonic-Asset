@@ -271,7 +271,14 @@ func (e *executor) generatePrototypeResources(
 
 		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: region.ImageBase64,
-			Options:     imageprocessor.DefaultResizeOptions(int(dimensions.Width), int(dimensions.Height)),
+			// Prototype cells share the padded canonical-frame contract used by
+			// animation references and final animation frames. This leaves room
+			// for large animation poses without making the prototype appear
+			// larger at the same nominal dimensions.
+			Options: imageprocessor.AnimationFrameResizeOptions(
+				int(dimensions.Width),
+				int(dimensions.Height),
+			),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generator: resize %s direction %d image: %w", taskType, index, err)

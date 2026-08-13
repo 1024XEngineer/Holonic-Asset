@@ -20,6 +20,8 @@ func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
 		"backend supplied exactly 4 current prototype direction image(s)",
 		"Treat every supplied reference image as part of the original object prototype",
 		"No user or project reference image is supplied",
+		"zero-based array index is the direction identity",
+		"index 0 = front, index 1 = right, index 2 = back, index 3 = left",
 		"a wooden chest",
 		"Minor edit",
 		"Major edit",

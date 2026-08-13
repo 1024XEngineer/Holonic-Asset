@@ -37,6 +37,10 @@ Edit-scope rules:
 Object framing and style requirements:
 %s
 - The perspective-derived direction count and grid override any conflicting direction count or layout visible in the supplied references.
+- The zero-based array index is the direction identity used later when an animation selects its prototype reference image. Preserve the supplied order exactly: never reorder, mirror, omit, or duplicate direction views.
+- For 2 directions, use this exact array order: index 0 = left, index 1 = right.
+- For 4 directions, use this exact array order: index 0 = front, index 1 = right, index 2 = back, index 3 = left.
+- For 8 directions, use this exact array order: index 0 = front, index 1 = front-right, index 2 = right, index 3 = back-right, index 4 = back, index 5 = back-left, index 6 = left, index 7 = front-left.
 - Output one direction sheet containing exactly the backend-derived number of cells in the backend-defined grid.
 - Edit every required direction cell consistently when the requested change applies to the object.
 - Show the complete object fully inside every cell with balanced spacing on all sides. Never crop, cut off, hide, or merge any part with a cell or canvas edge.

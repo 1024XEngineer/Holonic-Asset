@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -292,6 +293,12 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
 		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
+	}
+	wantMargin := imageprocessor.AnimationFrameMargin(64, 64)
+	for index, request := range processor.resizeRequests {
+		if request.Options.Margin != wantMargin {
+			t.Fatalf("prototype direction %d margin = %d, want %d", index, request.Options.Margin, wantMargin)
+		}
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
