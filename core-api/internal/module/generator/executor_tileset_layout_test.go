@@ -8,7 +8,7 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-func TestAssignTileSetLayoutUsesRequestOrderAndNearestFreeOrigin(t *testing.T) {
+func TestAssignTileSetLayoutUsesRequestOrderAndFirstRowMajorOrigin(t *testing.T) {
 	request := CreateTileSetPayload{
 		Dimensions: assetdomain.TileSetDimensions{
 			TileAmount: assetdomain.TileAmount{Columns: 4, Rows: 3},
@@ -33,6 +33,26 @@ func TestAssignTileSetLayoutUsesRequestOrderAndNearestFreeOrigin(t *testing.T) {
 		if placement.ItemIndex != index || !reflect.DeepEqual(placement.Positions, want[index]) {
 			t.Fatalf("Item %d placement: got %+v want %v", index, placement, want[index])
 		}
+	}
+}
+
+func TestAssignTileSetLayoutUsesRowMajorOrderInsteadOfDistance(t *testing.T) {
+	request := CreateTileSetPayload{
+		Dimensions: assetdomain.TileSetDimensions{
+			TileAmount: assetdomain.TileAmount{Columns: 4, Rows: 2},
+		},
+		Items: []TileSetItemDefinition{
+			{Name: "First", Shape: []TileSetCoordinate{{0, 0}, {1, 0}, {2, 0}}},
+			{Name: "Second", Shape: []TileSetCoordinate{{0, 0}}},
+		},
+	}
+
+	placements, err := assignTileSetLayout(request)
+	if err != nil {
+		t.Fatalf("assign row-major layout: %v", err)
+	}
+	if got, want := placements[1].Origin, (TileSetCoordinate{3, 0}); got != want {
+		t.Fatalf("second Item origin: got %v want row-major origin %v", got, want)
 	}
 }
 
