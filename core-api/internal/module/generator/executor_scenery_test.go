@@ -14,12 +14,14 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
 type sceneryLLMStub struct {
 	events   *[]string
 	requests []*llmclient.CompletionRequest
 	results  []*llmclient.CompletionResult
+	errors   []error
 }
 
 func (s *sceneryLLMStub) Complete(_ context.Context, request *llmclient.CompletionRequest) (*llmclient.CompletionResult, error) {
@@ -28,6 +30,9 @@ func (s *sceneryLLMStub) Complete(_ context.Context, request *llmclient.Completi
 	}
 	s.requests = append(s.requests, request)
 	call := len(s.requests) - 1
+	if call < len(s.errors) && s.errors[call] != nil {
+		return nil, s.errors[call]
+	}
 	if call >= len(s.results) {
 		return nil, errors.New("missing LLM result")
 	}
@@ -38,6 +43,7 @@ type sceneryImageStub struct {
 	events   *[]string
 	requests []*imageclient.GenerateRequest
 	results  []*imageclient.GenerateResult
+	errors   []error
 }
 
 func (s *sceneryImageStub) Generate(_ context.Context, request *imageclient.GenerateRequest) (*imageclient.GenerateResult, error) {
@@ -46,27 +52,107 @@ func (s *sceneryImageStub) Generate(_ context.Context, request *imageclient.Gene
 	}
 	s.requests = append(s.requests, request)
 	call := len(s.requests) - 1
+	if call < len(s.errors) && s.errors[call] != nil {
+		return nil, s.errors[call]
+	}
 	if call >= len(s.results) {
 		return nil, errors.New("missing image result")
 	}
 	return s.results[call], nil
 }
 
-type sceneryProcessorStub struct{ events *[]string }
+type sceneryProcessorStub struct {
+	events    *[]string
+	removeErr error
+	resizeErr error
+	verifyErr error
+	removed   *imageprocessor.RemoveBackgroundResult
+	resized   *imageprocessor.ResizeResult
+	verified  *imageprocessor.VerificationReport
+}
 
 func (s *sceneryProcessorStub) RemoveBackground(_ context.Context, request *imageprocessor.RemoveBackgroundRequest) (*imageprocessor.RemoveBackgroundResult, error) {
 	*s.events = append(*s.events, "remove")
+	if s.removeErr != nil {
+		return nil, s.removeErr
+	}
+	if s.removed != nil {
+		return s.removed, nil
+	}
 	return &imageprocessor.RemoveBackgroundResult{ImageBase64: "removed:" + request.ImageBase64, MIMEType: "image/png"}, nil
 }
 
 func (s *sceneryProcessorStub) Resize(_ context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
 	*s.events = append(*s.events, "resize")
+	if s.resizeErr != nil {
+		return nil, s.resizeErr
+	}
+	if s.resized != nil {
+		return s.resized, nil
+	}
 	return &imageprocessor.ResizeResult{ImageBase64: base64.StdEncoding.EncodeToString([]byte("processed:" + request.ImageBase64)), MIMEType: "image/png"}, nil
 }
 
 func (s *sceneryProcessorStub) Verify(context.Context, *imageprocessor.VerifyRequest) (*imageprocessor.VerificationReport, error) {
 	*s.events = append(*s.events, "verify")
+	if s.verifyErr != nil {
+		return nil, s.verifyErr
+	}
+	if s.verified != nil {
+		return s.verified, nil
+	}
 	return &imageprocessor.VerificationReport{Passed: true}, nil
+}
+
+func TestExecutorStopsSceneryWorkflowAtFailedStage(t *testing.T) {
+	wantErr := errors.New("stage failed")
+	tests := []struct {
+		name      string
+		llm       *sceneryLLMStub
+		images    *sceneryImageStub
+		processor *sceneryProcessorStub
+	}{
+		{name: "planning provider", llm: &sceneryLLMStub{errors: []error{wantErr}}},
+		{name: "empty planning result", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{nil}}},
+		{name: "invalid plan", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{{JSON: json.RawMessage(`{}`)}}}},
+		{name: "image provider", images: &sceneryImageStub{errors: []error{wantErr}}},
+		{name: "empty image", images: &sceneryImageStub{results: []*imageclient.GenerateResult{nil}}},
+		{name: "remove background", processor: &sceneryProcessorStub{removeErr: wantErr}},
+		{name: "empty removed image", processor: &sceneryProcessorStub{removed: &imageprocessor.RemoveBackgroundResult{}}},
+		{name: "resize", processor: &sceneryProcessorStub{resizeErr: wantErr}},
+		{name: "invalid resized image", processor: &sceneryProcessorStub{resized: &imageprocessor.ResizeResult{ImageBase64: "png", MIMEType: "image/jpeg"}}},
+		{name: "verify", processor: &sceneryProcessorStub{verifyErr: wantErr}},
+		{name: "verification rejected", processor: &sceneryProcessorStub{verified: &imageprocessor.VerificationReport{Passed: false}}},
+		{name: "layout provider", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)}}, errors: []error{nil, wantErr}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			llm := test.llm
+			if llm == nil {
+				llm = validSingleLayerSceneryLLM()
+			}
+			llm.events = &events
+			images := test.images
+			if images == nil {
+				images = &sceneryImageStub{results: sceneryImageResults()[:1]}
+			}
+			images.events = &events
+			processor := test.processor
+			if processor == nil {
+				processor = &sceneryProcessorStub{}
+			}
+			processor.events = &events
+			assets := &generationAssetWriterStub{events: &events}
+			executor := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
+				LLM: llm, Resources: &sceneryResourceStoreStub{},
+			})
+			_, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
+			if err == nil || assets.sceneryAsset != nil {
+				t.Fatalf("expected workflow failure before asset creation, got err=%v asset=%+v events=%v", err, assets.sceneryAsset, events)
+			}
+		})
+	}
 }
 
 func (*sceneryProcessorStub) SplitImage(context.Context, *imageprocessor.SplitImageRequest) (*imageprocessor.SplitImageResult, error) {
@@ -142,6 +228,56 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsSceneryPayloadFromProjectContext(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{
+		Name: "Moon Valley", GameType: "RPG", TargetPlatform: "PC", Description: "exploration",
+		Style: "pixel art", Perspective: "Side-On", Reference: "projects/42/reference.png",
+	}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{Projects: projects, References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "a valley at dawn",
+		Parameters: json.RawMessage(`{"asset_name":"Dawn Valley","style":"","dimensions":{"width":640,"height":360},"reference":""}`),
+	})
+	if err != nil {
+		t.Fatalf("create scenery: %v", err)
+	}
+	var payload generator.CreateSceneryPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode scenery payload: %v", err)
+	}
+	if payload.AssetName != "Dawn Valley" || payload.Style != "pixel art" || payload.Perspective != "Side-On" ||
+		payload.ProjectContext.Name != "Moon Valley" || payload.ProjectContext.GameType != "RPG" ||
+		payload.ProjectContext.TargetPlatform != "PC" || payload.ProjectContext.Description != "exploration" ||
+		payload.Reference != "uploads/generated-1.png" || projects.calls != 1 ||
+		!reflect.DeepEqual(references.persisted, []string{"projects/42/reference.png"}) {
+		t.Fatalf("unexpected scenery preparation: payload=%+v project_calls=%d persisted=%v", payload, projects.calls, references.persisted)
+	}
+}
+
+func TestCreateRejectsInvalidSceneryRequests(t *testing.T) {
+	assetID := uint(7)
+	tests := []struct {
+		name    string
+		request *generator.Request
+	}{
+		{name: "asset target", request: &generator.Request{ProjectID: 42, AssetID: &assetID, Kind: generator.GenerateScenery, CreativeBrief: "forest", Parameters: json.RawMessage(`{"asset_name":"Forest","dimensions":{"width":640,"height":360}}`)}},
+		{name: "unknown parameter", request: &generator.Request{ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "forest", Parameters: json.RawMessage(`{"asset_name":"Forest","dimensions":{"width":640,"height":360},"layers":[]}`)}},
+		{name: "missing name", request: &generator.Request{ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "forest", Parameters: json.RawMessage(`{"dimensions":{"width":640,"height":360}}`)}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tasks := &taskManagerStub{}
+			_, err := generator.NewEngine(tasks, nil).Create(context.Background(), test.request)
+			if !errors.Is(err, generator.ErrInvalidSceneryPayload) || tasks.createdTask != nil {
+				t.Fatalf("expected invalid scenery payload without publish, got err=%v task=%+v", err, tasks.createdTask)
+			}
+		})
+	}
+}
+
 func TestExecutorCleansUpSceneryResourcesAfterFailures(t *testing.T) {
 	t.Run("upload", func(t *testing.T) {
 		wantErr := errors.New("object storage unavailable")
@@ -187,6 +323,13 @@ func validSceneryLLM(events *[]string) *sceneryLLMStub {
 	return &sceneryLLMStub{events: events, results: []*llmclient.CompletionResult{
 		{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"},{"name":"Mountains","creative_brief":"distant peaks"}]}`)},
 		{JSON: json.RawMessage(`{"layers":[{"id":2,"position":{"x":100,"y":40},"scale":{"x":0.8,"y":0.8},"rotation":0,"opacity":0.75,"zIndex":20},{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":-10}]}`)},
+	}}
+}
+
+func validSingleLayerSceneryLLM() *sceneryLLMStub {
+	return &sceneryLLMStub{results: []*llmclient.CompletionResult{
+		{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)},
+		{JSON: json.RawMessage(`{"layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}]}`)},
 	}}
 }
 
