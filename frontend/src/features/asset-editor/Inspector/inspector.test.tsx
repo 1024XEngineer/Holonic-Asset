@@ -13,6 +13,14 @@ const animations: CharacterAnimation[] = [
     id: "idle-front",
     label: "Idle Front",
     frameCount: 4,
+    spriteSheet: {
+      format: "png-sprite-sheet",
+      imageUrl: "/idle-front.png",
+      frameWidth: 32,
+      frameHeight: 32,
+      columns: 2,
+      rows: 2,
+    },
   },
 ];
 
@@ -67,11 +75,11 @@ describe("Inspector", () => {
       label: "Idle Front - Frames 1, 3",
       detail: "Selected on canvas",
       thumbnail: {
-        imageUrl: "/prototype.png",
+        imageUrl: "/idle-front.png",
         column: 0,
         row: 0,
-        columns: 4,
-        rows: 1,
+        columns: 2,
+        rows: 2,
       },
     });
   });
@@ -93,6 +101,44 @@ describe("Inspector", () => {
         row: 0,
         columns: 4,
         rows: 1,
+      },
+    });
+  });
+
+  it("renders the selected frame thumbnail in the target control", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          selectedNodes={["prototype"]}
+          selectedFrames={[{ nodeId: "prototype", index: 1 }]}
+          prompt="Refine the silhouette"
+          onPromptChange={() => undefined}
+          history={[]}
+          animations={animations}
+          prototype={prototype}
+          onSubmit={() => undefined}
+          onClearSelection={() => undefined}
+        />,
+      ),
+    );
+
+    expect(html).toContain("Prototype - Frame 2");
+    expect(html).toContain('src="/prototype.png"');
+    expect(html).toContain("translate(-25%, -0%)");
+  });
+
+  it("uses the selected animation image for a node target", () => {
+    expect(
+      getInspectorTargetSummary(["idle-front"], [], animations, prototype),
+    ).toEqual({
+      label: "Idle Front",
+      detail: "Selected item",
+      thumbnail: {
+        imageUrl: "/idle-front.png",
+        column: 0,
+        row: 0,
+        columns: 2,
+        rows: 2,
       },
     });
   });
