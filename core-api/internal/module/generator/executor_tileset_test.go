@@ -226,6 +226,27 @@ func TestAlignTileSetImageToShapeRecoversUShapeTopBar(t *testing.T) {
 	}
 }
 
+func TestAlignTileSetImageToShapeRejectsTransparentFullShape(t *testing.T) {
+	const tileSize = 16
+	original := image.NewRGBA(image.Rect(0, 0, 2*tileSize, tileSize))
+	encoded, err := imageprocessor.EncodePNGBase64(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = alignTileSetImageToShape(
+		encoded,
+		[]TileSetCoordinate{{0, 0}, {1, 0}},
+		2,
+		1,
+		tileSize,
+		tileSize,
+	)
+	if err == nil || !strings.Contains(err.Error(), "no visible pixels") {
+		t.Fatalf("expected transparent Item error, got %v", err)
+	}
+}
+
 func TestAlignTileSetImageToShapeRejectsUnrecoverableClipping(t *testing.T) {
 	const tileSize = 16
 	original := image.NewRGBA(image.Rect(0, 0, 4*tileSize, 3*tileSize))
