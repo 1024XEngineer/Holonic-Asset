@@ -35,6 +35,14 @@ describe("asset record defaults", () => {
     expect(objectRecord).not.toHaveProperty("character");
   });
 
+  it("leaves animations empty when an asset has no animation data", () => {
+    const characterRecord = createDefaultAssetRecord("character", asset);
+    const objectRecord = createDefaultAssetRecord("object", asset);
+
+    expect(characterRecord.character.animations).toEqual([]);
+    expect(objectRecord.object.animations).toEqual([]);
+  });
+
   it("merges object records without crossing the character boundary", () => {
     const fallback = createDefaultAssetRecord("object", asset);
     const saved = structuredClone(fallback);
