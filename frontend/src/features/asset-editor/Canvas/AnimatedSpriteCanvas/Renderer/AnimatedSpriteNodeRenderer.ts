@@ -145,11 +145,8 @@ function hasAvailablePrototypeFrame(
   prototype: CharacterSpriteSheet,
   unavailableTextureUrls?: ReadonlySet<string>,
 ) {
-  return Array.from(
-    { length: getSpriteSheetFrameCount(prototype) },
-    (_, frame) => frame,
-  ).some((frame) =>
-    isSpriteSheetFrameAvailable(prototype, frame, unavailableTextureUrls),
+  return (
+    getAvailableSpriteSheetFrames(prototype, unavailableTextureUrls).length > 0
   );
 }
 
@@ -160,6 +157,18 @@ export function isSpriteSheetFrameAvailable(
 ) {
   const imageUrl = spriteSheet.frameUrls?.[frame] ?? spriteSheet.imageUrl;
   return Boolean(imageUrl) && !unavailableTextureUrls?.has(imageUrl);
+}
+
+export function getAvailableSpriteSheetFrames(
+  spriteSheet: CharacterSpriteSheet,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  return Array.from(
+    { length: getSpriteSheetFrameCount(spriteSheet) },
+    (_, frame) => frame,
+  ).filter((frame) =>
+    isSpriteSheetFrameAvailable(spriteSheet, frame, unavailableTextureUrls),
+  );
 }
 
 function drawLabel(
