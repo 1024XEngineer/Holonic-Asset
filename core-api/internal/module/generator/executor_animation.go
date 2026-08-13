@@ -720,7 +720,7 @@ func (e *executor) generateAnimation(
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
 	}
-	generated, err := e.animations.Generate(ctx, &AnimationGenerationRequest{
+	generationRequest, err := normalizeAnimationGenerationRequest(&AnimationGenerationRequest{
 		Description:            description,
 		Style:                  payload.Style,
 		Action:                 payload.CreativeBrief,
@@ -736,6 +736,10 @@ func (e *executor) generateAnimation(
 		AspectRatio:            payload.AspectRatio,
 	})
 	if err != nil {
+		return nil, fmt.Errorf("generator: normalize animation request: %w", err)
+	}
+	generated, err := e.animations.Generate(ctx, &generationRequest)
+	if err != nil {
 		return nil, fmt.Errorf("generator: generate animation frames: %w", err)
 	}
 	if generated == nil || len(generated.Frames) == 0 {
@@ -745,7 +749,22 @@ func (e *executor) generateAnimation(
 	if err != nil {
 		return nil, err
 	}
-	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, animationName, frames)
+	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, assetdomain.Animation{
+		Name:   animationName,
+		Frames: frames,
+		Generation: &assetdomain.AnimationGenerationConfig{
+			Direction:   strings.ToLower(strings.TrimSpace(payload.Direction)),
+			Style:       generationRequest.Style,
+			FrameCount:  generationRequest.FrameCount,
+			Columns:     generationRequest.Columns,
+			FrameWidth:  generationRequest.FrameWidth,
+			FrameHeight: generationRequest.FrameHeight,
+			FPS:         generationRequest.FPS,
+			Resolution:  generationRequest.Resolution,
+			Duration:    generationRequest.Duration,
+			AspectRatio: generationRequest.AspectRatio,
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: create animation for asset %d: %w", payload.AssetID, err)
 	}

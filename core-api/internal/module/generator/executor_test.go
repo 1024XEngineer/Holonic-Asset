@@ -172,6 +172,7 @@ type generationAssetWriterStub struct {
 	recordVersion    uint
 	expectedVersion  uint
 	animationAssetID uint
+	animation        assetdomain.Animation
 	animationName    string
 	animationID      uint
 	frames           []assetdomain.Frame
@@ -239,13 +240,14 @@ func (s *generationAssetWriterStub) CreateObjectAsset(
 func (s *generationAssetWriterStub) CreateAnimation(
 	_ context.Context,
 	assetID uint,
-	name string,
-	frames []assetdomain.Frame,
+	animation assetdomain.Animation,
 ) (uint, error) {
 	*s.events = append(*s.events, "create_animation")
 	s.animationAssetID = assetID
-	s.animationName = name
-	s.frames = append([]assetdomain.Frame(nil), frames...)
+	s.animation = animation
+	s.animation.Frames = append([]assetdomain.Frame(nil), animation.Frames...)
+	s.animationName = animation.Name
+	s.frames = append([]assetdomain.Frame(nil), animation.Frames...)
 	if s.err != nil {
 		return 0, s.err
 	}

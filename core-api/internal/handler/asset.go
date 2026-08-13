@@ -156,7 +156,7 @@ func (h *Handler) resolveAssetContent(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	if h.references == nil || len(raw) == 0 {
+	if len(raw) == 0 {
 		return raw, nil
 	}
 	var content map[string]json.RawMessage
@@ -167,26 +167,36 @@ func (h *Handler) resolveAssetContent(
 		return raw, nil
 	}
 
-	if value, ok := content["prototype"]; ok {
-		resolved, err := h.resolveImageArray(ctx, value, "prototype", "")
-		if err != nil {
-			return nil, err
-		}
-		content["prototype"] = resolved
-	}
 	if value, ok := content["animations"]; ok {
-		resolved, err := h.resolveImageArray(ctx, value, "animations", "frames")
+		sanitized, err := stripAnimationGeneration(value)
 		if err != nil {
 			return nil, err
 		}
-		content["animations"] = resolved
+		content["animations"] = sanitized
 	}
-	if value, ok := content["items"]; ok {
-		resolved, err := h.resolveImageArray(ctx, value, "items", "tiles")
-		if err != nil {
-			return nil, err
+
+	if h.references != nil {
+		if value, ok := content["prototype"]; ok {
+			resolved, err := h.resolveImageArray(ctx, value, "prototype", "")
+			if err != nil {
+				return nil, err
+			}
+			content["prototype"] = resolved
 		}
-		content["items"] = resolved
+		if value, ok := content["animations"]; ok {
+			resolved, err := h.resolveImageArray(ctx, value, "animations", "frames")
+			if err != nil {
+				return nil, err
+			}
+			content["animations"] = resolved
+		}
+		if value, ok := content["items"]; ok {
+			resolved, err := h.resolveImageArray(ctx, value, "items", "tiles")
+			if err != nil {
+				return nil, err
+			}
+			content["items"] = resolved
+		}
 	}
 
 	encoded, err := json.Marshal(content)
@@ -194,6 +204,32 @@ func (h *Handler) resolveAssetContent(
 		return nil, fmt.Errorf("handler: encode asset content: %w", err)
 	}
 	return json.RawMessage(encoded), nil
+}
+
+func stripAnimationGeneration(raw json.RawMessage) (json.RawMessage, error) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return raw, nil
+	}
+	var animations []json.RawMessage
+	if err := json.Unmarshal(raw, &animations); err != nil {
+		return nil, fmt.Errorf("handler: decode asset content animations: %w", err)
+	}
+	for index, value := range animations {
+		animation, err := decodeJSONObject(value)
+		if err != nil {
+			return nil, fmt.Errorf("handler: decode asset content animations[%d]: %w", index, err)
+		}
+		delete(animation, "generation")
+		animations[index], err = json.Marshal(animation)
+		if err != nil {
+			return nil, fmt.Errorf("handler: encode asset content animations[%d]: %w", index, err)
+		}
+	}
+	encoded, err := json.Marshal(animations)
+	if err != nil {
+		return nil, fmt.Errorf("handler: encode asset content animations: %w", err)
+	}
+	return encoded, nil
 }
 
 func (h *Handler) resolveImageArray(
