@@ -23,6 +23,7 @@ type ReferenceStore interface {
 	PersistReference(context.Context, string) (string, error)
 	NewObjectKey(string) (string, error)
 	PersistReferenceAt(context.Context, string, string) error
+	DeleteObjects(context.Context, []string) error
 }
 
 type ExecutionResult struct {
@@ -36,6 +37,7 @@ type AssetWriter interface {
 	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
+	CreateTileSetAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error)
 	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
 	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
@@ -150,9 +152,55 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.editAnimation(ctx, request)
+	case GenerateTileSet:
+		if err := e.requireTileSetDependencies(); err != nil {
+			return nil, err
+		}
+		request := CreateTileSetPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.generateTileSet(ctx, request)
+	case EditTiles:
+		if err := e.requireTileSetDependencies(); err != nil {
+			return nil, err
+		}
+		request := EditTilesPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editTileSetTiles(ctx, request)
+	case EditTilesetItem:
+		if err := e.requireTileSetDependencies(); err != nil {
+			return nil, err
+		}
+		request := EditTilesetItemPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editTileSetItem(ctx, request)
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, taskType)
 	}
+}
+
+func (e *executor) requireTileSetDependencies() error {
+	if e.images == nil {
+		return ErrImageServiceRequired
+	}
+	if e.processor == nil {
+		return ErrImageProcessorRequired
+	}
+	if e.assets == nil {
+		return ErrAssetWriterRequired
+	}
+	if e.projects == nil {
+		return fmt.Errorf("generator: project reader is required for Tileset execution")
+	}
+	if e.references == nil {
+		return fmt.Errorf("generator: reference store is required for Tileset execution")
+	}
+	return nil
 }
 
 func (e *executor) requirePrototypeDependencies() error {
