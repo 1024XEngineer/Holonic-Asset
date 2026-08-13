@@ -1,5 +1,8 @@
 import { coreAssetApi } from "./core-asset.api";
-import type { AssetListItemResponse } from "./asset.contract";
+import type {
+  AssetDetailResponse,
+  AssetListItemResponse,
+} from "./asset.contract";
 import {
   assetCanvasSizeDimensionsSchema,
   resolveAssetCanvasSize,
@@ -18,7 +21,13 @@ export type SaveAssetRevisionInput<Payload> = {
 export const assetApi = {
   listGroups: async (projectId: string) => {
     const response = await coreAssetApi.list(coreProjectId(projectId));
-    return toAssetGroups(response.assets);
+    const details = await Promise.all(
+      response.assets.map(async (asset) => {
+        const detail = await coreAssetApi.detail(asset.assetId);
+        return [asset.assetId, detail] as const;
+      }),
+    );
+    return toAssetGroups(response.assets, new Map(details));
   },
   copy: async (projectId: string, assetId: string) => {
     await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
@@ -52,12 +61,17 @@ export const assetApi = {
   },
 };
 
-export function toAssetGroups(items: AssetListItemResponse[]) {
+export function toAssetGroups(
+  items: AssetListItemResponse[],
+  details: ReadonlyMap<number, AssetDetailResponse> = new Map(),
+) {
   const groups = new Map<AssetKind, ProjectAsset[]>();
 
   for (const item of items) {
     const kind = item.type === "tileSet" ? "tileset" : item.type;
     const assets = groups.get(kind) ?? [];
+    const detail = details.get(item.assetId);
+    const thumbnailUrl = readPrototypeURL(detail?.content);
     assets.push({
       id: String(item.assetId),
       name: item.name,
@@ -66,6 +80,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
       tags: item.tags ?? [],
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
       history: [],
       animations: [],
     });
@@ -73,6 +88,14 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
+}
+
+function readPrototypeURL(content: unknown) {
+  if (!content || typeof content !== "object") return undefined;
+  const prototype = (content as { prototype?: unknown }).prototype;
+  if (!Array.isArray(prototype) || prototype.length === 0) return undefined;
+  const url = (prototype[0] as { url?: unknown } | null)?.url;
+  return typeof url === "string" && url.length > 0 ? url : undefined;
 }
 
 function coreProjectId(projectId: string) {

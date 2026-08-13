@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   coreList: vi.fn(),
+  coreDetail: vi.fn(),
   coreCopy: vi.fn(),
   coreDelete: vi.fn(),
   coreUpdate: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./core-asset.api", () => ({
   coreAssetApi: {
     list: mocks.coreList,
+    detail: mocks.coreDetail,
     copy: mocks.coreCopy,
     delete: mocks.coreDelete,
     update: mocks.coreUpdate,
@@ -36,6 +38,25 @@ const remoteAssets = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.coreList.mockResolvedValue(remoteAssets);
+  mocks.coreDetail.mockResolvedValue({
+    assetId: 8,
+    projectId: 42,
+    name: "Barrel",
+    description: "Wooden prop",
+    dimensions: { width: 32, height: 32 },
+    perspective: "Top-Down",
+    type: "object",
+    version: 1,
+    tags: ["prop"],
+    content: {
+      prototype: [
+        {
+          id: 1,
+          url: "https://storage.example/signed/barrel.png?token=abc",
+        },
+      ],
+    },
+  });
   mocks.coreCopy.mockResolvedValue({ newAssetId: 9 });
   mocks.coreDelete.mockResolvedValue({ assetId: 8 });
   mocks.coreUpdate.mockResolvedValue({});
@@ -46,10 +67,17 @@ describe("assetApi Core routing", () => {
     await expect(assetApi.listGroups("42")).resolves.toEqual([
       expect.objectContaining({
         kind: "object",
-        assets: [expect.objectContaining({ id: "8", name: "Barrel" })],
+        assets: [
+          expect.objectContaining({
+            id: "8",
+            name: "Barrel",
+            thumbnailUrl: "https://storage.example/signed/barrel.png?token=abc",
+          }),
+        ],
       }),
     ]);
     expect(mocks.coreList).toHaveBeenCalledWith(42);
+    expect(mocks.coreDetail).toHaveBeenCalledWith(8);
   });
 
   it("uses Core API copy and refreshes the remote library", async () => {
