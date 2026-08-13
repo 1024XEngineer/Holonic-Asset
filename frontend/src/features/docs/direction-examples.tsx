@@ -23,7 +23,11 @@ const eightDirections = [
   "south-east",
 ] as const;
 
-export function TwoDirectionExample({ priority = false }: { priority?: boolean }) {
+export function TwoDirectionExample({
+  priority = false,
+}: {
+  priority?: boolean;
+}) {
   const { t } = useTranslation("docs");
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
