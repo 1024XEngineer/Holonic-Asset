@@ -28,7 +28,7 @@ export function AnimatedSpriteZoomControl({
 
   const applyValue = () => {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
+    if (value.trim() === "" || !Number.isFinite(parsed)) {
       setValue(String(percentage));
       return;
     }
