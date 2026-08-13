@@ -102,7 +102,7 @@ describe("useEditorWorkspace", () => {
       prompt: "Theme",
       audio: {},
     });
-    mocks.stateValues.push(null, null, null);
+    mocks.stateValues.push(null, null);
 
     expect(
       useEditorWorkspace({
@@ -179,6 +179,21 @@ describe("useEditorWorkspace", () => {
     );
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(1800);
+  });
+
+  it("starts the inspector edit prompt empty instead of using the asset description", () => {
+    mocks.stateValues.push(null, null);
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.inspector.prompt).toBe("");
+    editor?.inspector.onPromptChange("Adjust the silhouette");
+    expect(mocks.session.dispatch).not.toHaveBeenCalledWith({
+      type: "prompt.set",
+      value: "Adjust the silhouette",
+    });
   });
 
   it("includes local tasks and blocks duplicate prompt submission", async () => {

@@ -16,6 +16,15 @@ const animations: CharacterAnimation[] = [
   },
 ];
 
+const prototype = {
+  format: "png-sprite-sheet" as const,
+  imageUrl: "/prototype.png",
+  frameWidth: 32,
+  frameHeight: 32,
+  columns: 4,
+  rows: 1,
+};
+
 describe("Inspector", () => {
   it("renders the AI composer controls without the old draft label", () => {
     const html = renderToStaticMarkup(
@@ -27,13 +36,15 @@ describe("Inspector", () => {
           onPromptChange={() => undefined}
           history={[]}
           animations={animations}
+          prototype={prototype}
           onSubmit={() => undefined}
           onClearSelection={() => undefined}
         />,
       ),
     );
 
-    expect(html).toContain("Entire asset");
+    expect(html).not.toContain("Entire asset");
+    expect(html).not.toContain("Target");
     expect(html).toContain("Edit");
     expect(html).toContain("What would you like to change?");
     expect(html).toContain("Attach image");
@@ -50,7 +61,39 @@ describe("Inspector", () => {
           { nodeId: "idle-front", index: 2 },
         ],
         animations,
+        prototype,
       ),
-    ).toEqual({ label: "Idle Front", detail: "Frames 1, 3" });
+    ).toEqual({
+      label: "Idle Front - Frames 1, 3",
+      detail: "Selected on canvas",
+      thumbnail: {
+        imageUrl: "/prototype.png",
+        column: 0,
+        row: 0,
+        columns: 4,
+        rows: 1,
+      },
+    });
+  });
+
+  it("names a selected prototype frame in the target control", () => {
+    expect(
+      getInspectorTargetSummary(
+        ["prototype"],
+        [{ nodeId: "prototype", index: 0 }],
+        animations,
+        prototype,
+      ),
+    ).toEqual({
+      label: "Prototype - Frame 1",
+      detail: "Selected on canvas",
+      thumbnail: {
+        imageUrl: "/prototype.png",
+        column: 0,
+        row: 0,
+        columns: 4,
+        rows: 1,
+      },
+    });
   });
 });

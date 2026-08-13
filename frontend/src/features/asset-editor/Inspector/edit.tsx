@@ -1,4 +1,4 @@
-import { ArrowUp, ImagePlus, LoaderCircle, Target, X } from "lucide-react";
+import { ArrowUp, ImagePlus, LoaderCircle, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export function InspectorEdit(props: InspectorEditProps) {
     selectedFrames,
     prompt,
     animations,
+    prototype,
     onPromptChange,
     onSubmit,
     onClearSelection,
@@ -29,6 +30,7 @@ export function InspectorEdit(props: InspectorEditProps) {
     selectedFrames,
     prompt,
     animations,
+    prototype,
     onPromptChange,
     onSubmit,
     isSubmitting,
@@ -46,22 +48,15 @@ export function InspectorEdit(props: InspectorEditProps) {
         className={`min-h-56 p-3 transition-colors ${isDragActive ? "bg-primary/5" : ""}`}
       >
         <input {...getInputProps()} />
-        <div className="flex items-center gap-2">
-          <div className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-            <Target className="size-3.5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {t("target")}
-            </p>
-            <p className="truncate text-xs font-semibold">
-              {controller.target.label}
-            </p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              {controller.target.detail}
-            </p>
-          </div>
-          {controller.canClearSelection ? (
+        {controller.target ? (
+          <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs shadow-sm">
+            <TargetThumbnail target={controller.target} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                {t("target")}
+              </p>
+              <p className="truncate font-semibold">{controller.target.label}</p>
+            </div>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -78,12 +73,12 @@ export function InspectorEdit(props: InspectorEditProps) {
               </TooltipTrigger>
               <TooltipContent>{t("useEntireAsset")}</TooltipContent>
             </Tooltip>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <Textarea
           aria-label={t("editPrompt")}
-          className="mt-4 min-h-28 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0"
+          className={`${controller.target ? "mt-3" : ""} min-h-28 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0`}
           placeholder={t("promptPlaceholder")}
           value={prompt}
           onChange={(event) => controller.changePrompt(event.target.value)}
@@ -156,6 +151,32 @@ export function InspectorEdit(props: InspectorEditProps) {
         </div>
       </div>
     </form>
+  );
+}
+
+function TargetThumbnail({
+  target,
+}: {
+  target: NonNullable<ReturnType<typeof useInspectorEdit>>["target"];
+}) {
+  if (!target) return null;
+  const { thumbnail } = target;
+  const imageWidth = thumbnail.columns * 100;
+  const imageHeight = thumbnail.rows * 100;
+
+  return (
+    <div className="size-7 shrink-0 overflow-hidden rounded-md border bg-muted">
+      <img
+        src={thumbnail.imageUrl}
+        alt=""
+        className="block max-w-none object-none"
+        style={{
+          width: `${imageWidth}%`,
+          height: `${imageHeight}%`,
+          transform: `translate(-${(thumbnail.column * 100) / thumbnail.columns}%, -${(thumbnail.row * 100) / thumbnail.rows}%)`,
+        }}
+      />
+    </div>
   );
 }
 
