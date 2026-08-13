@@ -79,10 +79,41 @@ func (e *Engine) handleTileSet(
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateTileSetPayload{}
-	if err := decodeTaskPayload(message, &payload); err != nil {
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	if err := validateCreateTileSetPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Tileset generation phase.
+}
+
+func (e *Engine) handleEditTilesetItem(
+	_ context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditTilesetItemPayload{}
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateEditTilesetItemPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Item editing phase.
+}
+
+func (e *Engine) handleEditTiles(
+	_ context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditTilesPayload{}
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateEditTilesPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Tile editing phase.
 }
 
 func (e *Engine) handleEmptyTask(
@@ -101,6 +132,17 @@ func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 		return ErrTaskRequired
 	}
 	if err := json.Unmarshal(message.Payload, payload); err != nil {
+		return fmt.Errorf("generator: decode %s task %d payload: %w", message.Type, message.ID, err)
+	}
+	return nil
+}
+
+func decodeTileSetTaskPayload(message *taskdomain.Task, payload any) error {
+	if message == nil {
+		return ErrTaskRequired
+	}
+	request := &Request{Kind: TaskType(message.Type), Parameters: message.Payload}
+	if err := decodeStrictParameters(request, payload); err != nil {
 		return fmt.Errorf("generator: decode %s task %d payload: %w", message.Type, message.ID, err)
 	}
 	return nil
@@ -125,13 +167,13 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateAnimation), taskdomain.HandlerFunc(e.handleAnimation))
 	manager.Register(string(EditAnimation), taskdomain.HandlerFunc(e.handleEditAnimation))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
+	manager.Register(string(EditTilesetItem), taskdomain.HandlerFunc(e.handleEditTilesetItem))
+	manager.Register(string(EditTiles), taskdomain.HandlerFunc(e.handleEditTiles))
 
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{
 		EditCharacterFrames,
 		EditObjectFrames,
-		EditTilesetItem,
-		EditTiles,
 	} {
 		manager.Register(string(taskType), emptyHandler)
 	}
