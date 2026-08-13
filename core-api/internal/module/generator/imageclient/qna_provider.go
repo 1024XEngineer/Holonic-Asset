@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -92,11 +93,12 @@ func (p *QNAProvider) call(
 		model = p.defaultModel
 	}
 
+	providerSize := normalizeQNAImageSize(request.Size)
 	payload := qnaImageRequest{
 		Model:   model,
 		Prompt:  request.Prompt,
 		Image:   referenceImages,
-		Size:    request.Size,
+		Size:    providerSize,
 		Quality: request.Params["quality"],
 	}
 	body, err := json.Marshal(payload)
@@ -189,6 +191,23 @@ func (p *QNAProvider) call(
 			RequestCount:      decoded.Usage.RequestCount,
 		},
 	}, nil
+}
+
+const minimumQNAImagePixels = 1024 * 1024
+
+func normalizeQNAImageSize(size string) string {
+	size = strings.TrimSpace(size)
+	if size == "" {
+		return size
+	}
+	var width, height int
+	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width <= 0 || height <= 0 {
+		return size
+	}
+	if int64(width)*int64(height) < minimumQNAImagePixels {
+		return "1024x1024"
+	}
+	return size
 }
 
 func classifyQNARequestError(ctx context.Context, err error) error {

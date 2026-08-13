@@ -16,8 +16,8 @@ type Manager interface {
 	CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
-	CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error)
-	CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error)
+	CreateAnimation(ctx context.Context, assetID uint, animation Animation) (uint, error)
+	CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error)
 	GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error)
 	RollBackRecord(ctx context.Context, assetID uint, version uint) (*AssetRecord, error)
 	Copy(ctx context.Context, assetID uint, version uint) (uint, error)
@@ -86,12 +86,12 @@ func (m *manager) CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, e
 	return m.store.CreateSceneryAsset(ctx, asset)
 }
 
-func (m *manager) CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error) {
-	return m.store.CreateAnimation(ctx, assetID, name)
+func (m *manager) CreateAnimation(ctx context.Context, assetID uint, animation Animation) (uint, error) {
+	return m.store.CreateAnimation(ctx, assetID, animation)
 }
 
-func (m *manager) CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error) {
-	return m.store.CreateRecord(ctx, record)
+func (m *manager) CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error) {
+	return m.store.CreateRecord(ctx, record, expectedVersion)
 }
 
 func (m *manager) GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error) {

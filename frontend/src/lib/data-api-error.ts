@@ -1,5 +1,6 @@
 export const dataApiErrorCodes = [
   "BAD_REQUEST",
+  "UNAUTHORIZED",
   "NOT_FOUND",
   "CONFLICT",
   "UNAVAILABLE",

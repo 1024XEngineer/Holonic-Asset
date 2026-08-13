@@ -348,6 +348,7 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return fmt.Errorf("repository: content storage is not configured")
 	}
+	nextVersion := asset.Version + 1
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
 		AssetID: asset.ID,
 		Content: datatypes.JSON(encoded),
@@ -355,7 +356,18 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	if err != nil {
 		return err
 	}
-	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, asset.Version, contentRecord.ID)
+	if _, err := r.RecordDao.CreateAssetRecord(ctx, &dao.AssetRecord{
+		AssetID:     asset.ID,
+		Version:     nextVersion,
+		ContentID:   contentRecord.ID,
+		Name:        asset.Name,
+		Description: asset.Description,
+		Perspective: asset.Perspective,
+		Dimensions:  append(datatypes.JSON(nil), asset.Dimensions...),
+	}); err != nil {
+		return err
+	}
+	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, nextVersion, contentRecord.ID)
 }
 
 func (r *AssetRepositoryImpl) mutateAssetContent(
@@ -493,18 +505,26 @@ func (r *AssetRepositoryImpl) CreateSceneryAsset(ctx context.Context, asset *dom
 	return r.createAsset(ctx, asset, domain.AssetTypeScenery)
 }
 
-func (r *AssetRepositoryImpl) CreateAnimation(ctx context.Context, assetID uint, name string) (uint, error) {
-	if name == "" {
+func (r *AssetRepositoryImpl) CreateAnimation(
+	ctx context.Context,
+	assetID uint,
+	animation domain.Animation,
+) (uint, error) {
+	animation.Name = strings.TrimSpace(animation.Name)
+	if animation.Name == "" {
 		return 0, fmt.Errorf("repository: animation name is empty")
 	}
 	var animationID uint
 	if err := r.mutateAssetContent(ctx, assetID, func(content *domain.AssetContent) error {
 		animationID = nextAnimationID(content.Animations)
-		content.Animations = append(content.Animations, domain.Animation{
-			ID:     animationID,
-			Name:   name,
-			Frames: make([]domain.Frame, 0),
-		})
+		value := animation
+		value.ID = animationID
+		value.Frames = append([]domain.Frame(nil), animation.Frames...)
+		if animation.Generation != nil {
+			generation := *animation.Generation
+			value.Generation = &generation
+		}
+		content.Animations = append(content.Animations, value)
 		return nil
 	}); err != nil {
 		return 0, err
@@ -524,7 +544,7 @@ func (r *AssetRepositoryImpl) UpdatePrototypeImages(
 	})
 }
 
-func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	if record == nil {
 		return nil, fmt.Errorf("repository: asset record is nil")
 	}
@@ -532,7 +552,7 @@ func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.A
 	var snapshot *domain.AssetRecord
 	if err := r.inTransaction(ctx, func(transactionRepository *AssetRepositoryImpl) error {
 		var err error
-		snapshot, err = transactionRepository.createRecord(ctx, &recordCopy)
+		snapshot, err = transactionRepository.createRecord(ctx, &recordCopy, expectedVersion)
 		return err
 	}); err != nil {
 		return nil, err
@@ -540,14 +560,30 @@ func (r *AssetRepositoryImpl) CreateRecord(ctx context.Context, record *domain.A
 	return snapshot, nil
 }
 
-func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	asset, err := r.AssetDao.GetAssetForUpdate(ctx, record.AssetID)
 	if err != nil {
 		return nil, err
 	}
-	content, err := r.resolveAssetContent(ctx, asset)
-	if err != nil {
-		return nil, err
+	if expectedVersion != 0 && asset.Version != expectedVersion {
+		return nil, fmt.Errorf(
+			"%w: asset %d expected version %d, current version %d",
+			domain.ErrVersionConflict,
+			asset.ID,
+			expectedVersion,
+			asset.Version,
+		)
+	}
+	var currentContent []byte
+	if len(record.Content) == 0 {
+		currentContent, err = r.resolveAssetContent(ctx, asset)
+		if err != nil {
+			return nil, err
+		}
+	}
+	content := append([]byte(nil), record.Content...)
+	if len(content) == 0 {
+		content = currentContent
 	}
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return nil, fmt.Errorf("repository: content storage is not configured")

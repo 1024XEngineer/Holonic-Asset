@@ -10,8 +10,8 @@ func InitTables(db *gorm.DB) error {
 	if db == nil {
 		return errors.New("dao: database is nil")
 	}
-
 	if err := db.AutoMigrate(
+		&User{},
 		&Project{},
 		&Asset{},
 		&AssetContent{},

@@ -2,6 +2,8 @@ package repository_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -116,6 +118,7 @@ type recordContentDaoStub struct {
 	dao.AssetContentDao
 	contents map[uint]dao.AssetContent
 	nextID   uint
+	getErr   error
 }
 
 func (s *recordContentDaoStub) CreateAssetContent(_ context.Context, content *dao.AssetContent) (dao.AssetContent, error) {
@@ -139,6 +142,9 @@ func (s *recordContentDaoStub) CreateAssetContents(_ context.Context, contents [
 }
 
 func (s *recordContentDaoStub) GetAssetContent(_ context.Context, id uint) (dao.AssetContent, error) {
+	if s.getErr != nil {
+		return dao.AssetContent{}, s.getErr
+	}
 	return s.contents[id], nil
 }
 
@@ -185,7 +191,7 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	}
 	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
 
-	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7})
+	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
 	if err != nil {
 		t.Fatalf("create record: %v", err)
 	}
@@ -200,6 +206,108 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	}
 	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
 		t.Fatalf("asset current pointer was not updated: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.T) {
+	currentContentID := uint(4)
+	wantErr := testingError("content unavailable")
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao: &recordAssetDaoStub{asset: dao.Asset{
+			ID:        7,
+			Version:   2,
+			ContentID: &currentContentID,
+		}},
+		ContentDao: &recordContentDaoStub{getErr: wantErr},
+		RecordDao:  &recordDaoStub{records: map[uint]dao.AssetRecord{}},
+	}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected content lookup error %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetRepositoryRejectsReplacementContentFromStaleVersion(t *testing.T) {
+	currentContentID := uint(5)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:        7,
+		Version:   3,
+		ContentID: &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 3, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{"version":3}`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: json.RawMessage(`{"version":2,"prototype":[{"id":1,"url":"stale.png"}]}`),
+	}, 2)
+	if !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("expected version conflict, got %v", err)
+	}
+	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
+		t.Fatalf("stale content was persisted: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
+	}
+	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
+		t.Fatalf("stale record was persisted: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
+	}
+	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
+		t.Fatalf("stale write moved the asset pointer: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
+	currentContentID := uint(4)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Perspective: "Top-Down",
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 2, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{"version":2}`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+	replacement := json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"new.png"}]}`)
+
+	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: replacement,
+	}, 2)
+	if err != nil {
+		t.Fatalf("create replacement record: %v", err)
+	}
+	if record.Version != 3 || record.ContentID != 5 || string(record.Content) != string(replacement) {
+		t.Fatalf("unexpected replacement record: %+v", record)
+	}
+	if got := string(contentDao.contents[record.ContentID].Content); got != string(replacement) {
+		t.Fatalf("replacement content was not persisted: %s", got)
+	}
+	if assetDao.updatedVersion != 3 || assetDao.updatedContent != record.ContentID {
+		t.Fatalf("asset current pointer was not moved to replacement: %+v", assetDao)
 	}
 }
 

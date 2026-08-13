@@ -1,0 +1,17 @@
+{
+  "home": "Home",
+  "image": "Image",
+  "project": "Project",
+  "docs": "Docs",
+  "account": "Account",
+  "login": "Log in",
+  "profileImageAlt": "Profile",
+  "credits": "Credits",
+  "plan": "Plan",
+  "starter": "Starter",
+  "settings": "Settings",
+  "billing": "Billing & credits",
+  "logout": "Log out",
+  "mainNavigation": "Main navigation",
+  "homeAriaLabel": "Holonic Asset home"
+}

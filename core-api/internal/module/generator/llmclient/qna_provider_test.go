@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -120,6 +122,62 @@ func TestQNAProviderRequestModelOverridesDefault(t *testing.T) {
 	}
 }
 
+func TestQNAProviderUsesRequestModelWhenResponseOmitsModel(t *testing.T) {
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{}"}}]}`)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:    "https://llm.example.test",
+		HTTPClient: client,
+	})
+
+	request := validProviderRequest()
+	request.Model = "request-model"
+	result, err := provider.Complete(context.Background(), request)
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if result.Model != "request-model" {
+		t.Fatalf("model = %q, want request-model", result.Model)
+	}
+}
+
+func TestQNAProviderRejectsInvalidRequests(t *testing.T) {
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{})
+	for name, request := range map[string]*llmclient.ProviderRequest{
+		"nil request":   nil,
+		"missing model": validProviderRequest(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := provider.Complete(context.Background(), request)
+			assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+		})
+	}
+}
+
+func TestQNAProviderRejectsUnencodableSchema(t *testing.T) {
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{DefaultModel: "model"})
+	request := validProviderRequest()
+	request.ResponseSchema.Schema = json.RawMessage(`{"type":`)
+
+	_, err := provider.Complete(context.Background(), request)
+	assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+}
+
+func TestQNAProviderRejectsInvalidBaseURL(t *testing.T) {
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      "://invalid",
+		DefaultModel: "model",
+	})
+
+	_, err := provider.Complete(context.Background(), validProviderRequest())
+	assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+}
+
 func TestQNAProviderClassifiesHTTPStatusErrors(t *testing.T) {
 	tests := []struct {
 		status    int
@@ -129,6 +187,8 @@ func TestQNAProviderClassifiesHTTPStatusErrors(t *testing.T) {
 		{http.StatusUnauthorized, llmclient.ErrorKindAuthentication, false},
 		{http.StatusForbidden, llmclient.ErrorKindAuthentication, false},
 		{http.StatusBadRequest, llmclient.ErrorKindInvalidRequest, false},
+		{http.StatusUnprocessableEntity, llmclient.ErrorKindInvalidRequest, false},
+		{http.StatusNotFound, llmclient.ErrorKindInvalidRequest, false},
 		{http.StatusRequestTimeout, llmclient.ErrorKindTimeout, true},
 		{http.StatusTooManyRequests, llmclient.ErrorKindRateLimited, true},
 		{http.StatusServiceUnavailable, llmclient.ErrorKindUnavailable, true},
@@ -151,6 +211,71 @@ func TestQNAProviderClassifiesHTTPStatusErrors(t *testing.T) {
 				t.Fatalf("unexpected provider error: %+v", providerErr)
 			}
 		})
+	}
+}
+
+func TestQNAProviderExtractsHTTPErrorMessages(t *testing.T) {
+	tests := map[string]struct {
+		body   string
+		status string
+		want   string
+	}{
+		"top-level message": {body: `{"message":"top level"}`, want: "top level"},
+		"string error":      {body: `{"error":"plain failure"}`, want: "plain failure"},
+		"plain body":        {body: "  gateway failure  ", want: "gateway failure"},
+		"empty body":        {status: "418 Custom Status", want: "418 Custom Status"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			status := test.status
+			if status == "" {
+				status = "418 I'm a teapot"
+			}
+			client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusTeapot,
+					Status:     status,
+					Body:       io.NopCloser(strings.NewReader(test.body)),
+					Header:     make(http.Header),
+				}, nil
+			})}
+			provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+				BaseURL:      "https://llm.example.test",
+				DefaultModel: "model",
+				HTTPClient:   client,
+			})
+
+			_, err := provider.Complete(context.Background(), validProviderRequest())
+			var providerErr *llmclient.ProviderError
+			if !errors.As(err, &providerErr) {
+				t.Fatalf("error = %v, want ProviderError", err)
+			}
+			if providerErr.Message != test.want {
+				t.Fatalf("message = %q, want %q", providerErr.Message, test.want)
+			}
+		})
+	}
+}
+
+func TestQNAProviderPreservesHTTPErrorBodyReadFailure(t *testing.T) {
+	readErr := errors.New("read response body")
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusBadGateway,
+			Status:     "502 Bad Gateway",
+			Body:       &errorReadCloser{err: readErr},
+			Header:     make(http.Header),
+		}, nil
+	})}
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      "https://llm.example.test",
+		DefaultModel: "model",
+		HTTPClient:   client,
+	})
+
+	_, err := provider.Complete(context.Background(), validProviderRequest())
+	if !errors.Is(err, readErr) {
+		t.Fatalf("error = %v, want body read error", err)
 	}
 }
 
@@ -217,6 +342,7 @@ func TestQNAProviderClassifiesTransportErrors(t *testing.T) {
 
 func TestQNAProviderRejectsInvalidResponses(t *testing.T) {
 	for name, response := range map[string]string{
+		"malformed response":  `{"choices":`,
 		"missing choices":     `{"choices":[]}`,
 		"empty content":       `{"choices":[{"message":{"content":""}}]}`,
 		"unstructured output": `{"choices":[{"message":{"content":"not json"}}]}`,
@@ -246,3 +372,13 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return function(request)
 }
+
+type errorReadCloser struct {
+	err error
+}
+
+func (reader *errorReadCloser) Read([]byte) (int, error) {
+	return 0, reader.err
+}
+
+func (*errorReadCloser) Close() error { return nil }

@@ -102,6 +102,21 @@ func TestLLMServiceRejectsInvalidRequests(t *testing.T) {
 			request.Images[0].URL = "data:image/png;base64,not-base64"
 			return request
 		},
+		"incomplete image data URI": func() *llmclient.CompletionRequest {
+			request := valid()
+			request.Images[0].URL = "data:image/png;base64"
+			return request
+		},
+		"empty image data": func() *llmclient.CompletionRequest {
+			request := valid()
+			request.Images[0].URL = "data:image/png;base64,"
+			return request
+		},
+		"malformed image URL": func() *llmclient.CompletionRequest {
+			request := valid()
+			request.Images[0].URL = "://missing-scheme"
+			return request
+		},
 		"missing schema name": func() *llmclient.CompletionRequest {
 			request := valid()
 			request.ResponseSchema.Name = ""
@@ -120,6 +135,42 @@ func TestLLMServiceRejectsInvalidRequests(t *testing.T) {
 			_, err := service.Complete(context.Background(), buildRequest())
 			assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
 		})
+	}
+}
+
+func TestLLMServiceRejectsMissingProvider(t *testing.T) {
+	service := llmclient.NewLLMService(nil)
+	_, err := service.Complete(context.Background(), validCompletionRequest())
+	assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+}
+
+func TestLLMServiceDescribesUnsupportedImageURL(t *testing.T) {
+	request := validCompletionRequest()
+	request.Images[0].URL = "file:///tmp/layer.png"
+	service := llmclient.NewLLMService(&llmProviderStub{})
+
+	_, err := service.Complete(context.Background(), request)
+	var providerErr *llmclient.ProviderError
+	if !errors.As(err, &providerErr) || providerErr.Cause == nil {
+		t.Fatalf("error = %v, want ProviderError with URL cause", err)
+	}
+	if got := providerErr.Cause.Error(); got != "parse \"file:///tmp/layer.png\": image URL must use HTTP(S) or an image data URI" {
+		t.Fatalf("cause = %q", got)
+	}
+}
+
+func TestLLMServicePreservesProviderError(t *testing.T) {
+	providerErr := &llmclient.ProviderError{
+		Provider:  "qna",
+		Kind:      llmclient.ErrorKindUnavailable,
+		Transient: true,
+		Message:   "temporarily unavailable",
+	}
+	service := llmclient.NewLLMService(&llmProviderStub{err: providerErr})
+
+	_, err := service.Complete(context.Background(), validCompletionRequest())
+	if !errors.Is(err, providerErr) {
+		t.Fatalf("error = %v, want original provider error", err)
 	}
 }
 
@@ -153,6 +204,17 @@ func assertProviderErrorKind(t *testing.T, err error, kind llmclient.ErrorKind) 
 	}
 	if providerErr.Kind != kind {
 		t.Fatalf("error kind = %q, want %q", providerErr.Kind, kind)
+	}
+}
+
+func validCompletionRequest() *llmclient.CompletionRequest {
+	return &llmclient.CompletionRequest{
+		Prompt: "layout",
+		Images: []llmclient.ImageInput{{URL: "https://cdn.example.test/layer.png"}},
+		ResponseSchema: llmclient.JSONSchema{
+			Name:   "layout",
+			Schema: json.RawMessage(`{"type":"object"}`),
+		},
 	}
 }
 

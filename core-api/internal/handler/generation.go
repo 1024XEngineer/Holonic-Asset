@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 
@@ -32,10 +33,11 @@ func (h *GenerationHandler) Create(
 		TargetAssetPaths: request.TargetAssetPaths,
 		Parameters:       request.Parameters,
 	})
-	if errors.Is(err, generator.ErrInvalidSceneryPayload) {
-		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, echo.ErrBadRequest
-	}
 	if err != nil {
+		if errors.Is(err, generator.ErrInvalidTaskPayload) || errors.Is(err, generator.ErrInvalidSceneryPayload) {
+			return dto.SuccessResponse[dto.CreateGenerationResponse]{},
+				echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+		}
 		return dto.SuccessResponse[dto.CreateGenerationResponse]{}, err
 	}
 	return dto.NewTypedSuccessResponse(dto.CreateGenerationResponse{GenerationRunID: runID}), nil

@@ -7,6 +7,7 @@ import {
   createNewProjectDraft,
   createProjectSettingsDraft,
   projectContextOptions,
+  toCreateBlankProjectInput,
   toCreateProjectInput,
 } from "./project-context";
 
@@ -18,8 +19,7 @@ describe("toCreateProjectInput", () => {
       platform: "PC",
       description: "  Restore the orchard.  ",
       perspective: "Top-Down",
-      reference: "https://example.com/game",
-      visualDirection: "data:image/png;base64,preview",
+      reference: "data:image/png;base64,preview",
     });
 
     expect(input).toEqual({
@@ -27,10 +27,9 @@ describe("toCreateProjectInput", () => {
       gameType: "Role-playing game",
       platform: "PC",
       description: "Restore the orchard.",
-      reference: "https://example.com/game",
+      reference: "data:image/png;base64,preview",
       style: "Top-Down",
       perspective: "Top-Down",
-      visualDirection: "data:image/png;base64,preview",
     });
     expect(input).not.toHaveProperty("id");
     expect(input).not.toHaveProperty("assetCount");
@@ -72,8 +71,23 @@ describe("toCreateProjectInput", () => {
       toCreateProjectInput({ ...draft, name: "New project" }),
     ).toMatchObject({
       description: "A new game asset workspace.",
-      visualDirection: "",
+      reference: "",
     });
+  });
+
+  it("creates blank projects with only a name and default perspective", () => {
+    expect(toCreateBlankProjectInput("  Blank project  ")).toEqual({
+      name: "Blank project",
+      gameType: "",
+      platform: "",
+      description: "",
+      perspective: "Top-Down",
+      reference: "",
+      style: "",
+    });
+    expect(() => toCreateBlankProjectInput("  ")).toThrow(
+      "Project name is required.",
+    );
   });
 
   it("maps known and custom game types into editable drafts", () => {
@@ -84,19 +98,24 @@ describe("toCreateProjectInput", () => {
     expect(
       createProjectSettingsDraft(project({ gameType: "Rhythm game" })),
     ).toMatchObject({ gameType: "Other", customGameType: "Rhythm game" });
+    expect(
+      createProjectSettingsDraft(project({ gameType: "", platform: "" })),
+    ).toMatchObject({ gameType: "", customGameType: "", platform: "" });
   });
 
   it("applies valid settings and rejects blank identity fields", () => {
-    const current = project();
+    const current = project({ reference: "reference.png" });
     const knownDraft = createProjectSettingsDraft(current);
     knownDraft.name = "  Updated project  ";
     knownDraft.perspective = "Isometric";
+    knownDraft.reference = "";
 
     expect(applyProjectSettings(current, knownDraft)).toMatchObject({
       name: "Updated project",
       gameType: "Role-playing game",
       perspective: "Isometric",
       style: "Isometric",
+      reference: "",
     });
 
     const customDraft = {
@@ -126,7 +145,6 @@ function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     description: "Restore the orchard.",
     reference: "",
     perspective: "Top-Down",
-    visualDirection: "",
     assetCount: 0,
     ...overrides,
   };

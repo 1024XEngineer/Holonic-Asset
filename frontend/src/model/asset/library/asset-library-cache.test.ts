@@ -12,17 +12,17 @@ describe("createAssetLibraryCacheSync", () => {
     const otherGroups: AssetGroup[] = [];
     const updatedGroups: AssetGroup[] = [{ kind: "object", assets: [] }];
 
-    queryClient.setQueryData(assetKeys.library("current"), currentGroups);
-    queryClient.setQueryData(assetKeys.library("other"), otherGroups);
+    queryClient.setQueryData(assetKeys.library(7, "current"), currentGroups);
+    queryClient.setQueryData(assetKeys.library(7, "other"), otherGroups);
 
-    createAssetLibraryCacheSync(queryClient)(updatedGroups, {
+    createAssetLibraryCacheSync(queryClient, 7)(updatedGroups, {
       projectId: "current",
     });
 
-    expect(queryClient.getQueryData(assetKeys.library("current"))).toEqual(
+    expect(queryClient.getQueryData(assetKeys.library(7, "current"))).toEqual(
       updatedGroups,
     );
-    expect(queryClient.getQueryData(assetKeys.library("other"))).toEqual(
+    expect(queryClient.getQueryData(assetKeys.library(7, "other"))).toEqual(
       otherGroups,
     );
   });

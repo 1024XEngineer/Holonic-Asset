@@ -1,7 +1,7 @@
 export {
-  accountProfileUpdatedEvent,
   readAccountProfile,
   saveAccountProfile,
-} from "./account-profile.storage";
-export { defaultAccountProfile } from "./mock";
-export type { AccountProfile } from "./types";
+  subscribeAccountProfile,
+} from "./account-profile.store";
+export { defaultAccountProfile } from "./account-profile";
+export type { AccountProfile } from "./account-profile";

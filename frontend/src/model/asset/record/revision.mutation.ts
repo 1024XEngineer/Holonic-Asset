@@ -4,6 +4,7 @@ import { assetKeys } from "../library/keys";
 import type { AssetWorkspaceData } from "./types";
 import { recordApi } from "./record.api";
 import { recordKeys } from "./record.keys";
+import { readAuthenticatedUserId } from "@/model/auth";
 
 export function useSaveAssetRevisionMutation() {
   const queryClient = useQueryClient();
@@ -11,8 +12,9 @@ export function useSaveAssetRevisionMutation() {
   return useMutation({
     mutationFn: recordApi.saveRevision,
     onSuccess: async (saved, { assetId, projectId }) => {
+      const userID = readAuthenticatedUserId();
       queryClient.setQueryData(
-        recordKeys.detail(projectId, assetId),
+        recordKeys.detail(userID, projectId, assetId),
         (current: AssetWorkspaceData | undefined) =>
           current
             ? {
@@ -28,10 +30,10 @@ export function useSaveAssetRevisionMutation() {
       );
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: assetKeys.library(projectId),
+          queryKey: assetKeys.library(userID, projectId),
         }),
         queryClient.invalidateQueries({
-          queryKey: recordKeys.detail(projectId, assetId),
+          queryKey: recordKeys.detail(userID, projectId, assetId),
         }),
       ]);
     },

@@ -1,5 +1,6 @@
 import { ChevronDown, Folder, ImagePlus, Play, Plus } from "lucide-react";
 import { useState, type MouseEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CreateAnimationTrigger } from "@/features/generation";
 import type { CharacterAnimation, GenerateAnimationRequest } from "@/model";
@@ -32,6 +33,7 @@ export function AssetTree({
   onDeleteAnimation: (animationId: string) => void;
   isGeneratingAnimation: boolean;
 }) {
+  const { t } = useTranslation("editor");
   const { openContextMenu, actions } = useAnimationActions({
     onRename: onRenameAnimation,
     onDelete: onDeleteAnimation,
@@ -47,10 +49,10 @@ export function AssetTree({
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Asset tree
+                {t("assetTree")}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Prototype and animation clips
+                {t("assetTreeDescription")}
               </p>
             </div>
             <span className="font-mono text-[10px] text-muted-foreground">
@@ -68,14 +70,16 @@ export function AssetTree({
               <div>
                 <div className="flex items-center gap-2 px-2 py-2 text-xs font-medium text-muted-foreground">
                   <Folder className="size-4 text-primary" />
-                  <span className="min-w-0 flex-1 truncate">Animations</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t("animations")}
+                  </span>
                   <span className="font-mono text-[10px]">
                     {animations.length}
                   </span>
                   <button
                     type="button"
-                    aria-label="Generate animation"
-                    title="Generate animation"
+                    aria-label={t("generateAnimation")}
+                    title={t("generateAnimation")}
                     disabled={isGeneratingAnimation}
                     onClick={openGenerationDialog}
                     className="grid size-6 place-items-center rounded-md border border-dashed text-muted-foreground transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -150,6 +154,7 @@ function AnimationNode({
   ) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation("editor");
 
   return (
     <div onContextMenu={(event) => onContextMenu(event, animation)}>
@@ -168,7 +173,7 @@ function AnimationNode({
         </button>
         <button
           type="button"
-          aria-label={`${open ? "Collapse" : "Expand"} ${animation.label}`}
+          aria-label={`${open ? t("collapse") : t("expand")} ${animation.label}`}
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
           className="mr-1 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
@@ -201,6 +206,7 @@ function AnimationFrames({
   }>;
   onSelectFrame: (nodeId: AnimatedSpriteNodeId, index: number) => void;
 }) {
+  const { t } = useTranslation("editor");
   const selectedFrameIndexes = new Set(
     selectedFrames
       .filter((frame) => frame.nodeId === animation.id)
@@ -221,7 +227,7 @@ function AnimationFrames({
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${isSelected ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
               <span className="size-1.5 rounded-full bg-current opacity-70" />
-              Frame {index + 1}
+              {t("frame", { index: index + 1 })}
             </button>
           );
         },

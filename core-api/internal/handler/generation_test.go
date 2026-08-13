@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -34,13 +36,17 @@ func (s *runManagerStub) Create(
 	return 17, s.createErr
 }
 
-func TestCreateMapsInvalidSceneryPayloadToBadRequest(t *testing.T) {
-	stub := &runManagerStub{createErr: generator.ErrInvalidSceneryPayload}
-	_, err := handler.NewGenerationHandler(stub).Create(context.Background(), dto.CreateGenerationRequest{
-		ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "forest",
-	})
-	if !errors.Is(err, echo.ErrBadRequest) {
-		t.Fatalf("expected bad request, got %v", err)
+func TestCreateMapsInvalidTaskPayloadToBadRequest(t *testing.T) {
+	wantErr := fmt.Errorf("%w: invalid target", generator.ErrInvalidTaskPayload)
+	stub := &runManagerStub{createErr: wantErr}
+	_, err := handler.NewGenerationHandler(stub).Create(
+		context.Background(),
+		dto.CreateGenerationRequest{Kind: generator.EditTiles, CreativeBrief: "edit"},
+	)
+
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusBadRequest || !errors.Is(err, wantErr) {
+		t.Fatalf("expected invalid payload bad request, got %v", err)
 	}
 }
 
@@ -103,7 +109,7 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		AssetID:   &assetID,
 		Kind:      generator.GenerateAnimation,
 		Status:    taskdomain.StatusProcessing,
-		Result:    json.RawMessage(`{"asset_id":3,"animation_id":9}`),
+		Result:    json.RawMessage(`{"media_ids":["media-1"]}`),
 	}}
 
 	response, err := handler.NewGenerationHandler(stub).Get(
@@ -117,9 +123,6 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		*response.Data.AssetID != assetID || response.Data.Kind != generator.GenerateAnimation ||
 		response.Data.Status != "processing" {
 		t.Fatalf("unexpected run response: %+v", response)
-	}
-	if response.Data.Result == nil || response.Data.Result.AssetID != 3 || response.Data.Result.AnimationID != 9 {
-		t.Fatalf("unexpected generation result: %+v", response.Data.Result)
 	}
 }
 

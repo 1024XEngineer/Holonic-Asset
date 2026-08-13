@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { requireAuth } from "@/app/auth-navigation";
 
 function GeneratePlaceholder() {
+  const { t } = useTranslation("generation");
+
   return (
     <main className="grid min-h-[calc(100vh-3.5rem)] place-items-center bg-muted/30 p-6">
       <section className="max-w-md rounded-xl border bg-background p-8 text-center shadow-sm">
-        <h1 className="text-2xl font-semibold">Image generation</h1>
+        <h1 className="text-2xl font-semibold">{t("placeholderTitle")}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          The image generation workspace will arrive in a follow-up change.
+          {t("placeholderDescription")}
         </p>
       </section>
     </main>
@@ -14,5 +18,6 @@ function GeneratePlaceholder() {
 }
 
 export const Route = createFileRoute("/generate")({
+  beforeLoad: ({ location }) => requireAuth(location.href),
   component: GeneratePlaceholder,
 });

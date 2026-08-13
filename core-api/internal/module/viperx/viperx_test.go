@@ -23,6 +23,9 @@ queue:
   databaseURL: postgres://localhost/holonic
   maxWorkers: 3
   jobTimeout: 30s
+auth:
+  jwtSecret: test-secret
+  tokenExpiry: 2h
 log:
   path: ./logs/app.log
   maxSize: 100
@@ -56,6 +59,9 @@ qiniu:
 	if loaded.DB.ConnMaxIdleTime != 15*time.Minute || loaded.Queue.JobTimeout != 30*time.Second {
 		t.Fatalf("unexpected duration config: db=%s queue=%s", loaded.DB.ConnMaxIdleTime, loaded.Queue.JobTimeout)
 	}
+	if loaded.Auth.JWTSecret != "test-secret" || loaded.Auth.TokenExpiry != 2*time.Hour {
+		t.Fatalf("unexpected auth config: %+v", loaded.Auth)
+	}
 	if loaded.Log.Path != "./logs/app.log" || !loaded.Log.Compress {
 		t.Fatalf("unexpected log config: %+v", loaded.Log)
 	}
@@ -77,6 +83,9 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
+	}
+	if loaded.Auth.TokenExpiry != 24*time.Hour {
+		t.Fatalf("unexpected auth config: %+v", loaded.Auth)
 	}
 	if loaded.LLM.BaseURL != "" || loaded.LLM.APIKey != "" || loaded.LLM.DefaultModel != "" {
 		t.Fatalf("expected example LLM config to be user-supplied: %+v", loaded.LLM)

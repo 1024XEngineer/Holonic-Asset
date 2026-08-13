@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SceneryLayer } from "@/model";
+import { withI18n } from "@/testing/with-i18n";
 
 import { SceneryCanvas } from "./scenery-canvas";
 
@@ -25,14 +26,16 @@ const layers: SceneryLayer[] = [
 describe("SceneryCanvas", () => {
   it("renders selected and hidden layer states", () => {
     const html = renderToStaticMarkup(
-      <SceneryCanvas
-        model={{
-          layers,
-          selectedLayerIds: ["trees"],
-          visibleLayerIds: ["sky"],
-        }}
-        onEvent={vi.fn()}
-      />,
+      withI18n(
+        <SceneryCanvas
+          model={{
+            layers,
+            selectedLayerIds: ["trees"],
+            visibleLayerIds: ["sky"],
+          }}
+          onEvent={vi.fn()}
+        />,
+      ),
     );
 
     expect(html).toContain('aria-pressed="true"');

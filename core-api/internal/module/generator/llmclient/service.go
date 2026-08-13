@@ -10,9 +10,8 @@ import (
 	"strings"
 )
 
-// LLMService completes provider-independent text or multimodal calls with
-// structured JSON output. Business prompts and domain validation remain with
-// callers.
+// LLMService completes provider-independent text or multimodal calls with structured
+// JSON output. Business prompts and domain validation remain with callers.
 type LLMService interface {
 	Complete(context.Context, *CompletionRequest) (*CompletionResult, error)
 }

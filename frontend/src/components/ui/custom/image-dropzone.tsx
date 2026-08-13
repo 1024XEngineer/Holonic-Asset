@@ -3,60 +3,78 @@
  * Image upload and preview dropzone component built with react-dropzone.
  */
 
-import { ImagePlus, X } from "lucide-react";
-import { useDropzone } from "react-dropzone";
+import { ImagePlus } from "lucide-react";
+import { useId } from "react";
+import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const imageAccept = {
+const IMAGE_ACCEPT = {
   "image/jpeg": [".jpg", ".jpeg"],
   "image/png": [".png"],
   "image/webp": [".webp"],
-};
+} satisfies Accept;
+
+const INVALID_IMAGE_MESSAGE = "Use a PNG, JPEG, or WebP image.";
+
+export type ImageDropzoneValue = File | string;
+
+export interface ImageDropzoneProps {
+  className?: string;
+  error?: string;
+  label?: string;
+  onChange: (value: File | undefined) => void;
+  value?: ImageDropzoneValue;
+}
 
 export function ImageDropzone({
   className,
-  fileName,
   error,
   label = "Upload a reference image",
-  onClear,
-  onSelect,
-  previewUrl,
-}: {
-  className?: string;
-  fileName?: string;
-  error?: string;
-  label?: string;
-  onClear?: () => void;
-  onSelect: (file: File) => void;
-  previewUrl?: string;
-}) {
+  onChange,
+  value,
+}: ImageDropzoneProps) {
+  const errorId = useId();
+  const previewUrl = typeof value === "string" ? value : undefined;
+  const fileName = value instanceof File ? value.name : undefined;
+  const hasSelection = Boolean(value);
   const { fileRejections, getInputProps, getRootProps, isDragActive } =
     useDropzone({
-      accept: imageAccept,
+      accept: IMAGE_ACCEPT,
       maxFiles: 1,
       multiple: false,
-      onDropAccepted: ([file]) => file && onSelect(file),
+      onDropAccepted: ([file]) => file && onChange(file),
     });
+  const message = getRejectionMessage(fileRejections) ?? error;
 
   return (
     <div className="grid gap-2">
       <div
-        {...getRootProps()}
+        {...getRootProps({
+          "aria-describedby": message ? errorId : undefined,
+          "aria-invalid": message ? true : undefined,
+          "aria-label": hasSelection ? "Replace image" : label,
+          role: "button",
+        })}
         className={cn(
-          "group relative flex min-h-28 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "group relative flex min-h-28 items-center justify-center overflow-visible rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground transition-colors aria-invalid:border-destructive",
+          "cursor-pointer hover:bg-muted/60",
           isDragActive && "border-ring bg-muted",
+          "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           className,
         )}
       >
-        <input {...getInputProps()} />
+        <input
+          {...getInputProps({
+            "aria-describedby": message ? errorId : undefined,
+            "aria-invalid": message ? true : undefined,
+          })}
+        />
         {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={previewUrl}
-            alt="Selected reference"
-            className="size-full object-cover"
+            alt="Selected image"
+            className="size-full rounded-[inherit] object-cover"
           />
         ) : fileName ? (
           <span className="max-w-full truncate px-12">{fileName}</span>
@@ -66,29 +84,24 @@ export function ImageDropzone({
             {isDragActive ? "Drop image to attach" : label}
           </span>
         )}
-        {onClear && (previewUrl || fileName) ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            className="absolute top-2 right-2 bg-background/90"
-            aria-label="Remove reference image"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClear();
-            }}
-          >
-            <X />
-          </Button>
-        ) : null}
       </div>
-      {fileRejections.length > 0 ? (
-        <p className="text-xs text-destructive">
-          Use a PNG, JPEG, or WebP image.
+      {message ? (
+        <p id={errorId} className="text-xs text-destructive" role="alert">
+          {message}
         </p>
-      ) : error ? (
-        <p className="text-xs text-destructive">{error}</p>
       ) : null}
     </div>
   );
+}
+
+function getRejectionMessage(fileRejections: readonly FileRejection[]) {
+  if (fileRejections.length === 0) return undefined;
+
+  const hasTooManyFiles = fileRejections.some(({ errors }) =>
+    errors.some(({ code }) => code === "too-many-files"),
+  );
+
+  return hasTooManyFiles
+    ? "Upload one image at a time."
+    : INVALID_IMAGE_MESSAGE;
 }

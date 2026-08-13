@@ -25,9 +25,28 @@ type Position struct {
 type Prototype []ImageResource
 
 type Animation struct {
-	ID     uint    `json:"id"`
-	Name   string  `json:"name"`
-	Frames []Frame `json:"frames"`
+	ID         uint                       `json:"id"`
+	Name       string                     `json:"name"`
+	Frames     []Frame                    `json:"frames"`
+	Generation *AnimationGenerationConfig `json:"generation,omitempty"`
+}
+
+// AnimationGenerationConfig stores the effective parameters used to generate
+// an animation. It is persisted with asset content for future regeneration,
+// but transport handlers remove it from asset responses.
+type AnimationGenerationConfig struct {
+	Direction string `json:"direction"`
+	Style     string `json:"style,omitempty"`
+
+	FrameCount  int `json:"frameCount"`
+	Columns     int `json:"columns"`
+	FrameWidth  int `json:"frameWidth"`
+	FrameHeight int `json:"frameHeight"`
+	FPS         int `json:"fps"`
+
+	Resolution  string `json:"resolution"`
+	Duration    int    `json:"duration"`
+	AspectRatio string `json:"aspectRatio"`
 }
 
 type ImageResource struct {

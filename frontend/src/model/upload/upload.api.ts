@@ -2,7 +2,7 @@ import type {
   CreateUploadTargetRequest,
   UploadTarget,
 } from "./upload.contract";
-import { postEnvelope } from "@/model/fetchers";
+import { coreApiClient, unwrapApiResponse } from "@/model/fetchers";
 
 export type {
   CreateUploadTargetRequest,
@@ -10,6 +10,8 @@ export type {
 } from "./upload.contract";
 
 export const uploadApi = {
-  createTarget: (request: CreateUploadTargetRequest) =>
-    postEnvelope<UploadTarget>("/uploads", request),
+  createTarget: async (request: CreateUploadTargetRequest) =>
+    unwrapApiResponse<UploadTarget>(
+      await coreApiClient.POST("/uploads", { body: request }),
+    ),
 };

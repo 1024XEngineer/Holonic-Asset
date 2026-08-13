@@ -19,6 +19,28 @@ func (e *Engine) handleCharacterPrototype(
 	return e.execute(ctx, GenerateCharacterProtoType, message.Payload)
 }
 
+func (e *Engine) handleEditCharacterPrototype(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditCharacterPrototypePayload{}
+	if err := decodeTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, EditCharacterProtoType, message.Payload)
+}
+
+func (e *Engine) handleEditObjectPrototype(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditObjectPrototypePayload{}
+	if err := decodeTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, EditObjectProtoType, message.Payload)
+}
+
 func (e *Engine) handleAnimation(
 	ctx context.Context,
 	message *taskdomain.Task,
@@ -57,10 +79,41 @@ func (e *Engine) handleTileSet(
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateTileSetPayload{}
-	if err := decodeTaskPayload(message, &payload); err != nil {
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	if err := validateCreateTileSetPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Tileset generation phase.
+}
+
+func (e *Engine) handleEditTilesetItem(
+	_ context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditTilesetItemPayload{}
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateEditTilesetItemPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Item editing phase.
+}
+
+func (e *Engine) handleEditTiles(
+	_ context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditTilesPayload{}
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateEditTilesPayload(&payload); err != nil {
+		return nil, err
+	}
+	return nil, nil //nolint:nilnil // Execution starts in the Tile editing phase.
 }
 
 func (e *Engine) handleEmptyTask(
@@ -84,6 +137,17 @@ func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 	return nil
 }
 
+func decodeTileSetTaskPayload(message *taskdomain.Task, payload any) error {
+	if message == nil {
+		return ErrTaskRequired
+	}
+	request := &Request{Kind: TaskType(message.Type), Parameters: message.Payload}
+	if err := decodeStrictParameters(request, payload); err != nil {
+		return fmt.Errorf("generator: decode %s task %d payload: %w", message.Type, message.ID, err)
+	}
+	return nil
+}
+
 func (e *Engine) execute(
 	ctx context.Context,
 	taskType TaskType,
@@ -97,20 +161,20 @@ func (e *Engine) execute(
 
 func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateCharacterProtoType), taskdomain.HandlerFunc(e.handleCharacterPrototype))
+	manager.Register(string(EditCharacterProtoType), taskdomain.HandlerFunc(e.handleEditCharacterPrototype))
+	manager.Register(string(EditObjectProtoType), taskdomain.HandlerFunc(e.handleEditObjectPrototype))
 	manager.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
 	manager.Register(string(GenerateAnimation), taskdomain.HandlerFunc(e.handleAnimation))
 	manager.Register(string(GenerateScenery), taskdomain.HandlerFunc(e.handleScenery))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
+	manager.Register(string(EditTilesetItem), taskdomain.HandlerFunc(e.handleEditTilesetItem))
+	manager.Register(string(EditTiles), taskdomain.HandlerFunc(e.handleEditTiles))
 
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{
-		EditCharacterProtoType,
 		EditCharacterFrames,
-		EditObjectProtoType,
 		EditObjectFrames,
 		EditAnimation,
-		EditTilesetItem,
-		EditTiles,
 	} {
 		manager.Register(string(taskType), emptyHandler)
 	}

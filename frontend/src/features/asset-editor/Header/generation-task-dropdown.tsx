@@ -1,4 +1,5 @@
 import { ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,6 +20,7 @@ export function GenerationTaskDropdown({
 }: {
   tasks: EditorGenerationTask[];
 }) {
+  const { t } = useTranslation("editor");
   if (tasks.length === 0) return null;
 
   return (
@@ -26,7 +28,7 @@ export function GenerationTaskDropdown({
       <DropdownMenuTrigger className="inline-flex h-8 max-w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
         <span className="hidden truncate sm:inline">
-          {tasks.length} generation{tasks.length === 1 ? "" : "s"} active
+          {t("generationActive", { count: tasks.length })}
         </span>
         <Badge
           variant="outline"
@@ -55,7 +57,7 @@ export function GenerationTaskDropdown({
                     variant="outline"
                     className="shrink-0 text-[10px] text-muted-foreground"
                   >
-                    {task.status === "queued" ? "Queued" : "Generating"}
+                    {task.status === "queued" ? t("queued") : t("generating")}
                   </Badge>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">

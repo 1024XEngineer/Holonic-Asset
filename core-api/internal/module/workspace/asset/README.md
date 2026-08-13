@@ -52,8 +52,9 @@ height = tileSize.height * tileAmount.rows
 ## Content
 
 Character Content contains `directionCount`, `prototype`, and `animations`.
-`directionCount` is derived from the Asset perspective: `Side-On` uses `2`,
-`Top-Down` uses `4`, and `Isometric` uses `8`. Callers do not provide it.
+`directionCount` is derived from the Asset perspective: `Side-On` uses `2`
+(left and right), `Top-Down` uses `4`, and `Isometric` uses `8`. Callers do
+not provide it.
 Object Content contains `prototype` and `animations`. TileSet Content contains
 `items`; tile dimensions belong to Dimensions. UI Set Content contains `components`,
 including component size and position. Scenery Content contains `layers`,

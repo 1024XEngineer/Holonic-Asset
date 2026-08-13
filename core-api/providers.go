@@ -8,6 +8,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/auth"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
@@ -40,6 +41,14 @@ func InitAssetStore(db *gorm.DB) assetdomain.Store {
 // InitTaskStore creates the persistence adapter used by the task module.
 func InitTaskStore(db *gorm.DB) task.TaskStore {
 	return repository.NewTaskRepository(db)
+}
+
+func InitUserStore(db *gorm.DB) auth.Store {
+	return repository.NewUserRepository(dao.NewGormUserDao(db))
+}
+
+func InitAuthService(cfg config.AuthConfig, store auth.Store) (*auth.Service, error) {
+	return auth.NewService(store, cfg.JWTSecret, cfg.TokenExpiry)
 }
 
 // InitImageService creates the external image provider and its application service.
@@ -91,11 +100,9 @@ func InitGeneratorExecutor(
 	llm llmclient.LLMService,
 	processor imageprocessor.Processor,
 	assets generator.AssetWriter,
-	resources generator.ResourceStore,
 ) generator.Executor {
 	return generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
-		LLM:       llm,
-		Resources: resources,
+		LLM: llm,
 	})
 }
 

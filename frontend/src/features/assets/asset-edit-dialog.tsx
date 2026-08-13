@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, Layers3, Ruler, Tags, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
+import { AssetKindIcon } from "@/components/asset-kind";
 import {
   assetMetadataUpdateSchema,
   assetCanvasSizeOptions,
@@ -50,6 +51,7 @@ export function AssetEditDialog({
   onSave: (metadata: AssetMetadataUpdate) => void;
   projectId?: string;
 }) {
+  const { t } = useTranslation(["assets", "common"]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -129,7 +131,7 @@ export function AssetEditDialog({
               }
             >
               <X />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t("common:actions.close")}</span>
             </DialogClose>
 
             <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(20rem,1fr)]">
@@ -142,20 +144,18 @@ export function AssetEditDialog({
                 <DialogHeader className="pr-7">
                   <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <AssetKindIcon kind={asset.kind} className="size-3.5" />
-                    {getAssetKindConfig(asset.kind).label}
+                    {t(`common:assetKinds.${asset.kind}`)}
                     <span aria-hidden="true">/</span>
                     {asset.version}
                   </div>
                   <DialogTitle className="text-xl leading-tight">
-                    Edit asset
+                    {t("edit.title")}
                   </DialogTitle>
-                  <DialogDescription>
-                    Update the asset information used throughout this project.
-                  </DialogDescription>
+                  <DialogDescription>{t("edit.description")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="mt-6 space-y-5">
-                  <Field label="Name" htmlFor="asset-name">
+                  <Field label={t("edit.name")} htmlFor="asset-name">
                     <Input
                       disabled={isSaving}
                       id="asset-name"
@@ -166,7 +166,10 @@ export function AssetEditDialog({
                       }}
                     />
                   </Field>
-                  <Field label="Description" htmlFor="asset-description">
+                  <Field
+                    label={t("edit.descriptionField")}
+                    htmlFor="asset-description"
+                  >
                     <Textarea
                       disabled={isSaving}
                       id="asset-description"
@@ -178,7 +181,7 @@ export function AssetEditDialog({
                     />
                   </Field>
                   <Field
-                    label="Tags"
+                    label={t("edit.tags")}
                     htmlFor="asset-tags"
                     icon={<Tags className="size-3.5" />}
                   >
@@ -194,7 +197,9 @@ export function AssetEditDialog({
                           />
                         }
                       >
-                        {tags.length > 0 ? tags.join(", ") : "Select tags"}
+                        {tags.length > 0
+                          ? tags.join(", ")
+                          : t("edit.selectTags")}
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-[var(--anchor-width)] min-w-52">
                         {tagOptions.map((tag) => (
@@ -219,7 +224,7 @@ export function AssetEditDialog({
                       label={
                         <>
                           <Ruler className="size-3.5" />
-                          Canvas
+                          {t("edit.canvas")}
                         </>
                       }
                       onChange={(value) => {
@@ -235,7 +240,7 @@ export function AssetEditDialog({
                       label={
                         <>
                           <Layers3 className="size-3.5" />
-                          Perspective
+                          {t("edit.perspective")}
                         </>
                       }
                       onChange={(value) => {
@@ -276,13 +281,13 @@ export function AssetEditDialog({
                   <Button type="button" variant="outline" disabled={isSaving} />
                 }
               >
-                Close
+                {t("common:actions.close")}
               </DialogClose>
               <Button
                 type="submit"
                 disabled={isSaving || !metadataResult.success}
               >
-                {isSaving ? "Saving..." : "Save changes"}
+                {isSaving ? t("edit.saving") : t("common:actions.save")}
               </Button>
             </DialogFooter>
           </form>

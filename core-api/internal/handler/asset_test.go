@@ -36,7 +36,7 @@ type assetManagerStub struct {
 	deleteErr       error
 }
 
-func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, _ uint) (*domain.AssetRecord, error) {
 	s.recordRequest = record
 	return s.record, nil
 }
@@ -306,6 +306,94 @@ func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
 	if *(*persisted.Prototype)[0].URL != prototypeURL || *persisted.Animations[0].Frames[0].URL != frameURL ||
 		*persisted.Items[0].Tiles[0].URL != tileURL || persisted.Layers[0].Resource != layerResource {
 		t.Fatalf("handler mutated persisted content: %+v", persisted)
+	}
+}
+
+func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing.T) {
+	raw := json.RawMessage(`{
+		"animations":[{
+			"id":3,
+			"name":"walk",
+			"frames":[{"id":1,"url":"uploads/frame.png"}],
+			"generation":{"direction":"front","frameCount":16,"columns":4,"frameWidth":256,"frameHeight":256,"fps":10,"resolution":"720p","duration":5,"aspectRatio":"1:1"},
+			"customAnimation":{"keep":true},
+			"futureValue":12345678901234567890
+		}],
+		"customTopLevel":"kept"
+	}`)
+	managerStub := &assetManagerStub{asset: domain.Asset{ID: 7, Content: raw}}
+	h := handler.NewHandler(managerStub)
+
+	response, err := h.Detail(context.Background(), dto.AssetDetailRequest{AssetID: 7})
+	if err != nil {
+		t.Fatalf("get asset detail: %v", err)
+	}
+	var content map[string]json.RawMessage
+	if err := json.Unmarshal(response.Data.Content, &content); err != nil {
+		t.Fatalf("decode response content: %v", err)
+	}
+	var animations []map[string]json.RawMessage
+	if err := json.Unmarshal(content["animations"], &animations); err != nil {
+		t.Fatalf("decode response animations: %v", err)
+	}
+	if len(animations) != 1 {
+		t.Fatalf("unexpected response animations: %s", content["animations"])
+	}
+	if _, ok := animations[0]["generation"]; ok {
+		t.Fatalf("animation generation metadata leaked in response: %s", response.Data.Content)
+	}
+	if string(animations[0]["customAnimation"]) != `{"keep":true}` ||
+		string(animations[0]["futureValue"]) != "12345678901234567890" ||
+		string(content["customTopLevel"]) != `"kept"` {
+		t.Fatalf("unmodeled fields changed: %s", response.Data.Content)
+	}
+	var frames []map[string]json.RawMessage
+	if err := json.Unmarshal(animations[0]["frames"], &frames); err != nil {
+		t.Fatalf("decode response frames: %v", err)
+	}
+	if string(frames[0]["url"]) != `"uploads/frame.png"` {
+		t.Fatalf("frame reference changed without resolver: %s", animations[0]["frames"])
+	}
+	if string(managerStub.asset.Content) != string(raw) {
+		t.Fatalf("handler mutated persisted content: %s", managerStub.asset.Content)
+	}
+	var persisted map[string]json.RawMessage
+	if err := json.Unmarshal(managerStub.asset.Content, &persisted); err != nil {
+		t.Fatalf("decode persisted content: %v", err)
+	}
+	var persistedAnimations []map[string]json.RawMessage
+	if err := json.Unmarshal(persisted["animations"], &persistedAnimations); err != nil {
+		t.Fatalf("decode persisted animations: %v", err)
+	}
+	if _, ok := persistedAnimations[0]["generation"]; !ok {
+		t.Fatalf("persisted animation generation metadata was removed: %s", managerStub.asset.Content)
+	}
+}
+
+func TestAssetHandlerRecordsHideAnimationGeneration(t *testing.T) {
+	raw := json.RawMessage(`{"animations":[{"id":3,"name":"walk","frames":[],"generation":{"direction":"front","frameCount":16}}]}`)
+	managerStub := &assetManagerStub{records: []domain.AssetRecord{{
+		ID: 15, AssetID: 7, Version: 1, ContentID: 21, Content: raw,
+	}}}
+	h := handler.NewHandler(managerStub)
+
+	response, err := h.Records(context.Background(), dto.GetAssetRecordsRequest{AssetID: 7})
+	if err != nil {
+		t.Fatalf("get asset records: %v", err)
+	}
+	var content map[string]json.RawMessage
+	if err := json.Unmarshal(response.Data.Records[0].Content, &content); err != nil {
+		t.Fatalf("decode record response content: %v", err)
+	}
+	var animations []map[string]json.RawMessage
+	if err := json.Unmarshal(content["animations"], &animations); err != nil {
+		t.Fatalf("decode record response animations: %v", err)
+	}
+	if _, ok := animations[0]["generation"]; ok {
+		t.Fatalf("animation generation metadata leaked in record response: %s", response.Data.Records[0].Content)
+	}
+	if string(managerStub.records[0].Content) != string(raw) {
+		t.Fatalf("handler mutated persisted record content: %s", managerStub.records[0].Content)
 	}
 }
 

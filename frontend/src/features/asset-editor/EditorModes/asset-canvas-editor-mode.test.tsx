@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { AssetKind, AssetRecord, AssetWorkspaceData } from "@/model";
+import { withI18n } from "@/testing/with-i18n";
 
 import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
 
@@ -38,10 +39,12 @@ describe("AssetCanvasEditorMode", () => {
     "renders the %s record in its editor canvas",
     (kind, record, canvasLabel) => {
       const html = renderToStaticMarkup(
-        <AssetCanvasEditorMode
-          data={workspaceData(kind, record)}
-          onBack={() => undefined}
-        />,
+        withI18n(
+          <AssetCanvasEditorMode
+            data={workspaceData(kind, record)}
+            onBack={() => undefined}
+          />,
+        ),
       );
 
       expect(html).toContain(`${kind} editor`);
@@ -52,14 +55,16 @@ describe("AssetCanvasEditorMode", () => {
 
   it("renders no canvas for unsupported record modes", () => {
     const html = renderToStaticMarkup(
-      <AssetCanvasEditorMode
-        data={workspaceData("audio", {
-          mode: "audio",
-          prompt: "Theme",
-          audio: {},
-        })}
-        onBack={() => undefined}
-      />,
+      withI18n(
+        <AssetCanvasEditorMode
+          data={workspaceData("audio", {
+            mode: "audio",
+            prompt: "Theme",
+            audio: {},
+          })}
+          onBack={() => undefined}
+        />,
+      ),
     );
 
     expect(html).toBe("");
