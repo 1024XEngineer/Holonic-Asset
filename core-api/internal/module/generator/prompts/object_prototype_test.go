@@ -20,6 +20,8 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 		"2 row x 2 column sheet",
 		"normal reading order",
 		"reading-order indexes",
+		"zero-based array index is the direction identity",
+		"index 0 = front, index 1 = right, index 2 = back, index 3 = left",
 		"a wooden chest with two locks",
 		"Top-Down",
 		"<direction_count>\n4\n</direction_count>",
