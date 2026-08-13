@@ -62,6 +62,9 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	if animations.request == nil || animations.request.FrameCount != 11 || animations.request.Columns != 4 || !animations.request.ReferenceImageContext {
 		t.Fatalf("unexpected edit animation request: %+v", animations.request)
 	}
+	if !reflect.DeepEqual(animations.request.TargetFrameIndices, []int{4, 6}) {
+		t.Fatalf("unexpected target frame indices: %+v", animations.request.TargetFrameIndices)
+	}
 	if animations.request.Action != "make the sword glow" {
 		t.Fatalf("unexpected edit prompt: %+v", animations.request)
 	}

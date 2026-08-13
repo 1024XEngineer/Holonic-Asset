@@ -90,6 +90,35 @@ func TestNormalizeAnimationGenerationRequestRejectsInvalidOptions(t *testing.T) 
 	}
 }
 
+func TestNormalizeAnimationGenerationRequestValidatesTargetFrameIndices(t *testing.T) {
+	base := AnimationGenerationRequest{
+		ReferenceImage: "reference", ReferenceImageContext: true, FrameCount: 4,
+		Columns: 2, FrameWidth: 64, FrameHeight: 64, FPS: 10, Duration: 5,
+	}
+	tests := []struct {
+		name    string
+		targets []int
+		context bool
+		want    string
+	}{
+		{name: "outside context", targets: []int{4}, context: true, want: "outside the 4-frame context"},
+		{name: "unordered", targets: []int{2, 1}, context: true, want: "unique and ordered"},
+		{name: "duplicate", targets: []int{1, 1}, context: true, want: "unique and ordered"},
+		{name: "without context", targets: []int{1}, context: false, want: "require an animation context reference"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := base
+			request.ReferenceImageContext = test.context
+			request.TargetFrameIndices = test.targets
+			_, err := normalizeAnimationGenerationRequest(&request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
 func TestLoadAnimationReferenceRejectsResolverFailures(t *testing.T) {
 	wantErr := errors.New("resolve failed")
 	service := &animationGenerationService{referenceResolver: &animationReferenceResolverStub{err: wantErr}}
@@ -160,6 +189,23 @@ func TestSelectEditFrameContextIndicesSamplesOrderedFullSegment(t *testing.T) {
 		t.Fatalf("select context indices: %v", err)
 	}
 	want := []int{0, 3, 6, 9}
+	if !reflect.DeepEqual(indices, want) {
+		t.Fatalf("indices = %v, want %v", indices, want)
+	}
+}
+
+func TestSelectEditFrameContextIndicesSkipsUnsafeBoundaryFrames(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{
+			{Safe: false}, {Safe: true}, {Safe: true}, {Safe: true}, {Safe: true},
+		},
+	}
+	indices, err := selectEditFrameContextIndices(analysis, 3)
+	if err != nil {
+		t.Fatalf("select context indices: %v", err)
+	}
+	want := []int{1, 3, 4}
 	if !reflect.DeepEqual(indices, want) {
 		t.Fatalf("indices = %v, want %v", indices, want)
 	}

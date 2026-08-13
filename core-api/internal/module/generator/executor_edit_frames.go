@@ -90,6 +90,10 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		contextEnd = len(animation.Frames) - 1
 	}
 	contextCount := contextEnd - contextStart + 1
+	targetFrameIndices := make([]int, len(indices))
+	for index, frameIndex := range indices {
+		targetFrameIndices[index] = frameIndex - contextStart
+	}
 	if contextCount > 32 {
 		return nil, fmt.Errorf("generator: edit frames context contains %d frames; maximum is 32", contextCount)
 	}
@@ -131,6 +135,7 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		ReferenceImage:         "data:image/png;base64," + contextSheet,
 		ReferenceImagePrepared: true,
 		ReferenceImageContext:  true,
+		TargetFrameIndices:     targetFrameIndices,
 		FrameCount:             contextCount,
 		Columns:                columns,
 		FrameWidth:             defaultAnimationFrameWidth,

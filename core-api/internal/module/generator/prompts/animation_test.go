@@ -38,17 +38,22 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 
 func TestBuildAnimationVideoUsesTemporalContextInstructionsForFrameEdits(t *testing.T) {
 	prompt := BuildAnimationVideo(AnimationOptions{
-		Description:  "travelling alchemist",
-		Style:        "painted 2D game art",
-		Action:       "make the flask glow",
-		FrameCount:   9,
-		ContextSheet: true,
+		Description:        "travelling alchemist",
+		Style:              "painted 2D game art",
+		Action:             "make the flask glow",
+		FrameCount:         9,
+		ContextSheet:       true,
+		TargetFrameIndices: []int{4, 5},
 	})
 	for _, expected := range []string{
-		"ordered contact sheet of neighboring animation frames",
+		"ordered contact sheet of exactly 9 neighboring animation frames",
 		"LOCAL FRAME EDIT",
 		"do not restart the full action",
-		"boundaries can be inserted back into the original animation",
+		"target samples can be inserted back into the original animation",
+		"TARGET OUTPUT SAMPLES: 5, 6",
+		"must be clearly visible there",
+		"begins in the first target sample and completes by the last target sample",
+		"non-target samples",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("context prompt does not contain %q:\n%s", expected, prompt)

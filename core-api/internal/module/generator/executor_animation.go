@@ -130,14 +130,17 @@ type AnimationGenerationRequest struct {
 	ReferenceImagePrepared bool
 	// ReferenceImageContext marks an ordered context strip used for local frame edits.
 	ReferenceImageContext bool
-	FrameCount            int
-	Columns               int
-	FrameWidth            int
-	FrameHeight           int
-	FPS                   int
-	Resolution            string
-	Duration              int
-	AspectRatio           string
+	// TargetFrameIndices identifies the zero-based output samples that will be
+	// replaced when ReferenceImageContext is true.
+	TargetFrameIndices []int
+	FrameCount         int
+	Columns            int
+	FrameWidth         int
+	FrameHeight        int
+	FPS                int
+	Resolution         string
+	Duration           int
+	AspectRatio        string
 }
 
 type AnimationGenerationResult struct {
@@ -223,11 +226,12 @@ func (s *animationGenerationService) Generate(
 		return nil, err
 	}
 	promptOptions := prompts.AnimationOptions{
-		Description:  options.Description,
-		Style:        options.Style,
-		Action:       options.Action,
-		FrameCount:   options.FrameCount,
-		ContextSheet: options.ReferenceImageContext,
+		Description:        options.Description,
+		Style:              options.Style,
+		Action:             options.Action,
+		FrameCount:         options.FrameCount,
+		ContextSheet:       options.ReferenceImageContext,
+		TargetFrameIndices: options.TargetFrameIndices,
 	}
 	greenReference, err := s.prepareAnimationReference(
 		ctx,
@@ -288,6 +292,7 @@ func normalizeAnimationGenerationRequest(
 	value.Description = strings.TrimSpace(value.Description)
 	value.Style = strings.TrimSpace(value.Style)
 	value.Action = strings.TrimSpace(value.Action)
+	value.TargetFrameIndices = append([]int(nil), value.TargetFrameIndices...)
 	value.ReferenceImage = strings.TrimSpace(value.ReferenceImage)
 	value.Resolution = strings.TrimSpace(value.Resolution)
 	value.AspectRatio = strings.TrimSpace(value.AspectRatio)
@@ -344,6 +349,19 @@ func normalizeAnimationGenerationRequest(
 	}
 	if value.Duration < 4 || value.Duration > 15 {
 		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation video duration must be between 4 and 15 seconds")
+	}
+	if len(value.TargetFrameIndices) > 0 && !value.ReferenceImageContext {
+		return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame indices require an animation context reference")
+	}
+	previousTarget := -1
+	for _, target := range value.TargetFrameIndices {
+		if target < 0 || target >= value.FrameCount {
+			return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame index %d is outside the %d-frame context", target, value.FrameCount)
+		}
+		if target <= previousTarget {
+			return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame indices must be unique and ordered")
+		}
+		previousTarget = target
 	}
 	return value, nil
 }
@@ -596,20 +614,24 @@ func selectEditFrameContextIndices(analysis videoprocessor.FrameSequenceAnalysis
 	if len(analysis.Frames) < frameCount {
 		return nil, fmt.Errorf("generator: video has %d candidate frames; need at least %d", len(analysis.Frames), frameCount)
 	}
-	indices := make([]int, frameCount)
-	if frameCount == 1 {
-		indices[0] = (len(analysis.Frames) - 1) / 2
-	} else {
-		last := len(analysis.Frames) - 1
-		for index := range frameCount {
-			indices[index] = (index*last + (frameCount-1)/2) / (frameCount - 1)
+	safeIndices := make([]int, 0, len(analysis.Frames))
+	for index, frame := range analysis.Frames {
+		if frame.Safe {
+			safeIndices = append(safeIndices, index)
 		}
 	}
-	for _, index := range indices {
-		if !analysis.Frames[index].Safe {
-			return nil, &videoprocessor.QualityError{
-				Kind: "framing", Message: fmt.Sprintf("generator: edit context candidate frame %d violates the framing safety band", index),
-			}
+	if len(safeIndices) < frameCount {
+		return nil, &videoprocessor.QualityError{
+			Kind: "framing", Message: fmt.Sprintf("generator: edit context video has %d safe candidate frames; need at least %d", len(safeIndices), frameCount),
+		}
+	}
+	indices := make([]int, frameCount)
+	if frameCount == 1 {
+		indices[0] = safeIndices[(len(safeIndices)-1)/2]
+	} else {
+		last := len(safeIndices) - 1
+		for index := range frameCount {
+			indices[index] = safeIndices[(index*last+(frameCount-1)/2)/(frameCount-1)]
 		}
 	}
 	return indices, nil

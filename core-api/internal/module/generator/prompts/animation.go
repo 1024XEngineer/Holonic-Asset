@@ -16,11 +16,12 @@ const (
 )
 
 type AnimationOptions struct {
-	Description  string
-	Style        string
-	Action       string
-	FrameCount   int
-	ContextSheet bool
+	Description        string
+	Style              string
+	Action             string
+	FrameCount         int
+	ContextSheet       bool
+	TargetFrameIndices []int
 }
 
 // BuildAnimationVideo converts the user's semantic action specification into
@@ -45,16 +46,19 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
 - do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose`
 	if options.ContextSheet {
-		referenceInstructions = `TEMPORAL CONTEXT REFERENCE:
-- the input is an ordered contact sheet of neighboring animation frames, read left-to-right then top-to-bottom
+		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
+		referenceInstructions = fmt.Sprintf(`TEMPORAL CONTEXT REFERENCE:
+- the input is an ordered contact sheet of exactly %d neighboring animation frames, read left-to-right then top-to-bottom
 - use it only as temporal context; the output must be a normal video and must never reproduce the sheet layout
 - preserve the subject's exact identity, proportions, details, materials, palette, art style, orientation, scale, camera, and root position
-- preserve the original pose progression and make the first and last generated poses compatible with their neighboring context frames`
-		actionInstructions = `LOCAL FRAME EDIT:
-- apply the requested change while following the same ordered motion segment shown by the temporal context
-- preserve timing and pose progression outside the requested local change
+- non-target frames are continuity anchors; match the pose immediately before and after each target region`, options.FrameCount)
+		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
+- the user's requested change is authoritative inside those target samples and must be clearly visible there
+- schedule and compress the requested motion so it begins in the first target sample and completes by the last target sample; do not place the requested action only before or after them
+- preserve timing and pose progression in non-target samples, using them only to enter and exit the edited motion smoothly
+- an explicitly requested held prop, equipment change, or pose change is allowed inside target samples; preserve everything the user did not ask to change
 - do not restart the full action, invent a new cycle, reverse time, loop early, or jump between motion phases
-- produce a smooth ordered segment whose boundaries can be inserted back into the original animation`
+- produce a smooth ordered segment whose target samples can be inserted back into the original animation`, targetFrames, options.FrameCount)
 	}
 	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image.
 
@@ -84,6 +88,17 @@ FRAMING AND BACKGROUND:
 - background is perfectly uniform pure chroma green #00FF00: no floor, shadow, gradient, scenery, lighting change, particles, text, audio, trails, or motion graphics`,
 		description, style, action, options.FrameCount, referenceInstructions, actionInstructions))
 	return limit(prompt, MaxAnimationVideoCharacters)
+}
+
+func formatAnimationTargetFrames(indices []int, frameCount int) string {
+	if len(indices) == 0 {
+		return fmt.Sprintf("all %d", frameCount)
+	}
+	values := make([]string, len(indices))
+	for index, frameIndex := range indices {
+		values[index] = fmt.Sprintf("%d", frameIndex+1)
+	}
+	return strings.Join(values, ", ")
 }
 
 func BuildAnimationVideoRetry(base, issueKind string) string {
