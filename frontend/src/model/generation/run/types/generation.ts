@@ -9,7 +9,6 @@ export type CreationRequest<Reference = unknown> = {
   canvasSize: string;
   perspective?: Perspective;
   reference?: Reference;
-  useProjectContext: boolean;
   style?: string;
   aspectRatio?: string;
   layers?: { description: string }[];
