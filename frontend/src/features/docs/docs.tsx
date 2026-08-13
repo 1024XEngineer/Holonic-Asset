@@ -13,6 +13,9 @@ import PerspectiveEn, {
 } from "./content/perspective.mdx";
 import ReferenceEn, { metadata as referenceEn } from "./content/reference.mdx";
 import TilesetsEn, { metadata as tilesetsEn } from "./content/tilesets.mdx";
+import AssetConcepts, {
+  metadata as assetConcepts,
+} from "./content/asset-concepts.mdx";
 import { AppHeader } from "@/components/layouts/app-header";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +29,7 @@ export const articleOrder = [
   "perspective",
   "directions",
   "tilesets",
+  "asset-concepts",
 ] as const;
 
 const articleIdSchema = z.enum(articleOrder);
@@ -37,6 +41,7 @@ const articles: Record<ArticleId, Article> = {
   perspective: { Content: PerspectiveEn, metadata: perspectiveEn },
   directions: { Content: DirectionsEn, metadata: directionsEn },
   tilesets: { Content: TilesetsEn, metadata: tilesetsEn },
+  "asset-concepts": { Content: AssetConcepts, metadata: assetConcepts },
 };
 
 const articleTitleKeys = {
@@ -44,6 +49,7 @@ const articleTitleKeys = {
   perspective: "perspectiveTitle",
   directions: "directionsTitle",
   tilesets: "tilesetsTitle",
+  "asset-concepts": "assetConceptsTitle",
 } as const;
 
 export function isArticleId(value: unknown): value is ArticleId {

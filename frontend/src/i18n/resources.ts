@@ -1,4 +1,5 @@
 import enAssets from "./locales/en-US/assets.json";
+import enAuth from "./locales/en-US/auth.json";
 import enCommon from "./locales/en-US/common.json";
 import enDocs from "./locales/en-US/docs.json";
 import enEditor from "./locales/en-US/editor.json";
@@ -9,6 +10,7 @@ import enProjects from "./locales/en-US/projects.json";
 import enSettings from "./locales/en-US/settings.json";
 import enStatus from "./locales/en-US/status.json";
 import zhAssets from "./locales/zh-CN/assets.json";
+import zhAuth from "./locales/zh-CN/auth.json";
 import zhCommon from "./locales/zh-CN/common.json";
 import zhDocs from "./locales/zh-CN/docs.json";
 import zhEditor from "./locales/zh-CN/editor.json";
@@ -41,6 +43,7 @@ type TranslationShape<T> = {
 
 const enResources = {
   assets: enAssets,
+  auth: enAuth,
   common: enCommon,
   docs: enDocs,
   editor: enEditor,
@@ -54,6 +57,7 @@ const enResources = {
 
 const zhResources = {
   assets: zhAssets,
+  auth: zhAuth,
   common: zhCommon,
   docs: zhDocs,
   editor: zhEditor,

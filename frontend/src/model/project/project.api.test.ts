@@ -4,6 +4,10 @@ import { DataApiError } from "@/lib/data-api-error";
 import type { CreateProjectInput, ProjectSummary } from "./types";
 import type { ProjectResponse } from "./project.contract";
 
+vi.mock("@/model/auth", () => ({
+  readAuthenticatedUserId: () => 4927310,
+}));
+
 const mocks = vi.hoisted(() => ({
   core: {
     create: vi.fn(),
@@ -36,7 +40,6 @@ vi.mock("../asset/library/mock", () => ({
 vi.mock("../generation/run/mock", () => ({
   deleteMockProjectGenerationRuns: mocks.deleteMockProjectGenerationRuns,
 }));
-
 import { projectApi, toProjectSummary } from "./project.api";
 
 const input: CreateProjectInput = {
@@ -96,7 +99,9 @@ describe("projectApi", () => {
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNKNOWN", "invalid response"),
     );
-    await expect(projectApi.list()).rejects.toMatchObject({ code: "UNKNOWN" });
+    await expect(projectApi.list()).rejects.toMatchObject({
+      code: "UNKNOWN",
+    });
   });
 
   it("uses the correct local and remote detail, update, and deletion paths", async () => {

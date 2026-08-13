@@ -6,21 +6,32 @@ import type {
   ListGenerationRunsQuery,
   ListGenerationRunsResponse,
 } from "./generation.contract";
-import { getEnvelope, postEnvelope } from "@/model/fetchers";
+import { coreApiClient, unwrapApiResponse } from "@/model/fetchers";
 
 export const coreGenerationApi = {
-  create: (projectID: number, request: CreateGenerationRequest) =>
-    postEnvelope<CreateGenerationResponse>(
-      `/projects/${projectID}/generation-runs`,
-      request,
+  create: async (projectID: number, request: CreateGenerationRequest) =>
+    unwrapApiResponse<CreateGenerationResponse>(
+      await coreApiClient.POST("/projects/{project_id}/generation-runs", {
+        params: { path: { project_id: projectID } },
+        body: request,
+      }),
     ),
-  list: (projectID: number, query?: ListGenerationRunsQuery) =>
-    getEnvelope<ListGenerationRunsResponse>(
-      `/projects/${projectID}/generation-runs`,
-      query,
+  list: async (projectID: number, query?: ListGenerationRunsQuery) =>
+    unwrapApiResponse<ListGenerationRunsResponse>(
+      await coreApiClient.GET("/projects/{project_id}/generation-runs", {
+        params: { path: { project_id: projectID }, query },
+      }),
     ),
-  detail: (runID: number) =>
-    getEnvelope<GenerationRunResponse>(`/generation-runs/${runID}`),
-  cancel: (runID: number) =>
-    postEnvelope<CancelGenerationResponse>(`/generation-runs/${runID}/cancel`),
+  detail: async (runID: number) =>
+    unwrapApiResponse<GenerationRunResponse>(
+      await coreApiClient.GET("/generation-runs/{run_id}", {
+        params: { path: { run_id: runID } },
+      }),
+    ),
+  cancel: async (runID: number) =>
+    unwrapApiResponse<CancelGenerationResponse>(
+      await coreApiClient.POST("/generation-runs/{run_id}/cancel", {
+        params: { path: { run_id: runID } },
+      }),
+    ),
 };
