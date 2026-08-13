@@ -6,8 +6,6 @@
   "objectNamePlaceholder": "例如：月光灯笼",
   "audioPromptPlaceholder": "描述氛围、乐器、节奏和使用场景……",
   "promptPlaceholder": "描述要生成的主体、材质、氛围和细节……",
-  "useContext": "使用 {{name}} 项目上下文",
-  "context": "生成上下文",
   "createError": "无法创建资产，请重试。",
   "reference": "参考图",
   "referenceImage": "参考图片",
@@ -59,7 +57,7 @@
     "failed": "失败"
   },
   "pageTitle": "创建{{kind}}",
-  "pageDescription": "设置新资产的制作详情和生成上下文。",
+  "pageDescription": "设置新资产的制作详情。",
   "placeholderTitle": "图像生成",
   "placeholderDescription": "图像生成工作区将在后续更新中推出。"
 }
