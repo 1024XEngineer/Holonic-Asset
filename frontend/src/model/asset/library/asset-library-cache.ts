@@ -6,6 +6,17 @@ import { readAuthenticatedUserId } from "@/model/auth";
 
 type ProjectScopedAssetMutation = { projectId: string };
 
+export function refreshAssetLibraryCache(
+  queryClient: QueryClient,
+  userID: number,
+  projectId: string,
+) {
+  return queryClient.refetchQueries({
+    queryKey: assetKeys.library(userID, projectId),
+    type: "all",
+  });
+}
+
 export function createAssetLibraryCacheSync(
   queryClient: QueryClient,
   userID?: number,

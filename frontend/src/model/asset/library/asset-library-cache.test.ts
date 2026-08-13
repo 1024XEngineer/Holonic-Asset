@@ -1,7 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { createAssetLibraryCacheSync } from "./asset-library-cache";
+import {
+  createAssetLibraryCacheSync,
+  refreshAssetLibraryCache,
+} from "./asset-library-cache";
 import { assetKeys } from "./keys";
 import type { AssetGroup } from "./types";
 
@@ -25,5 +28,20 @@ describe("createAssetLibraryCacheSync", () => {
     expect(queryClient.getQueryData(assetKeys.library(7, "other"))).toEqual(
       otherGroups,
     );
+  });
+
+  it("refreshes a cached project library even while it is not mounted", async () => {
+    const queryClient = new QueryClient();
+    const key = assetKeys.library(7, "current");
+    const currentGroups: AssetGroup[] = [];
+    const updatedGroups: AssetGroup[] = [{ kind: "character", assets: [] }];
+    const queryFn = vi.fn().mockResolvedValue(updatedGroups);
+    queryClient.setQueryDefaults(key, { queryFn });
+    queryClient.setQueryData(key, currentGroups);
+
+    await refreshAssetLibraryCache(queryClient, 7, "current");
+
+    expect(queryFn).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryData(key)).toEqual(updatedGroups);
   });
 });

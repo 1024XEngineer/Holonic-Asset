@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { assetKeys } from "../../asset/library/keys";
+import { refreshAssetLibraryCache } from "../../asset/library/asset-library-cache";
 import { projectKeys } from "../../project/keys";
 import { generationApi, pruneGenerationRequests } from "./generation.api";
 import { generationKeys } from "./keys";
@@ -47,9 +47,7 @@ export function useGenerationRunsQuery(projectId: string | undefined) {
     if (settledRunIds.length === 0) return;
 
     void Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: assetKeys.library(userID, projectId),
-      }),
+      refreshAssetLibraryCache(queryClient, userID, projectId),
       queryClient.invalidateQueries({ queryKey: projectKeys.list(userID) }),
     ]);
   }, [projectId, query.data, query.dataUpdatedAt, queryClient]);
