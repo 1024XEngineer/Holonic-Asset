@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -52,11 +53,11 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 		},
 	}
 	references := &executorReferenceStoreStub{events: &events}
-	executor := generator.NewExecutor(
+	executor := generator.NewExecutorWithDependencies(
 		images,
 		&imageProcessorStub{events: &events},
 		assets,
-		references,
+		generator.ExecutorDependencies{References: references},
 	)
 
 	result, err := executor.Generate(
@@ -195,9 +196,19 @@ func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(
 
 			var executor generator.Executor
 			if test.withStore {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+				executor = generator.NewExecutorWithDependencies(
+					images,
+					&imageProcessorStub{events: &events},
+					assets,
+					generator.ExecutorDependencies{References: references},
+				)
 			} else {
-				executor = generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+				executor = generator.NewExecutorWithDependencies(
+					images,
+					&imageProcessorStub{events: &events},
+					assets,
+					generator.ExecutorDependencies{},
+				)
 			}
 			payload := test.payload
 			if payload == nil {
@@ -248,7 +259,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assets := &generationAssetWriterStub{events: &events}
 	processor := &imageProcessorStub{events: &events}
-	executor := generator.NewExecutor(images, processor, assets)
+	executor := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{})
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -283,6 +294,12 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
 		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
 	}
+	wantMargin := imageprocessor.AnimationFrameMargin(64, 64)
+	for index, request := range processor.resizeRequests {
+		if request.Options.Margin != wantMargin {
+			t.Fatalf("prototype direction %d margin = %d, want %d", index, request.Options.Margin, wantMargin)
+		}
+	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
 		assets.characterAsset.Description != "pixel knight" {
@@ -314,10 +331,11 @@ func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyIn
 		t.Run(string(test.perspective), func(t *testing.T) {
 			events := []string{}
 			assets := &generationAssetWriterStub{events: &events}
-			executor := generator.NewExecutor(
+			executor := generator.NewExecutorWithDependencies(
 				&imageGenerationServiceStub{events: &events, result: generatedImages()},
 				&imageProcessorStub{events: &events},
 				assets,
+				generator.ExecutorDependencies{},
 			)
 
 			payload := json.RawMessage(fmt.Sprintf(`{
@@ -346,7 +364,12 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
 	references := &executorReferenceStoreStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets, references)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -403,7 +426,12 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"chest",
 		"creative_brief":"wooden chest",
@@ -457,7 +485,12 @@ func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *test
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
-	executor := generator.NewExecutor(images, &imageProcessorStub{events: &events}, assets)
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&imageProcessorStub{events: &events},
+		assets,
+		generator.ExecutorDependencies{},
+	)
 	payload := json.RawMessage(`{
 		"asset_name":"hero",
 		"creative_brief":"pixel knight",
@@ -472,5 +505,236 @@ func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *test
 	}
 	if len(events) != 0 {
 		t.Fatalf("workflow should stop before side effects: %v", events)
+	}
+}
+
+func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+	events := []string{}
+	originalURLs := []string{
+		"assets/chest/front.png",
+		"assets/chest/front_right.png",
+		"assets/chest/back_right.png",
+		"assets/chest/back.png",
+		"assets/chest/back_left.png",
+		"assets/chest/front_left.png",
+		"assets/chest/top.png",
+		"assets/chest/bottom.png",
+	}
+	prototype := make(assetdomain.Prototype, len(originalURLs))
+	for index := range originalURLs {
+		prototype[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &originalURLs[index]}
+	}
+	content := assetdomain.AssetContent{
+		DirectionCount: 2,
+		Prototype:      &prototype,
+		Items: []assetdomain.TileSetItem{{
+			Name:  "loot",
+			Tiles: []assetdomain.Tile{{Position: assetdomain.TilePosition{X: 1, Y: 2}}},
+		}},
+		Metadata: map[string]any{"material": "wood"},
+	}
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode source content: %v", err)
+	}
+
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{
+		events:        &events,
+		recordVersion: 6,
+		asset: assetdomain.Asset{
+			ID:          8,
+			Name:        "chest",
+			ProjectID:   12,
+			Type:        assetdomain.AssetTypeObject,
+			Description: "an ornate wooden treasure chest",
+			Perspective: assetdomain.PerspectiveIsometric,
+			Dimensions:  json.RawMessage(`{"width":128,"height":128}`),
+			Content:     encoded,
+			Version:     5,
+		},
+	}
+	references := &executorReferenceStoreStub{events: &events}
+	executor := generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, references)
+
+	result, err := executor.Generate(
+		context.Background(),
+		generator.EditObjectProtoType,
+		json.RawMessage(`{"asset_id":8,"project_id":12,"edit_instructions":"change only the lock to gold"}`),
+	)
+	if err != nil {
+		t.Fatalf("edit object prototype: %v", err)
+	}
+	if assets.expectedVersion != 5 {
+		t.Fatalf("expected current asset version to be passed separately, got %d", assets.expectedVersion)
+	}
+	if !reflect.DeepEqual(references.resolved, originalURLs) {
+		t.Fatalf("unexpected resolved references: got %v want %v", references.resolved, originalURLs)
+	}
+	if images.request == nil || !strings.Contains(images.request.Prompt, "an ornate wooden treasure chest") ||
+		!strings.Contains(images.request.Prompt, "change only the lock to gold") ||
+		!strings.Contains(images.request.Prompt, "backend supplied exactly 8 current prototype direction image") {
+		t.Fatalf("unexpected edit prompt: %+v", images.request)
+	}
+	if assets.createdRecord == nil || assets.createdRecord.AssetID != 8 {
+		t.Fatalf("expected object version record: %+v", assets.createdRecord)
+	}
+	updated, err := (assetdomain.Asset{
+		Type: assetdomain.AssetTypeObject, Content: assets.createdRecord.Content,
+	}).DecodeContent()
+	if err != nil {
+		t.Fatalf("decode version content: %v", err)
+	}
+	if updated.DirectionCount != 8 || updated.Prototype == nil || len(*updated.Prototype) != 8 {
+		t.Fatalf("unexpected edited object content: %+v", updated)
+	}
+	if len(updated.Items) != 1 || updated.Items[0].Name != "loot" || updated.Metadata["material"] != "wood" {
+		t.Fatalf("existing object content was not preserved: %+v", updated)
+	}
+	for index, resource := range *updated.Prototype {
+		want := fmt.Sprintf("uploads/prototype-%d.png", index)
+		if resource.URL == nil || *resource.URL != want {
+			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
+		}
+	}
+	if events[len(events)-1] != "create_record" {
+		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	}
+	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 8, Version: 6})
+}
+
+func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
+	wantLoadErr := errors.New("object unavailable")
+	wantResolveErr := errors.New("reference unavailable")
+	wantRecordErr := errors.New("record unavailable")
+	wantImageErr := errors.New("image unavailable")
+
+	tests := []struct {
+		name      string
+		payload   json.RawMessage
+		configure func(*generationAssetWriterStub, *executorReferenceStoreStub, *imageGenerationServiceStub)
+		wantErr   error
+		wantText  string
+		withStore bool
+	}{
+		{name: "malformed payload", payload: json.RawMessage(`{`), wantText: "decode edit_object_prototype execution payload"},
+		{name: "asset load failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			assets.detailErr = wantLoadErr
+		}, wantErr: wantLoadErr},
+		{name: "asset not found", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			assets.detailResult = &assetdomain.Asset{}
+		}, wantText: "object asset 8 not found"},
+		{name: "wrong asset type", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Type = assetdomain.AssetTypeCharacter
+			assets.detailResult = &asset
+		}, wantText: "unsupported for asset type"},
+		{name: "invalid perspective", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Perspective = assetdomain.Perspective("sideways")
+			assets.detailResult = &asset
+		}, wantText: "invalid perspective"},
+		{name: "malformed dimensions", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Dimensions = json.RawMessage(`{`)
+			assets.detailResult = &asset
+		}, wantText: "decode asset 8 dimensions"},
+		{name: "nonpositive dimensions", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Dimensions = json.RawMessage(`{"width":0,"height":128}`)
+			assets.detailResult = &asset
+		}, wantText: "dimensions must be positive"},
+		{name: "malformed content", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Content = json.RawMessage(`{`)
+			assets.detailResult = &asset
+		}, wantText: "decode object asset 8 content"},
+		{name: "missing prototype", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Content = json.RawMessage(`{}`)
+			assets.detailResult = &asset
+		}, wantText: "prototype images are required"},
+		{name: "missing prototype URL", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			asset := editableObjectAsset()
+			asset.Content = json.RawMessage(`{"prototype":[{"id":1}]}`)
+			assets.detailResult = &asset
+		}, wantText: "prototype image 1 URL is required"},
+		{name: "reference resolution failure", configure: func(_ *generationAssetWriterStub, references *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			references.resolveErr = wantResolveErr
+		}, wantErr: wantResolveErr, withStore: true},
+		{name: "image generation failure", configure: func(_ *generationAssetWriterStub, _ *executorReferenceStoreStub, images *imageGenerationServiceStub) {
+			images.err = wantImageErr
+		}, wantErr: wantImageErr},
+		{name: "record creation failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			assets.recordErr = wantRecordErr
+		}, wantErr: wantRecordErr},
+		{name: "nil record", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			assets.nilRecord = true
+		}, wantText: "version: empty result"},
+		{name: "zero record version", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
+			assets.emptyRecord = true
+		}, wantText: "version: empty result"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			asset := editableObjectAsset()
+			assets := &generationAssetWriterStub{events: &events, detailResult: &asset}
+			references := &executorReferenceStoreStub{events: &events}
+			if test.configure != nil {
+				test.configure(assets, references, images)
+			}
+
+			var executor generator.Executor
+			if test.withStore {
+				executor = generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, references)
+			} else {
+				executor = generator.NewExecutorForTest(images, &imageProcessorStub{events: &events}, assets, nil)
+			}
+			payload := test.payload
+			if payload == nil {
+				payload = json.RawMessage(`{"asset_id":8,"edit_instructions":"change the lock"}`)
+			}
+			_, err := executor.Generate(context.Background(), generator.EditObjectProtoType, payload)
+			if err == nil {
+				t.Fatal("expected edit failure")
+			}
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("expected wrapped error %v, got %v", test.wantErr, err)
+			}
+			if test.wantText != "" && !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("expected error containing %q, got %v", test.wantText, err)
+			}
+		})
+	}
+}
+
+func editableObjectAsset() assetdomain.Asset {
+	originalURLs := []string{
+		"assets/chest/front.png", "assets/chest/right.png", "assets/chest/back.png", "assets/chest/left.png",
+	}
+	prototype := make(assetdomain.Prototype, len(originalURLs))
+	for index := range originalURLs {
+		prototype[index] = assetdomain.ImageResource{ID: uint(index + 1), URL: &originalURLs[index]}
+	}
+	content := assetdomain.AssetContent{
+		DirectionCount: 4,
+		Prototype:      &prototype,
+		Metadata:       map[string]any{"material": "wood"},
+	}
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		panic(err)
+	}
+	return assetdomain.Asset{
+		ID:          8,
+		Type:        assetdomain.AssetTypeObject,
+		Description: "a wooden treasure chest",
+		Perspective: assetdomain.PerspectiveTopDown,
+		Dimensions:  json.RawMessage(`{"width":128,"height":128}`),
+		Content:     encoded,
+		Version:     4,
 	}
 }

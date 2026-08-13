@@ -17,7 +17,7 @@ type Manager interface {
 	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateAnimation(ctx context.Context, assetID uint, name string, frames []Frame) (uint, error)
-	CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error)
+	CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error)
 	GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error)
 	RollBackRecord(ctx context.Context, assetID uint, version uint) (*AssetRecord, error)
 	Copy(ctx context.Context, assetID uint, version uint) (uint, error)
@@ -90,8 +90,8 @@ func (m *manager) CreateAnimation(ctx context.Context, assetID uint, name string
 	return m.store.CreateAnimation(ctx, assetID, name, frames)
 }
 
-func (m *manager) CreateRecord(ctx context.Context, record *AssetRecord) (*AssetRecord, error) {
-	return m.store.CreateRecord(ctx, record)
+func (m *manager) CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error) {
+	return m.store.CreateRecord(ctx, record, expectedVersion)
 }
 
 func (m *manager) GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error) {

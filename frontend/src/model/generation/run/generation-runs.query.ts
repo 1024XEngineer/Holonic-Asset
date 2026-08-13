@@ -10,15 +10,17 @@ import {
   generationPollingInterval,
 } from "./generation-polling";
 import type { GenerationRun } from "./types";
+import { readAuthenticatedUserId } from "@/model/auth";
 
 export function useGenerationRunsQuery(projectId: string | undefined) {
+  const userID = readAuthenticatedUserId();
   const queryClient = useQueryClient();
   const previousRuns = useRef<{
     projectId: string | undefined;
     runs: GenerationRun[];
   }>({ projectId, runs: [] });
   const query = useQuery({
-    queryKey: generationKeys.runs(projectId ?? "unselected"),
+    queryKey: generationKeys.runs(userID, projectId ?? "unselected"),
     queryFn: () => generationApi.listRuns(projectId!),
     enabled: Boolean(projectId),
     refetchInterval: ({ state }) => generationPollingInterval(state.data),
@@ -46,9 +48,9 @@ export function useGenerationRunsQuery(projectId: string | undefined) {
 
     void Promise.all([
       queryClient.invalidateQueries({
-        queryKey: assetKeys.library(projectId),
+        queryKey: assetKeys.library(userID, projectId),
       }),
-      queryClient.invalidateQueries({ queryKey: projectKeys.list() }),
+      queryClient.invalidateQueries({ queryKey: projectKeys.list(userID) }),
     ]);
   }, [projectId, query.data, query.dataUpdatedAt, queryClient]);
 

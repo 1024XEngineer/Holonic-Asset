@@ -10,6 +10,7 @@ import (
 	"image/color"
 	"image/draw"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -34,7 +35,75 @@ const (
 	animationVideoAttempts      = 2
 	animationReferenceSize      = 1024
 	maxAnimationReferenceBytes  = 32 << 20
+	animationAnalysisFPS        = 12
+	animationMinLoopSpanFrames  = 4
+	animationMinLoopSpanRatio   = 0.50
+	animationMinStartWindow     = 1
+	animationInitialWindowRatio = 0.20
+	animationMinForegroundRatio = 0.05
+	animationEndpointQuantile   = 0.35
+	animationRichnessQuantile   = 0.90
+	animationMotionQuantile     = 0.25
+	animationSeamWarningMSE     = 0.015
+
+	animationEndpointWeight          = 1.0
+	animationRichnessWeight          = 0.45
+	animationCentroidStabilityWeight = 0.45
+	animationTranslationWeight       = 0.20
+	animationInitialFrameWeight      = 0.45
+	animationLoopCompactnessWeight   = 1.15
+	animationPoseCoverageWeight      = 0.65
+	animationMotionCoverageWeight    = 0.65
+	animationRecoveryWeight          = 0.35
+
+	animationChromaHueMin              = 30
+	animationChromaHueMax              = 90
+	animationChromaHighSaturationMin   = 80
+	animationChromaHighValueMin        = 80
+	animationChromaBrightSaturationMin = 50
+	animationChromaBrightValueMin      = 180
 )
+
+func animationFrameSelectionOptions(frameCount int) videoprocessor.FrameIntervalSelectionOptions {
+	return videoprocessor.FrameIntervalSelectionOptions{
+		SampleCount:              frameCount,
+		MinimumSpanFrames:        animationMinLoopSpanFrames,
+		MinimumSpanRatio:         animationMinLoopSpanRatio,
+		MinimumStartWindowFrames: animationMinStartWindow,
+		StartWindowRatio:         animationInitialWindowRatio,
+		PreferFirstFrame:         true,
+		MinimumForegroundRatio:   animationMinForegroundRatio,
+		EndpointMSEQuantile:      animationEndpointQuantile,
+		ChangeScaleQuantile:      animationRichnessQuantile,
+		ChangeBaselineQuantile:   animationMotionQuantile,
+		Weights: videoprocessor.FrameIntervalSelectionWeights{
+			EndpointSimilarity:    animationEndpointWeight,
+			MeanAdjacentMSE:       animationRichnessWeight,
+			CentroidStability:     animationCentroidStabilityWeight,
+			LinearCentroidMotion:  animationTranslationWeight,
+			FirstFrameSimilarity:  animationInitialFrameWeight,
+			Compactness:           animationLoopCompactnessWeight,
+			GeometryCoverage:      animationPoseCoverageWeight,
+			ChangeCoverage:        animationMotionCoverageWeight,
+			PostIntervalStability: animationRecoveryWeight,
+		},
+	}
+}
+
+type AnimationLoopSelection struct {
+	CandidateFPS       int     `json:"candidate_fps"`
+	StartFrame         int     `json:"start_frame"`
+	EndFrame           int     `json:"end_frame"`
+	SpanFrames         int     `json:"span_frames"`
+	Score              float64 `json:"score"`
+	EndpointSimilarity float64 `json:"endpoint_similarity"`
+	Richness           float64 `json:"richness"`
+	PoseCoverage       float64 `json:"pose_coverage"`
+	SpanRatio          float64 `json:"span_ratio"`
+	CentroidStability  float64 `json:"centroid_stability"`
+	SeamWarning        string  `json:"seam_warning,omitempty"`
+	Method             string  `json:"method"`
+}
 
 // AnimationGenerationService turns one asset reference into normalized,
 // transparent animation frames. Provider calls stay in videoclient;
@@ -75,7 +144,7 @@ type AnimationGenerationResult struct {
 	Spritesheet     string
 	MIMEType        string
 	Normalization   *imageprocessor.AnimationNormalizationReport
-	Loop            videoprocessor.AnimationLoopSelection
+	Loop            AnimationLoopSelection
 	VideoRequestID  string
 	VideoAttempts   int
 	FrameDurationMS uint
@@ -193,7 +262,7 @@ func (s *animationGenerationService) Generate(
 			processed.FrameDurationMS = uint((1000 + options.FPS/2) / options.FPS)
 			return processed, nil
 		}
-		var qualityError *videoprocessor.AnimationVideoQualityError
+		var qualityError *videoprocessor.QualityError
 		if !errors.As(processErr, &qualityError) || attempt == animationVideoAttempts {
 			return nil, fmt.Errorf("generator: process animation video: %w", processErr)
 		}
@@ -427,7 +496,26 @@ func (s *animationGenerationService) processVideo(
 	video []byte,
 	request AnimationGenerationRequest,
 ) (*AnimationGenerationResult, error) {
-	processed, err := s.videoProcessor.Process(ctx, video, request.FrameCount)
+	var loop AnimationLoopSelection
+	processed, err := s.videoProcessor.Process(ctx, video, videoprocessor.ProcessOptions{
+		AnalysisFPS: animationAnalysisFPS,
+		ChromaKey: videoprocessor.ChromaKey{
+			HueMin: animationChromaHueMin, HueMax: animationChromaHueMax,
+			HighSaturationMin: animationChromaHighSaturationMin, HighValueMin: animationChromaHighValueMin,
+			BrightSaturationMin: animationChromaBrightSaturationMin, BrightValueMin: animationChromaBrightValueMin,
+		},
+		Select: func(analysis videoprocessor.FrameSequenceAnalysis) ([]int, error) {
+			selected, selectErr := videoprocessor.SelectFrameInterval(
+				analysis,
+				animationFrameSelectionOptions(request.FrameCount),
+			)
+			if selectErr != nil {
+				return nil, animationFrameSelectionError(selectErr, analysis, request.FrameCount)
+			}
+			loop = animationLoopSelection(selected, analysis.FPS)
+			return selected.Indices, nil
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -465,8 +553,57 @@ func (s *animationGenerationService) processVideo(
 	return &AnimationGenerationResult{
 		Frames: normalized.Regions, Spritesheet: normalized.ImageBase64,
 		MIMEType: normalized.MIMEType, Normalization: normalized.AnimationReport,
-		Loop: processed.Loop,
+		Loop: loop,
 	}, nil
+}
+
+func animationFrameSelectionError(
+	err error,
+	analysis videoprocessor.FrameSequenceAnalysis,
+	frameCount int,
+) error {
+	var qualityError *videoprocessor.QualityError
+	if errors.As(err, &qualityError) {
+		switch qualityError.Kind {
+		case "foreground":
+			return &videoprocessor.QualityError{
+				Kind: "foreground", Message: fmt.Sprintf("generator: chroma-key separation failed: foreground ratio %.3f", analysis.ForegroundRatio),
+			}
+		case "framing":
+			return &videoprocessor.QualityError{
+				Kind:    "framing",
+				Message: fmt.Sprintf("generator: no candidate interval has %d sampled frames inside the outer 2.5%% safety band; interval still needs at least %.0f%% of the source duration", frameCount, animationMinLoopSpanRatio*100),
+			}
+		}
+	}
+	if frameCount <= 0 || len(analysis.Frames) < frameCount+1 {
+		return fmt.Errorf("generator: video has %d candidate frames; need at least %d", len(analysis.Frames), frameCount+1)
+	}
+	return fmt.Errorf("generator: loop search produced no candidate: %w", err)
+}
+
+func animationLoopSelection(
+	selected videoprocessor.FrameIntervalSelection,
+	fps int,
+) AnimationLoopSelection {
+	warning := ""
+	if selected.EndpointMSE > animationSeamWarningMSE {
+		warning = fmt.Sprintf("foreground seam MSE %.4f exceeds 0.015; inspect the source video", selected.EndpointMSE)
+	}
+	return AnimationLoopSelection{
+		CandidateFPS: fps, StartFrame: selected.StartFrame, EndFrame: selected.EndFrame,
+		SpanFrames: selected.EndFrame - selected.StartFrame, Score: roundAnimationValue(selected.Score),
+		EndpointSimilarity: roundAnimationValue(selected.EndpointSimilarity),
+		Richness:           roundAnimationValue(selected.MeanAdjacentMSE),
+		PoseCoverage:       roundAnimationValue(selected.GeometryCoverage),
+		SpanRatio:          roundAnimationValue(selected.SpanRatio),
+		CentroidStability:  roundAnimationValue(selected.CentroidStability),
+		SeamWarning:        warning, Method: "subject_mse_full_cycle",
+	}
+}
+
+func roundAnimationValue(value float64) float64 {
+	return math.Round(value*1e6) / 1e6
 }
 
 func packAnimationVideoFrames(frames []image.Image, columns int) (*image.NRGBA, error) {

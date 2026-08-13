@@ -1,6 +1,6 @@
 ---
 name: create-issue
-description: Draft and create one GitHub issue from a bug, feature, documentation request, or experiment using the repository's issue templates. Use when the user asks to open, create, file, or refine a GitHub issue.
+description: Draft and create one GitHub issue using the repository's issue-form templates. Use this skill whenever the user asks to open, create, file, or refine an issue, including bug, feature, documentation, experiment, proposal, performance, refactor, or CI/CD work.
 ---
 
 # Create Issue
@@ -10,14 +10,14 @@ Create one focused GitHub issue. Draft first, then publish only after explicit u
 ## Scope
 
 - Handle one issue at a time.
-- Support the repository templates for bug, feature, documentation, experiment, proposal, performance, and refactor work.
+- Support every active repository template discovered in `.github/ISSUE_TEMPLATE/*.yml`, including the current bug, feature, documentation, experiment, proposal, performance, refactor, and CI/CD templates.
 - Keep implementation, branch, commit, and pull request work out of this workflow; use `split-issues` for multi-issue plans.
 
 ## Workflow
 
 ### 1. Gather context
 
-Read the conversation and the repository's `.github/ISSUE_TEMPLATE/*.yml` files. Identify:
+Read the conversation and every active file in the repository's `.github/ISSUE_TEMPLATE/*.yml` directory before selecting a template. Treat each template's `name`, `description`, `title`, required fields, and optional fields as the source of truth. Identify:
 
 - The problem, question, or desired outcome.
 - Affected users, assets, modules, platforms, or versions.
@@ -37,6 +37,10 @@ Use the narrowest matching template:
 - `05-proposal.yml`: notable change needing design discussion before implementation.
 - `06-performance.yml`: measurable performance problem, regression, or optimization opportunity.
 - `07-refactor.yml`: reorganization or simplification of code without changing external behavior.
+- `08-ci-cd.yml`: CI/CD workflow failure, regression, improvement, or tooling change.
+
+New issue-form templates should be picked up automatically by this workflow after they are added to `.github/ISSUE_TEMPLATE/`; do not rely on a hard-coded list alone. Update this skill only when a new template needs special routing or drafting rules.
+
 If the request contains multiple independent outcomes, recommend splitting it instead of hiding them in one issue.
 
 ### 3. Check related work
@@ -50,7 +54,7 @@ Treat similar issues as possible duplicates or references. Do not edit, close, o
 
 ### 4. Draft the issue
 
-Produce a concise title using the template prefix, such as `[Bug]:` or `[Feature]:`. Mirror the selected template's required fields as markdown headings and include optional fields only when they contain useful information.
+Produce a concise title using the selected template's `title` prefix, such as `[Bug]:`, `[Feature]:`, or `[CI/CD]:`. Mirror the selected template's required fields as markdown headings in the same conceptual order. Include optional fields only when they contain useful information.
 
 The body must:
 
@@ -58,6 +62,7 @@ The body must:
 - Use project terminology, clear boundaries, and observable acceptance criteria.
 - Separate facts, assumptions, and proposed approach.
 - Avoid stale file paths, unnecessary code snippets, and invented metrics, versions, tests, issue numbers, or outcomes.
+- For CI/CD drafts, preserve workflow names and paths exactly when known, distinguish observed failures from proposed changes, and state how the workflow result will be verified.
 
 Default to the repository's language convention. These templates are English, so use English unless the user requests another language.
 

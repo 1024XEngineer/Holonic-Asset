@@ -11,13 +11,13 @@ describe("project cache", () => {
     const queryClient = new QueryClient();
     const current = project({ name: "Before" });
     const updated = project({ name: "After" });
-    queryClient.setQueryData(projectKeys.list(), [current]);
-    queryClient.setQueryData(projectKeys.detail(current.id), current);
+    queryClient.setQueryData(projectKeys.list(7), [current]);
+    queryClient.setQueryData(projectKeys.detail(7, current.id), current);
 
-    updateProjectCache(queryClient, updated);
+    updateProjectCache(queryClient, updated, 7);
 
-    expect(queryClient.getQueryData(projectKeys.list())).toEqual([updated]);
-    expect(queryClient.getQueryData(projectKeys.detail(updated.id))).toEqual(
+    expect(queryClient.getQueryData(projectKeys.list(7))).toEqual([updated]);
+    expect(queryClient.getQueryData(projectKeys.detail(7, updated.id))).toEqual(
       updated,
     );
   });
@@ -25,14 +25,14 @@ describe("project cache", () => {
   it("removes list and detail entries together", () => {
     const queryClient = new QueryClient();
     const deleted = project();
-    queryClient.setQueryData(projectKeys.list(), [deleted]);
-    queryClient.setQueryData(projectKeys.detail(deleted.id), deleted);
+    queryClient.setQueryData(projectKeys.list(7), [deleted]);
+    queryClient.setQueryData(projectKeys.detail(7, deleted.id), deleted);
 
-    clearDeletedProjectCache(queryClient, deleted.id);
+    clearDeletedProjectCache(queryClient, deleted.id, 7);
 
-    expect(queryClient.getQueryData(projectKeys.list())).toEqual([]);
+    expect(queryClient.getQueryData(projectKeys.list(7))).toEqual([]);
     expect(
-      queryClient.getQueryData(projectKeys.detail(deleted.id)),
+      queryClient.getQueryData(projectKeys.detail(7, deleted.id)),
     ).toBeUndefined();
   });
 });

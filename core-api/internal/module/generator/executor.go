@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -36,49 +37,40 @@ type AssetWriter interface {
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, string, []assetdomain.Frame) (uint, error)
-	CreateRecord(context.Context, *assetdomain.AssetRecord) (*assetdomain.AssetRecord, error)
+	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
 type executor struct {
 	images     imageclient.ImageGenerationService
+	llm        llmclient.LLMService
 	animations AnimationGenerationService
 	processor  imageprocessor.Processor
 	assets     AssetWriter
 	references ReferenceStore
 }
 
-// NewExecutor creates the image-to-asset workflow used by task handlers.
-func NewExecutor(
-	images imageclient.ImageGenerationService,
-	processor imageprocessor.Processor,
-	assets AssetWriter,
-	references ...ReferenceStore,
-) Executor {
-	var referenceStore ReferenceStore
-	if len(references) > 0 {
-		referenceStore = references[0]
-	}
-	return &executor{
-		images: images, processor: processor, assets: assets, references: referenceStore,
-	}
+// ExecutorDependencies contains optional workflow integrations.
+type ExecutorDependencies struct {
+	References ReferenceStore
+	LLM        llmclient.LLMService
+	Animations AnimationGenerationService
 }
 
-// NewExecutorWithAnimation creates the complete generation workflow, including
-// image-to-video animation generation. NewExecutor remains available for
-// prototype-only callers and tests that do not need animation generation.
-func NewExecutorWithAnimation(
+// NewExecutorWithDependencies creates an executor with explicit optional
+// workflow integrations.
+func NewExecutorWithDependencies(
 	images imageclient.ImageGenerationService,
-	animations AnimationGenerationService,
 	processor imageprocessor.Processor,
 	assets AssetWriter,
-	references ...ReferenceStore,
+	dependencies ExecutorDependencies,
 ) Executor {
-	var referenceStore ReferenceStore
-	if len(references) > 0 {
-		referenceStore = references[0]
-	}
 	return &executor{
-		images: images, animations: animations, processor: processor, assets: assets, references: referenceStore,
+		images:     images,
+		llm:        dependencies.LLM,
+		animations: dependencies.Animations,
+		processor:  processor,
+		assets:     assets,
+		references: dependencies.References,
 	}
 }
 
@@ -106,6 +98,15 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.editCharacterPrototype(ctx, request)
+	case EditObjectProtoType:
+		if err := e.requirePrototypeDependencies(); err != nil {
+			return nil, err
+		}
+		request := EditObjectPrototypePayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editObjectPrototype(ctx, request)
 	case GenerateObjectProtoType:
 		if err := e.requirePrototypeDependencies(); err != nil {
 			return nil, err

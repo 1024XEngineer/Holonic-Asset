@@ -1,4 +1,15 @@
 import { DataApiError } from "@/lib/data-api-error";
+import { readAuthenticatedUserId } from "@/model/auth";
+
+import {
+  deleteMockProject,
+  getMockProject,
+  hasMockProject,
+  listMockProjects,
+  updateMockProject,
+} from "./mock";
+import { deleteMockProjectAssets } from "../asset/library/mock";
+import { deleteMockProjectGenerationRuns } from "../generation/run/mock";
 
 import { coreProjectApi } from "./core-project.api";
 import type {
@@ -37,23 +48,30 @@ export type ProjectApi = {
 
 export const projectApi: ProjectApi = {
   list: async () => {
+    const mockProjects = await listMockProjects();
+    const mockProjectIds = new Set(mockProjects.map((project) => project.id));
     try {
-      const response = await coreProjectApi.list(coreApiUserId);
-      return response.projects.map((project) => toProjectSummary(project));
+      const response = await coreProjectApi.list(readAuthenticatedUserId());
+      const remoteProjects = response.projects
+        .map((project) => toProjectSummary(project))
+        .filter((project) => !mockProjectIds.has(project.id));
+      return [...mockProjects, ...remoteProjects];
     } catch (error) {
       if (error instanceof DataApiError && error.code === "UNAVAILABLE") {
-        return [];
+        return mockProjects;
       }
       throw error;
     }
   },
   detail: async (projectId) => {
+    if (hasMockProject(projectId)) return getMockProject(projectId);
+
     const response = await coreProjectApi.detail(Number(projectId));
     return toProjectSummary(response.project);
   },
-  create: async (input: CreateProjectInput) => {
+  create: async (input) => {
     const response = await coreProjectApi.create({
-      userID: coreApiUserId,
+      userID: readAuthenticatedUserId(),
       ...toCoreProjectFields(input),
     });
 
@@ -75,6 +93,8 @@ export const projectApi: ProjectApi = {
     return response.reference;
   },
   update: async (project) => {
+    if (hasMockProject(project.id)) return updateMockProject(project);
+
     await coreProjectApi.update({
       projectID: Number(project.id),
       ...toCoreProjectFields(project),
@@ -82,13 +102,16 @@ export const projectApi: ProjectApi = {
     return project;
   },
   delete: async (projectId) => {
+    if (hasMockProject(projectId)) {
+      await deleteMockProject(projectId);
+      deleteMockProjectAssets(projectId);
+      deleteMockProjectGenerationRuns(projectId);
+      return;
+    }
+
     await coreProjectApi.delete({ projectID: Number(projectId) });
   },
 };
-
-const coreApiUserId = Number(
-  import.meta.env.PUBLIC_CORE_API_USER_ID ?? "4927310",
-);
 
 function toCoreProjectFields(
   input: CreateProjectInput,

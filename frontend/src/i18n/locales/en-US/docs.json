@@ -3,14 +3,14 @@
   "contents": "Table of contents",
   "referenceTitle": "Why references matter",
   "perspectiveTitle": "Perspective types",
-  "directionsTitle": "1 / 4 / 8 directions",
+  "directionsTitle": "2 / 4 / 8 directions",
   "tilesetsTitle": "Split tilesets",
   "directions": {
     "heading": "Direction count defines how freely a character can move.",
     "intro": "A direction is one view of the same character. More directions make movement more natural, but each added view must preserve pose, equipment, and lighting.",
     "match": "Match direction count to real movement",
-    "oneTitle": "One direction",
-    "oneBody": "Use one direction for static portraits, side-view characters, or objects with a fixed orientation.",
+    "twoTitle": "Two directions",
+    "twoBody": "Use left and right views for side-on characters that move horizontally, such as platformer and side-scrolling action characters.",
     "fourTitle": "Four directions",
     "fourBody": "Use front, back, left, and right as the practical starting point for top-down movement.",
     "fourNote": "Each view should retain the same silhouette, weapon position, and lighting direction. This swordsman set shows the four cardinal views needed for a top-down character.",
@@ -30,7 +30,6 @@
       "south-west": "South-west",
       "south": "South",
       "south-east": "South-east",
-      "oneAlt": "Idle knight shown from a single direction",
       "swordsmanAlt": "{{label}} swordsman direction",
       "basketballAlt": "{{label}} basketball player direction"
     }
