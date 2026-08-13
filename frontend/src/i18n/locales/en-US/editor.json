@@ -56,6 +56,7 @@
   "noComponentsSelected": "No UI Set components selected",
   "noUISetComponents": "No UI Set components",
   "loadingCanvas": "Loading canvas",
+  "canvasZoom": "Canvas zoom percentage",
   "noCanvasItems": "No canvas items selected",
   "previewReady": "Preview ready",
   "savingChanges": "Saving changes",

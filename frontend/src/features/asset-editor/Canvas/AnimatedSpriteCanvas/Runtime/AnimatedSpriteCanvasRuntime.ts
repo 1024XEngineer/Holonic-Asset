@@ -121,6 +121,12 @@ export class AnimatedSpriteCanvasRuntime {
     this.render();
   }
 
+  setZoom(scale: number) {
+    if (!this.viewport || !Number.isFinite(scale)) return;
+    this.viewport.setZoom(scale, true);
+    this.syncViewportGrid();
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -176,6 +182,7 @@ export class AnimatedSpriteCanvasRuntime {
       isCompactViewport ? 300 : 650,
       isCompactViewport ? 300 : 700,
     );
+    this.notifyZoomChange();
   }
 
   private render() {
@@ -188,9 +195,15 @@ export class AnimatedSpriteCanvasRuntime {
   }
 
   private syncViewportGrid = () => {
-    if (this.viewport && this.renderer)
+    if (this.viewport && this.renderer) {
       this.renderer.syncViewport(this.viewport, this.props.model.prototype);
+      this.notifyZoomChange();
+    }
   };
+
+  private notifyZoomChange() {
+    if (this.viewport) this.props.onZoomChange?.(this.viewport.scale.x);
+  }
 
   private updateAnimation = () => {
     if (this.scene.getSnapshot().playing.size === 0) return;
