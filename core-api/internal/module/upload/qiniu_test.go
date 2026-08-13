@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,18 @@ type bucketManagerStub struct {
 	statErr    error
 	statBucket string
 	statKey    string
+	batchOps   []string
+	batchRet   []qiniustorage.BatchOpRet
+	batchErr   error
+}
+
+func (s *bucketManagerStub) BatchWithContext(
+	_ context.Context,
+	_ string,
+	operations []string,
+) ([]qiniustorage.BatchOpRet, error) {
+	s.batchOps = append([]string(nil), operations...)
+	return s.batchRet, s.batchErr
 }
 
 type formUploaderStub struct {
@@ -311,6 +324,42 @@ func TestPersistReferenceAtUploadsToProvidedObjectKey(t *testing.T) {
 	if uploader.key != "uploads/prototype-2-unprocessed.png" ||
 		string(uploader.data) != "hello" || uploader.extra.MimeType != "image/png" {
 		t.Fatalf("unexpected exact-key upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+}
+
+func TestDeleteObjectsUsesExactImmutableKeys(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	manager := &bucketManagerStub{batchRet: []qiniustorage.BatchOpRet{{Code: 200}, {Code: 200}}}
+	store.bucketManager = manager
+
+	keys := []string{"uploads/tile-1.png", "uploads/tile-2.png"}
+	if err := store.DeleteObjects(context.Background(), keys); err != nil {
+		t.Fatalf("delete objects: %v", err)
+	}
+	want := []string{
+		qiniustorage.URIDelete("asset-bucket", keys[0]),
+		qiniustorage.URIDelete("asset-bucket", keys[1]),
+	}
+	if !slices.Equal(manager.batchOps, want) {
+		t.Fatalf("unexpected delete operations: got %v want %v", manager.batchOps, want)
+	}
+}
+
+func TestDeleteObjectsReportsPartialFailure(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	failed := qiniustorage.BatchOpRet{Code: 500}
+	failed.Data.Error = "delete unavailable"
+	store.bucketManager = &bucketManagerStub{batchRet: []qiniustorage.BatchOpRet{{Code: 200}, failed}}
+
+	err = store.DeleteObjects(context.Background(), []string{"uploads/tile-1.png", "uploads/tile-2.png"})
+	if err == nil || !strings.Contains(err.Error(), "uploads/tile-2.png") || !strings.Contains(err.Error(), "delete unavailable") {
+		t.Fatalf("expected exact partial-delete error, got %v", err)
 	}
 }
 
