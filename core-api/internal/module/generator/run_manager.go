@@ -91,6 +91,18 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		value.Reference, err = prepare(value.Reference)
 		return value, err
+	case CreateAnimationPayload:
+		if e.projects == nil || projectID == 0 {
+			return value, nil
+		}
+		project, err := e.projects.GetDetail(ctx, projectID)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load project %d style: %w", projectID, err)
+		}
+		if project != nil {
+			value.Style = project.Style
+		}
+		return value, nil
 	case CreateTileSetPayload:
 		return value, nil
 	case EditTilesetItemPayload:
@@ -147,13 +159,28 @@ func buildTaskPayload(request *Request) (any, error) {
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
 	case GenerateAnimation:
-		payload := CreateAnimationPayload{}
-		if err := decodeParameters(request, &payload); err != nil {
+		parameters := struct {
+			AnimationName string `json:"animation_name"`
+			Direction     string `json:"direction"`
+			FrameCount    int    `json:"frame_count,omitempty"`
+			FPS           int    `json:"fps,omitempty"`
+			Resolution    string `json:"resolution,omitempty"`
+			Duration      int    `json:"duration,omitempty"`
+		}{}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
 			return nil, err
 		}
-		payload.ProjectID = request.ProjectID
-		payload.CreativeBrief = request.CreativeBrief
-		if payload.AssetID == 0 && request.AssetID != nil {
+		payload := CreateAnimationPayload{
+			AnimationName: parameters.AnimationName,
+			ProjectID:     request.ProjectID,
+			Direction:     parameters.Direction,
+			CreativeBrief: request.CreativeBrief,
+			FrameCount:    parameters.FrameCount,
+			FPS:           parameters.FPS,
+			Resolution:    parameters.Resolution,
+			Duration:      parameters.Duration,
+		}
+		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
 		}
 		return payload, nil

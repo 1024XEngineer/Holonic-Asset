@@ -202,6 +202,27 @@ func TestPrepareAnimationReferenceRejectsInvalidDownloadedImage(t *testing.T) {
 	}
 }
 
+func TestAnimationGridColumnsPrefersSquareLayout(t *testing.T) {
+	tests := []struct {
+		frameCount int
+		want       int
+	}{
+		{frameCount: 1, want: 1},
+		{frameCount: 5, want: 3},
+		{frameCount: 8, want: 3},
+		{frameCount: 9, want: 3},
+		{frameCount: 10, want: 4},
+		{frameCount: 16, want: 4},
+		{frameCount: 17, want: 5},
+		{frameCount: 32, want: 6},
+	}
+	for _, test := range tests {
+		if got := animationGridColumns(test.frameCount); got != test.want {
+			t.Errorf("animationGridColumns(%d) = %d, want %d", test.frameCount, got, test.want)
+		}
+	}
+}
+
 func TestNormalizeAnimationGenerationRequestAppliesDefaults(t *testing.T) {
 	result, err := normalizeAnimationGenerationRequest(&AnimationGenerationRequest{
 		ReferenceImage: " data:image/png;base64,parent ",
@@ -210,7 +231,7 @@ func TestNormalizeAnimationGenerationRequestAppliesDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.FrameCount != defaultAnimationFrameCount ||
-		result.Columns != defaultAnimationColumns ||
+		result.Columns != animationGridColumns(defaultAnimationFrameCount) ||
 		result.FrameWidth != defaultAnimationFrameWidth ||
 		result.FrameHeight != defaultAnimationFrameHeight ||
 		result.FPS != defaultAnimationFPS ||
