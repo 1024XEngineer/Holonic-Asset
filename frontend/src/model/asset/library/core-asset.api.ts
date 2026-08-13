@@ -21,12 +21,14 @@ export const coreAssetApi = {
     unwrapApiResponse<GetAssetsResponse>(
       await coreApiClient.GET("/projects/{project_id}/assets", {
         params: { path: { project_id: projectID }, query },
+        cache: "no-store",
       }),
     ),
   detail: async (assetID: number) =>
     unwrapApiResponse<AssetDetailResponse>(
       await coreApiClient.GET("/asset/{asset_id}", {
         params: { path: { asset_id: assetID } },
+        cache: "no-store",
       }),
     ),
   records: async (assetID: number) =>

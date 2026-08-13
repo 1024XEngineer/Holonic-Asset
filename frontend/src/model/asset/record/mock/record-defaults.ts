@@ -165,10 +165,6 @@ function createFallbackSpritePrototype(
   };
 }
 
-function createFallbackSpriteAnimations(): CharacterAnimation[] {
-  return [{ kind: "clip", id: "idle", label: "Idle", frameCount: 1 }];
-}
-
 const tilesetAssetBase = "/assets/split_same_32px_grid_assets";
 
 function createTilesetItem({
@@ -419,9 +415,7 @@ function createDefaultSpriteAssetRecordData(
       spritePrototypesByAssetId[sourceId] ??
         createFallbackSpritePrototype(asset),
     ),
-    animations: structuredClone(
-      spriteAnimationsByAssetId[sourceId] ?? createFallbackSpriteAnimations(),
-    ),
+    animations: structuredClone(spriteAnimationsByAssetId[sourceId] ?? []),
     nodePositions: {},
   };
 }

@@ -6,12 +6,17 @@
   "objectNamePlaceholder": "e.g. Moonlit Lantern",
   "audioPromptPlaceholder": "Describe the mood, instruments, rhythm, and intended use...",
   "promptPlaceholder": "Describe the subject, material, mood, and details to generate...",
-  "useContext": "Use {{name}} project context",
-  "context": "Generation context",
   "createError": "Unable to create the asset. Please try again.",
   "reference": "Reference",
   "referenceImage": "Reference image",
   "canvasSize": "Canvas size",
+  "canvasSizeOther": "Other",
+  "customCanvasSize": "Custom canvas size",
+  "canvasWidth": "Canvas width",
+  "canvasHeight": "Canvas height",
+  "canvasWidthPlaceholder": "Width",
+  "canvasHeightPlaceholder": "Height",
+  "canvasSizeInvalid": "Enter a positive number.",
   "perspective": "Perspective",
   "directions_one": "{{count}} direction",
   "directions_other": "{{count}} directions",
@@ -52,7 +57,7 @@
     "failed": "Failed"
   },
   "pageTitle": "Create {{kind}}",
-  "pageDescription": "Set the production details and generation context for this new asset.",
+  "pageDescription": "Set the production details for this new asset.",
   "placeholderTitle": "Image generation",
   "placeholderDescription": "The image generation workspace will arrive in a follow-up change."
 }

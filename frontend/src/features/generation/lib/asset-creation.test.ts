@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { CreatableAssetKind } from "@/model/asset";
 
-import { createAssetCreationDraft, toCreationRequest } from "./asset-creation";
+import {
+  assetCreationDraftSchema,
+  createAssetCreationDraft,
+  toCreationRequest,
+} from "./asset-creation";
 
 const kinds: CreatableAssetKind[] = [
   "character",
@@ -21,7 +25,6 @@ describe("asset creation", () => {
       kind,
       name: "",
       prompt: "Initial prompt",
-      useProjectContext: true,
     });
     expect(draft.canvasSize).toMatch(/px$/);
   });
@@ -71,4 +74,19 @@ describe("asset creation", () => {
     expect(requests[0]).not.toHaveProperty("directionCount");
     expect(requests[1]).not.toHaveProperty("directionCount");
   });
+
+  it.each(["0 × 0 px", "0 × 32 px", "32 × 0 px", "large"])(
+    "rejects invalid user-entered canvas size: %s",
+    (canvasSize) => {
+      const draft = createAssetCreationDraft("character");
+      const result = assetCreationDraftSchema.safeParse({
+        ...draft,
+        name: "Asset name",
+        prompt: "Asset prompt",
+        canvasSize,
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
 });

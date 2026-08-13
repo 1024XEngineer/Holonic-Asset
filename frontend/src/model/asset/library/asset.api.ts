@@ -1,13 +1,12 @@
+import { coreAssetApi } from "./core-asset.api";
+import type {
+  AssetDetailResponse,
+  AssetListItemResponse,
+} from "./asset.contract";
 import {
-  addMockAsset,
-  copyMockAsset,
-  deleteMockAsset,
-  listMockAssetGroups,
-  saveMockAssetRevision,
-  updateMockAsset,
-} from "./mock";
-import type { AssetListItemResponse } from "./asset.contract";
-import { resolveAssetCanvasSize } from "./asset-canvas-size";
+  assetCanvasSizeDimensionsSchema,
+  resolveAssetCanvasSize,
+} from "./asset-canvas-size";
 import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
@@ -20,30 +19,82 @@ export type SaveAssetRevisionInput<Payload> = {
 };
 
 export const assetApi = {
-  listGroups: (projectId: string) => listMockAssetGroups(projectId),
-  add: (projectId: string, kind: AssetKind, asset: ProjectAsset) =>
-    addMockAsset(projectId, kind, asset),
-  copy: (projectId: string, assetId: string) =>
-    copyMockAsset(projectId, assetId),
-  delete: (projectId: string, assetId: string) =>
-    deleteMockAsset(projectId, assetId),
-  update: (projectId: string, assetId: string, metadata: AssetMetadataUpdate) =>
-    updateMockAsset(projectId, assetId, metadata),
-  saveRevision: <Payload>({
-    projectId,
-    assetId,
-    description,
-    payload,
-  }: SaveAssetRevisionInput<Payload>) =>
-    saveMockAssetRevision(projectId, assetId, description, payload),
+  listGroups: async (projectId: string) => {
+    const response = await coreAssetApi.list(coreProjectId(projectId));
+    const details = await readAssetDetails(response.assets);
+    return toAssetGroups(response.assets, new Map(details));
+  },
+  copy: async (projectId: string, assetId: string) => {
+    await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
+    return assetApi.listGroups(projectId);
+  },
+  delete: async (assetId: string) => {
+    return coreAssetApi.delete({ assetId: coreAssetId(assetId) });
+  },
+  update: async (
+    projectId: string,
+    assetId: string,
+    metadata: AssetMetadataUpdate,
+  ) => {
+    const dimensions = parseAssetDimensions(metadata.canvasSize);
+    await coreAssetApi.update({
+      assetId: coreAssetId(assetId),
+      name: metadata.name,
+      description: metadata.description,
+      tags: metadata.tags,
+      perspective: metadata.perspective,
+      ...(dimensions ? { dimensions } : {}),
+    });
+    return assetApi.listGroups(projectId);
+  },
+  saveRevision: <Payload>(_input: SaveAssetRevisionInput<Payload>) => {
+    return Promise.reject(
+      new Error(
+        "Asset revisions cannot be saved through the Core API until the save payload is supported.",
+      ),
+    );
+  },
 };
 
-export function toAssetGroups(items: AssetListItemResponse[]) {
+const assetDetailConcurrency = 4;
+
+async function readAssetDetails(assets: AssetListItemResponse[]) {
+  const details: (readonly [number, AssetDetailResponse])[] = [];
+  for (let index = 0; index < assets.length; index += assetDetailConcurrency) {
+    const batch = assets.slice(index, index + assetDetailConcurrency);
+    const results = await Promise.allSettled(
+      batch.map(
+        async (asset) =>
+          [asset.assetId, await coreAssetApi.detail(asset.assetId)] as const,
+      ),
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled") details.push(result.value);
+    }
+  }
+  return details;
+}
+
+function parseAssetDimensions(canvasSize: string) {
+  if (canvasSize.trim().toUpperCase() === "N/A") return undefined;
+  const result = assetCanvasSizeDimensionsSchema.safeParse(canvasSize);
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "Invalid canvas size.");
+  }
+  return result.data;
+}
+
+export function toAssetGroups(
+  items: AssetListItemResponse[],
+  details: ReadonlyMap<number, AssetDetailResponse> = new Map(),
+) {
   const groups = new Map<AssetKind, ProjectAsset[]>();
 
   for (const item of items) {
     const kind = item.type === "tileSet" ? "tileset" : item.type;
     const assets = groups.get(kind) ?? [];
+    const detail = details.get(item.assetId);
+    const thumbnailUrl = readPrototypeURL(detail?.content);
     assets.push({
       id: String(item.assetId),
       name: item.name,
@@ -52,6 +103,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
       tags: item.tags ?? [],
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
       history: [],
       animations: [],
     });
@@ -59,4 +111,28 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
+}
+
+function readPrototypeURL(content: unknown) {
+  if (!content || typeof content !== "object") return undefined;
+  const prototype = (content as { prototype?: unknown }).prototype;
+  if (!Array.isArray(prototype) || prototype.length === 0) return undefined;
+  const url = (prototype[0] as { url?: unknown } | null)?.url;
+  return typeof url === "string" && url.length > 0 ? url : undefined;
+}
+
+function coreProjectId(projectId: string) {
+  const value = Number(projectId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Asset loading requires a persisted Core API project.");
+  }
+  return value;
+}
+
+function coreAssetId(assetId: string) {
+  const value = Number(assetId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Asset operations require a persisted Core API asset.");
+  }
+  return value;
 }

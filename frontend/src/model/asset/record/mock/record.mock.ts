@@ -1,6 +1,6 @@
 import { assetApi } from "../../library/asset.api";
 import { createAssetLibraryCollection } from "../../library/asset-library-collection";
-import { listMockProjects } from "@/model/project";
+import { projectApi } from "@/model/project";
 import { DataApiError } from "@/lib/data-api-error";
 import { createDefaultAssetRecord, mergeAssetRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
@@ -12,16 +12,10 @@ export function getMockAssetRecord(
   options?: MockRequestOptions,
 ) {
   return runMockRequest(async (): Promise<AssetWorkspaceData> => {
-    const [projects, groups] = await Promise.all([
-      listMockProjects(),
+    const [project, groups] = await Promise.all([
+      projectApi.detail(input.projectId),
       assetApi.listGroups(input.projectId),
     ]);
-    const project = projects.find((item) => item.id === input.projectId);
-    if (!project) {
-      throw new DataApiError("NOT_FOUND", "Project was not found.", {
-        projectId: input.projectId,
-      });
-    }
 
     const asset = createAssetLibraryCollection(groups).find(input.assetId);
     if (!asset) {

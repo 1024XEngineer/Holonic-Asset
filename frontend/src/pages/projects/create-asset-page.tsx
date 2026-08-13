@@ -54,7 +54,6 @@ export function CreateAssetPage({
         <section className="mt-12 border bg-background p-7 shadow-sm sm:p-10 lg:mt-14 lg:p-10">
           <CreateAssetForm
             kind={kind}
-            project={project}
             onCancel={goBack}
             error={enqueueError}
             isSubmitting={isEnqueuePending}

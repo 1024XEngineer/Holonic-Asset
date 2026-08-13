@@ -15,7 +15,6 @@ function generationRun(status: GenerationRun["status"]): GenerationRun {
     name: "Swordsman",
     prompt: "Four-direction top-down swordsman",
     canvasSize: "64 × 64 px",
-    useProjectContext: true,
   };
 }
 

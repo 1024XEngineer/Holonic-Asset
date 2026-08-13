@@ -17,29 +17,9 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     update: vi.fn(),
   },
-  deleteMockProject: vi.fn(),
-  deleteMockProjectAssets: vi.fn(),
-  deleteMockProjectGenerationRuns: vi.fn(),
-  getMockProject: vi.fn(),
-  hasMockProject: vi.fn(),
-  listMockProjects: vi.fn(),
-  updateMockProject: vi.fn(),
 }));
 
 vi.mock("./core-project.api", () => ({ coreProjectApi: mocks.core }));
-vi.mock("./mock", () => ({
-  deleteMockProject: mocks.deleteMockProject,
-  getMockProject: mocks.getMockProject,
-  hasMockProject: mocks.hasMockProject,
-  listMockProjects: mocks.listMockProjects,
-  updateMockProject: mocks.updateMockProject,
-}));
-vi.mock("../asset/library/mock", () => ({
-  deleteMockProjectAssets: mocks.deleteMockProjectAssets,
-}));
-vi.mock("../generation/run/mock", () => ({
-  deleteMockProjectGenerationRuns: mocks.deleteMockProjectGenerationRuns,
-}));
 import { projectApi, toProjectSummary } from "./project.api";
 
 const input: CreateProjectInput = {
@@ -66,8 +46,6 @@ const remoteProject: ProjectResponse = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.hasMockProject.mockReturnValue(false);
-  mocks.listMockProjects.mockResolvedValue([]);
   mocks.core.create.mockResolvedValue({ id: 7 });
   mocks.core.detail.mockResolvedValue({ project: remoteProject });
   mocks.core.generateReference.mockResolvedValue({
@@ -79,22 +57,19 @@ beforeEach(() => {
 });
 
 describe("projectApi", () => {
-  it("merges remote projects with mocks and falls back when listing fails", async () => {
-    const mockProject = project({ id: "local" });
-    mocks.listMockProjects.mockResolvedValue([mockProject]);
+  it("lists Core projects and returns an empty list when the API is unavailable", async () => {
     mocks.core.list.mockResolvedValue({
-      projects: [remoteProject, { ...remoteProject, id: "local" }],
+      projects: [remoteProject],
     });
 
     await expect(projectApi.list()).resolves.toEqual([
-      mockProject,
       toProjectSummary(remoteProject),
     ]);
 
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNAVAILABLE", "offline"),
     );
-    await expect(projectApi.list()).resolves.toEqual([mockProject]);
+    await expect(projectApi.list()).resolves.toEqual([]);
 
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNKNOWN", "invalid response"),
@@ -104,20 +79,9 @@ describe("projectApi", () => {
     });
   });
 
-  it("uses the correct local and remote detail, update, and deletion paths", async () => {
-    const localProject = project({ id: "local" });
-    mocks.hasMockProject.mockReturnValueOnce(true);
-    mocks.getMockProject.mockResolvedValue(localProject);
-    await expect(projectApi.detail("local")).resolves.toEqual(localProject);
-
+  it("uses Core detail, update, and deletion paths", async () => {
     await expect(projectApi.detail("7")).resolves.toEqual(
       toProjectSummary(remoteProject),
-    );
-
-    mocks.hasMockProject.mockReturnValueOnce(true);
-    mocks.updateMockProject.mockResolvedValue(localProject);
-    await expect(projectApi.update(localProject)).resolves.toEqual(
-      localProject,
     );
 
     const remoteSummary = {
@@ -143,11 +107,6 @@ describe("projectApi", () => {
       ...coreFields(clearedRemoteSummary),
       reference: "",
     });
-
-    mocks.hasMockProject.mockReturnValueOnce(true);
-    await projectApi.delete("local");
-    expect(mocks.deleteMockProjectAssets).toHaveBeenCalledWith("local");
-    expect(mocks.deleteMockProjectGenerationRuns).toHaveBeenCalledWith("local");
 
     await projectApi.delete("7");
     expect(mocks.core.delete).toHaveBeenCalledWith({ projectID: 7 });
@@ -211,8 +170,4 @@ function coreFields(project: CreateProjectInput | ProjectSummary) {
     reference: project.reference,
     style: project.style,
   };
-}
-
-function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
-  return { ...input, id: "project-1", assetCount: 0, ...overrides };
 }

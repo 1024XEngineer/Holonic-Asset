@@ -1,5 +1,6 @@
 export {
   assetApi,
+  assetCanvasSizeSchema,
   assetCanvasSizeOptions,
   assetKeys,
   createAssetLibraryCollection,

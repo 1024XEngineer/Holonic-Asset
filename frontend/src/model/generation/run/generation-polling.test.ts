@@ -39,6 +39,5 @@ function run(id: string, status: GenerationRun["status"]): GenerationRun {
     name: "Hero",
     prompt: "Hero",
     canvasSize: "64 × 64 px",
-    useProjectContext: true,
   };
 }
