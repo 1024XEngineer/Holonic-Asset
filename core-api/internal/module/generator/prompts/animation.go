@@ -79,7 +79,7 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 - maintain at least 18% uninterrupted pure-green empty space on every side
 - preserve the smaller scale of the supplied reference and never zoom, crop, reframe, or push any subject part toward an edge
 - keep long parts, weapons, or tool tips inside the central 64%%; use a compact controlled motion instead of a wide edge-reaching swing`
-	if issueKind == "subject" {
+	if issueKind == "subject" || issueKind == "foreground" {
 		correction = `Generate a fresh take; the previous take lost the readable subject silhouette.
 - output exactly one subject in every frame; never reproduce a multi-direction reference sheet or show multiple views
 - preserve the exact subject, attached parts, and opaque silhouette in every frame

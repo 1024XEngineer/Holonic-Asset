@@ -110,12 +110,14 @@ func (s *animationReferenceResolverStub) ResolveReference(_ context.Context, ref
 type animationVideoProcessorStub struct {
 	results []*videoprocessor.Result
 	errors  []error
+	options []videoprocessor.ProcessOptions
 	calls   int
 }
 
-func (s *animationVideoProcessorStub) Process(context.Context, []byte, int) (*videoprocessor.Result, error) {
+func (s *animationVideoProcessorStub) Process(_ context.Context, _ []byte, options videoprocessor.ProcessOptions) (*videoprocessor.Result, error) {
 	index := s.calls
 	s.calls++
+	s.options = append(s.options, options)
 	if index < len(s.errors) && s.errors[index] != nil {
 		return nil, s.errors[index]
 	}
@@ -301,7 +303,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 			},
 		},
 	}
-	qualityErr := &videoprocessor.AnimationVideoQualityError{Kind: "framing", Message: "unsafe framing"}
+	qualityErr := &videoprocessor.QualityError{Kind: "framing", Message: "unsafe framing"}
 	videoProcessor := &animationVideoProcessorStub{
 		errors:  []error{fmt.Errorf("wrapped quality error: %w", qualityErr), nil},
 		results: []*videoprocessor.Result{nil, {Frames: animationTestVideoFrames(4)}},
@@ -328,6 +330,10 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 	}
 	if len(videos.requests) != 2 || !strings.Contains(videos.requests[1].Prompt, "QUALITY RETRY OVERRIDE") {
 		t.Fatalf("quality retry was not issued: %+v", videos.requests)
+	}
+	if len(videoProcessor.options) != 2 || videoProcessor.options[1].AnalysisFPS != animationAnalysisFPS ||
+		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin {
+		t.Fatalf("executor did not supply media selection policy: %+v", videoProcessor.options)
 	}
 	if !strings.Contains(videos.requests[0].Prompt, action) ||
 		!strings.Contains(videos.requests[0].Prompt, "interpret the requested action by its actual meaning") {

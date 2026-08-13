@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// AnimationAnchor identifies the stable point used to register generated
-// animation frames before a shared crop is calculated.
+// AnimationAnchor identifies the stable point used to register a frame
+// sequence before a shared crop is calculated.
 type AnimationAnchor string
 
 const (
@@ -20,7 +20,7 @@ const (
 	AnimationAnchorHead   AnimationAnchor = "head"
 )
 
-// AnimationBackgroundOptions optionally removes a generated flat background
+// AnimationBackgroundOptions optionally removes a flat background
 // before frame registration. Leave nil when the input already has alpha.
 type AnimationBackgroundOptions struct {
 	MatteColor       string   `json:"matte_color,omitempty"`
@@ -263,10 +263,9 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	renderCrop := shared
 	var scale float64
 	if request.PreserveSourceCellScale {
-		// The prepared reference and the prototype both describe one complete
-		// direction cell. Render that same cell into the output frame instead of
-		// fitting the action's union bounds. The latter makes the body shrink
-		// whenever a held weapon reaches farther than the idle pose.
+		// Preserve the source cell as the rendering coordinate system instead of
+		// fitting the sequence-wide foreground union. This keeps foreground scale
+		// stable when individual frames have different visible extents.
 		renderCrop = image.Rect(pad, pad, pad+cellW, pad+cellH)
 		scale = math.Min(float64(frameWidth)/float64(cellW), float64(frameHeight)/float64(cellH))
 	} else {

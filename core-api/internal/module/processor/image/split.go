@@ -26,7 +26,7 @@ const (
 	ImageSplitModeComponents ImageSplitMode = "components"
 	// ImageSplitModeProjection groups nearby disconnected alpha components into
 	// larger visual regions using expanded bounds and union-find. This is useful
-	// for a pose whose body, weapon, or shadow is not one connected component.
+	// when one visual region contains disconnected foreground components.
 	ImageSplitModeProjection ImageSplitMode = "projection"
 )
 
@@ -55,16 +55,14 @@ type SplitImageRequest struct {
 	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
 	PreserveHorizontalMotion bool            `json:"preserve_horizontal_motion,omitempty"`
 	PreserveVerticalMotion   bool            `json:"preserve_vertical_motion,omitempty"`
-	// NormalizeContentScale is intended for static multi-direction sheets, not
-	// action frames. It rescales each visible subject to the median source
-	// content height before anchor registration. This corrects image-model
-	// direction sheets whose cells contain the same subject at inconsistent
-	// apparent sizes while keeping every returned frame on one fixed canvas.
+	// NormalizeContentScale rescales each visible foreground region to the median
+	// source content height before anchor registration. It keeps regions with
+	// inconsistent apparent sizes on one fixed output canvas.
 	NormalizeContentScale bool `json:"normalize_content_scale,omitempty"`
 	// PreserveSourceCellScale keeps the source grid-cell canvas as the
 	// coordinate system for output frames. Without it, animation mode scales
-	// the union of every pose to the target frame, so a sword extending during
-	// an action makes the character body appear smaller than its prototype.
+	// the sequence-wide foreground union to the target frame, so differences in
+	// individual frame extents can change apparent foreground scale.
 	PreserveSourceCellScale bool                        `json:"preserve_source_cell_scale,omitempty"`
 	MaxStabilizationShift   int                         `json:"max_stabilization_shift,omitempty"`
 	Background              *AnimationBackgroundOptions `json:"background,omitempty"`
@@ -322,8 +320,8 @@ func detectGridBoundsNRGBA(img *image.NRGBA, columns, rows int, forceProportiona
 func projectionRegions(img *image.NRGBA, threshold uint8, minBandSize, mergeGap int) []splitRegion {
 	// Projection mode starts with alpha-connected regions, then joins regions
 	// that are close enough to belong to the same pose. This handles common
-	// generated character sheets where a head, body, weapon, or shadow is
-	// separated by transparent pixels but still occupies one visual column.
+	// source sheets where related foreground parts are separated by transparent
+	// pixels but still occupy one visual region.
 	components := componentRegions(img, threshold, splitMaxInt(1, minBandSize*minBandSize))
 	if len(components) < 2 {
 		return components
