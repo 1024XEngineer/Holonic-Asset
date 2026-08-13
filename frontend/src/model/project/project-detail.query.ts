@@ -3,13 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectApi } from "./project.api";
 import { projectKeys } from "./keys";
 import type { ProjectSummary } from "./types";
+import { readAuthenticatedUserId } from "@/model/auth";
 
 export function useProjectDetailQuery(projectId: string | undefined) {
   const queryClient = useQueryClient();
-  const listQueryKey = projectKeys.list();
+  const userID = readAuthenticatedUserId();
+  const listQueryKey = projectKeys.list(userID);
 
   return useQuery({
-    queryKey: projectKeys.detail(projectId ?? "unselected"),
+    queryKey: projectKeys.detail(userID, projectId ?? "unselected"),
     queryFn: () => projectApi.detail(projectId!),
     enabled: Boolean(projectId),
     initialData: () =>

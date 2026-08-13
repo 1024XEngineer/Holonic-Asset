@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, CreditCard, LogOut, Settings } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { ChevronDown, CreditCard, LogIn, LogOut, Settings } from "lucide-react";
 import { useHoverDropdown } from "./use-hover-dropdown";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +15,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAccountProfile } from "@/hooks/use-account-profile";
 import {
-  accountProfileUpdatedEvent,
-  defaultAccountProfile,
-  readAccountProfile,
-  type AccountProfile,
-} from "@/model/account";
+  clearAuthSession,
+  readAuthSession,
+  subscribeAuthSession,
+} from "@/model/auth";
 
 const navigationItems = [
   ["/", "home"],
@@ -36,10 +37,15 @@ function isActivePath(pathname: string, to: string) {
 
 function AccountMenu() {
   const { t } = useTranslation("navigation");
-  const [profile, setProfile] = useState<AccountProfile>(defaultAccountProfile);
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
+  const navigate = useNavigate();
+  const session = useSyncExternalStore(
+    subscribeAuthSession,
+    readAuthSession,
+    readAuthSession,
+  );
+  const { avatarUrl } = useAccountProfile();
+  const location = useRouterState({ select: (state) => state.location });
+  const { href, pathname } = location;
   const {
     closeFromHover,
     isOpen,
@@ -51,16 +57,20 @@ function AccountMenu() {
   const isSettingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
 
-  useEffect(() => {
-    const syncProfile = () => setProfile(readAccountProfile());
-    syncProfile();
-    window.addEventListener(accountProfileUpdatedEvent, syncProfile);
-    window.addEventListener("storage", syncProfile);
-    return () => {
-      window.removeEventListener(accountProfileUpdatedEvent, syncProfile);
-      window.removeEventListener("storage", syncProfile);
-    };
-  }, []);
+  if (!session) {
+    return (
+      <Button
+        nativeButton={false}
+        variant="outline"
+        render={
+          <Link to="/login" search={{ redirect: href }}>
+            <LogIn />
+            {t("login")}
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
@@ -94,17 +104,17 @@ function AccountMenu() {
             <div className="flex items-center gap-3">
               <div className="grid size-9 place-items-center overflow-hidden rounded-lg border border-border bg-transparent">
                 <img
-                  src={profile.avatarUrl ?? "/setting/images.jpg"}
+                  src={avatarUrl ?? "/setting/images.jpg"}
                   alt={t("profileImageAlt")}
                   className="size-full object-cover"
                 />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-popover-foreground">
-                  {profile.name}
+                  {session.user.username}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {profile.email}
+                  {session.user.email}
                 </p>
               </div>
             </div>
@@ -136,7 +146,18 @@ function AccountMenu() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={releaseMenu}>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            releaseMenu();
+            clearAuthSession();
+            void navigate({
+              to: "/login",
+              search: { redirect: href },
+              replace: true,
+            });
+          }}
+        >
           <LogOut />
           {t("logout")}
         </DropdownMenuItem>
