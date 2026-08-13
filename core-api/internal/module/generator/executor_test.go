@@ -163,27 +163,31 @@ func (s *imageGenerationServiceStub) Generate(
 }
 
 type generationAssetWriterStub struct {
-	events           *[]string
-	parentAsset      assetdomain.Asset
-	getDetailErr     error
-	characterAsset   *assetdomain.Asset
-	objectAsset      *assetdomain.Asset
-	sceneryAsset     *assetdomain.Asset
-	createdRecord    *assetdomain.AssetRecord
-	recordVersion    uint
-	expectedVersion  uint
-	animationAssetID uint
-	animation        assetdomain.Animation
-	animationName    string
-	animationID      uint
-	frames           []assetdomain.Frame
-	err              error
-	detailErr        error
-	recordErr        error
-	detailResult     *assetdomain.Asset
-	nilRecord        bool
-	emptyRecord      bool
-	asset            assetdomain.Asset
+	events                  *[]string
+	parentAsset             assetdomain.Asset
+	getDetailErr            error
+	characterAsset          *assetdomain.Asset
+	objectAsset             *assetdomain.Asset
+	sceneryAsset            *assetdomain.Asset
+	createdRecord           *assetdomain.AssetRecord
+	recordVersion           uint
+	expectedVersion         uint
+	animationAssetID        uint
+	animation               assetdomain.Animation
+	animationName           string
+	animationID             uint
+	frames                  []assetdomain.Frame
+	updatedAnimationAssetID uint
+	updatedAnimationID      uint
+	updatedFrames           []assetdomain.Frame
+	updateAnimationErr      error
+	err                     error
+	detailErr               error
+	recordErr               error
+	detailResult            *assetdomain.Asset
+	nilRecord               bool
+	emptyRecord             bool
+	asset                   assetdomain.Asset
 }
 
 func (s *generationAssetWriterStub) GetDetail(
@@ -268,6 +272,21 @@ func (s *generationAssetWriterStub) CreateAnimation(
 	}
 	s.animationID = 3
 	return 3, nil
+}
+
+func (s *generationAssetWriterStub) UpdateAnimationFrames(
+	_ context.Context,
+	assetID uint,
+	animationID uint,
+	frames []assetdomain.Frame,
+) error {
+	if s.events != nil {
+		*s.events = append(*s.events, "update_animation_frames")
+	}
+	s.updatedAnimationAssetID = assetID
+	s.updatedAnimationID = animationID
+	s.updatedFrames = append([]assetdomain.Frame(nil), frames...)
+	return s.updateAnimationErr
 }
 
 func (s *generationAssetWriterStub) CreateRecord(

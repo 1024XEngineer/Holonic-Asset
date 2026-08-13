@@ -145,6 +145,7 @@ func TestExecutorRejectsMalformedAndUnsupportedTasks(t *testing.T) {
 		generator.EditCharacterProtoType,
 		generator.GenerateObjectProtoType,
 		generator.GenerateAnimation,
+		generator.EditAnimation,
 	} {
 		_, err := executor.Generate(context.Background(), taskType, json.RawMessage(`{`))
 		if err == nil || !strings.Contains(err.Error(), "decode "+string(taskType)+" execution payload") {

@@ -7,7 +7,6 @@ type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   name: string;
   prompt: string;
   canvasSize: string;
-  useProjectContext: boolean;
 };
 
 export type VisualAssetCreationDraft<Reference = unknown> =
