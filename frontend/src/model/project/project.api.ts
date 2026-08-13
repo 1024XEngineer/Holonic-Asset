@@ -1,4 +1,5 @@
 import { DataApiError } from "@/lib/data-api-error";
+import { readAuthenticatedUserId } from "@/model/auth";
 
 import {
   deleteMockProject,
@@ -35,12 +36,9 @@ export type {
 } from "./project.contract";
 
 export type ProjectApi = {
-  list: (userID: number) => Promise<ProjectSummary[]>;
+  list: () => Promise<ProjectSummary[]>;
   detail: (projectId: string) => Promise<ProjectSummary>;
-  create: (
-    userID: number,
-    input: CreateProjectInput,
-  ) => Promise<ProjectSummary>;
+  create: (input: CreateProjectInput) => Promise<ProjectSummary>;
   generateReference: (input: CreateProjectInput) => Promise<string>;
   regenerateReference: (input: CreateProjectInput) => Promise<string>;
   update: (project: ProjectSummary) => Promise<ProjectSummary>;
@@ -48,11 +46,11 @@ export type ProjectApi = {
 };
 
 export const projectApi: ProjectApi = {
-  list: async (userID) => {
+  list: async () => {
     const mockProjects = await listMockProjects();
     const mockProjectIds = new Set(mockProjects.map((project) => project.id));
     try {
-      const response = await coreProjectApi.list(userID);
+      const response = await coreProjectApi.list(readAuthenticatedUserId());
       const remoteProjects = response.projects
         .map((project) => toProjectSummary(project))
         .filter((project) => !mockProjectIds.has(project.id));
@@ -70,9 +68,9 @@ export const projectApi: ProjectApi = {
     const response = await coreProjectApi.detail(Number(projectId));
     return toProjectSummary(response.project);
   },
-  create: async (userID, input) => {
+  create: async (input) => {
     const response = await coreProjectApi.create({
-      userID,
+      userID: readAuthenticatedUserId(),
       ...toCoreProjectFields(input),
     });
 

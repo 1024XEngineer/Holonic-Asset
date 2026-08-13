@@ -4,6 +4,10 @@ import { DataApiError } from "@/lib/data-api-error";
 import type { CreateProjectInput, ProjectSummary } from "./types";
 import type { ProjectResponse } from "./project.contract";
 
+vi.mock("@/model/auth", () => ({
+  readAuthenticatedUserId: () => 4927310,
+}));
+
 const mocks = vi.hoisted(() => ({
   core: {
     create: vi.fn(),
@@ -82,7 +86,7 @@ describe("projectApi", () => {
       projects: [remoteProject, { ...remoteProject, id: "local" }],
     });
 
-    await expect(projectApi.list(4927310)).resolves.toEqual([
+    await expect(projectApi.list()).resolves.toEqual([
       mockProject,
       toProjectSummary(remoteProject),
     ]);
@@ -90,12 +94,12 @@ describe("projectApi", () => {
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNAVAILABLE", "offline"),
     );
-    await expect(projectApi.list(4927310)).resolves.toEqual([mockProject]);
+    await expect(projectApi.list()).resolves.toEqual([mockProject]);
 
     mocks.core.list.mockRejectedValueOnce(
       new DataApiError("UNKNOWN", "invalid response"),
     );
-    await expect(projectApi.list(4927310)).rejects.toMatchObject({
+    await expect(projectApi.list()).rejects.toMatchObject({
       code: "UNKNOWN",
     });
   });
@@ -150,7 +154,7 @@ describe("projectApi", () => {
   });
 
   it("maps project inputs for creation and reference generation", async () => {
-    await expect(projectApi.create(4927310, input)).resolves.toEqual({
+    await expect(projectApi.create(input)).resolves.toEqual({
       ...input,
       id: "7",
     });
