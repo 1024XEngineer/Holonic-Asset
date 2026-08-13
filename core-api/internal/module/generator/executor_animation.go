@@ -25,7 +25,6 @@ import (
 
 const (
 	defaultAnimationFrameCount  = 16
-	defaultAnimationColumns     = 4
 	defaultAnimationFrameWidth  = 256
 	defaultAnimationFrameHeight = 256
 	defaultAnimationFPS         = 10
@@ -301,7 +300,7 @@ func normalizeAnimationGenerationRequest(
 		value.FrameCount = defaultAnimationFrameCount
 	}
 	if value.Columns == 0 {
-		value.Columns = defaultAnimationColumns
+		value.Columns = animationGridColumns(value.FrameCount)
 	}
 	if value.FrameWidth == 0 {
 		value.FrameWidth = defaultAnimationFrameWidth
@@ -636,6 +635,20 @@ func animationRows(frameCount, columns int) int {
 	return (frameCount + columns - 1) / columns
 }
 
+// animationGridColumns picks the most square grid possible. For non-square
+// frame counts the final row may have unused cells, but only real frames are
+// emitted and persisted.
+func animationGridColumns(frameCount int) int {
+	if frameCount <= 1 {
+		return 1
+	}
+	columns := int(math.Ceil(math.Sqrt(float64(frameCount))))
+	if columns > 8 {
+		return 8
+	}
+	return columns
+}
+
 var _ AnimationGenerationService = (*animationGenerationService)(nil)
 
 var animationDirectionLayouts = map[uint][]string{
@@ -686,6 +699,24 @@ func animationDirectionIndex(direction string, directionCount uint) (int, error)
 	return index, nil
 }
 
+func animationFrameDimensions(asset assetdomain.Asset) (assetdomain.Size, error) {
+	var dimensions assetdomain.Size
+	if err := json.Unmarshal(asset.Dimensions, &dimensions); err != nil {
+		return assetdomain.Size{}, fmt.Errorf(
+			"generator: decode animation asset %d dimensions: %w",
+			asset.ID,
+			err,
+		)
+	}
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return assetdomain.Size{}, fmt.Errorf(
+			"generator: animation asset %d dimensions must be positive",
+			asset.ID,
+		)
+	}
+	return dimensions, nil
+}
+
 func (e *executor) generateAnimation(
 	ctx context.Context,
 	payload CreateAnimationPayload,
@@ -716,6 +747,10 @@ func (e *executor) generateAnimation(
 	if err != nil {
 		return nil, err
 	}
+	dimensions, err := animationFrameDimensions(asset)
+	if err != nil {
+		return nil, err
+	}
 	description := strings.TrimSpace(asset.Description)
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
@@ -727,13 +762,12 @@ func (e *executor) generateAnimation(
 		ReferenceImage:         reference,
 		ReferenceImagePrepared: referencePrepared,
 		FrameCount:             payload.FrameCount,
-		Columns:                payload.Columns,
-		FrameWidth:             payload.FrameWidth,
-		FrameHeight:            payload.FrameHeight,
+		FrameWidth:             int(dimensions.Width),
+		FrameHeight:            int(dimensions.Height),
 		FPS:                    payload.FPS,
 		Resolution:             payload.Resolution,
 		Duration:               payload.Duration,
-		AspectRatio:            payload.AspectRatio,
+		AspectRatio:            defaultAnimationAspectRatio,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: normalize animation request: %w", err)

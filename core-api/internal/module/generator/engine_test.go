@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -155,6 +156,55 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	}
 	if strings.Contains(string(tasks.createdTask.Payload), "parent_id") {
 		t.Fatalf("animation task payload must not contain parent_id: %s", tasks.createdTask.Payload)
+	}
+}
+
+func TestCreateDerivesAnimationStyleAndRejectsRemovedParameters(t *testing.T) {
+	assetID := uint(9)
+
+	t.Run("inherits project style", func(t *testing.T) {
+		tasks := &taskManagerStub{createID: 17}
+		projects := &projectReaderStub{project: &projectdomain.Project{Style: " clean pixel art "}}
+		engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{Projects: projects})
+
+		_, err := engine.Create(context.Background(), &generator.Request{
+			ProjectID:     42,
+			AssetID:       &assetID,
+			Kind:          generator.GenerateAnimation,
+			CreativeBrief: "walk",
+			Parameters:    json.RawMessage(`{"animation_name":"hero walk","direction":"front","frame_count":10}`),
+		})
+		if err != nil {
+			t.Fatalf("create generation: %v", err)
+		}
+		var payload generator.CreateAnimationPayload
+		if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Style != " clean pixel art " || projects.calls != 1 {
+			t.Fatalf("animation style was not inherited: payload=%+v calls=%d", payload, projects.calls)
+		}
+	})
+
+	for _, field := range []string{"style", "columns", "frame_width", "frame_height", "aspect_ratio"} {
+		t.Run("rejects "+field, func(t *testing.T) {
+			tasks := &taskManagerStub{createID: 17}
+			engine := generator.NewEngine(tasks, nil)
+			parameters := fmt.Sprintf(`{"animation_name":"hero walk","direction":"front","%s":1}`, field)
+			_, err := engine.Create(context.Background(), &generator.Request{
+				ProjectID:     42,
+				AssetID:       &assetID,
+				Kind:          generator.GenerateAnimation,
+				CreativeBrief: "walk",
+				Parameters:    json.RawMessage(parameters),
+			})
+			if err == nil || !strings.Contains(err.Error(), "unknown field") {
+				t.Fatalf("expected removed parameter %q to be rejected, got %v", field, err)
+			}
+			if tasks.createdTask != nil {
+				t.Fatalf("task published with removed parameter %q", field)
+			}
+		})
 	}
 }
 
