@@ -158,6 +158,101 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsEditAnimationPayload(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	runID, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditAnimation,
+		CreativeBrief: "attack with sword",
+		Parameters: json.RawMessage(
+			`{"asset_id":99,"animation_id":3,"project_id":99,"creative_brief":"ignore me"}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("create animation edit: %v", err)
+	}
+	if runID != 17 || tasks.createdTask == nil || tasks.createdTask.Type != string(generator.EditAnimation) {
+		t.Fatalf("unexpected edit animation task: run=%d task=%+v", runID, tasks.createdTask)
+	}
+
+	var payload generator.EditAnimationPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode edit animation task payload: %v", err)
+	}
+	if payload.AssetID != assetID || payload.AnimationID != 3 || payload.ProjectID != 42 ||
+		payload.CreativeBrief != "attack with sword" {
+		t.Fatalf("unexpected edit animation payload: %+v", payload)
+	}
+}
+
+func TestCreateEditAnimationRequiresAssetAndAnimationIDs(t *testing.T) {
+	tests := []struct {
+		name       string
+		assetID    *uint
+		parameters json.RawMessage
+		want       string
+	}{
+		{
+			name:       "asset id",
+			parameters: json.RawMessage(`{"animation_id":3}`),
+			want:       "asset id is required",
+		},
+		{
+			name:       "animation id",
+			assetID:    func() *uint { value := uint(9); return &value }(),
+			parameters: json.RawMessage(`{}`),
+			want:       "animation id is required",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tasks := &taskManagerStub{createID: 17}
+			engine := generator.NewEngine(tasks, nil)
+			_, err := engine.Create(context.Background(), &generator.Request{
+				ProjectID:     42,
+				AssetID:       tt.assetID,
+				Kind:          generator.EditAnimation,
+				CreativeBrief: "attack with sword",
+				Parameters:    tt.parameters,
+			})
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+			if tasks.createdTask != nil {
+				t.Fatalf("task published with invalid edit animation identity: %+v", tasks.createdTask)
+			}
+		})
+	}
+}
+
+func TestCreateEditAnimationDoesNotPrepareProjectReference(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/reference.png"}}
+	references := &referenceStoreStub{}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditAnimation,
+		CreativeBrief: "attack with sword",
+		Parameters:    json.RawMessage(`{"animation_id":3}`),
+	})
+	if err != nil {
+		t.Fatalf("create animation edit: %v", err)
+	}
+	if projects.calls != 0 || len(references.persisted) != 0 {
+		t.Fatalf("animation edit prepared an extra reference: project_calls=%d persisted=%v", projects.calls, references.persisted)
+	}
+}
+
 func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	engine := generator.NewEngine(tasks, nil)
@@ -598,8 +693,8 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			payload:  json.RawMessage(`{"asset_id":8,"project_id":11,"edit_instructions":"change only the lock"}`),
 		},
 		{
-			taskType: generator.GenerateAnimation,
-			payload:  json.RawMessage(`{"animation_name":"open chest","project_id":11,"asset_id":8,"creative_brief":"opening animation"}`),
+			taskType: generator.EditAnimation,
+			payload:  json.RawMessage(`{"asset_id":8,"animation_id":3,"project_id":11,"creative_brief":"opening animation"}`),
 		},
 		{
 			taskType: generator.GenerateTileSet,
@@ -708,8 +803,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 5 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected five implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 6 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected six implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
