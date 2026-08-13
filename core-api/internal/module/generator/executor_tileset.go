@@ -42,6 +42,9 @@ func (e *executor) processTileSetItems(
 	if e.projects == nil {
 		return nil, fmt.Errorf("generator: project reader is required for Tileset processing")
 	}
+	if err := validateCreateTileSetPayload(&request); err != nil {
+		return nil, err
+	}
 	project, err := e.projects.GetDetail(ctx, request.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("generator: load project %d for Tileset processing: %w", request.ProjectID, err)
@@ -335,24 +338,7 @@ func paintTileSetShape(
 ) {
 	margin := tileSetShapeSafetyMargin(tileWidth, tileHeight)
 	for cell := range occupied {
-		bounds := image.Rect(
-			cell[0]*tileWidth,
-			cell[1]*tileHeight,
-			(cell[0]+1)*tileWidth,
-			(cell[1]+1)*tileHeight,
-		)
-		if _, adjacent := occupied[TileSetCoordinate{cell[0] - 1, cell[1]}]; !adjacent {
-			bounds.Min.X += margin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0] + 1, cell[1]}]; !adjacent {
-			bounds.Max.X -= margin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] - 1}]; !adjacent {
-			bounds.Min.Y += margin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] + 1}]; !adjacent {
-			bounds.Max.Y -= margin
-		}
+		bounds := tileSetOccupiedCellBounds(cell, occupied, tileWidth, tileHeight, margin)
 		draw.Draw(target, bounds, &image.Uniform{C: paint}, image.Point{}, draw.Src)
 	}
 }
@@ -404,7 +390,7 @@ func alignTileSetImageToShape(
 	if len(occupied) == columns*rows {
 		return imageBase64, nil
 	}
-	_, visibleBounds, visible := tileSetAlphaIntegral(decoded)
+	visibleBounds, visible := tileSetAlphaBounds(decoded)
 	if !visible {
 		return "", fmt.Errorf("item has no visible pixels")
 	}
@@ -460,11 +446,19 @@ func alignTileSetImageToShape(
 		Max: best.position.Add(best.image.Bounds().Size()),
 	}
 	draw.Draw(aligned, destination, best.image, best.image.Bounds().Min, draw.Src)
-	for y := range expectedHeight {
-		for x := range expectedWidth {
-			if _, allowed := occupied[TileSetCoordinate{x / tileWidth, y / tileHeight}]; !allowed {
-				aligned.SetRGBA(x, y, color.RGBA{})
+	transparent := &image.Uniform{C: color.RGBA{}}
+	for row := range rows {
+		for column := range columns {
+			if _, allowed := occupied[TileSetCoordinate{column, row}]; allowed {
+				continue
 			}
+			bounds := image.Rect(
+				column*tileWidth,
+				row*tileHeight,
+				(column+1)*tileWidth,
+				(row+1)*tileHeight,
+			)
+			draw.Draw(aligned, bounds, transparent, image.Point{}, draw.Src)
 		}
 	}
 	return imageprocessor.EncodePNGBase64(aligned)
@@ -472,6 +466,34 @@ func alignTileSetImageToShape(
 
 func tileSetShapeSafetyMargin(tileWidth int, tileHeight int) int {
 	return max(1, min(tileWidth, tileHeight)/32)
+}
+
+func tileSetOccupiedCellBounds(
+	cell TileSetCoordinate,
+	occupied map[TileSetCoordinate]struct{},
+	tileWidth int,
+	tileHeight int,
+	safetyMargin int,
+) image.Rectangle {
+	bounds := image.Rect(
+		cell[0]*tileWidth,
+		cell[1]*tileHeight,
+		(cell[0]+1)*tileWidth,
+		(cell[1]+1)*tileHeight,
+	)
+	if _, adjacent := occupied[TileSetCoordinate{cell[0] - 1, cell[1]}]; !adjacent {
+		bounds.Min.X += safetyMargin
+	}
+	if _, adjacent := occupied[TileSetCoordinate{cell[0] + 1, cell[1]}]; !adjacent {
+		bounds.Max.X -= safetyMargin
+	}
+	if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] - 1}]; !adjacent {
+		bounds.Min.Y += safetyMargin
+	}
+	if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] + 1}]; !adjacent {
+		bounds.Max.Y -= safetyMargin
+	}
+	return bounds
 }
 
 type tileSetShapePlacement struct {
@@ -590,6 +612,25 @@ func tileSetAlphaIntegral(value *image.RGBA) ([][]int, image.Rectangle, bool) {
 	return integral, visibleBounds, found
 }
 
+func tileSetAlphaBounds(value *image.RGBA) (image.Rectangle, bool) {
+	width, height := value.Bounds().Dx(), value.Bounds().Dy()
+	visibleBounds := image.Rectangle{Min: image.Pt(width, height), Max: image.Point{}}
+	found := false
+	for y := range height {
+		for x := range width {
+			if value.RGBAAt(x, y).A == 0 {
+				continue
+			}
+			found = true
+			visibleBounds.Min.X = min(visibleBounds.Min.X, x)
+			visibleBounds.Min.Y = min(visibleBounds.Min.Y, y)
+			visibleBounds.Max.X = max(visibleBounds.Max.X, x+1)
+			visibleBounds.Max.Y = max(visibleBounds.Max.Y, y+1)
+		}
+	}
+	return visibleBounds, found
+}
+
 func tileSetShapeScore(
 	integral [][]int,
 	occupied map[TileSetCoordinate]struct{},
@@ -603,26 +644,13 @@ func tileSetShapeScore(
 ) (int, bool) {
 	inside := 0
 	for cell := range occupied {
-		left, top := cell[0]*tileWidth, cell[1]*tileHeight
-		right, bottom := left+tileWidth, top+tileHeight
-		if _, adjacent := occupied[TileSetCoordinate{cell[0] - 1, cell[1]}]; !adjacent {
-			left += safetyMargin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0] + 1, cell[1]}]; !adjacent {
-			right -= safetyMargin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] - 1}]; !adjacent {
-			top += safetyMargin
-		}
-		if _, adjacent := occupied[TileSetCoordinate{cell[0], cell[1] + 1}]; !adjacent {
-			bottom -= safetyMargin
-		}
-		rectangle := image.Rect(
-			left-position.X,
-			top-position.Y,
-			right-position.X,
-			bottom-position.Y,
-		).Intersect(image.Rect(0, 0, width, height))
+		rectangle := tileSetOccupiedCellBounds(
+			cell,
+			occupied,
+			tileWidth,
+			tileHeight,
+			safetyMargin,
+		).Sub(position).Intersect(image.Rect(0, 0, width, height))
 		cellPixels := tileSetIntegralArea(integral, rectangle)
 		if cellPixels < minimumCellPixels {
 			return 0, false
