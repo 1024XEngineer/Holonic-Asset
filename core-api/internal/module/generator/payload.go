@@ -2,7 +2,6 @@ package generator
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -93,18 +92,20 @@ type CreateTileSetPayload struct {
 
 // EditTilesetItemPayload is the complete input consumed by an Item edit task.
 type EditTilesetItemPayload struct {
-	AssetID          uint     `json:"asset_id"`
-	ProjectID        uint     `json:"project_id"`
-	CreativeBrief    string   `json:"creative_brief"`
-	TargetAssetPaths []string `json:"target_asset_paths"`
+	AssetID       uint               `json:"asset_id"`
+	ProjectID     uint               `json:"project_id"`
+	CreativeBrief string             `json:"creative_brief"`
+	Target        *TileSetEditTarget `json:"target"`
+	Reference     string             `json:"reference,omitempty"`
 }
 
 // EditTilesPayload is the complete input consumed by a Tile edit task.
 type EditTilesPayload struct {
-	AssetID          uint     `json:"asset_id"`
-	ProjectID        uint     `json:"project_id"`
-	CreativeBrief    string   `json:"creative_brief"`
-	TargetAssetPaths []string `json:"target_asset_paths"`
+	AssetID       uint                `json:"asset_id"`
+	ProjectID     uint                `json:"project_id"`
+	CreativeBrief string              `json:"creative_brief"`
+	Targets       []TileSetEditTarget `json:"targets"`
+	Reference     string              `json:"reference,omitempty"`
 }
 
 const (
@@ -118,63 +119,22 @@ const (
 	maxCreativeBriefLength    = 4000
 	maxItemNameLength         = 200
 	maxItemDescriptionLength  = 2000
+	maxReferenceLength        = 8 << 20
 
 	// MaxTileSetItemConcurrency bounds the per-task fan-out used by the item
 	// generation workflow implemented in the next phase.
 	MaxTileSetItemConcurrency = 4
 )
 
-type TileSetItemTarget struct {
-	ItemIndex int
+// TileSetEditTarget identifies an occupied global Tileset cell. Execution
+// resolves the matching Tile and its owning Item after loading the Asset.
+type TileSetEditTarget struct {
+	Position *TileSetEditPosition `json:"position"`
 }
 
-type TileSetTileTarget struct {
-	ItemIndex int
-	TileIndex int
-}
-
-func ParseTilesetItemTargetPath(path string) (TileSetItemTarget, error) {
-	parts := strings.Split(path, ".")
-	if len(parts) != 2 || parts[0] != "items" {
-		return TileSetItemTarget{}, invalidTaskPayload("invalid Tileset Item target path %q", path)
-	}
-	itemIndex, err := parseTargetIndex(parts[1])
-	if err != nil {
-		return TileSetItemTarget{}, invalidTaskPayload("invalid Tileset Item target path %q", path)
-	}
-	return TileSetItemTarget{ItemIndex: itemIndex}, nil
-}
-
-func ParseTilesetTileTargetPath(path string) (TileSetTileTarget, error) {
-	parts := strings.Split(path, ".")
-	if len(parts) != 4 || parts[0] != "items" || parts[2] != "tiles" {
-		return TileSetTileTarget{}, invalidTaskPayload("invalid Tileset Tile target path %q", path)
-	}
-	itemIndex, err := parseTargetIndex(parts[1])
-	if err != nil {
-		return TileSetTileTarget{}, invalidTaskPayload("invalid Tileset Tile target path %q", path)
-	}
-	tileIndex, err := parseTargetIndex(parts[3])
-	if err != nil {
-		return TileSetTileTarget{}, invalidTaskPayload("invalid Tileset Tile target path %q", path)
-	}
-	return TileSetTileTarget{ItemIndex: itemIndex, TileIndex: tileIndex}, nil
-}
-
-func parseTargetIndex(value string) (int, error) {
-	if value == "" {
-		return 0, fmt.Errorf("empty index")
-	}
-	for _, r := range value {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("non-decimal index")
-		}
-	}
-	index, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, err
-	}
-	return index, nil
+type TileSetEditPosition struct {
+	X *int `json:"x"`
+	Y *int `json:"y"`
 }
 
 func validateCreateTileSetPayload(payload *CreateTileSetPayload) error {
@@ -279,11 +239,13 @@ func validateEditTilesetItemPayload(payload *EditTilesetItemPayload) error {
 	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
 		return err
 	}
-	if len(payload.TargetAssetPaths) != 1 {
-		return invalidTaskPayload("edit_tileset_item requires exactly one target path")
+	if err := validateOptionalReference(payload.Reference); err != nil {
+		return err
 	}
-	_, err := ParseTilesetItemTargetPath(payload.TargetAssetPaths[0])
-	return err
+	if err := validateTileSetEditTarget("target", payload.Target); err != nil {
+		return err
+	}
+	return nil
 }
 
 func validateEditTilesPayload(payload *EditTilesPayload) error {
@@ -293,19 +255,36 @@ func validateEditTilesPayload(payload *EditTilesPayload) error {
 	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
 		return err
 	}
-	if len(payload.TargetAssetPaths) == 0 || len(payload.TargetAssetPaths) > maxTileEditTargets {
-		return invalidTaskPayload("edit_tiles requires between 1 and %d target paths", maxTileEditTargets)
+	if err := validateOptionalReference(payload.Reference); err != nil {
+		return err
 	}
-	seen := make(map[TileSetTileTarget]struct{}, len(payload.TargetAssetPaths))
-	for _, path := range payload.TargetAssetPaths {
-		target, err := ParseTilesetTileTargetPath(path)
-		if err != nil {
+	if len(payload.Targets) == 0 || len(payload.Targets) > maxTileEditTargets {
+		return invalidTaskPayload("edit_tiles requires between 1 and %d targets", maxTileEditTargets)
+	}
+	seen := make(map[assetdomain.TilePosition]struct{}, len(payload.Targets))
+	for targetIndex := range payload.Targets {
+		target := &payload.Targets[targetIndex]
+		if err := validateTileSetEditTarget(fmt.Sprintf("targets[%d]", targetIndex), target); err != nil {
 			return err
 		}
-		if _, duplicate := seen[target]; duplicate {
-			return invalidTaskPayload("edit_tiles contains duplicate target %q", path)
+		position := assetdomain.TilePosition{X: *target.Position.X, Y: *target.Position.Y}
+		if _, duplicate := seen[position]; duplicate {
+			return invalidTaskPayload("edit_tiles contains duplicate target position (%d,%d)", position.X, position.Y)
 		}
-		seen[target] = struct{}{}
+		seen[position] = struct{}{}
+	}
+	return nil
+}
+
+func validateTileSetEditTarget(field string, target *TileSetEditTarget) error {
+	if target == nil || target.Position == nil {
+		return invalidTaskPayload("%s.position is required", field)
+	}
+	if target.Position.X == nil || target.Position.Y == nil {
+		return invalidTaskPayload("%s.position must contain x and y", field)
+	}
+	if *target.Position.X < 0 || *target.Position.Y < 0 {
+		return invalidTaskPayload("%s.position must contain nonnegative coordinates", field)
 	}
 	return nil
 }
@@ -319,6 +298,24 @@ func validateEditPayloadBase(projectID, assetID uint, creativeBrief string) erro
 	}
 	if err := validateRequiredText("creative_brief", creativeBrief, maxCreativeBriefLength); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateOptionalReference(reference string) error {
+	if reference == "" {
+		return nil
+	}
+	if strings.TrimSpace(reference) == "" {
+		return invalidTaskPayload("reference must not be blank")
+	}
+	if len(reference) > maxReferenceLength {
+		return invalidTaskPayload("reference exceeds maximum length of %d bytes", maxReferenceLength)
+	}
+	for _, r := range reference {
+		if unicode.IsControl(r) {
+			return invalidTaskPayload("reference contains invalid control characters")
+		}
 	}
 	return nil
 }

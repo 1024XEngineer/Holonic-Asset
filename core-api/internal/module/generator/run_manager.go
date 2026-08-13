@@ -81,7 +81,27 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		value.Reference, err = prepare(value.Reference)
 		return value, err
-	case CreateTileSetPayload, EditTilesetItemPayload, EditTilesPayload:
+	case CreateTileSetPayload:
+		return value, nil
+	case EditTilesetItemPayload:
+		if value.Reference == "" || e.references == nil {
+			return value, nil
+		}
+		persisted, err := e.references.PersistReference(ctx, value.Reference)
+		if err != nil {
+			return nil, fmt.Errorf("generator: persist edit reference: %w", err)
+		}
+		value.Reference = persisted
+		return value, nil
+	case EditTilesPayload:
+		if value.Reference == "" || e.references == nil {
+			return value, nil
+		}
+		persisted, err := e.references.PersistReference(ctx, value.Reference)
+		if err != nil {
+			return nil, fmt.Errorf("generator: persist edit reference: %w", err)
+		}
+		value.Reference = persisted
 		return value, nil
 	default:
 		return payload, nil
@@ -163,14 +183,21 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		return payload, nil
 	case EditTilesetItem:
-		parameters := struct{}{}
+		parameters := struct {
+			Target    *TileSetEditTarget `json:"target"`
+			Reference string             `json:"reference,omitempty"`
+		}{}
+		if len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("edit_tileset_item does not accept targetAssetPaths")
+		}
 		if err := decodeTileSetParameters(request, &parameters); err != nil {
 			return nil, err
 		}
 		payload := EditTilesetItemPayload{
-			ProjectID:        request.ProjectID,
-			CreativeBrief:    request.CreativeBrief,
-			TargetAssetPaths: append([]string(nil), request.TargetAssetPaths...),
+			ProjectID:     request.ProjectID,
+			CreativeBrief: request.CreativeBrief,
+			Target:        parameters.Target,
+			Reference:     parameters.Reference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
@@ -180,14 +207,21 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		return payload, nil
 	case EditTiles:
-		parameters := struct{}{}
+		parameters := struct {
+			Targets   []TileSetEditTarget `json:"targets"`
+			Reference string              `json:"reference,omitempty"`
+		}{}
+		if len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("edit_tiles does not accept targetAssetPaths")
+		}
 		if err := decodeTileSetParameters(request, &parameters); err != nil {
 			return nil, err
 		}
 		payload := EditTilesPayload{
-			ProjectID:        request.ProjectID,
-			CreativeBrief:    request.CreativeBrief,
-			TargetAssetPaths: append([]string(nil), request.TargetAssetPaths...),
+			ProjectID:     request.ProjectID,
+			CreativeBrief: request.CreativeBrief,
+			Targets:       append([]TileSetEditTarget(nil), parameters.Targets...),
+			Reference:     parameters.Reference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
