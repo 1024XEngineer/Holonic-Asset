@@ -56,6 +56,7 @@
   "noComponentsSelected": "未选中 UI Set 组件",
   "noUISetComponents": "暂无 UI Set 组件",
   "loadingCanvas": "正在加载画布",
+  "canvasZoom": "画布缩放比例",
   "noCanvasItems": "未选中画布项目",
   "previewReady": "预览就绪",
   "savingChanges": "正在保存更改",

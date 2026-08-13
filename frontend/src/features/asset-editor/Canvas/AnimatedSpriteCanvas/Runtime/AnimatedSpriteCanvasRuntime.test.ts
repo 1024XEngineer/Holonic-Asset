@@ -19,6 +19,42 @@ const model = (): AnimatedSpriteCanvasModel => ({
 });
 
 describe("AnimatedSpriteCanvasRuntime", () => {
+  it("sets a finite zoom around the current viewport center", () => {
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const setZoom = vi.fn();
+    const syncViewportGrid = vi.spyOn(
+      runtime as unknown as { syncViewportGrid: () => void },
+      "syncViewportGrid",
+    );
+    (runtime as unknown as { viewport: { setZoom: typeof setZoom } }).viewport =
+      { setZoom };
+
+    runtime.setZoom(1.25);
+    runtime.setZoom(Number.NaN);
+
+    expect(setZoom).toHaveBeenCalledWith(1.25, true);
+    expect(syncViewportGrid).toHaveBeenCalledOnce();
+  });
+
+  it("notifies the latest zoom callback when the viewport is available", () => {
+    const onZoomChange = vi.fn();
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+      onZoomChange,
+    });
+    (runtime as unknown as { viewport: { scale: { x: number } } }).viewport = {
+      scale: { x: 0.88 },
+    };
+
+    (runtime as unknown as { notifyZoomChange: () => void }).notifyZoomChange();
+
+    expect(onZoomChange).toHaveBeenCalledWith(0.88);
+  });
+
   it("does not render when only the props wrapper changes", () => {
     const initialModel = model();
     const runtime = new AnimatedSpriteCanvasRuntime({
