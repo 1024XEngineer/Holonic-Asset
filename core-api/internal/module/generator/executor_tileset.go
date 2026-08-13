@@ -387,12 +387,12 @@ func alignTileSetImageToShape(
 		}
 		occupied[cell] = struct{}{}
 	}
-	if len(occupied) == columns*rows {
-		return imageBase64, nil
-	}
 	visibleBounds, visible := tileSetAlphaBounds(decoded)
 	if !visible {
 		return "", fmt.Errorf("item has no visible pixels")
+	}
+	if len(occupied) == columns*rows {
+		return imageBase64, nil
 	}
 	minimumCellPixels := max(1, tileWidth*tileHeight/100)
 	safetyMargin := tileSetShapeSafetyMargin(tileWidth, tileHeight)
@@ -587,11 +587,16 @@ func tileSetShapePlacementLess(candidate tileSetShapePlacement, current tileSetS
 	return candidate.distance < current.distance
 }
 
-func tileSetAlphaIntegral(value *image.RGBA) ([][]int, image.Rectangle, bool) {
+type tileSetIntegralImage struct {
+	values []int
+	stride int
+}
+
+func tileSetAlphaIntegral(value *image.RGBA) (tileSetIntegralImage, image.Rectangle, bool) {
 	width, height := value.Bounds().Dx(), value.Bounds().Dy()
-	integral := make([][]int, height+1)
-	for y := range integral {
-		integral[y] = make([]int, width+1)
+	integral := tileSetIntegralImage{
+		values: make([]int, (width+1)*(height+1)),
+		stride: width + 1,
 	}
 	visibleBounds := image.Rectangle{Min: image.Pt(width, height), Max: image.Point{}}
 	found := false
@@ -606,7 +611,8 @@ func tileSetAlphaIntegral(value *image.RGBA) ([][]int, image.Rectangle, bool) {
 				visibleBounds.Max.X = max(visibleBounds.Max.X, x+1)
 				visibleBounds.Max.Y = max(visibleBounds.Max.Y, y+1)
 			}
-			integral[y+1][x+1] = integral[y][x+1] + row
+			integral.values[(y+1)*integral.stride+x+1] =
+				integral.values[y*integral.stride+x+1] + row
 		}
 	}
 	return integral, visibleBounds, found
@@ -632,7 +638,7 @@ func tileSetAlphaBounds(value *image.RGBA) (image.Rectangle, bool) {
 }
 
 func tileSetShapeScore(
-	integral [][]int,
+	integral tileSetIntegralImage,
 	occupied map[TileSetCoordinate]struct{},
 	position image.Point,
 	tileWidth int,
@@ -660,11 +666,14 @@ func tileSetShapeScore(
 	return inside, true
 }
 
-func tileSetIntegralArea(integral [][]int, rectangle image.Rectangle) int {
-	return integral[rectangle.Max.Y][rectangle.Max.X] -
-		integral[rectangle.Min.Y][rectangle.Max.X] -
-		integral[rectangle.Max.Y][rectangle.Min.X] +
-		integral[rectangle.Min.Y][rectangle.Min.X]
+func tileSetIntegralArea(integral tileSetIntegralImage, rectangle image.Rectangle) int {
+	index := func(x int, y int) int {
+		return y*integral.stride + x
+	}
+	return integral.values[index(rectangle.Max.X, rectangle.Max.Y)] -
+		integral.values[index(rectangle.Max.X, rectangle.Min.Y)] -
+		integral.values[index(rectangle.Min.X, rectangle.Max.Y)] +
+		integral.values[index(rectangle.Min.X, rectangle.Min.Y)]
 }
 
 func tileSetAbsolute(value int) int {
