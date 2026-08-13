@@ -509,6 +509,11 @@
             "format": "int64",
             "minimum": 1,
             "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "type": "object"
