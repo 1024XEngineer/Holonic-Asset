@@ -25,16 +25,25 @@ export function HomeProjectStory() {
           <img
             src="/assets/sky.png"
             alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${activeLayer === "background" ? "opacity-100" : "opacity-55"}`}
           />
           <img
             src="/assets/wind.png"
             alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className={`absolute inset-0 size-full object-cover mix-blend-multiply transition-opacity duration-500 ${activeLayer === "atmosphere" ? "opacity-100" : "opacity-45"}`}
           />
           <img
             src="/assets/nearby-trees.png"
             alt={t("projectStory.imageAlt")}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             className={`absolute inset-0 size-full object-cover mix-blend-multiply transition-opacity duration-500 ${activeLayer === "foreground" ? "opacity-100" : "opacity-35"}`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20" />

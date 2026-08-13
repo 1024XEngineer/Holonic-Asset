@@ -110,16 +110,25 @@ export function HomeCapabilities() {
                     <img
                       src="/assets/sky.png"
                       alt={t("capabilities.scenery.alt")}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       className="absolute inset-0 size-full object-cover"
                     />
                     <img
                       src="/assets/wind-clean.png"
                       alt=""
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       className="absolute inset-0 z-10 size-full origin-bottom scale-110 -translate-y-[38%] object-cover"
                     />
                     <img
                       src="/assets/nearby-trees-clean.png"
                       alt={t("capabilities.scenery.treesAlt")}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       className="absolute -left-[6%] -bottom-[10%] h-auto w-[112%] max-w-none mix-blend-multiply"
                     />
                   </div>
@@ -128,6 +137,9 @@ export function HomeCapabilities() {
                 <img
                   src={preview.src}
                   alt={t(`capabilities.${key}.alt`)}
+                  loading="lazy"
+                  decoding="async"
+                  fetchPriority="low"
                   className={`aspect-square object-contain [image-rendering:pixelated] ${title === "Objects" ? "w-[62%] sm:w-[68%]" : "w-[76%] sm:w-[82%]"}`}
                 />
               ) : (
