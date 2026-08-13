@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -17,6 +19,7 @@ import (
 
 type runManagerStub struct {
 	createRequest *generator.Request
+	createErr     error
 	listQuery     *generator.RunListQuery
 	listPage      *generator.RunListPage
 	listErr       error
@@ -30,7 +33,21 @@ func (s *runManagerStub) Create(
 	request *generator.Request,
 ) (generator.RunID, error) {
 	s.createRequest = request
-	return 17, nil
+	return 17, s.createErr
+}
+
+func TestCreateMapsInvalidTaskPayloadToBadRequest(t *testing.T) {
+	wantErr := fmt.Errorf("%w: invalid target", generator.ErrInvalidTaskPayload)
+	stub := &runManagerStub{createErr: wantErr}
+	_, err := handler.NewGenerationHandler(stub).Create(
+		context.Background(),
+		dto.CreateGenerationRequest{Kind: generator.EditTiles, CreativeBrief: "edit"},
+	)
+
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusBadRequest || !errors.Is(err, wantErr) {
+		t.Fatalf("expected invalid payload bad request, got %v", err)
+	}
 }
 
 func (s *runManagerStub) List(

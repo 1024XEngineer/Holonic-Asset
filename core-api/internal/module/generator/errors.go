@@ -5,6 +5,7 @@ import "errors"
 var (
 	ErrInvalidRunListStatus        = errors.New("generator: invalid run list status")
 	ErrInvalidRunListCursor        = errors.New("generator: invalid run list cursor")
+	ErrInvalidTaskPayload          = errors.New("generator: invalid task payload")
 	ErrTaskManagerRequired         = errors.New("generator: task manager is required")
 	ErrTaskRequired                = errors.New("generator: task is required")
 	ErrUnsupportedTaskType         = errors.New("generator: unsupported task type")
