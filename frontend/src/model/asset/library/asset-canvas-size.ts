@@ -4,12 +4,9 @@ import type {
   AssetListItemResponse,
   AssetSizeResponse,
 } from "./asset.contract";
-import {
-  assetCanvasSizeOptions,
-  type AssetCanvasSize,
-} from "./types/asset-canvas-size";
+import { type AssetCanvasSize } from "./types/asset-canvas-size";
 
-export const defaultAssetCanvasSize = assetCanvasSizeOptions[1];
+export const defaultAssetCanvasSize = "32 × 32 px" as const;
 
 const defaultCanvasSizeByAssetKind: Record<AssetKind, AssetCanvasSize> = {
   character: defaultAssetCanvasSize,

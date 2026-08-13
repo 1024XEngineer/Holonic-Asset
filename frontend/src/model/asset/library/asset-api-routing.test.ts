@@ -80,6 +80,17 @@ describe("assetApi Core routing", () => {
     expect(mocks.coreDetail).toHaveBeenCalledWith(8);
   });
 
+  it("keeps the library usable when an optional thumbnail detail fails", async () => {
+    mocks.coreDetail.mockRejectedValueOnce(new Error("detail unavailable"));
+
+    await expect(assetApi.listGroups("42")).resolves.toEqual([
+      expect.objectContaining({
+        kind: "object",
+        assets: [expect.objectContaining({ id: "8" })],
+      }),
+    ]);
+  });
+
   it("uses Core API copy and refreshes the remote library", async () => {
     await expect(assetApi.copy("42", "8")).resolves.toEqual([
       expect.objectContaining({ kind: "object" }),
@@ -114,6 +125,37 @@ describe("assetApi Core routing", () => {
       dimensions: { width: 48, height: 64 },
     });
     expect(mocks.coreList).toHaveBeenCalledWith(42);
+  });
+
+  it("omits dimensions for non-dimensional assets", async () => {
+    await assetApi.update("42", "8", {
+      name: "Audio",
+      description: "Updated audio",
+      tags: [],
+      canvasSize: "N/A",
+      perspective: "Top-Down",
+    });
+
+    expect(mocks.coreUpdate).toHaveBeenCalledWith({
+      assetId: 8,
+      name: "Audio",
+      description: "Updated audio",
+      tags: [],
+      perspective: "Top-Down",
+    });
+  });
+
+  it("reports malformed dimensions as a domain error", async () => {
+    await expect(
+      assetApi.update("42", "8", {
+        name: "Asset",
+        description: "",
+        tags: [],
+        canvasSize: "not a size",
+        perspective: "Top-Down",
+      }),
+    ).rejects.toThrow("Canvas size must use a positive width × height value.");
+    expect(mocks.coreUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects remote operations with non-persisted asset ids", async () => {

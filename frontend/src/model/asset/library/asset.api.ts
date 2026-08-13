@@ -21,12 +21,7 @@ export type SaveAssetRevisionInput<Payload> = {
 export const assetApi = {
   listGroups: async (projectId: string) => {
     const response = await coreAssetApi.list(coreProjectId(projectId));
-    const details = await Promise.all(
-      response.assets.map(async (asset) => {
-        const detail = await coreAssetApi.detail(asset.assetId);
-        return [asset.assetId, detail] as const;
-      }),
-    );
+    const details = await readAssetDetails(response.assets);
     return toAssetGroups(response.assets, new Map(details));
   },
   copy: async (projectId: string, assetId: string) => {
@@ -42,13 +37,14 @@ export const assetApi = {
     assetId: string,
     metadata: AssetMetadataUpdate,
   ) => {
+    const dimensions = parseAssetDimensions(metadata.canvasSize);
     await coreAssetApi.update({
       assetId: coreAssetId(assetId),
       name: metadata.name,
       description: metadata.description,
       tags: metadata.tags,
       perspective: metadata.perspective,
-      dimensions: assetCanvasSizeDimensionsSchema.parse(metadata.canvasSize),
+      ...(dimensions ? { dimensions } : {}),
     });
     return assetApi.listGroups(projectId);
   },
@@ -60,6 +56,34 @@ export const assetApi = {
     );
   },
 };
+
+const assetDetailConcurrency = 4;
+
+async function readAssetDetails(assets: AssetListItemResponse[]) {
+  const details: (readonly [number, AssetDetailResponse])[] = [];
+  for (let index = 0; index < assets.length; index += assetDetailConcurrency) {
+    const batch = assets.slice(index, index + assetDetailConcurrency);
+    const results = await Promise.allSettled(
+      batch.map(
+        async (asset) =>
+          [asset.assetId, await coreAssetApi.detail(asset.assetId)] as const,
+      ),
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled") details.push(result.value);
+    }
+  }
+  return details;
+}
+
+function parseAssetDimensions(canvasSize: string) {
+  if (canvasSize.trim().toUpperCase() === "N/A") return undefined;
+  const result = assetCanvasSizeDimensionsSchema.safeParse(canvasSize);
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "Invalid canvas size.");
+  }
+  return result.data;
+}
 
 export function toAssetGroups(
   items: AssetListItemResponse[],
