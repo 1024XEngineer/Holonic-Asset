@@ -24,3 +24,10 @@ type ReferenceStore interface {
 	NewObjectKey(string) (string, error)
 	PersistReferenceAt(context.Context, string, string) error
 }
+
+// ResourceStore supports generated resources whose stable object key is
+// selected by the publishing workflow.
+type ResourceStore interface {
+	PutObject(context.Context, string, string, []byte) error
+	DeleteObject(context.Context, string) error
+}

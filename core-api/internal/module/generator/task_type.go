@@ -13,6 +13,7 @@ const (
 
 	GenerateAnimation TaskType = "generate_animation"
 	EditAnimation     TaskType = "edit_animation"
+	GenerateScenery   TaskType = "generate_scenery"
 	GenerateTileSet   TaskType = "generate_tileset"
 	EditTilesetItem   TaskType = "edit_tileset_item"
 	EditTiles         TaskType = "edit_tiles"
@@ -22,6 +23,7 @@ func ProjectLevelTaskTypes() []TaskType {
 	return []TaskType{
 		GenerateCharacterProtoType,
 		GenerateObjectProtoType,
+		GenerateScenery,
 		GenerateTileSet,
 	}
 }
@@ -36,6 +38,7 @@ func TaskTypes() []TaskType {
 		EditObjectFrames,
 		GenerateAnimation,
 		EditAnimation,
+		GenerateScenery,
 		GenerateTileSet,
 		EditTilesetItem,
 		EditTiles,
