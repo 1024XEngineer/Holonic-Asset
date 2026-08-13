@@ -135,6 +135,29 @@ func TestProcessTileSetItemsBuildsGuideMaskAndOccupiedTiles(t *testing.T) {
 	}
 }
 
+func TestProcessTileSetItemsRejectsEmptyShape(t *testing.T) {
+	executor := &executor{
+		images:    &tileSetGenerationImageStub{},
+		processor: imageprocessor.NewProcessor(),
+		projects:  &tileSetGenerationProjectStub{},
+	}
+	request := CreateTileSetPayload{
+		ProjectID:     9,
+		AssetName:     "Forest Terrain",
+		CreativeBrief: "compact forest terrain",
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize:   assetdomain.Size{Width: 16, Height: 16},
+			TileAmount: assetdomain.TileAmount{Columns: 8, Rows: 8},
+		},
+		Items: []TileSetItemDefinition{{Name: "Edge", Description: "grass edge"}},
+	}
+
+	_, err := executor.processTileSetItems(context.Background(), request)
+	if err == nil || !strings.Contains(err.Error(), "shape must contain between") {
+		t.Fatalf("expected empty Shape validation error, got %v", err)
+	}
+}
+
 func assertTileSetGuideMatchesMask(t *testing.T, guideDataURL string, maskDataURL string) {
 	t.Helper()
 	guide, err := imageprocessor.DecodeBase64Image(
