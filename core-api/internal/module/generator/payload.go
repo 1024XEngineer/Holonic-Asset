@@ -58,6 +58,17 @@ type CreateAnimationPayload struct {
 	AspectRatio   string `json:"aspect_ratio,omitempty"`
 }
 
+// EditAnimationPayload is the self-contained input consumed by the animation
+// regeneration task handler. The generation parameters are loaded from the
+// persisted animation content; only the latest creative brief is supplied by
+// the caller.
+type EditAnimationPayload struct {
+	AssetID       uint   `json:"asset_id"`
+	AnimationID   uint   `json:"animation_id"`
+	ProjectID     uint   `json:"project_id"`
+	CreativeBrief string `json:"creative_brief"`
+}
+
 // CreateObjectPrototypePayload is the complete input consumed by the object
 // prototype task handler.
 type CreateObjectPrototypePayload struct {

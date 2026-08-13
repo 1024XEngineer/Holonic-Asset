@@ -217,10 +217,23 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 
 func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	generation := &domain.AnimationGenerationConfig{
+		Direction:   "back_right",
+		Style:       "painted pixel art",
+		FrameCount:  8,
+		Columns:     4,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FPS:         12,
+		Resolution:  "1080p",
+		Duration:    8,
+		AspectRatio: "1:1",
+	}
 	content.Animations = []domain.Animation{{
-		ID:     9,
-		Name:   "walk",
-		Frames: []domain.Frame{},
+		ID:         9,
+		Name:       "walk",
+		Frames:     []domain.Frame{},
+		Generation: generation,
 	}}
 	payload, err := domain.EncodeContent(content)
 	if err != nil {
@@ -265,7 +278,8 @@ func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 		t.Fatalf("decode updated content: %v", err)
 	}
 	animation := updated.Animations[0]
-	if len(animation.Frames) != 1 || animation.Frames[0].ID != 2201 || animation.Frames[0].URL == nil {
+	if animation.Name != "walk" || !reflect.DeepEqual(animation.Generation, generation) ||
+		len(animation.Frames) != 1 || animation.Frames[0].ID != 2201 || animation.Frames[0].URL == nil {
 		t.Fatalf("unexpected animation content: %+v", animation)
 	}
 	if daoStub.updatedVersion != 3 {

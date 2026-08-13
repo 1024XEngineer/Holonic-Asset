@@ -157,6 +157,23 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.AssetID = *request.AssetID
 		}
 		return payload, nil
+	case EditAnimation:
+		payload := EditAnimationPayload{}
+		if err := decodeParameters(request, &payload); err != nil {
+			return nil, err
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if payload.AssetID == 0 {
+			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
+		}
+		if payload.AnimationID == 0 {
+			return nil, fmt.Errorf("generator: animation id is required for %s", request.Kind)
+		}
+		payload.ProjectID = request.ProjectID
+		payload.CreativeBrief = request.CreativeBrief
+		return payload, nil
 	case GenerateTileSet:
 		parameters := struct {
 			AssetName  string                        `json:"asset_name"`
@@ -229,8 +246,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		return payload, nil
 	case EditCharacterFrames,
-		EditObjectFrames,
-		EditAnimation:
+		EditObjectFrames:
 		return struct{}{}, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, request.Kind)

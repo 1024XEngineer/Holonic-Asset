@@ -774,6 +774,117 @@ func (e *executor) generateAnimation(
 	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
 }
 
+func (e *executor) editAnimation(
+	ctx context.Context,
+	payload EditAnimationPayload,
+) (json.RawMessage, error) {
+	if payload.AssetID == 0 {
+		return nil, fmt.Errorf("generator: animation asset is required")
+	}
+	if payload.AnimationID == 0 {
+		return nil, fmt.Errorf("generator: animation id is required")
+	}
+	creativeBrief := strings.TrimSpace(payload.CreativeBrief)
+	if creativeBrief == "" {
+		return nil, fmt.Errorf("generator: animation creative brief is required")
+	}
+
+	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	if err != nil {
+		return nil, fmt.Errorf("generator: get animation asset %d: %w", payload.AssetID, err)
+	}
+	if asset.ID == 0 {
+		return nil, fmt.Errorf("generator: animation asset %d not found", payload.AssetID)
+	}
+	if payload.ProjectID != 0 && asset.ProjectID != payload.ProjectID {
+		return nil, fmt.Errorf(
+			"generator: animation asset %d belongs to project %d, not project %d",
+			payload.AssetID,
+			asset.ProjectID,
+			payload.ProjectID,
+		)
+	}
+
+	content, err := asset.DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("generator: decode animation asset %d content: %w", payload.AssetID, err)
+	}
+	var animation *assetdomain.Animation
+	for index := range content.Animations {
+		if content.Animations[index].ID == payload.AnimationID {
+			animation = &content.Animations[index]
+			break
+		}
+	}
+	if animation == nil {
+		return nil, fmt.Errorf(
+			"generator: animation %d not found in asset %d",
+			payload.AnimationID,
+			payload.AssetID,
+		)
+	}
+	if animation.Generation == nil {
+		return nil, fmt.Errorf(
+			"generator: animation %d in asset %d has no generation configuration",
+			payload.AnimationID,
+			payload.AssetID,
+		)
+	}
+
+	generation := *animation.Generation
+	reference, _, err := animationReference(asset, generation.Direction)
+	if err != nil {
+		return nil, err
+	}
+	description := strings.TrimSpace(asset.Description)
+	if description == "" {
+		description = strings.TrimSpace(asset.Name)
+	}
+	generationRequest := AnimationGenerationRequest{
+		Description:            description,
+		Style:                  generation.Style,
+		Action:                 creativeBrief,
+		ReferenceImage:         reference,
+		ReferenceImagePrepared: false,
+		FrameCount:             generation.FrameCount,
+		Columns:                generation.Columns,
+		FrameWidth:             generation.FrameWidth,
+		FrameHeight:            generation.FrameHeight,
+		FPS:                    generation.FPS,
+		Resolution:             generation.Resolution,
+		Duration:               generation.Duration,
+		AspectRatio:            generation.AspectRatio,
+	}
+	generated, err := e.animations.Generate(ctx, &generationRequest)
+	if err != nil {
+		return nil, fmt.Errorf("generator: regenerate animation frames: %w", err)
+	}
+	if generated == nil || len(generated.Frames) == 0 {
+		return nil, fmt.Errorf("generator: regenerate animation frames: empty result")
+	}
+	frames, err := e.persistAnimationFrames(ctx, generated)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.assets.UpdateAnimationFrames(
+		ctx,
+		payload.AssetID,
+		payload.AnimationID,
+		frames,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"generator: update animation %d frames for asset %d: %w",
+			payload.AnimationID,
+			payload.AssetID,
+			err,
+		)
+	}
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:     payload.AssetID,
+		AnimationID: payload.AnimationID,
+	})
+}
+
 func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
 	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
 		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
