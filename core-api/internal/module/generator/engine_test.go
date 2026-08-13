@@ -608,8 +608,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 				"project_id":11,
 				"creative_brief":"forest ground",
 				"dimensions":{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":8,"rows":8}},
-				"items":[{"name":"grass","description":"grass edge","shape":[[0,0],[1,0]]}],
-				"reference":"media-3"
+				"items":[{"name":"grass","description":"grass edge","shape":[[0,0],[1,0]]}]
 			}`),
 		},
 	}
@@ -778,7 +777,7 @@ func TestImplementedHandlerRequiresExecutor(t *testing.T) {
 	}
 }
 
-func TestCreateBuildsCompleteTileSetPayloadAndPersistsReferences(t *testing.T) {
+func TestCreateBuildsCompleteTileSetPayload(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	references := &referenceStoreStub{}
 	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
@@ -802,15 +801,8 @@ func TestCreateBuildsCompleteTileSetPayloadAndPersistsReferences(t *testing.T) {
 		!reflect.DeepEqual(payload.Items[0].Shape, []generator.TileSetCoordinate{{0, 0}, {1, 0}}) {
 		t.Fatalf("unexpected Tileset payload: %+v", payload)
 	}
-	if !reflect.DeepEqual(references.persisted, []string{
-		"https://cdn.example/project.png",
-		"https://cdn.example/grass.png",
-	}) {
-		t.Fatalf("unexpected persisted references: %v", references.persisted)
-	}
-	if payload.Reference != "uploads/generated-1.png" ||
-		payload.Items[0].Reference != "uploads/generated-2.png" || payload.Items[1].Reference != "" {
-		t.Fatalf("references were not copied into the queued payload: %+v", payload)
+	if len(references.persisted) != 0 {
+		t.Fatalf("Tileset creation must resolve the Project reference during execution: %v", references.persisted)
 	}
 }
 
@@ -819,32 +811,32 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 		name        string
 		kind        generator.TaskType
 		targets     []string
-		decodeAsset func(*testing.T, json.RawMessage) (uint, uint, string, []string, string)
+		decodeAsset func(*testing.T, json.RawMessage) (uint, uint, string, []string)
 	}{
 		{
 			name:    "complete Item",
 			kind:    generator.EditTilesetItem,
 			targets: []string{"items.3"},
-			decodeAsset: func(t *testing.T, raw json.RawMessage) (uint, uint, string, []string, string) {
+			decodeAsset: func(t *testing.T, raw json.RawMessage) (uint, uint, string, []string) {
 				t.Helper()
 				var payload generator.EditTilesetItemPayload
 				if err := json.Unmarshal(raw, &payload); err != nil {
 					t.Fatalf("decode Item edit payload: %v", err)
 				}
-				return payload.ProjectID, payload.AssetID, payload.CreativeBrief, payload.TargetAssetPaths, payload.Reference
+				return payload.ProjectID, payload.AssetID, payload.CreativeBrief, payload.TargetAssetPaths
 			},
 		},
 		{
 			name:    "Tile batch",
 			kind:    generator.EditTiles,
 			targets: []string{"items.3.tiles.1", "items.3.tiles.2"},
-			decodeAsset: func(t *testing.T, raw json.RawMessage) (uint, uint, string, []string, string) {
+			decodeAsset: func(t *testing.T, raw json.RawMessage) (uint, uint, string, []string) {
 				t.Helper()
 				var payload generator.EditTilesPayload
 				if err := json.Unmarshal(raw, &payload); err != nil {
 					t.Fatalf("decode Tile edit payload: %v", err)
 				}
-				return payload.ProjectID, payload.AssetID, payload.CreativeBrief, payload.TargetAssetPaths, payload.Reference
+				return payload.ProjectID, payload.AssetID, payload.CreativeBrief, payload.TargetAssetPaths
 			},
 		},
 	}
@@ -853,25 +845,24 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assetID := uint(100)
 			tasks := &taskManagerStub{createID: 17}
-			references := &referenceStoreStub{}
-			engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+			engine := generator.NewEngine(tasks, nil)
 			_, err := engine.Create(context.Background(), &generator.Request{
 				ProjectID:        42,
 				AssetID:          &assetID,
 				Kind:             test.kind,
 				CreativeBrief:    "Make the target brighter",
 				TargetAssetPaths: test.targets,
-				Parameters:       json.RawMessage(`{"reference":"https://cdn.example/edit.png"}`),
+				Parameters:       json.RawMessage(`{}`),
 			})
 			if err != nil {
 				t.Fatalf("create edit task: %v", err)
 			}
 
-			projectID, gotAssetID, brief, targets, reference := test.decodeAsset(t, tasks.createdTask.Payload)
+			projectID, gotAssetID, brief, targets := test.decodeAsset(t, tasks.createdTask.Payload)
 			if projectID != 42 || gotAssetID != assetID || brief != "Make the target brighter" ||
-				!reflect.DeepEqual(targets, test.targets) || reference != "uploads/generated-1.png" {
-				t.Fatalf("editing request was not preserved: project=%d asset=%d brief=%q targets=%v reference=%q",
-					projectID, gotAssetID, brief, targets, reference)
+				!reflect.DeepEqual(targets, test.targets) {
+				t.Fatalf("editing request was not preserved: project=%d asset=%d brief=%q targets=%v",
+					projectID, gotAssetID, brief, targets)
 			}
 		})
 	}
@@ -911,8 +902,8 @@ func TestCreateRejectsInvalidTileSetRequestsBeforePublishing(t *testing.T) {
 			"dimensions":{"tileSize":{"width":1024,"height":16},"tileAmount":{"columns":5,"rows":1}},
 			"items":[{"name":"edge","description":"edge","shape":[[0,0],[4,0]]}]
 		}`)},
-		{"blank project reference", tileSetRequestWithParameters(validTileSetParametersWith("reference", " "))},
-		{"blank Item reference", tileSetRequestWithParameters(validTileSetParametersWith("items", json.RawMessage(`[{"name":"edge","description":"edge","shape":[[0,0]],"reference":" "}]`)))},
+		{"project reference", tileSetRequestWithParameters(validTileSetParametersWith("reference", "https://cdn.example/project.png"))},
+		{"Item reference", tileSetRequestWithParameters(validTileSetParametersWith("items", json.RawMessage(`[{"name":"edge","description":"edge","shape":[[0,0]],"reference":"https://cdn.example/item.png"}]`)))},
 		{"trailing JSON", tileSetRequestWithParameters(validTileSetParameters() + `{}`)},
 	}
 
@@ -1073,10 +1064,9 @@ func validTileSetParameters() string {
 		"asset_name":"Forest Terrain",
 		"dimensions":{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":16,"rows":16}},
 		"items":[
-			{"name":"Grass edge","description":"A seamless grass edge","shape":[[0,0],[1,0]],"reference":"https://cdn.example/grass.png"},
+			{"name":"Grass edge","description":"A seamless grass edge","shape":[[0,0],[1,0]]},
 			{"name":"Dirt","description":"A dirt Tile","shape":[[0,0]]}
-		],
-		"reference":"https://cdn.example/project.png"
+		]
 	}`
 }
 
