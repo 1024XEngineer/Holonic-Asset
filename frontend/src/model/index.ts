@@ -44,7 +44,6 @@ export type {
   CharacterAnimationClip,
   CharacterSpriteSheet,
   CreatableAssetKind,
-  DirectionCountByPerspective,
   DirectionCountForPerspective,
   GenerateAudioVariationInput,
   GetAssetRecordInput,

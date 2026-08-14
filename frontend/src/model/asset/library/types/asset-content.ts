@@ -1,10 +1,5 @@
 import type { Perspective } from "@/model/project";
-import type {
-  DirectionCountByPerspective,
-  DirectionCountForPerspective,
-} from "../../types/perspective-direction";
-
-export type { DirectionCountByPerspective, DirectionCountForPerspective };
+import type { DirectionCountForPerspective } from "../../types/perspective-direction";
 
 export type AssetContentMetadata = Record<string, unknown>;
 

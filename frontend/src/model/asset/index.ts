@@ -75,7 +75,6 @@ export {
   type CharacterAnimationClip,
   type CharacterSpriteSheet,
   type CreatableAssetKind,
-  type DirectionCountByPerspective,
   type DirectionCountForPerspective,
   type ProjectAsset,
   type SceneryAssetData,

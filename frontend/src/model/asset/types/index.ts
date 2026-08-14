@@ -10,10 +10,7 @@ export {
   getPerspectiveDirectionLayout,
   perspectiveDirectionLayouts,
 } from "./perspective-direction";
-export type {
-  DirectionCountByPerspective,
-  DirectionCountForPerspective,
-} from "./perspective-direction";
+export type { DirectionCountForPerspective } from "./perspective-direction";
 export {
   assetMetadataUpdateSchema,
   type AssetAnimation,

@@ -9,7 +9,7 @@ export const perspectiveDirectionLayouts = {
   { directionCount: number; columns: number; rows: number }
 >;
 
-export type DirectionCountByPerspective = {
+type DirectionCountByPerspective = {
   [View in Perspective]: (typeof perspectiveDirectionLayouts)[View]["directionCount"];
 };
 
