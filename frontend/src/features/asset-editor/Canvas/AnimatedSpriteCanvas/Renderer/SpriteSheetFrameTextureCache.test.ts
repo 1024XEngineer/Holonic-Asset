@@ -62,7 +62,7 @@ describe("SpriteSheetFrameTextureCache", () => {
     const has = vi.spyOn(Assets.cache, "has").mockReturnValue(true);
     const get = vi
       .spyOn(Assets.cache, "get")
-      .mockReturnValue({ source: {} } as never);
+      .mockReturnValue({ source: Texture.EMPTY.source } as never);
     const cache = new SpriteSheetFrameTextureCache();
     const sheet = {
       ...spriteSheet("front.png"),
@@ -76,17 +76,45 @@ describe("SpriteSheetFrameTextureCache", () => {
   });
 
   it("does not create a frame texture before its source is loaded", () => {
-    const has = vi.spyOn(Assets.cache, "has").mockReturnValue(false);
-    const get = vi.spyOn(Assets.cache, "get");
+    const has = vi
+      .spyOn(Assets.cache, "has")
+      .mockReturnValueOnce(false)
+      .mockReturnValue(true);
+    const get = vi
+      .spyOn(Assets.cache, "get")
+      .mockReturnValue({ source: Texture.EMPTY.source } as never);
     const cache = new SpriteSheetFrameTextureCache();
     const sheet = {
       ...spriteSheet("front.png"),
       frameUrls: ["front.png", "back.png"],
     };
 
-    expect(cache.get(sheet, 1)).toBeUndefined();
+    const missing = cache.get(sheet, 1);
+    const loaded = cache.get(sheet, 1);
+
+    expect(missing).toBeUndefined();
+    expect(loaded).toBeInstanceOf(Texture);
+    expect(cache.get(sheet, 1)).toBe(loaded);
     expect(has).toHaveBeenCalledWith("back.png");
-    expect(get).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalledOnce();
+  });
+
+  it("crops a frame from a loaded sprite sheet", () => {
+    vi.spyOn(Assets.cache, "has").mockReturnValue(true);
+    vi.spyOn(Assets.cache, "get").mockReturnValue({
+      source: Texture.EMPTY.source,
+    } as never);
+    const cache = new SpriteSheetFrameTextureCache();
+
+    const texture = cache.get(spriteSheet("idle.png"), 1);
+
+    expect(texture?.frame).toMatchObject({
+      x: 32,
+      y: 0,
+      width: 32,
+      height: 32,
+    });
+    cache.destroy();
   });
 
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {

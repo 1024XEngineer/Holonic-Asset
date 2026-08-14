@@ -59,6 +59,22 @@ describe("AnimatedSpriteCanvasRuntime", () => {
       ...model(),
       animations: [
         {
+          id: "pending",
+          kind: "clip" as const,
+          label: "Pending",
+          frameCount: 0,
+        },
+        {
+          id: "idle",
+          kind: "clip" as const,
+          label: "Idle",
+          frameCount: 1,
+          spriteSheet: {
+            ...model().prototype,
+            imageUrl: "shared.png",
+          },
+        },
+        {
           id: "walk",
           kind: "clip" as const,
           label: "Walk",
@@ -86,6 +102,80 @@ describe("AnimatedSpriteCanvasRuntime", () => {
 
     expect(load).toHaveBeenCalledWith("walk-1.png");
     expect(load).toHaveBeenCalledWith("walk-2.png");
+  });
+
+  it("deduplicates texture URLs and isolates failed frame loads", async () => {
+    const loadedTexture = { source: { scaleMode: "linear" } };
+    const load = vi
+      .spyOn(Assets, "load")
+      .mockImplementation((url) =>
+        typeof url === "string" && url === "broken.png"
+          ? Promise.reject(new Error("frame unavailable"))
+          : Promise.resolve(loadedTexture as never),
+      );
+    const animationModel = {
+      ...model(),
+      prototype: { ...model().prototype, imageUrl: "shared.png" },
+      animations: [
+        {
+          id: "walk",
+          kind: "clip" as const,
+          label: "Walk",
+          frameCount: 2,
+          spriteSheet: {
+            ...model().prototype,
+            imageUrl: "shared.png",
+            frameUrls: ["shared.png", "broken.png"],
+          },
+        },
+      ],
+    };
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: animationModel,
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const internals = runtime as unknown as {
+      preloadAnimatedSpriteTextures: (
+        value: AnimatedSpriteCanvasModel,
+      ) => Promise<void>;
+      render: () => void;
+      unavailableTextureUrls: Set<string>;
+    };
+    internals.unavailableTextureUrls.add("shared.png");
+    const render = vi.spyOn(internals, "render");
+
+    await internals.preloadAnimatedSpriteTextures(animationModel);
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledWith("shared.png");
+    expect(load).toHaveBeenCalledWith("broken.png");
+    expect(loadedTexture.source.scaleMode).toBe("nearest");
+    expect(internals.unavailableTextureUrls.has("shared.png")).toBe(false);
+    expect(internals.unavailableTextureUrls.has("broken.png")).toBe(true);
+    expect(render).toHaveBeenCalledOnce();
+  });
+
+  it("does not render after texture loading when the runtime is destroyed", async () => {
+    vi.spyOn(Assets, "load").mockResolvedValue({
+      source: { scaleMode: "linear" },
+    } as never);
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const internals = runtime as unknown as {
+      destroyed: boolean;
+      preloadAnimatedSpriteTextures: (
+        value: AnimatedSpriteCanvasModel,
+      ) => Promise<void>;
+      render: () => void;
+    };
+    internals.destroyed = true;
+    const render = vi.spyOn(internals, "render");
+
+    await internals.preloadAnimatedSpriteTextures(model());
+
+    expect(render).not.toHaveBeenCalled();
   });
 
   it("sets a finite zoom around the current viewport center", () => {
