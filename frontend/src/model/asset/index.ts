@@ -59,11 +59,15 @@ export type {
   UpdateAudioTrackInput,
 } from "./audio";
 export {
+  assetDirectionSchema,
+  assetDirections,
+  assetDirectionsByPerspective,
   assetMetadataUpdateSchema,
   assetKindSchema,
   assetKinds,
   creatableAssetKinds,
   type AssetAnimation,
+  type AssetDirection,
   type AssetMetadataUpdate,
   type AssetPreviewCrop,
   type AssetPreviewFrame,

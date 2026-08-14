@@ -1,4 +1,4 @@
-import { ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
+import { AlertCircle, ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,8 @@ export type EditorGenerationTask = {
   id: string;
   name: string;
   prompt: string;
-  status: "queued" | "processing";
+  status: "queued" | "processing" | "failed";
+  error?: string;
 };
 
 export function GenerationTaskDropdown({
@@ -22,13 +23,20 @@ export function GenerationTaskDropdown({
 }) {
   const { t } = useTranslation("editor");
   if (tasks.length === 0) return null;
+  const hasActiveTasks = tasks.some((task) => task.status !== "failed");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex h-8 max-w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-        <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+        {hasActiveTasks ? (
+          <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+        ) : (
+          <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+        )}
         <span className="hidden truncate sm:inline">
-          {t("generationActive", { count: tasks.length })}
+          {t(hasActiveTasks ? "generationActive" : "generationFailed", {
+            count: tasks.length,
+          })}
         </span>
         <Badge
           variant="outline"
@@ -46,7 +54,11 @@ export function GenerationTaskDropdown({
               className="flex min-w-0 items-start gap-3 rounded-md px-2 py-2.5"
             >
               <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
-                <Sparkles className="size-3.5" />
+                {task.status === "failed" ? (
+                  <AlertCircle className="size-3.5 text-destructive" />
+                ) : (
+                  <Sparkles className="size-3.5" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -54,15 +66,26 @@ export function GenerationTaskDropdown({
                     {task.name}
                   </p>
                   <Badge
-                    variant="outline"
+                    variant={
+                      task.status === "failed" ? "destructive" : "outline"
+                    }
                     className="shrink-0 text-[10px] text-muted-foreground"
                   >
-                    {task.status === "queued" ? t("queued") : t("generating")}
+                    {task.status === "queued"
+                      ? t("queued")
+                      : task.status === "failed"
+                        ? t("failed")
+                        : t("generating")}
                   </Badge>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                   {task.prompt}
                 </p>
+                {task.error ? (
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-destructive">
+                    {task.error}
+                  </p>
+                ) : null}
               </div>
             </div>
           ))}

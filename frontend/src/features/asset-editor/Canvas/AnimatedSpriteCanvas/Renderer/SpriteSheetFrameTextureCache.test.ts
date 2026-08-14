@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { Texture, type Texture as TextureType } from "pixi.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Assets, Texture, type Texture as TextureType } from "pixi.js";
 
 import type { CharacterSpriteSheet } from "@/model";
 
@@ -17,6 +17,8 @@ function spriteSheet(imageUrl: string): CharacterSpriteSheet {
 }
 
 describe("SpriteSheetFrameTextureCache", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("reuses the texture for the same sprite-sheet frame", () => {
     const createTexture = vi.fn(
       () => ({ destroy: vi.fn() }) as unknown as TextureType,
@@ -57,9 +59,10 @@ describe("SpriteSheetFrameTextureCache", () => {
   });
 
   it("creates a texture from an independent URL with the default factory", () => {
-    const from = vi
-      .spyOn(Texture, "from")
-      .mockReturnValue({ source: {} } as never);
+    const has = vi.spyOn(Assets.cache, "has").mockReturnValue(true);
+    const get = vi
+      .spyOn(Assets.cache, "get")
+      .mockReturnValue({ source: Texture.EMPTY.source } as never);
     const cache = new SpriteSheetFrameTextureCache();
     const sheet = {
       ...spriteSheet("front.png"),
@@ -67,9 +70,51 @@ describe("SpriteSheetFrameTextureCache", () => {
     };
 
     expect(cache.get(sheet, 1)).toBeInstanceOf(Texture);
-    expect(from).toHaveBeenCalledWith("back.png");
+    expect(has).toHaveBeenCalledWith("back.png");
+    expect(get).toHaveBeenCalledWith("back.png");
     cache.destroy();
-    from.mockRestore();
+  });
+
+  it("does not create a frame texture before its source is loaded", () => {
+    const has = vi
+      .spyOn(Assets.cache, "has")
+      .mockReturnValueOnce(false)
+      .mockReturnValue(true);
+    const get = vi
+      .spyOn(Assets.cache, "get")
+      .mockReturnValue({ source: Texture.EMPTY.source } as never);
+    const cache = new SpriteSheetFrameTextureCache();
+    const sheet = {
+      ...spriteSheet("front.png"),
+      frameUrls: ["front.png", "back.png"],
+    };
+
+    const missing = cache.get(sheet, 1);
+    const loaded = cache.get(sheet, 1);
+
+    expect(missing).toBeUndefined();
+    expect(loaded).toBeInstanceOf(Texture);
+    expect(cache.get(sheet, 1)).toBe(loaded);
+    expect(has).toHaveBeenCalledWith("back.png");
+    expect(get).toHaveBeenCalledOnce();
+  });
+
+  it("crops a frame from a loaded sprite sheet", () => {
+    vi.spyOn(Assets.cache, "has").mockReturnValue(true);
+    vi.spyOn(Assets.cache, "get").mockReturnValue({
+      source: Texture.EMPTY.source,
+    } as never);
+    const cache = new SpriteSheetFrameTextureCache();
+
+    const texture = cache.get(spriteSheet("idle.png"), 1);
+
+    expect(texture?.frame).toMatchObject({
+      x: 32,
+      y: 0,
+      width: 32,
+      height: 32,
+    });
+    cache.destroy();
   });
 
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {

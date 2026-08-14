@@ -1,8 +1,4 @@
-import type {
-  AssetCanvasPosition,
-  AssetRecord,
-  GeneratedCharacterAnimation,
-} from "@/model";
+import type { AssetCanvasPosition, AssetRecord } from "@/model";
 
 export type EditorTarget = {
   projectId: string;
@@ -15,10 +11,6 @@ export type EditorCommand =
       type: "sprite.node-position.set";
       nodeId: string;
       position: AssetCanvasPosition;
-    }
-  | {
-      type: "sprite.animation.generated";
-      animation: GeneratedCharacterAnimation;
     }
   | {
       type: "sprite.animation.rename";
@@ -50,6 +42,7 @@ export type EditorSaveResult =
 export type EditorSession = {
   snapshot: EditorSessionSnapshot;
   dispatch: (command: EditorCommand) => void;
+  syncExternalRecord: (record: AssetRecord) => void;
   save: () => Promise<EditorSaveResult>;
 };
 
