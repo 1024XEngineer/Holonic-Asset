@@ -23,6 +23,7 @@ type ReferenceStore interface {
 	PersistReference(context.Context, string) (string, error)
 	NewObjectKey(string) (string, error)
 	PersistReferenceAt(context.Context, string, string) error
+	DeleteObjects(context.Context, []string) error
 }
 
 // ResourceStore supports generated resources whose stable object key is

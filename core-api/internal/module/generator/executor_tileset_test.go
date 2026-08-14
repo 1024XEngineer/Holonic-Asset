@@ -113,6 +113,9 @@ func TestProcessTileSetItemsBuildsGuideMaskAndOccupiedTiles(t *testing.T) {
 		t.Fatalf("expected one generation per Item, got %d", len(requests))
 	}
 	for _, imageRequest := range requests {
+		if imageRequest.N != 2 {
+			t.Fatalf("expected two candidates per Item, got %d", imageRequest.N)
+		}
 		if len(imageRequest.ReferenceImages) != 2 ||
 			!strings.HasPrefix(imageRequest.ReferenceImages[0], "data:image/png;base64,") ||
 			imageRequest.ReferenceImages[1] != "projects/9/reference.png" {
@@ -133,6 +136,71 @@ func TestProcessTileSetItemsBuildsGuideMaskAndOccupiedTiles(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestProcessTileSetItemUsesSecondValidCandidate(t *testing.T) {
+	images := &tileSetCandidateImageStub{}
+	executor := &executor{
+		images: images, processor: imageprocessor.NewProcessor(),
+		projects: &tileSetGenerationProjectStub{project: &projectdomain.Project{
+			ID: 9, Name: "Forest", Perspective: projectdomain.PerspectiveTopDown,
+		}},
+	}
+	request := CreateTileSetPayload{
+		ProjectID: 9, AssetName: "Forest", CreativeBrief: "terrain",
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize:   assetdomain.Size{Width: 16, Height: 16},
+			TileAmount: assetdomain.TileAmount{Columns: 4, Rows: 4},
+		},
+		Items: []TileSetItemDefinition{{Name: "L", Description: "corner", Shape: []TileSetCoordinate{{0, 0}, {0, 1}, {1, 1}}}},
+	}
+
+	processed, err := executor.processTileSetItems(context.Background(), request)
+	if err != nil {
+		t.Fatalf("process second Tileset candidate: %v", err)
+	}
+	if len(processed) != 1 || len(processed[0].Tiles) != 3 || images.request == nil || images.request.N != 2 {
+		t.Fatalf("unexpected second-candidate result: processed=%+v request=%+v", processed, images.request)
+	}
+}
+
+type tileSetCandidateImageStub struct {
+	request *imageclient.GenerateRequest
+}
+
+func (s *tileSetCandidateImageStub) Generate(
+	_ context.Context,
+	request *imageclient.GenerateRequest,
+) (*imageclient.GenerateResult, error) {
+	copyRequest := *request
+	s.request = &copyRequest
+	guide, err := imageprocessor.DecodeBase64Image(strings.TrimPrefix(request.ReferenceImages[0], "data:image/png;base64,"))
+	if err != nil {
+		return nil, err
+	}
+	valid := image.NewRGBA(guide.Bounds())
+	for y := guide.Bounds().Min.Y; y < guide.Bounds().Max.Y; y++ {
+		for x := guide.Bounds().Min.X; x < guide.Bounds().Max.X; x++ {
+			pixel := guide.RGBAAt(x, y)
+			if pixel.R == 0 && pixel.G == 0 && pixel.B == 0 {
+				valid.SetRGBA(x, y, color.RGBA{R: 160, G: 90, B: 30, A: 255})
+			} else {
+				valid.SetRGBA(x, y, color.RGBA{G: 255, A: 255})
+			}
+		}
+	}
+	validBase64, err := imageprocessor.EncodePNGBase64(valid)
+	if err != nil {
+		return nil, err
+	}
+	emptyBase64, err := imageprocessor.EncodePNGBase64(image.NewRGBA(guide.Bounds()))
+	if err != nil {
+		return nil, err
+	}
+	return &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{
+		{Base64: emptyBase64, MediaType: "image/png"},
+		{Base64: validBase64, MediaType: "image/png"},
+	}}, nil
 }
 
 func TestProcessTileSetItemsRejectsEmptyShape(t *testing.T) {
@@ -247,7 +315,7 @@ func TestAlignTileSetImageToShapeRejectsTransparentFullShape(t *testing.T) {
 	}
 }
 
-func TestAlignTileSetImageToShapeRejectsUnrecoverableClipping(t *testing.T) {
+func TestAlignTileSetImageToShapeClipsModelSpillFromOmittedCells(t *testing.T) {
 	const tileSize = 16
 	original := image.NewRGBA(image.Rect(0, 0, 4*tileSize, 3*tileSize))
 	paint := color.RGBA{R: 60, G: 130, B: 220, A: 255}
@@ -268,8 +336,15 @@ func TestAlignTileSetImageToShapeRejectsUnrecoverableClipping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = alignTileSetImageToShape(encoded, shape, 4, 3, tileSize, tileSize)
-	if err == nil || !strings.Contains(err.Error(), "cannot fit Shape without clipping") {
-		t.Fatalf("expected protected-boundary error, got %v", err)
+	alignedBase64, err := alignTileSetImageToShape(encoded, shape, 4, 3, tileSize, tileSize)
+	if err != nil {
+		t.Fatalf("align Shape with model spill: %v", err)
+	}
+	aligned, err := imageprocessor.DecodeBase64Image(alignedBase64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if aligned.RGBAAt(4, tileSize+4).A != 0 {
+		t.Fatal("model spill remained visible in an omitted cell")
 	}
 }

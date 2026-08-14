@@ -63,3 +63,72 @@ func TileSetItem(
 		perspective,
 	)
 }
+
+const tileSetEditTemplate = `Edit exactly one existing classic 2D pixel-art game asset.
+
+NON-OVERRIDABLE RULES:
+- Keep classic low-resolution 2D pixel art with crisp square pixels, hard edges, and no anti-aliasing, gradients, smooth resampling, 3D, photorealism, text, or scenery.
+- The first reference is the authoritative current image. Preserve its canvas size, camera perspective, pixel density, placement, scale, and alpha silhouette.
+- Apply only this edit: %s
+- Project context: %s
+- Item name: %s
+- Tile size: %dx%d pixels
+- Perspective: %s
+- Return exactly one transparent PNG image and no variants.`
+
+// TileSetTileEdit constrains one independently edited Tile.
+func TileSetTileEdit(
+	creativeBrief string,
+	projectContext string,
+	itemName string,
+	tileWidth int,
+	tileHeight int,
+	perspective string,
+) string {
+	return fmt.Sprintf(
+		tileSetEditTemplate,
+		creativeBrief,
+		projectContext,
+		itemName,
+		tileWidth,
+		tileHeight,
+		perspective,
+	)
+}
+
+const tileSetItemEditTemplate = `Edit one complete existing classic 2D pixel-art Tileset Item.
+
+NON-OVERRIDABLE RULES:
+- Keep classic low-resolution 2D pixel art with crisp square pixels, hard edges, and no anti-aliasing, gradients, smooth resampling, 3D, photorealism, text, or scenery.
+- The first reference is an authoritative occupancy guide: black is editable Item area and green is protected. The second reference is the current complete Item.
+- Preserve the exact occupied-cell footprint, canvas, camera perspective, pixel density, coherent cross-Tile seams, placement, and scale.
+- Every occupied cell must contain meaningful connected content. No visible pixel may enter an omitted cell.
+- Apply only this edit: %s
+- Project context: %s
+- Item name: %s
+- Occupied cells: %s
+- Tile size: %dx%d pixels
+- Perspective: %s
+- Return exactly one complete transparent PNG image and no variants.`
+
+// TileSetItemEdit constrains regeneration of a complete persisted Item.
+func TileSetItemEdit(
+	creativeBrief string,
+	projectContext string,
+	itemName string,
+	shape string,
+	tileWidth int,
+	tileHeight int,
+	perspective string,
+) string {
+	return fmt.Sprintf(
+		tileSetItemEditTemplate,
+		creativeBrief,
+		projectContext,
+		itemName,
+		shape,
+		tileWidth,
+		tileHeight,
+		perspective,
+	)
+}

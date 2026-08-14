@@ -99,6 +99,7 @@ func (p *QNAProvider) call(
 		Prompt:  request.Prompt,
 		Image:   referenceImages,
 		Mask:    request.MaskImage,
+		N:       request.N,
 		Size:    providerSize,
 		Quality: request.Params["quality"],
 	}
@@ -300,6 +301,7 @@ type qnaImageRequest struct {
 	Prompt  string   `json:"prompt"`
 	Image   []string `json:"image,omitempty"`
 	Mask    string   `json:"mask,omitempty"`
+	N       int      `json:"n,omitempty"`
 	Size    string   `json:"size,omitempty"`
 	Quality string   `json:"quality,omitempty"`
 }

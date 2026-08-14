@@ -115,6 +115,10 @@ func (s *referenceStoreStub) PersistReferenceAt(context.Context, string, string)
 	return nil
 }
 
+func (s *referenceStoreStub) DeleteObjects(context.Context, []string) error {
+	return nil
+}
+
 func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
 	s.calls++
 	return s.project, s.err
@@ -769,16 +773,11 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dispatch generation task: %v", err)
 			}
-			shouldExecute := tt.taskType != generator.GenerateTileSet
-			if shouldExecute {
-				if executor.calls != 1 || executor.taskType != tt.taskType ||
-					!reflect.DeepEqual(executor.payload, tt.payload) ||
-					!reflect.DeepEqual(result, executor.result) {
-					t.Fatalf("unexpected executor call: calls=%d type=%s payload=%s result=%s",
-						executor.calls, executor.taskType, executor.payload, result)
-				}
-			} else if executor.calls != 0 || result != nil {
-				t.Fatalf("tileset handler must remain deferred: calls=%d result=%v", executor.calls, result)
+			if executor.calls != 1 || executor.taskType != tt.taskType ||
+				!reflect.DeepEqual(executor.payload, tt.payload) ||
+				!reflect.DeepEqual(result, executor.result) {
+				t.Fatalf("unexpected executor call: calls=%d type=%s payload=%s result=%s",
+					executor.calls, executor.taskType, executor.payload, result)
 			}
 			if len(tasks.statusUpdates) != 0 {
 				t.Fatalf("task queue owns status updates, got %+v", tasks.statusUpdates)
@@ -878,8 +877,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 7 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected seven implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 10 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected ten implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }

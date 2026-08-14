@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -29,11 +30,13 @@ const (
 	maxS3DownloadURLTTL    = 7 * 24 * time.Hour
 	generatedObjectPrefix  = "uploads/"
 	generatedObjectIDBytes = 16
+	maxBatchOperations     = 1000
 )
 
 type qiniuBucketManager interface {
 	Stat(bucket, key string) (qiniustorage.FileInfo, error)
 	Delete(bucket, key string) error
+	BatchWithContext(context.Context, string, []string) ([]qiniustorage.BatchOpRet, error)
 }
 
 type qiniuFormUploader interface {
@@ -325,6 +328,51 @@ func (s *QiniuStorage) DeleteObject(ctx context.Context, objectKey string) error
 	return nil
 }
 
+// DeleteObjects removes exact immutable keys allocated by a failed workflow.
+func (s *QiniuStorage) DeleteObjects(ctx context.Context, objectKeys []string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(objectKeys) == 0 {
+		return nil
+	}
+	operations := make([]string, len(objectKeys))
+	for index, objectKey := range objectKeys {
+		objectKey = strings.TrimSpace(objectKey)
+		if err := validateObjectKey(objectKey); err != nil {
+			return err
+		}
+		operations[index] = qiniustorage.URIDelete(s.bucket, objectKey)
+	}
+	var deleteErrors []error
+	for offset := 0; offset < len(operations); offset += maxBatchOperations {
+		end := min(offset+maxBatchOperations, len(operations))
+		responses, err := s.bucketManager.BatchWithContext(ctx, s.bucket, operations[offset:end])
+		if err != nil {
+			deleteErrors = append(deleteErrors, fmt.Errorf("delete object batch %d-%d: %w", offset, end-1, err))
+			continue
+		}
+		if len(responses) != end-offset {
+			deleteErrors = append(deleteErrors, fmt.Errorf(
+				"delete object batch %d-%d: got %d responses, want %d",
+				offset, end-1, len(responses), end-offset,
+			))
+		}
+		for index, response := range responses[:min(len(responses), end-offset)] {
+			if response.Code < http.StatusOK || response.Code >= http.StatusMultipleChoices {
+				deleteErrors = append(deleteErrors, fmt.Errorf(
+					"delete object %q: status %d: %s",
+					objectKeys[offset+index], response.Code, response.Data.Error,
+				))
+			}
+		}
+	}
+	if err := errors.Join(deleteErrors...); err != nil {
+		return fmt.Errorf("upload: delete objects: %w", err)
+	}
+	return nil
+}
+
 func (s *QiniuStorage) putObject(ctx context.Context, mediaType string, data []byte) (string, error) {
 	objectKey, err := s.NewObjectKey(mediaType)
 	if err != nil {
@@ -415,7 +463,6 @@ func fileExtension(mediaType string) string {
 }
 
 func validatedDurationSeconds(value time.Duration) uint64 {
-	// The storage constructor rejects non-positive token durations.
 	seconds := value / time.Second
 	if seconds <= 0 {
 		return 0
