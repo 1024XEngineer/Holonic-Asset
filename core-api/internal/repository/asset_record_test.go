@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -225,6 +226,48 @@ func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.
 	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected content lookup error %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetRepositoryReturnsAnimationMigrationErrorWithoutWrites(t *testing.T) {
+	currentContentID := uint(5)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:        7,
+		Version:   3,
+		ContentID: &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 3, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: json.RawMessage(`{"animations":[{"id":1}]}`),
+	}, 3)
+	if err == nil {
+		t.Fatal("expected animation generation migration error")
+	}
+	if !strings.Contains(err.Error(), "decode current asset content") {
+		t.Fatalf("unexpected migration error: %v", err)
+	}
+	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
+		t.Fatalf("failed migration persisted content: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
+	}
+	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
+		t.Fatalf("failed migration persisted record: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
+	}
+	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
+		t.Fatalf("failed migration moved asset pointer: %+v", assetDao)
 	}
 }
 
