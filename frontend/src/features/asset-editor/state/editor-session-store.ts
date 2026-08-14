@@ -5,7 +5,6 @@ import { temporal } from "zundo";
 import type {
   AssetCanvasPosition,
   AssetRecord,
-  GeneratedCharacterAnimation,
   SpriteAssetRecordData,
 } from "@/model";
 
@@ -23,7 +22,6 @@ type EditorSessionState = {
     nodeId: string,
     position: AssetCanvasPosition,
   ) => void;
-  addGeneratedSpriteAnimation: (animation: GeneratedCharacterAnimation) => void;
   renameSpriteAnimation: (animationId: string, label: string) => void;
   deleteSpriteAnimation: (animationId: string) => void;
 };
@@ -64,27 +62,6 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
                   ...current.nodePositions,
                   [nodeId]: { ...position },
                 },
-              })),
-            };
-          }),
-        addGeneratedSpriteAnimation: (animation) =>
-          set((state) => {
-            const sprite = getSpriteRecordData(state.record);
-            const normalizedLabel = animation.label.trim();
-            if (!normalizedLabel) return state;
-
-            const animations = sprite.animations ?? [];
-            return {
-              record: updateSpriteRecord(state.record, (current) => ({
-                ...current,
-                animations: [
-                  ...animations,
-                  {
-                    ...structuredClone(animation),
-                    id: createSpriteAnimationId(normalizedLabel, animations),
-                    label: normalizedLabel,
-                  },
-                ],
               })),
             };
           }),
@@ -170,6 +147,85 @@ export function markEditorSessionSaved(
   store.setState({ savedRecord: structuredClone(record) });
 }
 
+export function syncEditorSessionExternalRecord(
+  store: EditorSessionStore,
+  incomingRecord: AssetRecord,
+) {
+  const state = store.getState();
+  if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) return;
+  if (state.record.mode !== incomingRecord.mode) return;
+
+  const incomingSprite = getSpriteRecordData(incomingRecord);
+  const record = syncExternalAnimations(
+    state.record,
+    state.savedRecord,
+    incomingRecord,
+  );
+  const savedRecord = updateSpriteRecord(state.savedRecord, (current) => ({
+    ...current,
+    animations: structuredClone(incomingSprite.animations ?? []),
+  }));
+  if (
+    recordsMatch(record, state.record) &&
+    recordsMatch(savedRecord, state.savedRecord)
+  ) {
+    return;
+  }
+
+  const temporalState = store.temporal.getState();
+  const rebaseHistory = (history: typeof temporalState.pastStates) =>
+    history.map((snapshot) =>
+      snapshot.record
+        ? {
+            ...snapshot,
+            record: syncExternalAnimations(
+              snapshot.record,
+              state.savedRecord,
+              incomingRecord,
+            ),
+          }
+        : snapshot,
+    );
+  const wasTracking = temporalState.isTracking;
+  if (wasTracking) temporalState.pause();
+  try {
+    store.setState({ record, savedRecord });
+    store.temporal.setState({
+      pastStates: rebaseHistory(temporalState.pastStates),
+      futureStates: rebaseHistory(temporalState.futureStates),
+    });
+  } finally {
+    if (wasTracking) store.temporal.getState().resume();
+  }
+}
+
+function syncExternalAnimations(
+  record: AssetRecord,
+  savedRecord: AssetRecord,
+  incomingRecord: AssetRecord,
+) {
+  if (
+    !isSpriteRecord(record) ||
+    !isSpriteRecord(savedRecord) ||
+    !isSpriteRecord(incomingRecord) ||
+    record.mode !== savedRecord.mode ||
+    record.mode !== incomingRecord.mode
+  ) {
+    return record;
+  }
+  const currentSprite = getSpriteRecordData(record);
+  const savedSprite = getSpriteRecordData(savedRecord);
+  const incomingSprite = getSpriteRecordData(incomingRecord);
+  return updateSpriteRecord(record, (current) => ({
+    ...current,
+    animations: mergeExternalAnimations(
+      currentSprite.animations ?? [],
+      savedSprite.animations ?? [],
+      incomingSprite.animations ?? [],
+    ),
+  }));
+}
+
 export function dispatchEditorCommand(
   store: EditorSessionStore,
   command: EditorCommand,
@@ -180,9 +236,6 @@ export function dispatchEditorCommand(
       return;
     case "sprite.node-position.set":
       store.getState().setSpriteNodePosition(command.nodeId, command.position);
-      return;
-    case "sprite.animation.generated":
-      store.getState().addGeneratedSpriteAnimation(command.animation);
       return;
     case "sprite.animation.rename":
       store
@@ -239,26 +292,41 @@ function recordsMatch(left: AssetRecord, right: AssetRecord) {
   return deepEqual(left, right);
 }
 
-function createSpriteAnimationId(
-  label: string,
-  animations: Array<{ id: string }>,
+function isSpriteRecord(record: AssetRecord) {
+  return record.mode === "character" || record.mode === "object";
+}
+
+function mergeExternalAnimations(
+  current: SpriteAssetRecordData["animations"],
+  saved: SpriteAssetRecordData["animations"],
+  incoming: SpriteAssetRecordData["animations"],
 ) {
-  const base =
-    label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "animation";
-  const ids = new Set([
-    "prototype",
-    ...animations.map((animation) => animation.id),
-  ]);
-  let id = base;
-  let suffix = 2;
+  const savedById = new Map(
+    saved?.map((animation) => [animation.id, animation]),
+  );
+  const currentById = new Map(
+    current?.map((animation) => [animation.id, animation]),
+  );
+  const incomingIds = new Set(incoming?.map((animation) => animation.id));
+  const merged = (incoming ?? []).flatMap((animation) => {
+    const currentAnimation = currentById.get(animation.id);
+    const savedAnimation = savedById.get(animation.id);
+    if (savedAnimation && !currentAnimation) return [];
+    return [
+      currentAnimation &&
+      savedAnimation &&
+      !deepEqual(currentAnimation, savedAnimation)
+        ? currentAnimation
+        : structuredClone(animation),
+    ];
+  });
 
-  while (ids.has(id)) {
-    id = `${base}-${suffix}`;
-    suffix += 1;
+  for (const animation of current ?? []) {
+    if (incomingIds.has(animation.id)) continue;
+    const savedAnimation = savedById.get(animation.id);
+    if (!savedAnimation || !deepEqual(animation, savedAnimation)) {
+      merged.push(animation);
+    }
   }
-
-  return id;
+  return merged;
 }

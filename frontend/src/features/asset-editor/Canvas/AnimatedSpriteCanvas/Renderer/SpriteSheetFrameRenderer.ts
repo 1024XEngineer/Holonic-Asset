@@ -21,6 +21,7 @@ export function drawSpriteSheetFrame({
   pixelScale: number;
 }) {
   const texture = frameTextures.get(spriteSheet, frame);
+  if (!texture) return;
   const sprite = new Sprite(texture);
   const renderedWidth = spriteSheet.frameWidth * pixelScale;
   const renderedHeight = spriteSheet.frameHeight * pixelScale;

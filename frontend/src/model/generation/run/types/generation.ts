@@ -23,11 +23,13 @@ export type CreationRequest<Reference = unknown> = {
 export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
   id: string;
   projectId: string;
+  assetId?: string;
   // The backend lifecycle is pending, processing, completed, failed, or cancelled.
   // This queue is a current-work projection: completed runs become assets and are
   // removed after the asset list refreshes; user-cancelled runs are removed once
   // cancellation succeeds. Only pending, processing, and actionable failures remain.
   status: "pending" | "processing" | "failed";
+  error?: string;
 };
 
 export type GenerationInput<Reference = unknown> = {

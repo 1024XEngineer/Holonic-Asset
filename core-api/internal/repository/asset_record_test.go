@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -228,6 +229,48 @@ func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.
 	}
 }
 
+func TestAssetRepositoryReturnsAnimationMigrationErrorWithoutWrites(t *testing.T) {
+	currentContentID := uint(5)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:        7,
+		Version:   3,
+		ContentID: &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 3, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{`)},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+
+	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: json.RawMessage(`{"animations":[{"id":1}]}`),
+	}, 3)
+	if err == nil {
+		t.Fatal("expected animation generation migration error")
+	}
+	if !strings.Contains(err.Error(), "decode current asset content") {
+		t.Fatalf("unexpected migration error: %v", err)
+	}
+	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
+		t.Fatalf("failed migration persisted content: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
+	}
+	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
+		t.Fatalf("failed migration persisted record: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
+	}
+	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
+		t.Fatalf("failed migration moved asset pointer: %+v", assetDao)
+	}
+}
+
 func TestAssetRepositoryRejectsReplacementContentFromStaleVersion(t *testing.T) {
 	currentContentID := uint(5)
 	assetDao := &recordAssetDaoStub{asset: dao.Asset{
@@ -308,6 +351,85 @@ func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	}
 	if assetDao.updatedVersion != 3 || assetDao.updatedContent != record.ContentID {
 		t.Fatalf("asset current pointer was not moved to replacement: %+v", assetDao)
+	}
+}
+
+func TestAssetRepositoryMigratesAnimationGenerationIntoReplacementContent(t *testing.T) {
+	currentContentID := uint(4)
+	currentContent := datatypes.JSON(`{
+		"animations":[
+			{"id":3,"name":"walk","frames":[{"id":1,"url":"old.png"}],"generation":{"direction":"front","frameCount":16,"custom":{"keep":true}}},
+			{"id":4,"name":"idle","frames":[],"generation":{"direction":"front","frameCount":8}},
+			{"id":6,"name":"removed","frames":[],"generation":{"direction":"back","frameCount":4}}
+		]
+	}`)
+	assetDao := &recordAssetDaoStub{asset: dao.Asset{
+		ID:          7,
+		Name:        "hero",
+		Description: "main character",
+		Perspective: "Top-Down",
+		Dimensions:  datatypes.JSON(`{"width":64,"height":64}`),
+		Version:     2,
+		ContentID:   &currentContentID,
+	}}
+	recordDao := &recordDaoStub{
+		records: map[uint]dao.AssetRecord{
+			1: {ID: 1, AssetID: 7, Version: 2, ContentID: currentContentID},
+		},
+		nextID: 1,
+	}
+	contentDao := &recordContentDaoStub{
+		contents: map[uint]dao.AssetContent{
+			currentContentID: {ID: currentContentID, AssetID: 7, Content: currentContent},
+		},
+		nextID: currentContentID,
+	}
+	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
+	replacement := json.RawMessage(`{
+		"animations":[
+			{"id":3,"name":"walk edited","frames":[{"id":2,"url":"new.png"}],"futureValue":12345678901234567890},
+			{"id":4,"name":"idle edited","frames":[],"generation":{"direction":"side","frameCount":12}},
+			{"id":5,"name":"new","frames":[]}
+		],
+		"customTopLevel":{"keep":true}
+	}`)
+
+	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
+		AssetID: 7,
+		Content: replacement,
+	}, 2)
+	if err != nil {
+		t.Fatalf("create replacement record: %v", err)
+	}
+
+	var content map[string]json.RawMessage
+	if err := json.Unmarshal(record.Content, &content); err != nil {
+		t.Fatalf("decode replacement content: %v", err)
+	}
+	if string(content["customTopLevel"]) != `{"keep":true}` {
+		t.Fatalf("custom top-level content changed: %s", record.Content)
+	}
+	var animations []map[string]json.RawMessage
+	if err := json.Unmarshal(content["animations"], &animations); err != nil {
+		t.Fatalf("decode replacement animations: %v", err)
+	}
+	if len(animations) != 3 {
+		t.Fatalf("unexpected replacement animations: %s", content["animations"])
+	}
+	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16,"custom":{"keep":true}}` {
+		t.Fatalf("existing generation was not migrated: %s", animations[0]["generation"])
+	}
+	if string(animations[0]["futureValue"]) != "12345678901234567890" {
+		t.Fatalf("unmodeled animation content changed: %s", content["animations"])
+	}
+	if string(animations[1]["generation"]) != `{"direction":"side","frameCount":12}` {
+		t.Fatalf("supplied generation was overwritten: %s", animations[1]["generation"])
+	}
+	if _, ok := animations[2]["generation"]; ok {
+		t.Fatalf("new animation unexpectedly inherited generation: %s", content["animations"])
+	}
+	if got := string(contentDao.contents[record.ContentID].Content); got != string(record.Content) {
+		t.Fatalf("migrated content was not persisted: %s", got)
 	}
 }
 

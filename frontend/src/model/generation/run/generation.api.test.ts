@@ -7,26 +7,32 @@ const mocks = vi.hoisted(() => ({
     create: vi.fn(),
     list: vi.fn(),
   },
+  assetDetail: vi.fn(),
   readFileAsDataUrl: vi.fn(),
 }));
 
 vi.mock("./core-generation.api", () => ({ coreGenerationApi: mocks.core }));
+vi.mock("../../asset/library/core-asset.api", () => ({
+  coreAssetApi: { detail: mocks.assetDetail },
+}));
 vi.mock("@/lib/read-file-as-data-url", () => ({
   readFileAsDataUrl: mocks.readFileAsDataUrl,
 }));
 
 import {
+  forgetGenerationRunMetadata,
   generationApi,
-  pruneGenerationRequests,
+  rememberGenerationRunMetadata,
   toCreateGenerationRequest,
 } from "./generation.api";
 
 beforeEach(() => {
   vi.stubGlobal("localStorage", createStorage());
-  pruneGenerationRequests("42", []);
+  forgetGenerationRunMetadata("42", ["17", "23"]);
   vi.clearAllMocks();
   mocks.core.create.mockResolvedValue({ generationRunId: 17 });
   mocks.core.list.mockResolvedValue({ items: [] });
+  mocks.assetDetail.mockResolvedValue({ type: "character" });
   mocks.readFileAsDataUrl.mockResolvedValue("data:image/png;base64,reference");
 });
 
@@ -144,7 +150,7 @@ describe("generationApi", () => {
     ]);
     expect(mocks.core.list).toHaveBeenCalledWith(42, { status: "active" });
 
-    pruneGenerationRequests("42", []);
+    forgetGenerationRunMetadata("42", ["17"]);
     await expect(generationApi.listRuns("42")).resolves.toEqual([
       expect.objectContaining({
         id: "17",
@@ -177,33 +183,94 @@ describe("generationApi", () => {
     ]);
   });
 
-  it("retains metadata for failed runs while pruning runs no longer listed", async () => {
-    const request = creationRequest();
-    await generationApi.enqueue({ projectId: "42", request });
-
+  it("includes queued animation runs when their form metadata is available", async () => {
+    rememberGenerationRunMetadata("42", 23, {
+      kind: "character",
+      name: "Walk left",
+      prompt: "A relaxed looping walk",
+    });
     mocks.core.list.mockResolvedValue({
       items: [
         {
-          id: 17,
+          id: 23,
           projectId: 42,
-          kind: "generate_character_prototype",
-          status: "failed",
+          assetId: 7,
+          kind: "generate_animation",
+          status: "pending",
         },
       ],
     });
-    pruneGenerationRequests("42", ["17"]);
-    await expect(generationApi.listRuns("42")).resolves.toEqual([
+
+    await expect(generationApi.listRuns("42", "7")).resolves.toEqual([
       expect.objectContaining({
-        id: "17",
-        name: request.name,
-        prompt: request.prompt,
-        status: "failed",
+        id: "23",
+        kind: "character",
+        name: "Walk left",
+        prompt: "A relaxed looping walk",
+        status: "pending",
       }),
     ]);
+    expect(mocks.core.list).toHaveBeenCalledWith(42, {
+      status: "active",
+      assetId: 7,
+    });
+    expect(mocks.assetDetail).not.toHaveBeenCalled();
+  });
 
-    pruneGenerationRequests("42", []);
-    mocks.core.list.mockResolvedValue({ items: [] });
-    await expect(generationApi.listRuns("42")).resolves.toEqual([]);
+  it("restores an animation kind from the Core asset without local metadata", async () => {
+    mocks.assetDetail.mockResolvedValue({ type: "object" });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 23,
+          projectId: 42,
+          assetId: 8,
+          kind: "generate_animation",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "23",
+        kind: "object",
+        name: "New object",
+        status: "processing",
+      }),
+    ]);
+    expect(mocks.assetDetail).toHaveBeenCalledWith(8);
+  });
+
+  it("forgets animation metadata after a settled run is reconciled", async () => {
+    rememberGenerationRunMetadata("42", 23, {
+      kind: "character",
+      name: "Walk left",
+      prompt: "A relaxed looping walk",
+      assetId: "7",
+    });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 23,
+          projectId: 42,
+          assetId: 7,
+          kind: "generate_animation",
+          status: "processing",
+        },
+      ],
+    });
+    await expect(generationApi.listRuns("42", "7")).resolves.toHaveLength(1);
+
+    forgetGenerationRunMetadata("42", ["23"]);
+
+    await expect(generationApi.listRuns("42", "7")).resolves.toEqual([
+      expect.objectContaining({
+        id: "23",
+        kind: "character",
+        name: "New character",
+      }),
+    ]);
   });
 
   it("rejects projects that have not been persisted by the Core API", async () => {
@@ -217,6 +284,13 @@ describe("generationApi", () => {
       "persisted Core API project",
     );
     expect(mocks.core.create).not.toHaveBeenCalled();
+    expect(mocks.core.list).not.toHaveBeenCalled();
+  });
+
+  it("rejects assets that have not been persisted by the Core API", async () => {
+    await expect(generationApi.listRuns("42", "draft")).rejects.toThrow(
+      "persisted Core API asset",
+    );
     expect(mocks.core.list).not.toHaveBeenCalled();
   });
 
