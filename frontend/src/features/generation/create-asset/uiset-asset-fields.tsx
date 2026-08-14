@@ -1,5 +1,5 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import {
@@ -28,12 +28,6 @@ export function UISetAssetFields({
   const [openDimension, setOpenDimension] = useState<"width" | "height">();
   const [expandedComponents, setExpandedComponents] = useState(
     () => new Set(draft.components.map((_, index) => index)),
-  );
-
-  useEffect(
-    () =>
-      setExpandedComponents(new Set(draft.components.map((_, index) => index))),
-    [draft.components.length],
   );
   const updateComponent = (
     index: number,
@@ -137,14 +131,28 @@ export function UISetAssetFields({
                       disabled={draft.components.length === 1}
                       title={t("removeComponent")}
                       aria-label={t("removeComponent")}
-                      onClick={() =>
+                      onClick={() => {
+                        setExpandedComponents(
+                          (current) =>
+                            new Set(
+                              [...current]
+                                .filter(
+                                  (componentIndex) => componentIndex !== index,
+                                )
+                                .map((componentIndex) =>
+                                  componentIndex > index
+                                    ? componentIndex - 1
+                                    : componentIndex,
+                                ),
+                            ),
+                        );
                         onChange({
                           ...draft,
                           components: draft.components.filter(
                             (_, componentIndex) => componentIndex !== index,
                           ),
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Trash2 />
                     </Button>
@@ -208,12 +216,15 @@ export function UISetAssetFields({
         <Button
           type="button"
           variant="outline"
-          onClick={() =>
+          onClick={() => {
+            setExpandedComponents((current) =>
+              new Set(current).add(draft.components.length),
+            );
             onChange({
               ...draft,
               components: [...draft.components, { name: "", description: "" }],
-            })
-          }
+            });
+          }}
         >
           <Plus />
           {t("addComponent")}
