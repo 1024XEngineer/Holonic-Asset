@@ -63,6 +63,12 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	if animations.request == nil || animations.request.FrameCount != 11 || animations.request.Columns != 4 || !animations.request.ReferenceImageContext {
 		t.Fatalf("unexpected edit animation request: %+v", animations.request)
 	}
+	if animations.request.Style != "pixel art" ||
+		animations.request.FrameWidth != 64 || animations.request.FrameHeight != 64 ||
+		animations.request.FPS != 10 || animations.request.Resolution != "720p" ||
+		animations.request.Duration != 5 || animations.request.AspectRatio != "1:1" {
+		t.Fatalf("edit frame request did not inherit animation generation config: %+v", animations.request)
+	}
 	if !reflect.DeepEqual(animations.request.TargetFrameIndices, []int{4, 6}) {
 		t.Fatalf("unexpected target frame indices: %+v", animations.request.TargetFrameIndices)
 	}
@@ -188,6 +194,32 @@ func editFrameDataURL(t *testing.T, value uint8) string {
 		t.Fatal(err)
 	}
 	return "data:image/png;base64," + encoded
+}
+
+func TestExecutorEditFramesRequiresGenerationConfiguration(t *testing.T) {
+	parent := editFramesAsset(t, 1)
+	var content assetdomain.AssetContent
+	if err := json.Unmarshal(parent.Content, &content); err != nil {
+		t.Fatalf("decode parent asset: %v", err)
+	}
+	content.Animations[0].Generation = nil
+	parent.Content, _ = assetdomain.EncodeContent(content)
+	events := []string{}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations, References: editFrameReferenceStore(t, 1),
+	})
+
+	_, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{
+		"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "has no generation configuration for frame editing") {
+		t.Fatalf("expected missing generation configuration error, got %v", err)
+	}
+	if animations.request != nil || assets.updateCalls != 0 {
+		t.Fatalf("missing generation configuration started edit: request=%+v updates=%d", animations.request, assets.updateCalls)
+	}
 }
 
 func TestExecutorEditFramesValidatesContextAndAssetErrors(t *testing.T) {

@@ -584,8 +584,13 @@ func (s *animationGenerationService) processVideo(
 		ForceProportionalGrid:   true,
 		PreserveVerticalMotion:  true,
 		PreserveSourceCellScale: true,
+		// The video prompt asks for a matte, but providers can return a
+		// different (or compressed) background colour. Sample the frame
+		// borders instead of assuming an exact pure-green key; otherwise
+		// normalization may receive an entirely opaque sheet and cannot
+		// compute the character bounds.
 		Background: &imageprocessor.AnimationBackgroundOptions{
-			MatteColor: "#00ff00",
+			MatteColor: "auto",
 		},
 	})
 	if err != nil {

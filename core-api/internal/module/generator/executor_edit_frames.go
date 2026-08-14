@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -121,34 +120,37 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
 	}
+	// Editing an existing animation must use the configuration that created
+	// that animation. Falling back to the global generation defaults changes
+	// the provider's canvas, sampling, and timing policy, which can make the
+	// edited subject come back at a different scale from the untouched frames.
+	if animation.Generation == nil {
+		return nil, fmt.Errorf(
+			"generator: animation %d in asset %d has no generation configuration for frame editing",
+			payload.AnimationID,
+			payload.AssetID,
+		)
+	}
 	generation := animation.Generation
 	request := &AnimationGenerationRequest{
 		Description:            description,
-		Style:                  prompts.DefaultAnimationStyle,
+		Style:                  generation.Style,
 		Action:                 prompt,
 		ReferenceImage:         "data:image/png;base64," + contextSheet,
 		ReferenceImagePrepared: true,
 		ReferenceImageContext:  true,
 		TargetFrameIndices:     targetFrameIndices,
-		FrameCount:             contextCount,
-		Columns:                columns,
-		FrameWidth:             defaultAnimationFrameWidth,
-		FrameHeight:            defaultAnimationFrameHeight,
-		FPS:                    defaultAnimationFPS,
-		Resolution:             defaultAnimationResolution,
-		Duration:               defaultAnimationDuration,
-		AspectRatio:            defaultAnimationAspectRatio,
-	}
-	if generation != nil {
-		request.Style = generation.Style
-		request.FrameCount = contextCount
-		request.Columns = columns
-		request.FrameWidth = generation.FrameWidth
-		request.FrameHeight = generation.FrameHeight
-		request.FPS = generation.FPS
-		request.Resolution = generation.Resolution
-		request.Duration = generation.Duration
-		request.AspectRatio = generation.AspectRatio
+		// These two values describe the temporary context strip, not the
+		// original animation. The provider must return one sample per context
+		// frame so that only the selected samples can be replaced.
+		FrameCount:  contextCount,
+		Columns:     columns,
+		FrameWidth:  generation.FrameWidth,
+		FrameHeight: generation.FrameHeight,
+		FPS:         generation.FPS,
+		Resolution:  generation.Resolution,
+		Duration:    generation.Duration,
+		AspectRatio: generation.AspectRatio,
 	}
 	requestValue, err := normalizeAnimationGenerationRequest(request)
 	if err != nil {

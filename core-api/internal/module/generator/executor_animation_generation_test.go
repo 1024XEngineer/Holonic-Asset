@@ -388,7 +388,9 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
 		!processor.splitRequest.PreserveVerticalMotion ||
-		!processor.splitRequest.PreserveSourceCellScale {
+		!processor.splitRequest.PreserveSourceCellScale ||
+		processor.splitRequest.Background == nil ||
+		processor.splitRequest.Background.MatteColor != "auto" {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
 	}
 }
@@ -465,6 +467,29 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 	}
 }
 
+func TestProcessAnimationVideoAutoDetectsNonGreenMatte(t *testing.T) {
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+		Frames: animationTestVideoFramesWithMatte(4, color.NRGBA{R: 235, G: 235, B: 235, A: 255}),
+	}}}
+	service := &animationGenerationService{
+		processor:      imageprocessor.NewProcessor(),
+		videoProcessor: videoProcessor,
+	}
+
+	result, err := service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
+		Action: "idle breathing", FrameCount: 4, Columns: 2, FrameWidth: 64, FrameHeight: 64,
+	})
+	if err != nil {
+		t.Fatalf("process video with non-green matte: %v", err)
+	}
+	if result.Normalization == nil || result.Normalization.BackgroundRemovalReport == nil {
+		t.Fatal("expected automatic background removal report")
+	}
+	if result.Normalization.BackgroundRemovalReport.MatteColorSource != "auto-sampled" {
+		t.Fatalf("matte source = %q, want auto-sampled", result.Normalization.BackgroundRemovalReport.MatteColorSource)
+	}
+}
+
 func animationTestForeground(t *testing.T) string {
 	t.Helper()
 	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
@@ -501,10 +526,14 @@ func animationTestOpaquePrototype(t *testing.T) string {
 }
 
 func animationTestVideoFrames(count int) []image.Image {
+	return animationTestVideoFramesWithMatte(count, color.NRGBA{G: 255, A: 255})
+}
+
+func animationTestVideoFramesWithMatte(count int, matte color.NRGBA) []image.Image {
 	frames := make([]image.Image, count)
 	for index := range frames {
 		frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
-		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: matte}, image.Point{}, draw.Src)
 		offset := index % 3
 		draw.Draw(frame, image.Rect(30+offset, 18, 66+offset, 88), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
 		frames[index] = frame
