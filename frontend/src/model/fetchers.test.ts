@@ -5,6 +5,7 @@ import { DataApiError } from "@/lib/data-api-error";
 import {
   configureCoreApiAuth,
   coreApiClient,
+  createCoreApiClients,
   publicCoreApiClient,
   unwrapApiResponse,
 } from "./fetchers";
@@ -26,6 +27,24 @@ function response(body: unknown, init: ResponseInit = {}) {
 }
 
 describe("core API client", () => {
+  it("uses the injected API base URL", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(response({ code: 200, message: "ok", data: {} }));
+    const clients = createCoreApiClients({
+      baseUrl: "https://api.example.test/v2",
+      fetch: fetchMock,
+    });
+
+    await clients.public.POST("/auth/login", {
+      body: { username: "kay", password: "secret" },
+    });
+
+    expect(requestFrom(fetchMock).url).toBe(
+      "https://api.example.test/v2/auth/login",
+    );
+  });
+
   it("serializes typed path, query, and repeated array parameters", async () => {
     const fetchMock = vi
       .fn()
