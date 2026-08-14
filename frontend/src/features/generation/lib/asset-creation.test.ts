@@ -67,7 +67,8 @@ describe("asset creation", () => {
       expect.objectContaining({
         kind: "uiset",
         reference,
-        components: [{ name: "", description: "", isCustom: false }],
+        dimensions: { width: 1024, height: 768 },
+        components: [{ name: "", description: "" }],
       }),
       expect.objectContaining({ kind: "audio" }),
     ]);

@@ -44,15 +44,29 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
     kind: z.literal("uiset"),
-    style: z.string(),
+    dimensions: z.object({
+      width: z
+        .number()
+        .int()
+        .positive("Canvas width must be a positive integer."),
+      height: z
+        .number()
+        .int()
+        .positive("Canvas height must be a positive integer."),
+    }),
+    style: z.string().trim().min(1, "UI Set style is required."),
     reference: z.unknown().optional(),
-    components: z.array(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        isCustom: z.boolean(),
-      }),
-    ),
+    components: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1, "Every component needs a name."),
+          description: z
+            .string()
+            .trim()
+            .min(1, "Every component needs a description."),
+        }),
+      )
+      .min(1, "Add at least one UI Set component."),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -94,9 +108,10 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
+        dimensions: { width: 1024, height: 768 },
         style: "",
         reference: undefined,
-        components: [{ name: "", description: "", isCustom: false }],
+        components: [{ name: "", description: "" }],
       };
     default:
       return {
@@ -133,6 +148,7 @@ export function toCreationRequest<Reference>(
     case "uiset":
       return {
         ...common,
+        dimensions: draft.dimensions,
         style: draft.style,
         reference: draft.reference,
         components: draft.components,
