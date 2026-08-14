@@ -138,17 +138,6 @@ func (e *Engine) handleEditFrames(
 	return e.execute(ctx, EditFrames, message.Payload)
 }
 
-func (e *Engine) handleEmptyTask(
-	_ context.Context,
-	message *taskdomain.Task,
-) (any, error) {
-	payload := struct{}{}
-	if err := decodeTaskPayload(message, &payload); err != nil {
-		return nil, err
-	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
-}
-
 func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 	if message == nil {
 		return ErrTaskRequired

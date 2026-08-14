@@ -81,10 +81,7 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		indices = append(indices, index)
 	}
 	slices.Sort(indices)
-	contextStart := indices[0] - editFrameContextPadding
-	if contextStart < 0 {
-		contextStart = 0
-	}
+	contextStart := max(indices[0]-editFrameContextPadding, 0)
 	contextEnd := indices[len(indices)-1] + editFrameContextPadding
 	if contextEnd >= len(animation.Frames) {
 		contextEnd = len(animation.Frames) - 1
@@ -110,10 +107,7 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		}
 		contextImages = append(contextImages, imageValue)
 	}
-	columns := contextCount
-	if columns > 4 {
-		columns = 4
-	}
+	columns := min(contextCount, 4)
 	sheet, err := packAnimationVideoFrames(contextImages, columns)
 	if err != nil {
 		return nil, fmt.Errorf("generator: build edit frames context: %w", err)
