@@ -155,25 +155,75 @@ export function syncEditorSessionExternalRecord(
   if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) return;
   if (state.record.mode !== incomingRecord.mode) return;
 
-  const currentSprite = getSpriteRecordData(state.record);
-  const savedSprite = getSpriteRecordData(state.savedRecord);
   const incomingSprite = getSpriteRecordData(incomingRecord);
-  const animations = mergeExternalAnimations(
-    currentSprite.animations ?? [],
-    savedSprite.animations ?? [],
-    incomingSprite.animations ?? [],
+  const record = syncExternalAnimations(
+    state.record,
+    state.savedRecord,
+    incomingRecord,
   );
+  const savedRecord = updateSpriteRecord(state.savedRecord, (current) => ({
+    ...current,
+    animations: structuredClone(incomingSprite.animations ?? []),
+  }));
+  if (
+    recordsMatch(record, state.record) &&
+    recordsMatch(savedRecord, state.savedRecord)
+  ) {
+    return;
+  }
 
-  store.setState({
-    record: updateSpriteRecord(state.record, (current) => ({
-      ...current,
-      animations,
-    })),
-    savedRecord: updateSpriteRecord(state.savedRecord, (current) => ({
-      ...current,
-      animations: structuredClone(incomingSprite.animations ?? []),
-    })),
-  });
+  const temporalState = store.temporal.getState();
+  const rebaseHistory = (history: typeof temporalState.pastStates) =>
+    history.map((snapshot) =>
+      snapshot.record
+        ? {
+            ...snapshot,
+            record: syncExternalAnimations(
+              snapshot.record,
+              state.savedRecord,
+              incomingRecord,
+            ),
+          }
+        : snapshot,
+    );
+  const wasTracking = temporalState.isTracking;
+  if (wasTracking) temporalState.pause();
+  try {
+    store.setState({ record, savedRecord });
+    store.temporal.setState({
+      pastStates: rebaseHistory(temporalState.pastStates),
+      futureStates: rebaseHistory(temporalState.futureStates),
+    });
+  } finally {
+    if (wasTracking) store.temporal.getState().resume();
+  }
+}
+
+function syncExternalAnimations(
+  record: AssetRecord,
+  savedRecord: AssetRecord,
+  incomingRecord: AssetRecord,
+) {
+  if (
+    !isSpriteRecord(record) ||
+    !isSpriteRecord(savedRecord) ||
+    !isSpriteRecord(incomingRecord) ||
+    record.mode !== savedRecord.mode ||
+    record.mode !== incomingRecord.mode
+  ) {
+    return record;
+  }
+  const currentSprite = getSpriteRecordData(record);
+  const savedSprite = getSpriteRecordData(savedRecord);
+  const incomingSprite = getSpriteRecordData(incomingRecord);
+  return updateSpriteRecord(record, (current) => ({
+    ...current,
+    animations: mergeExternalAnimations(
+      currentSprite.animations ?? [],
+      savedSprite.animations ?? [],
+      incomingSprite.animations ?? [],
+    ),
+  }));
 }
 
 export function dispatchEditorCommand(

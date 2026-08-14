@@ -173,6 +173,43 @@ describe("editor session store", () => {
     expect(snapshot.dirty).toBe(true);
   });
 
+  it("keeps external synchronization out of undo history", () => {
+    const initialRecord = createCharacterRecord();
+    const store = createEditorSessionStore(initialRecord);
+
+    syncEditorSessionExternalRecord(store, structuredClone(initialRecord));
+
+    expect(store.temporal.getState().pastStates).toHaveLength(0);
+
+    dispatchEditorCommand(store, {
+      type: "sprite.animation.rename",
+      animationId: "idle",
+      label: "Local idle edit",
+    });
+    const incoming = createCharacterRecord();
+    incoming.character.animations = [
+      { kind: "clip", id: "idle", label: "Server idle", frameCount: 4 },
+      { kind: "clip", id: "walk", label: "Walk", frameCount: 8 },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(store.temporal.getState().pastStates).toHaveLength(1);
+    dispatchEditorCommand(store, { type: "history.undo" });
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: {
+        mode: "character",
+        character: {
+          animations: [
+            { id: "idle", label: "Server idle" },
+            { id: "walk", label: "Walk" },
+          ],
+        },
+      },
+      dirty: false,
+    });
+  });
+
   it("does not restore a locally deleted animation during a server refresh", () => {
     const store = createEditorSessionStore(createCharacterRecord());
     dispatchEditorCommand(store, {
