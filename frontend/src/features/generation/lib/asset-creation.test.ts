@@ -87,6 +87,7 @@ describe("asset creation", () => {
       canvasSize: "1280 x 720 px",
       dimensions: { width: 1280, height: 720 },
     });
+    expect(toCreationRequest(draft).components?.[0]).not.toHaveProperty("id");
   });
 
   it.each(["0 × 0 px", "0 × 32 px", "32 × 0 px", "large"])(

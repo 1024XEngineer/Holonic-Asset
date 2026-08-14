@@ -35,8 +35,9 @@ export function CreateAssetForm({
   const { t } = useTranslation(["generation", "common"]);
   const [validationError, setValidationError] = useState<string>();
   const [localSubmissionReady, setLocalSubmissionReady] = useState(false);
+  const [initialDraft] = useState(() => createAssetCreationDraft<File>(kind));
   const form = useForm({
-    defaultValues: { draft: createAssetCreationDraft<File>(kind) },
+    defaultValues: { draft: initialDraft },
     onSubmit: async ({ value }) => {
       const result = assetCreationDraftSchema.safeParse(value.draft);
       if (!result.success) {
@@ -49,12 +50,12 @@ export function CreateAssetForm({
       }
 
       setValidationError(undefined);
-      if (value.draft.kind === "uiset") {
+      const validatedDraft = result.data as AssetCreationDraft<File>;
+      if (validatedDraft.kind === "uiset") {
         setLocalSubmissionReady(true);
         return;
       }
-      setLocalSubmissionReady(false);
-      await onCreate(toCreationRequest(value.draft));
+      await onCreate(toCreationRequest(validatedDraft));
     },
   });
   const draft = useStore(form.store, (state) => state.values.draft);

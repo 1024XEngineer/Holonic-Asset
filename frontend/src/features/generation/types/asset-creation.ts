@@ -39,7 +39,7 @@ export type UISetAssetCreationDraft<Reference = unknown> =
     dimensions: { width: number; height: number };
     style: string;
     reference: Reference | undefined;
-    components: { name: string; description: string }[];
+    components: { id: string; name: string; description: string }[];
   };
 
 export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;

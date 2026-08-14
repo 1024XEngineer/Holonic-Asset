@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { createUISetComponent } from "../lib";
 import type { UISetAssetCreationDraft } from "../types";
+import {
+  uiSetCanvasHeightOptions,
+  uiSetCanvasWidthOptions,
+} from "./ui-set-canvas";
 import { useTranslation } from "react-i18next";
-
-const canvasWidthOptions = [640, 768, 1024, 1280, 1440, 1920];
-const canvasHeightOptions = [360, 480, 576, 720, 768, 1080];
 
 export function UISetAssetFields({
   draft,
@@ -25,9 +27,8 @@ export function UISetAssetFields({
   onChange: (draft: UISetAssetCreationDraft<File>) => void;
 }) {
   const { t } = useTranslation("generation");
-  const [openDimension, setOpenDimension] = useState<"width" | "height">();
   const [expandedComponents, setExpandedComponents] = useState(
-    () => new Set(draft.components.map((_, index) => index)),
+    () => new Set(draft.components.map((component) => component.id)),
   );
   const updateComponent = (
     index: number,
@@ -54,11 +55,8 @@ export function UISetAssetFields({
             {t("canvasWidth")}
             <CanvasDimensionSelect
               value={draft.dimensions.width}
-              options={canvasWidthOptions}
-              open={openDimension === "width"}
-              onOpenChange={(open) =>
-                setOpenDimension(open ? "width" : undefined)
-              }
+              label={t("canvasWidth")}
+              options={uiSetCanvasWidthOptions}
               onChange={(width) =>
                 onChange({
                   ...draft,
@@ -71,11 +69,8 @@ export function UISetAssetFields({
             {t("canvasHeight")}
             <CanvasDimensionSelect
               value={draft.dimensions.height}
-              options={canvasHeightOptions}
-              open={openDimension === "height"}
-              onOpenChange={(open) =>
-                setOpenDimension(open ? "height" : undefined)
-              }
+              label={t("canvasHeight")}
+              options={uiSetCanvasHeightOptions}
               onChange={(height) =>
                 onChange({
                   ...draft,
@@ -110,11 +105,11 @@ export function UISetAssetFields({
         </div>
         <div className="grid gap-4">
           {draft.components.map((component, index) => {
-            const expanded = expandedComponents.has(index);
+            const expanded = expandedComponents.has(component.id);
 
             return (
               <section
-                key={index}
+                key={component.id}
                 className="grid gap-3 rounded-lg border p-4"
                 aria-label={t("componentItem", { number: index + 1 })}
               >
@@ -135,15 +130,9 @@ export function UISetAssetFields({
                         setExpandedComponents(
                           (current) =>
                             new Set(
-                              [...current]
-                                .filter(
-                                  (componentIndex) => componentIndex !== index,
-                                )
-                                .map((componentIndex) =>
-                                  componentIndex > index
-                                    ? componentIndex - 1
-                                    : componentIndex,
-                                ),
+                              [...current].filter(
+                                (componentId) => componentId !== component.id,
+                              ),
                             ),
                         );
                         onChange({
@@ -168,8 +157,8 @@ export function UISetAssetFields({
                       onClick={() =>
                         setExpandedComponents((current) => {
                           const next = new Set(current);
-                          if (next.has(index)) next.delete(index);
-                          else next.add(index);
+                          if (next.has(component.id)) next.delete(component.id);
+                          else next.add(component.id);
                           return next;
                         })
                       }
@@ -217,12 +206,13 @@ export function UISetAssetFields({
           type="button"
           variant="outline"
           onClick={() => {
+            const component = createUISetComponent();
             setExpandedComponents((current) =>
-              new Set(current).add(draft.components.length),
+              new Set(current).add(component.id),
             );
             onChange({
               ...draft,
-              components: [...draft.components, { name: "", description: "" }],
+              components: [...draft.components, component],
             });
           }}
         >
@@ -240,26 +230,27 @@ export function UISetAssetFields({
 }
 
 function CanvasDimensionSelect({
+  label,
   value,
   options,
-  open,
-  onOpenChange,
   onChange,
 }: {
+  label: string;
   value: number;
   options: readonly number[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onChange: (value: number) => void;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
           <Button
             type="button"
             variant="outline"
             className="h-9 w-full justify-between px-3 font-normal"
+            aria-label={label}
           />
         }
       >
@@ -271,7 +262,7 @@ function CanvasDimensionSelect({
           value={String(value)}
           onValueChange={(nextValue) => {
             onChange(Number(nextValue));
-            onOpenChange(false);
+            setOpen(false);
           }}
         >
           {options.map((option) => (

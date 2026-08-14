@@ -5,6 +5,11 @@ import { getDefaultAssetCanvasSize } from "@/model";
 import { perspectiveOptions, perspectiveSchema } from "@/model/project";
 import { z } from "zod";
 
+import {
+  defaultUISetCanvasDimensions,
+  isUISetCanvasHeight,
+  isUISetCanvasWidth,
+} from "../create-asset/ui-set-canvas";
 import type { AssetCreationDraft } from "../types";
 
 const commonAssetCreationDraftShape = {
@@ -14,6 +19,10 @@ const commonAssetCreationDraftShape = {
 };
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
+
+export function createUISetComponent() {
+  return { id: crypto.randomUUID(), name: "", description: "" };
+}
 
 function formatCanvasSize({
   width,
@@ -58,17 +67,18 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
       width: z
         .number()
         .int()
-        .positive("Canvas width must be a positive integer."),
+        .refine(isUISetCanvasWidth, "Select a supported canvas width."),
       height: z
         .number()
         .int()
-        .positive("Canvas height must be a positive integer."),
+        .refine(isUISetCanvasHeight, "Select a supported canvas height."),
     }),
     style: z.string().trim().min(1, "UI Set style is required."),
     reference: z.unknown().optional(),
     components: z
       .array(
         z.object({
+          id: z.string(),
           name: z.string().trim().min(1, "Every component needs a name."),
           description: z
             .string()
@@ -115,7 +125,7 @@ export function createAssetCreationDraft<Reference = unknown>(
         tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
       };
     case "uiset":
-      const dimensions = { width: 1024, height: 768 };
+      const dimensions = { ...defaultUISetCanvasDimensions };
       return {
         ...common,
         kind,
@@ -123,7 +133,7 @@ export function createAssetCreationDraft<Reference = unknown>(
         dimensions,
         style: "",
         reference: undefined,
-        components: [{ name: "", description: "" }],
+        components: [createUISetComponent()],
       };
     default:
       return {
@@ -164,7 +174,9 @@ export function toCreationRequest<Reference>(
         dimensions: draft.dimensions,
         style: draft.style,
         reference: draft.reference,
-        components: draft.components,
+        components: draft.components.map(
+          ({ id: _, ...component }) => component,
+        ),
       };
     default:
       return draft.kind === "character" || draft.kind === "object"
