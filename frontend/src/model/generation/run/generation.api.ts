@@ -5,6 +5,7 @@ import {
   defaultAssetCanvasSize,
 } from "../../asset/library/asset-canvas-size";
 import type { CreatableAssetKind } from "../../asset";
+import { coreAssetApi } from "../../asset/library/core-asset.api";
 import { coreGenerationApi } from "./core-generation.api";
 import type {
   CreateGenerationRequest,
@@ -47,15 +48,19 @@ export const generationApi: GenerationApi = {
       ...(assetId ? { assetId: coreAssetId(assetId) } : {}),
     });
     const storedMetadata = readGenerationRequests();
-    const runs = response.items.flatMap((item) => {
-      const run = toGenerationRun(
-        item,
-        generationRequests.get(runKey(projectId, item.id)) ??
-          storedMetadata[runKey(projectId, item.id)],
-      );
-      return run ? [run] : [];
-    });
-    return runs;
+    const runs = await Promise.all(
+      response.items.map(async (item) => {
+        const request =
+          generationRequests.get(runKey(projectId, item.id)) ??
+          storedMetadata[runKey(projectId, item.id)];
+        return toGenerationRun(
+          item,
+          request,
+          await resolveAnimationAssetKind(item, request?.kind),
+        );
+      }),
+    );
+    return runs.flatMap((run) => (run ? [run] : []));
   },
   enqueue: async (input) => {
     const request = await toCreateGenerationRequest(input.request);
@@ -78,35 +83,8 @@ export const generationApi: GenerationApi = {
 };
 
 const generationRequests = new Map<string, GenerationRequestMetadata>();
+const animationAssetKinds = new Map<number, "character" | "object">();
 const generationRequestsStorageKey = "holonic-generation-requests";
-
-export function pruneGenerationRequests(
-  projectId: string,
-  visibleRunIds: string[],
-  assetId?: string,
-) {
-  const visibleKeys = new Set(
-    visibleRunIds.map((runId) => runKey(projectId, runId)),
-  );
-  const projectPrefix = `${projectId}:`;
-  const storedRequests = readGenerationRequests();
-  const keys = new Set([
-    ...generationRequests.keys(),
-    ...Object.keys(storedRequests),
-  ]);
-  for (const key of keys) {
-    const metadata = generationRequests.get(key) ?? storedRequests[key];
-    if (
-      key.startsWith(projectPrefix) &&
-      metadata?.assetId === assetId &&
-      !visibleKeys.has(key)
-    ) {
-      generationRequests.delete(key);
-      delete storedRequests[key];
-    }
-  }
-  writeGenerationRequests(storedRequests);
-}
 
 export async function toCreateGenerationRequest(
   request: CreationRequest,
@@ -138,8 +116,13 @@ export async function toCreateGenerationRequest(
 function toGenerationRun(
   item: GenerationRunListItemResponse,
   request: GenerationRequestMetadata | undefined,
+  resolvedAnimationKind: "character" | "object" | undefined,
 ): GenerationRun | undefined {
-  const kind = generationKindToAssetKind(item.kind, request?.kind);
+  const kind = generationKindToAssetKind(
+    item.kind,
+    request?.kind,
+    resolvedAnimationKind,
+  );
   if (!kind || !isVisibleGenerationStatus(item.status)) return undefined;
 
   return {
@@ -158,6 +141,7 @@ function toGenerationRun(
 function generationKindToAssetKind(
   kind: GenerationRunListItemResponse["kind"],
   requestedKind?: CreatableAssetKind,
+  resolvedAnimationKind?: "character" | "object",
 ) {
   if (kind === "generate_character_prototype") return "character" as const;
   if (kind === "generate_object_prototype") return "object" as const;
@@ -168,7 +152,32 @@ function generationKindToAssetKind(
   ) {
     return requestedKind;
   }
+  if (kind === "generate_animation") {
+    return resolvedAnimationKind ?? ("character" as const);
+  }
   return undefined;
+}
+
+async function resolveAnimationAssetKind(
+  item: GenerationRunListItemResponse,
+  requestedKind: CreatableAssetKind | undefined,
+): Promise<"character" | "object" | undefined> {
+  if (requestedKind === "character" || requestedKind === "object") {
+    return requestedKind;
+  }
+  if (item.kind !== "generate_animation" || item.assetId === undefined) {
+    return undefined;
+  }
+  const cachedKind = animationAssetKinds.get(item.assetId);
+  if (cachedKind) return cachedKind;
+  try {
+    const asset = await coreAssetApi.detail(item.assetId);
+    if (asset.type !== "character" && asset.type !== "object") return undefined;
+    animationAssetKinds.set(item.assetId, asset.type);
+    return asset.type;
+  } catch {
+    return undefined;
+  }
 }
 
 function isVisibleGenerationStatus(
