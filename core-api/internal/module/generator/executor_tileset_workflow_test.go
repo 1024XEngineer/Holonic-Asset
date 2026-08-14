@@ -331,6 +331,10 @@ func (*tileSetWorkflowAssets) CreateObjectAsset(context.Context, *assetdomain.As
 	return 0, fmt.Errorf("unexpected object creation")
 }
 
+func (*tileSetWorkflowAssets) CreateSceneryAsset(context.Context, *assetdomain.Asset) (uint, error) {
+	return 0, fmt.Errorf("unexpected scenery creation")
+}
+
 func (s *tileSetWorkflowAssets) CreateTileSetAsset(_ context.Context, value *assetdomain.Asset) (uint, error) {
 	s.asset = *value
 	s.asset.ID = 100

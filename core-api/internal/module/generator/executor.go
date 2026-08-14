@@ -26,6 +26,13 @@ type ReferenceStore interface {
 	DeleteObjects(context.Context, []string) error
 }
 
+// ResourceStore publishes generated resources under stable object keys and
+// removes them when the enclosing asset workflow cannot be completed.
+type ResourceStore interface {
+	PutObject(context.Context, string, string, []byte) error
+	DeleteObject(context.Context, string) error
+}
+
 type ExecutionResult struct {
 	AssetID     uint `json:"asset_id"`
 	AnimationID uint `json:"animation_id,omitempty"`
@@ -37,6 +44,7 @@ type AssetWriter interface {
 	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
+	CreateSceneryAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateTileSetAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error)
 	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
@@ -51,6 +59,7 @@ type executor struct {
 	assets     AssetWriter
 	projects   ProjectReader
 	references ReferenceStore
+	resources  ResourceStore
 }
 
 // ExecutorDependencies contains optional workflow integrations.
@@ -59,6 +68,7 @@ type ExecutorDependencies struct {
 	Projects   ProjectReader
 	LLM        llmclient.LLMService
 	Animations AnimationGenerationService
+	Resources  ResourceStore
 }
 
 // NewExecutorWithDependencies creates an executor with explicit optional
@@ -77,6 +87,7 @@ func NewExecutorWithDependencies(
 		assets:     assets,
 		projects:   dependencies.Projects,
 		references: dependencies.References,
+		resources:  dependencies.Resources,
 	}
 }
 
@@ -137,6 +148,18 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateAnimation(ctx, request)
+	case GenerateScenery:
+		if err := e.requireSceneryDependencies(); err != nil {
+			return nil, err
+		}
+		request := CreateSceneryPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		if err := validateSceneryPayload(request); err != nil {
+			return nil, err
+		}
+		return e.generateScenery(ctx, request)
 	case EditAnimation:
 		if e.assets == nil {
 			return nil, ErrAssetWriterRequired
@@ -182,6 +205,25 @@ func (e *executor) Generate(
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, taskType)
 	}
+}
+
+func (e *executor) requireSceneryDependencies() error {
+	if e.images == nil {
+		return ErrImageServiceRequired
+	}
+	if e.assets == nil {
+		return ErrAssetWriterRequired
+	}
+	if e.processor == nil {
+		return ErrImageProcessorRequired
+	}
+	if e.llm == nil {
+		return ErrLLMServiceRequired
+	}
+	if e.resources == nil {
+		return ErrResourceStoreRequired
+	}
+	return nil
 }
 
 func (e *executor) requireTileSetDependencies() error {

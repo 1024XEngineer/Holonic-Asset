@@ -17,6 +17,7 @@ export type AnimatedSpriteCanvasActions = {
 export type AnimatedSpriteCanvasRuntimeProps = {
   model: AnimatedSpriteCanvasModel;
   actions: AnimatedSpriteCanvasActions;
+  onZoomChange?: (scale: number) => void;
 };
 
 export type Bounds = Rect;

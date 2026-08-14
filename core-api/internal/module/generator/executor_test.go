@@ -159,6 +159,8 @@ func (s *imageGenerationServiceStub) Generate(
 	s.request = &imageclient.GenerateRequest{
 		Prompt:          request.Prompt,
 		ReferenceImages: append([]string(nil), request.ReferenceImages...),
+		MaskImage:       request.MaskImage,
+		N:               request.N,
 		Model:           request.Model,
 		Size:            request.Size,
 		Params:          request.Params,
@@ -172,6 +174,7 @@ type generationAssetWriterStub struct {
 	getDetailErr            error
 	characterAsset          *assetdomain.Asset
 	objectAsset             *assetdomain.Asset
+	sceneryAsset            *assetdomain.Asset
 	createdRecord           *assetdomain.AssetRecord
 	recordVersion           uint
 	expectedVersion         uint
@@ -243,6 +246,20 @@ func (s *generationAssetWriterStub) CreateObjectAsset(
 		return 0, s.err
 	}
 	return 42, nil
+}
+
+func (s *generationAssetWriterStub) CreateSceneryAsset(
+	_ context.Context,
+	value *assetdomain.Asset,
+) (uint, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "create_scenery_asset")
+	}
+	s.sceneryAsset = value
+	if s.err != nil {
+		return 0, s.err
+	}
+	return 43, nil
 }
 
 func (s *generationAssetWriterStub) CreateTileSetAsset(

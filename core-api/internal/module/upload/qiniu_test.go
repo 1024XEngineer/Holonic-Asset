@@ -25,6 +25,8 @@ type bucketManagerStub struct {
 	batchOps   []string
 	batchRet   []qiniustorage.BatchOpRet
 	batchErr   error
+	deleteErr  error
+	deleted    []string
 }
 
 func (s *bucketManagerStub) BatchWithContext(
@@ -63,6 +65,11 @@ func (s *formUploaderStub) Put(
 func (s *bucketManagerStub) Stat(bucket, key string) (qiniustorage.FileInfo, error) {
 	s.statBucket, s.statKey = bucket, key
 	return s.info, s.statErr
+}
+
+func (s *bucketManagerStub) Delete(bucket, key string) error {
+	s.deleted = append(s.deleted, bucket+":"+key)
+	return s.deleteErr
 }
 
 func validQiniuConfig() config.QiniuConfig {
@@ -303,6 +310,31 @@ func TestPersistReferenceUploadsDataURLAndReturnsObjectKey(t *testing.T) {
 	}
 	if uploader.key != objectKey || string(uploader.data) != "hello" || uploader.extra.MimeType != "image/png" || uploader.uptoken == "" {
 		t.Fatalf("unexpected upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+}
+
+func TestQiniuStoragePutsAndDeletesExplicitResourceKey(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	uploader := &formUploaderStub{}
+	bucketManager := &bucketManagerStub{}
+	store.uploader = uploader
+	store.bucketManager = bucketManager
+	objectKey := "projects/42/scenery/batch/layers/1.png"
+
+	if err := store.PutObject(context.Background(), objectKey, "image/png", []byte("png")); err != nil {
+		t.Fatalf("put object: %v", err)
+	}
+	if uploader.key != objectKey || string(uploader.data) != "png" || uploader.extra.MimeType != "image/png" {
+		t.Fatalf("unexpected upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+	if err := store.DeleteObject(context.Background(), objectKey); err != nil {
+		t.Fatalf("delete object: %v", err)
+	}
+	if len(bucketManager.deleted) != 1 || bucketManager.deleted[0] != "asset-bucket:"+objectKey {
+		t.Fatalf("unexpected deletes: %v", bucketManager.deleted)
 	}
 }
 

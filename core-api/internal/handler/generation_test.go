@@ -107,9 +107,9 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		ID:        7,
 		ProjectID: 2,
 		AssetID:   &assetID,
-		Kind:      generator.GenerateAnimation,
-		Status:    taskdomain.StatusProcessing,
-		Result:    json.RawMessage(`{"media_ids":["media-1"]}`),
+		Kind:      generator.EditCharacterProtoType,
+		Status:    taskdomain.StatusCompleted,
+		Result:    json.RawMessage(`{"asset_id":3,"version":2}`),
 	}}
 
 	response, err := handler.NewGenerationHandler(stub).Get(
@@ -120,8 +120,9 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		t.Fatalf("get generation: %v", err)
 	}
 	if response.Data.ID != 7 || response.Data.ProjectID != 2 || response.Data.AssetID == nil ||
-		*response.Data.AssetID != assetID || response.Data.Kind != generator.GenerateAnimation ||
-		response.Data.Status != "processing" {
+		*response.Data.AssetID != assetID || response.Data.Kind != generator.EditCharacterProtoType ||
+		response.Data.Status != "completed" || response.Data.Result == nil ||
+		response.Data.Result.AssetID != assetID || response.Data.Result.Version != 2 {
 		t.Fatalf("unexpected run response: %+v", response)
 	}
 }

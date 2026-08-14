@@ -197,6 +197,13 @@ func (h *Handler) resolveAssetContent(
 			}
 			content["items"] = resolved
 		}
+		if value, ok := content["layers"]; ok {
+			resolved, err := h.resolveResourceArray(ctx, value, "layers")
+			if err != nil {
+				return nil, err
+			}
+			content["layers"] = resolved
+		}
 	}
 
 	encoded, err := json.Marshal(content)
@@ -204,6 +211,30 @@ func (h *Handler) resolveAssetContent(
 		return nil, fmt.Errorf("handler: encode asset content: %w", err)
 	}
 	return json.RawMessage(encoded), nil
+}
+
+func (h *Handler) resolveResourceArray(ctx context.Context, raw json.RawMessage, field string) (json.RawMessage, error) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return raw, nil
+	}
+	var values []json.RawMessage
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, fmt.Errorf("handler: decode asset content %s: %w", field, err)
+	}
+	for index, value := range values {
+		object, err := decodeJSONObject(value)
+		if err != nil {
+			return nil, fmt.Errorf("handler: decode asset content %s[%d]: %w", field, index, err)
+		}
+		if err := h.resolveReferenceField(ctx, object, "resource"); err != nil {
+			return nil, fmt.Errorf("handler: resolve asset content %s[%d].resource: %w", field, index, err)
+		}
+		values[index], err = json.Marshal(object)
+		if err != nil {
+			return nil, fmt.Errorf("handler: encode asset content %s[%d]: %w", field, index, err)
+		}
+	}
+	return json.Marshal(values)
 }
 
 func stripAnimationGeneration(raw json.RawMessage) (json.RawMessage, error) {
@@ -285,7 +316,11 @@ func decodeJSONObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 }
 
 func (h *Handler) resolveURLField(ctx context.Context, object map[string]json.RawMessage) error {
-	rawURL, ok := object["url"]
+	return h.resolveReferenceField(ctx, object, "url")
+}
+
+func (h *Handler) resolveReferenceField(ctx context.Context, object map[string]json.RawMessage, field string) error {
+	rawURL, ok := object[field]
 	if !ok || len(rawURL) == 0 || rawURL[0] != '"' {
 		return nil
 	}
@@ -304,7 +339,7 @@ func (h *Handler) resolveURLField(ctx context.Context, object map[string]json.Ra
 	if err != nil {
 		return err
 	}
-	object["url"] = encoded
+	object[field] = encoded
 	return nil
 }
 

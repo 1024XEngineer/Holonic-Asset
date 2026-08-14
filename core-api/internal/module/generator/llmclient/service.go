@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// LLMService completes provider-independent multimodal calls with structured
+// LLMService completes provider-independent text or multimodal calls with structured
 // JSON output. Business prompts and domain validation remain with callers.
 type LLMService interface {
 	Complete(context.Context, *CompletionRequest) (*CompletionResult, error)
@@ -69,10 +69,6 @@ func normalizeRequest(request *CompletionRequest) (*ProviderRequest, error) {
 	if prompt == "" {
 		return nil, invalidRequestError("LLM prompt is required", nil)
 	}
-	if len(request.Images) == 0 {
-		return nil, invalidRequestError("at least one image is required", nil)
-	}
-
 	imageURLs := make([]string, len(request.Images))
 	for index, image := range request.Images {
 		imageURL := strings.TrimSpace(image.URL)
