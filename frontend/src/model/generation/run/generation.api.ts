@@ -4,6 +4,7 @@ import {
   assetCanvasSizeDimensionsSchema,
   defaultAssetCanvasSize,
 } from "../../asset/library/asset-canvas-size";
+import type { CreatableAssetKind } from "../../asset";
 import { coreGenerationApi } from "./core-generation.api";
 import type {
   CreateGenerationRequest,
@@ -13,8 +14,11 @@ import type { CreationRequest, GenerationInput, GenerationRun } from "./types";
 
 type GenerationRequestMetadata = Pick<
   CreationRequest,
-  "kind" | "name" | "prompt" | "canvasSize" | "perspective"
->;
+  "kind" | "name" | "prompt"
+> &
+  Partial<Pick<CreationRequest, "canvasSize" | "perspective">> & {
+    assetId?: string;
+  };
 
 export type { GenerationInput } from "./types";
 
@@ -32,14 +36,15 @@ export type {
 } from "./generation.contract";
 
 export type GenerationApi = {
-  listRuns: (projectId: string) => Promise<GenerationRun[]>;
+  listRuns: (projectId: string, assetId?: string) => Promise<GenerationRun[]>;
   enqueue: (input: GenerationInput) => Promise<GenerationRun>;
 };
 
 export const generationApi: GenerationApi = {
-  listRuns: async (projectId) => {
+  listRuns: async (projectId, assetId) => {
     const response = await coreGenerationApi.list(coreProjectId(projectId), {
       status: "active",
+      ...(assetId ? { assetId: coreAssetId(assetId) } : {}),
     });
     const storedMetadata = readGenerationRequests();
     const runs = response.items.flatMap((item) => {
@@ -50,10 +55,6 @@ export const generationApi: GenerationApi = {
       );
       return run ? [run] : [];
     });
-    pruneGenerationRequests(
-      projectId,
-      runs.map((run) => run.id),
-    );
     return runs;
   },
   enqueue: async (input) => {
@@ -62,13 +63,14 @@ export const generationApi: GenerationApi = {
       coreProjectId(input.projectId),
       request,
     );
+    const metadata = toGenerationRequestMetadata(input.request);
     const run: GenerationRun = {
-      ...toGenerationRequestMetadata(input.request),
+      ...metadata,
+      canvasSize: metadata.canvasSize ?? defaultAssetCanvasSize,
       id: String(response.generationRunId),
       projectId: input.projectId,
       status: "pending",
     };
-    const metadata = toGenerationRequestMetadata(input.request);
     generationRequests.set(runKey(input.projectId, run.id), metadata);
     writeGenerationRequest(runKey(input.projectId, run.id), metadata);
     return run;
@@ -81,6 +83,7 @@ const generationRequestsStorageKey = "holonic-generation-requests";
 export function pruneGenerationRequests(
   projectId: string,
   visibleRunIds: string[],
+  assetId?: string,
 ) {
   const visibleKeys = new Set(
     visibleRunIds.map((runId) => runKey(projectId, runId)),
@@ -92,7 +95,12 @@ export function pruneGenerationRequests(
     ...Object.keys(storedRequests),
   ]);
   for (const key of keys) {
-    if (key.startsWith(projectPrefix) && !visibleKeys.has(key)) {
+    const metadata = generationRequests.get(key) ?? storedRequests[key];
+    if (
+      key.startsWith(projectPrefix) &&
+      metadata?.assetId === assetId &&
+      !visibleKeys.has(key)
+    ) {
       generationRequests.delete(key);
       delete storedRequests[key];
     }
@@ -131,7 +139,7 @@ function toGenerationRun(
   item: GenerationRunListItemResponse,
   request: GenerationRequestMetadata | undefined,
 ): GenerationRun | undefined {
-  const kind = generationKindToAssetKind(item.kind);
+  const kind = generationKindToAssetKind(item.kind, request?.kind);
   if (!kind || !isVisibleGenerationStatus(item.status)) return undefined;
 
   return {
@@ -142,16 +150,24 @@ function toGenerationRun(
     perspective: request?.perspective,
     id: String(item.id),
     projectId: String(item.projectId),
+    assetId: item.assetId === undefined ? undefined : String(item.assetId),
     status: item.status,
   };
 }
 
 function generationKindToAssetKind(
   kind: GenerationRunListItemResponse["kind"],
+  requestedKind?: CreatableAssetKind,
 ) {
   if (kind === "generate_character_prototype") return "character" as const;
   if (kind === "generate_object_prototype") return "object" as const;
   if (kind === "generate_tileset") return "tileset" as const;
+  if (
+    kind === "generate_animation" &&
+    (requestedKind === "character" || requestedKind === "object")
+  ) {
+    return requestedKind;
+  }
   return undefined;
 }
 
@@ -181,10 +197,41 @@ function runKey(projectId: string, runId: string | number) {
   return `${projectId}:${runId}`;
 }
 
+export function rememberGenerationRunMetadata(
+  projectId: string,
+  runId: string | number,
+  metadata: GenerationRequestMetadata,
+) {
+  const key = runKey(projectId, runId);
+  generationRequests.set(key, metadata);
+  writeGenerationRequest(key, metadata);
+}
+
+export function forgetGenerationRunMetadata(
+  projectId: string,
+  runIds: string[],
+) {
+  const storedRequests = readGenerationRequests();
+  for (const runId of runIds) {
+    const key = runKey(projectId, runId);
+    generationRequests.delete(key);
+    delete storedRequests[key];
+  }
+  writeGenerationRequests(storedRequests);
+}
+
 function coreProjectId(projectId: string) {
   const value = Number(projectId);
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error("Asset generation requires a persisted Core API project.");
+  }
+  return value;
+}
+
+function coreAssetId(assetId: string) {
+  const value = Number(assetId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Asset generation requires a persisted Core API asset.");
   }
   return value;
 }

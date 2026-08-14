@@ -51,6 +51,43 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(load).toHaveBeenCalledWith("back.png");
   });
 
+  it("preloads every independent animation frame", async () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue({
+      source: { scaleMode: "linear" },
+    } as never);
+    const animationModel = {
+      ...model(),
+      animations: [
+        {
+          id: "walk",
+          kind: "clip" as const,
+          label: "Walk",
+          frameCount: 2,
+          spriteSheet: {
+            ...model().prototype,
+            imageUrl: "walk-1.png",
+            frameUrls: ["walk-1.png", "walk-2.png"],
+          },
+        },
+      ],
+    };
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: animationModel,
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+
+    await (
+      runtime as unknown as {
+        preloadAnimatedSpriteTextures: (
+          value: AnimatedSpriteCanvasModel,
+        ) => Promise<void>;
+      }
+    ).preloadAnimatedSpriteTextures(animationModel);
+
+    expect(load).toHaveBeenCalledWith("walk-1.png");
+    expect(load).toHaveBeenCalledWith("walk-2.png");
+  });
+
   it("sets a finite zoom around the current viewport center", () => {
     const runtime = new AnimatedSpriteCanvasRuntime({
       model: model(),

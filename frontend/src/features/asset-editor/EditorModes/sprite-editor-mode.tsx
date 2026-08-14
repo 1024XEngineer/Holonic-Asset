@@ -63,6 +63,7 @@ export function SpriteEditorMode({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <AssetTree
           animations={animations}
+          perspective={sprite.perspective}
           selectedNode={selection.nodeIds[0] ?? null}
           selectedFrames={selection.frames}
           onSelect={selectNode}

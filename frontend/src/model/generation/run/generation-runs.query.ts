@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { refreshAssetLibraryCache } from "../../asset/library/asset-library-cache";
+import { recordQueryOptions } from "../../asset/record/record.query";
 import { projectKeys } from "../../project/keys";
-import { generationApi, pruneGenerationRequests } from "./generation.api";
+import { coreGenerationApi } from "./core-generation.api";
+import { forgetGenerationRunMetadata, generationApi } from "./generation.api";
 import { generationKeys } from "./keys";
 import {
   findSettledGenerationRunIds,
@@ -12,45 +14,163 @@ import {
 import type { GenerationRun } from "./types";
 import { readAuthenticatedUserId } from "@/model/auth";
 
-export function useGenerationRunsQuery(projectId: string | undefined) {
+export function useGenerationRunsQuery(
+  projectId: string | undefined,
+  assetId?: string,
+) {
   const userID = readAuthenticatedUserId();
   const queryClient = useQueryClient();
+  const reconcilingRunIds = useRef(new Set<string>());
+  const handledRunIds = useRef(new Set<string>());
   const previousRuns = useRef<{
     projectId: string | undefined;
+    assetId: string | undefined;
     runs: GenerationRun[];
-  }>({ projectId, runs: [] });
+  }>({ projectId, assetId, runs: [] });
   const query = useQuery({
-    queryKey: generationKeys.runs(userID, projectId ?? "unselected"),
-    queryFn: () => generationApi.listRuns(projectId!),
+    queryKey: generationKeys.runs(userID, projectId ?? "unselected", assetId),
+    queryFn: () => generationApi.listRuns(projectId!, assetId),
     enabled: Boolean(projectId),
     refetchInterval: ({ state }) => generationPollingInterval(state.data),
   });
 
   useEffect(() => {
-    if (previousRuns.current.projectId !== projectId) {
-      previousRuns.current = { projectId, runs: query.data ?? [] };
+    if (
+      previousRuns.current.projectId !== projectId ||
+      previousRuns.current.assetId !== assetId
+    ) {
+      previousRuns.current = { projectId, assetId, runs: query.data ?? [] };
+      reconcilingRunIds.current.clear();
+      handledRunIds.current.clear();
       return;
     }
     if (!projectId || !query.data) return;
 
-    pruneGenerationRequests(
-      projectId,
-      query.data.map((run) => run.id),
-    );
-
     const settledRunIds = findSettledGenerationRunIds(
       previousRuns.current.runs,
       query.data,
+    ).filter(
+      (runId) =>
+        !reconcilingRunIds.current.has(runId) &&
+        !handledRunIds.current.has(runId),
     );
-    previousRuns.current = { projectId, runs: query.data };
+    const previousById = new Map(
+      previousRuns.current.runs.map((run) => [run.id, run]),
+    );
+    const settledRuns = settledRunIds.flatMap((runId) => {
+      const run = previousById.get(runId);
+      return run ? [run] : [];
+    });
+    const runsToReconcile = new Map(settledRuns.map((run) => [run.id, run]));
+    for (const run of query.data) {
+      if (
+        run.status === "failed" &&
+        !run.error &&
+        !reconcilingRunIds.current.has(run.id) &&
+        !handledRunIds.current.has(run.id)
+      ) {
+        runsToReconcile.set(run.id, run);
+      }
+    }
+    previousRuns.current = { projectId, assetId, runs: query.data };
 
-    if (settledRunIds.length === 0) return;
+    const reconciliationRuns = [...runsToReconcile.values()];
+    if (reconciliationRuns.length === 0) return;
 
-    void Promise.all([
-      refreshAssetLibraryCache(queryClient, userID, projectId),
-      queryClient.invalidateQueries({ queryKey: projectKeys.list(userID) }),
+    const queryKey = generationKeys.runs(userID, projectId, assetId);
+    for (const run of reconciliationRuns) {
+      reconcilingRunIds.current.add(run.id);
+    }
+    queryClient.setQueryData<GenerationRun[]>(queryKey, (current = []) => [
+      ...current,
+      ...reconciliationRuns.filter(
+        (run) => !current.some((currentRun) => currentRun.id === run.id),
+      ),
     ]);
-  }, [projectId, query.data, query.dataUpdatedAt, queryClient]);
+
+    void Promise.all(
+      reconciliationRuns.map(async (run) => {
+        try {
+          const detail = await coreGenerationApi.detail(coreRunId(run.id));
+          if (detail.status === "completed") {
+            await refreshSettledAssets(queryClient, userID, projectId, assetId);
+            forgetGenerationRunMetadata(projectId, [run.id]);
+            handledRunIds.current.add(run.id);
+            removeRun(queryClient, queryKey, run.id);
+            return;
+          }
+          if (detail.status === "failed") {
+            handledRunIds.current.add(run.id);
+            queryClient.setQueryData<GenerationRun[]>(
+              queryKey,
+              (current = []) =>
+                current.map((currentRun) =>
+                  currentRun.id === run.id
+                    ? { ...currentRun, status: "failed", error: detail.error }
+                    : currentRun,
+                ),
+            );
+            return;
+          }
+          if (detail.status === "cancelled") {
+            forgetGenerationRunMetadata(projectId, [run.id]);
+            handledRunIds.current.add(run.id);
+            removeRun(queryClient, queryKey, run.id);
+          }
+        } catch {
+          queryClient.setQueryData<GenerationRun[]>(queryKey, (current = []) =>
+            current.some((currentRun) => currentRun.id === run.id)
+              ? current
+              : [...current, run],
+          );
+        } finally {
+          reconcilingRunIds.current.delete(run.id);
+        }
+      }),
+    );
+  }, [assetId, projectId, query.data, query.dataUpdatedAt, queryClient]);
 
   return query;
+}
+
+async function refreshSettledAssets(
+  queryClient: ReturnType<typeof useQueryClient>,
+  userID: number,
+  projectId: string,
+  assetId: string | undefined,
+) {
+  const refreshes: Promise<unknown>[] = [
+    refreshAssetLibraryCache(queryClient, userID, projectId),
+    queryClient.invalidateQueries({ queryKey: projectKeys.list(userID) }),
+  ];
+  if (assetId) {
+    refreshes.push(
+      queryClient.refetchQueries(
+        {
+          queryKey: recordQueryOptions(projectId, assetId).queryKey,
+          type: "all",
+        },
+        { throwOnError: true },
+      ),
+    );
+  }
+  await Promise.all(refreshes);
+}
+
+function removeRun(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: ReturnType<typeof generationKeys.runs>,
+  runId: string,
+) {
+  queryClient.setQueryData<GenerationRun[]>(queryKey, (current = []) =>
+    current.filter((run) => run.id !== runId),
+  );
+}
+
+function coreRunId(runId: string) {
+  const value = Number(runId);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error("Generation status requires a persisted Core API run.");
+  }
+  return value;
 }

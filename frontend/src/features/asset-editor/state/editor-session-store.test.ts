@@ -8,6 +8,7 @@ import {
   getEditorSessionSnapshot,
   markEditorSessionSaved,
   resetEditorSessionStore,
+  syncEditorSessionExternalRecord,
 } from "./editor-session-store";
 
 const idleSaveState = { phase: "idle" } as const;
@@ -111,21 +112,17 @@ describe("editor session store", () => {
     expect(store.temporal.getState().pastStates).toHaveLength(1);
   });
 
-  it("adds, renames, and deletes generated character animations", () => {
+  it("renames and deletes character animations", () => {
     const store = createEditorSessionStore(createCharacterRecord());
 
     dispatchEditorCommand(store, {
-      type: "sprite.animation.generated",
-      animation: { kind: "clip", label: " Idle ", frameCount: 8 },
-    });
-    dispatchEditorCommand(store, {
       type: "sprite.animation.rename",
-      animationId: "idle-2",
+      animationId: "idle",
       label: "Run",
     });
     dispatchEditorCommand(store, {
       type: "sprite.node-position.set",
-      nodeId: "idle-2",
+      nodeId: "idle",
       position: { x: 30, y: 40 },
     });
 
@@ -133,19 +130,70 @@ describe("editor session store", () => {
     expect(record.mode).toBe("character");
     if (record.mode !== "character") return;
     expect(record.character.animations?.at(-1)).toMatchObject({
-      id: "idle-2",
+      id: "idle",
       label: "Run",
     });
 
     dispatchEditorCommand(store, {
       type: "sprite.animation.delete",
-      animationId: "idle-2",
+      animationId: "idle",
     });
     record = store.getState().record;
     expect(record.mode).toBe("character");
     if (record.mode !== "character") return;
-    expect(record.character.animations).toHaveLength(1);
-    expect(record.character.nodePositions["idle-2"]).toBeUndefined();
+    expect(record.character.animations).toHaveLength(0);
+    expect(record.character.nodePositions.idle).toBeUndefined();
+  });
+
+  it("merges generated server animations without overwriting local edits", () => {
+    const store = createEditorSessionStore(createCharacterRecord());
+    dispatchEditorCommand(store, {
+      type: "sprite.animation.rename",
+      animationId: "idle",
+      label: "Local idle edit",
+    });
+    const incoming = createCharacterRecord();
+    incoming.character.animations = [
+      { kind: "clip", id: "idle", label: "Server idle", frameCount: 4 },
+      { kind: "clip", id: "walk", label: "Walk", frameCount: 8 },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    const snapshot = getEditorSessionSnapshot(store, idleSaveState);
+    expect(snapshot.record).toMatchObject({
+      mode: "character",
+      character: {
+        animations: [
+          { id: "idle", label: "Local idle edit" },
+          { id: "walk", label: "Walk" },
+        ],
+      },
+    });
+    expect(snapshot.dirty).toBe(true);
+  });
+
+  it("does not restore a locally deleted animation during a server refresh", () => {
+    const store = createEditorSessionStore(createCharacterRecord());
+    dispatchEditorCommand(store, {
+      type: "sprite.animation.delete",
+      animationId: "idle",
+    });
+    const incoming = createCharacterRecord();
+    incoming.character.animations?.push({
+      kind: "clip",
+      id: "walk",
+      label: "Walk",
+      frameCount: 8,
+    });
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(store.getState().record).toMatchObject({
+      mode: "character",
+      character: { animations: [{ id: "walk" }] },
+    });
+    expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(true);
   });
 
   it("rejects sprite commands for non-sprite asset records", () => {

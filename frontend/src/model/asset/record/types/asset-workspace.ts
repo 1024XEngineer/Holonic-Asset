@@ -1,4 +1,5 @@
 import type { AssetKind, AssetRevision } from "../../types";
+import type { Perspective } from "@/model/project";
 import type { AssetRecordForKind } from "./asset-record";
 
 export type AssetWorkspaceAsset<K extends AssetKind = AssetKind> = {
@@ -6,6 +7,7 @@ export type AssetWorkspaceAsset<K extends AssetKind = AssetKind> = {
   projectId: string;
   kind: K;
   name: string;
+  perspective: Perspective;
   version: string;
   history: AssetRevision[];
 };

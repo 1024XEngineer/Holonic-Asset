@@ -18,6 +18,7 @@ vi.mock("@/lib/read-file-as-data-url", () => ({
 import {
   generationApi,
   pruneGenerationRequests,
+  rememberGenerationRunMetadata,
   toCreateGenerationRequest,
 } from "./generation.api";
 
@@ -105,6 +106,32 @@ describe("generationApi", () => {
     ]);
   });
 
+  it("does not prune asset metadata when the project queue is empty", async () => {
+    rememberGenerationRunMetadata("42", 23, {
+      kind: "character",
+      name: "Walk left",
+      prompt: "A relaxed looping walk",
+      assetId: "7",
+    });
+
+    await generationApi.listRuns("42");
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 23,
+          projectId: 42,
+          assetId: 7,
+          kind: "generate_animation",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42", "7")).resolves.toEqual([
+      expect.objectContaining({ name: "Walk left", status: "processing" }),
+    ]);
+  });
+
   it("restores generation metadata from browser storage", async () => {
     const request = creationRequest();
     await generationApi.enqueue({ projectId: "42", request });
@@ -125,6 +152,39 @@ describe("generationApi", () => {
     await expect(reloaded.generationApi.listRuns("42")).resolves.toEqual([
       expect.objectContaining({ name: request.name, prompt: request.prompt }),
     ]);
+  });
+
+  it("includes queued animation runs when their form metadata is available", async () => {
+    rememberGenerationRunMetadata("42", 23, {
+      kind: "character",
+      name: "Walk left",
+      prompt: "A relaxed looping walk",
+    });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 23,
+          projectId: 42,
+          assetId: 7,
+          kind: "generate_animation",
+          status: "pending",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42", "7")).resolves.toEqual([
+      expect.objectContaining({
+        id: "23",
+        kind: "character",
+        name: "Walk left",
+        prompt: "A relaxed looping walk",
+        status: "pending",
+      }),
+    ]);
+    expect(mocks.core.list).toHaveBeenCalledWith(42, {
+      status: "active",
+      assetId: 7,
+    });
   });
 
   it("retains metadata for failed runs while pruning runs no longer listed", async () => {

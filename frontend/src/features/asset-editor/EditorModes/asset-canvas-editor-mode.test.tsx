@@ -82,6 +82,7 @@ function workspaceData(
       projectId: "project-1",
       kind,
       name: "Demo asset",
+      perspective: "Top-Down",
       version: "v1",
       history: [],
     },

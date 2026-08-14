@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { Texture, type Texture as TextureType } from "pixi.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Assets, Texture, type Texture as TextureType } from "pixi.js";
 
 import type { CharacterSpriteSheet } from "@/model";
 
@@ -17,6 +17,8 @@ function spriteSheet(imageUrl: string): CharacterSpriteSheet {
 }
 
 describe("SpriteSheetFrameTextureCache", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("reuses the texture for the same sprite-sheet frame", () => {
     const createTexture = vi.fn(
       () => ({ destroy: vi.fn() }) as unknown as TextureType,
@@ -57,8 +59,9 @@ describe("SpriteSheetFrameTextureCache", () => {
   });
 
   it("creates a texture from an independent URL with the default factory", () => {
-    const from = vi
-      .spyOn(Texture, "from")
+    const has = vi.spyOn(Assets.cache, "has").mockReturnValue(true);
+    const get = vi
+      .spyOn(Assets.cache, "get")
       .mockReturnValue({ source: {} } as never);
     const cache = new SpriteSheetFrameTextureCache();
     const sheet = {
@@ -67,9 +70,23 @@ describe("SpriteSheetFrameTextureCache", () => {
     };
 
     expect(cache.get(sheet, 1)).toBeInstanceOf(Texture);
-    expect(from).toHaveBeenCalledWith("back.png");
+    expect(has).toHaveBeenCalledWith("back.png");
+    expect(get).toHaveBeenCalledWith("back.png");
     cache.destroy();
-    from.mockRestore();
+  });
+
+  it("does not create a frame texture before its source is loaded", () => {
+    const has = vi.spyOn(Assets.cache, "has").mockReturnValue(false);
+    const get = vi.spyOn(Assets.cache, "get");
+    const cache = new SpriteSheetFrameTextureCache();
+    const sheet = {
+      ...spriteSheet("front.png"),
+      frameUrls: ["front.png", "back.png"],
+    };
+
+    expect(cache.get(sheet, 1)).toBeUndefined();
+    expect(has).toHaveBeenCalledWith("back.png");
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {
