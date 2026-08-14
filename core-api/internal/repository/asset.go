@@ -574,16 +574,18 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 			asset.Version,
 		)
 	}
-	var currentContent []byte
-	if len(record.Content) == 0 {
-		currentContent, err = r.resolveAssetContent(ctx, asset)
-		if err != nil {
-			return nil, err
-		}
+	currentContent, err := r.resolveAssetContent(ctx, asset)
+	if err != nil {
+		return nil, err
 	}
 	content := append([]byte(nil), record.Content...)
 	if len(content) == 0 {
 		content = currentContent
+	} else {
+		content, err = migrateAnimationGeneration(currentContent, content)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return nil, fmt.Errorf("repository: content storage is not configured")
