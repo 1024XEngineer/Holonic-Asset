@@ -64,6 +64,31 @@ func TestBuildAnimationVideoUsesTemporalContextInstructionsForFrameEdits(t *test
 	}
 }
 
+func TestBuildAnimationVideoUsesSingleFrameInstructionsForLocalEdits(t *testing.T) {
+	prompt := BuildAnimationVideo(AnimationOptions{
+		Description:        "travelling alchemist",
+		Style:              "painted 2D game art",
+		Action:             "make the flask glow",
+		FrameCount:         1,
+		LocalFrameEdit:     true,
+		TargetFrameIndices: []int{0},
+	})
+	for _, expected := range []string{
+		"exactly ONE original high-resolution animation frame",
+		"not a contact sheet or multi-frame canvas",
+		"LOCAL FRAME EDIT",
+		"TARGET OUTPUT SAMPLES: 1",
+		"exactly one complete subject",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("single-frame edit prompt does not contain %q:\n%s", expected, prompt)
+		}
+	}
+	if strings.Contains(prompt, "ordered contact sheet") {
+		t.Fatalf("single-frame edit prompt must not describe a contact sheet:\n%s", prompt)
+	}
+}
+
 func TestAnimationVideoPromptsStayInsideProviderLimit(t *testing.T) {
 	longText := strings.Repeat("长动作描述", 1000)
 	prompt := BuildAnimationVideo(AnimationOptions{

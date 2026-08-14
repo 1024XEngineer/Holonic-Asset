@@ -20,10 +20,12 @@ type imageGenerationServiceStub struct {
 }
 
 type animationGenerationServiceStub struct {
-	events  *[]string
-	request *generator.AnimationGenerationRequest
-	result  *generator.AnimationGenerationResult
-	err     error
+	events   *[]string
+	request  *generator.AnimationGenerationRequest
+	requests []*generator.AnimationGenerationRequest
+	result   *generator.AnimationGenerationResult
+	results  []*generator.AnimationGenerationResult
+	err      error
 }
 
 func (s *animationGenerationServiceStub) Generate(
@@ -32,7 +34,13 @@ func (s *animationGenerationServiceStub) Generate(
 ) (*generator.AnimationGenerationResult, error) {
 	*s.events = append(*s.events, "generate_animation")
 	copy := *request
+	copy.TargetFrameIndices = append([]int(nil), request.TargetFrameIndices...)
 	s.request = &copy
+	s.requests = append(s.requests, &copy)
+	call := len(s.requests) - 1
+	if call < len(s.results) {
+		return s.results[call], s.err
+	}
 	return s.result, s.err
 }
 

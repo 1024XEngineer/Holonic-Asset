@@ -60,8 +60,16 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	if err != nil {
 		t.Fatalf("edit frames: %v", err)
 	}
-	if animations.request == nil || animations.request.FrameCount != 11 || animations.request.Columns != 4 || !animations.request.ReferenceImageContext {
-		t.Fatalf("unexpected edit animation request: %+v", animations.request)
+	if len(animations.requests) != 1 {
+		t.Fatalf("unexpected edit generation call count: %d", len(animations.requests))
+	}
+	request := animations.requests[0]
+	if request.FrameCount != 11 || request.Columns != 4 || !request.ReferenceImageContext ||
+		request.ReferenceImageContextSheet || request.ReferenceImagePrepared {
+		t.Fatalf("unexpected single-reference edit request: %+v", request)
+	}
+	if request.ReferenceImage != "animations/original-5-unprocessed.png" {
+		t.Fatalf("edit request did not use the raw single-frame reference: %q", request.ReferenceImage)
 	}
 	if animations.request.Style != "pixel art" ||
 		animations.request.FrameWidth != 64 || animations.request.FrameHeight != 64 ||
@@ -69,8 +77,8 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		animations.request.Duration != 5 || animations.request.AspectRatio != "1:1" {
 		t.Fatalf("edit frame request did not inherit animation generation config: %+v", animations.request)
 	}
-	if !reflect.DeepEqual(animations.request.TargetFrameIndices, []int{4, 6}) {
-		t.Fatalf("unexpected target frame indices: %+v", animations.request.TargetFrameIndices)
+	if !reflect.DeepEqual(request.TargetFrameIndices, []int{4, 6}) {
+		t.Fatalf("unexpected target frame indices: %+v", request.TargetFrameIndices)
 	}
 	if animations.request.Action != "make the sword glow" {
 		t.Fatalf("unexpected edit prompt: %+v", animations.request)
@@ -178,17 +186,21 @@ func editFramesAsset(t *testing.T, frameCount int) assetdomain.Asset {
 
 func editFrameReferenceStore(t *testing.T, frameCount int) *executorReferenceStoreStub {
 	t.Helper()
-	values := make(map[string]string, frameCount)
+	values := make(map[string]string, frameCount*2)
 	for index := range frameCount {
-		values[fmt.Sprintf("animations/original-%d-unprocessed.png", index+1)] = editFrameDataURL(t, uint8(index+1))
+		// The processed frame is the canonical 8x8 asset. The raw companion is
+		// deliberately larger to verify edit requests select the unprocessed
+		// source while the generation service performs canonical normalization.
+		values[fmt.Sprintf("animations/original-%d.png", index+1)] = editFrameDataURL(t, uint8(index+1), 8)
+		values[fmt.Sprintf("animations/original-%d-unprocessed.png", index+1)] = editFrameDataURL(t, uint8(index+1), 32)
 	}
 	return &executorReferenceStoreStub{resolveValues: values}
 }
 
-func editFrameDataURL(t *testing.T, value uint8) string {
+func editFrameDataURL(t *testing.T, value uint8, size int) string {
 	t.Helper()
-	frame := image.NewNRGBA(image.Rect(0, 0, 8, 8))
-	draw.Draw(frame, image.Rect(2, 1, 6, 7), &image.Uniform{C: color.NRGBA{R: value, G: 40, B: 100, A: 255}}, image.Point{}, draw.Src)
+	frame := image.NewNRGBA(image.Rect(0, 0, size, size))
+	draw.Draw(frame, image.Rect(size/4, size/8, size*3/4, size*7/8), &image.Uniform{C: color.NRGBA{R: value, G: 40, B: 100, A: 255}}, image.Point{}, draw.Src)
 	encoded, err := imageprocessor.EncodePNGBase64(frame)
 	if err != nil {
 		t.Fatal(err)
@@ -281,7 +293,7 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 		{name: "wrong raw count", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(2, "raw")}, want: "edited raw frame result contains 2"},
 		{name: "processed persist error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistErr: errors.New("processed upload failed")}, want: "persist edited animation frame"},
 		{name: "invalid processed key", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistValue: "data:image/png;base64,bad"}, want: "non-object-key"},
-		{name: "update error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw"), FrameDurationMS: 80}, store: editFrameReferenceStore(t, 3), updateErr: errors.New("update failed"), want: "update animation 42 frames"},
+		{name: "update error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw"), FrameDurationMS: 80}, store: editFrameReferenceStore(t, 3), updateErr: errors.New("update failed")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

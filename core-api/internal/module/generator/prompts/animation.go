@@ -21,6 +21,7 @@ type AnimationOptions struct {
 	Action             string
 	FrameCount         int
 	ContextSheet       bool
+	LocalFrameEdit     bool
 	TargetFrameIndices []int
 }
 
@@ -59,6 +60,17 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - an explicitly requested held prop, equipment change, or pose change is allowed inside target samples; preserve everything the user did not ask to change
 - do not restart the full action, invent a new cycle, reverse time, loop early, or jump between motion phases
 - produce a smooth ordered segment whose target samples can be inserted back into the original animation`, targetFrames, options.FrameCount)
+	} else if options.LocalFrameEdit {
+		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
+		referenceInstructions = `SINGLE-FRAME EDIT REFERENCE:
+- the input is exactly ONE original high-resolution animation frame, not a contact sheet or multi-frame canvas
+- use it only as the subject identity, proportions, details, materials, palette, orientation, scale, camera, and root-position reference
+- keep exactly one complete subject in every output frame; never reproduce the reference as a grid, collage, storyboard, or spritesheet`
+		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
+- the user's requested change is authoritative inside those target samples and must be clearly visible there
+- preserve the supplied frame's exact identity, proportions, details, materials, equipment, and root position in every sample
+- schedule the requested change through the generated segment so the selected target samples can be inserted into the original animation
+- preserve everything the user did not ask to change; do not invent a new subject, direction, camera, or canvas layout`, targetFrames, options.FrameCount)
 	}
 	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image.
 

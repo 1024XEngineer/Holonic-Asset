@@ -127,8 +127,13 @@ type AnimationGenerationRequest struct {
 	// asset that does not need image-model redrawing. The executor selects one
 	// character or object direction before this service is called.
 	ReferenceImagePrepared bool
-	// ReferenceImageContext marks an ordered context strip used for local frame edits.
+	// ReferenceImageContext marks a local frame edit whose generated samples are
+	// mapped back to selected frames. The reference itself may be a single frame.
 	ReferenceImageContext bool
+	// ReferenceImageContextSheet marks that ReferenceImage is an ordered contact
+	// sheet. It is intentionally separate from ReferenceImageContext so local
+	// edits can use one raw frame without exposing a multi-frame canvas.
+	ReferenceImageContextSheet bool
 	// TargetFrameIndices identifies the zero-based output samples that will be
 	// replaced when ReferenceImageContext is true.
 	TargetFrameIndices []int
@@ -229,7 +234,8 @@ func (s *animationGenerationService) Generate(
 		Style:              options.Style,
 		Action:             options.Action,
 		FrameCount:         options.FrameCount,
-		ContextSheet:       options.ReferenceImageContext,
+		ContextSheet:       options.ReferenceImageContextSheet,
+		LocalFrameEdit:     options.ReferenceImageContext,
 		TargetFrameIndices: options.TargetFrameIndices,
 	}
 	greenReference, err := s.prepareAnimationReference(

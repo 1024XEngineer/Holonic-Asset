@@ -2,13 +2,8 @@ package generator
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"image"
-	"io"
-	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 
@@ -94,36 +89,6 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		return nil, fmt.Errorf("generator: edit frames context contains %d frames; maximum is 32", contextCount)
 	}
 
-	contextImages := make([]image.Image, 0, contextCount)
-	for index := contextStart; index <= contextEnd; index++ {
-		frame := animation.Frames[index]
-		if frame.URL == nil || strings.TrimSpace(*frame.URL) == "" {
-			return nil, fmt.Errorf("generator: frame %d has no image URL", frame.ID)
-		}
-		imageValue, loadErr := e.loadFrameImage(ctx, animationUnprocessedImageURL(*frame.URL), *frame.URL)
-		if loadErr != nil {
-			return nil, fmt.Errorf("generator: load context frame %d: %w", frame.ID, loadErr)
-		}
-		contextImages = append(contextImages, imageValue)
-	}
-	columns := min(contextCount, 4)
-	sheet, err := packAnimationVideoFrames(contextImages, columns)
-	if err != nil {
-		return nil, fmt.Errorf("generator: build edit frames context: %w", err)
-	}
-	contextSheet, err := imageprocessor.EncodePNGBase64(sheet)
-	if err != nil {
-		return nil, fmt.Errorf("generator: encode edit frames context: %w", err)
-	}
-
-	description := strings.TrimSpace(asset.Description)
-	if description == "" {
-		description = strings.TrimSpace(asset.Name)
-	}
-	// Editing an existing animation must use the configuration that created
-	// that animation. Falling back to the global generation defaults changes
-	// the provider's canvas, sampling, and timing policy, which can make the
-	// edited subject come back at a different scale from the untouched frames.
 	if animation.Generation == nil {
 		return nil, fmt.Errorf(
 			"generator: animation %d in asset %d has no generation configuration for frame editing",
@@ -132,19 +97,33 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		)
 	}
 	generation := animation.Generation
+	description := strings.TrimSpace(asset.Description)
+	if description == "" {
+		description = strings.TrimSpace(asset.Name)
+	}
+
+	// edit_frames is one generation operation for the whole local context.
+	// The model still receives exactly one image: the original, unprocessed
+	// frame of the first selected target. Do not build a contact sheet from
+	// neighboring frames; that changes the reference canvas and can make the
+	// model generate a multi-frame sheet-like animation.
+	referenceFrame := animation.Frames[indices[0]]
+	if referenceFrame.URL == nil || strings.TrimSpace(*referenceFrame.URL) == "" {
+		return nil, fmt.Errorf("generator: frame %d has no image URL", referenceFrame.ID)
+	}
 	request := &AnimationGenerationRequest{
-		Description:            description,
-		Style:                  generation.Style,
-		Action:                 prompt,
-		ReferenceImage:         "data:image/png;base64," + contextSheet,
-		ReferenceImagePrepared: true,
-		ReferenceImageContext:  true,
-		TargetFrameIndices:     targetFrameIndices,
-		// These two values describe the temporary context strip, not the
-		// original animation. The provider must return one sample per context
-		// frame so that only the selected samples can be replaced.
+		Description:                description,
+		Style:                      generation.Style,
+		Action:                     prompt,
+		ReferenceImage:             animationUnprocessedImageURL(strings.TrimSpace(*referenceFrame.URL)),
+		ReferenceImagePrepared:     false,
+		ReferenceImageContext:      true,
+		ReferenceImageContextSheet: false,
+		TargetFrameIndices:         targetFrameIndices,
+		// Generate one ordered context segment, then replace only the requested
+		// samples in the original animation.
 		FrameCount:  contextCount,
-		Columns:     columns,
+		Columns:     min(contextCount, 4),
 		FrameWidth:  generation.FrameWidth,
 		FrameHeight: generation.FrameHeight,
 		FPS:         generation.FPS,
@@ -168,22 +147,21 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 	}
 
 	updated := append([]assetdomain.Frame(nil), animation.Frames...)
-	for index := contextStart; index <= contextEnd; index++ {
-		if _, selected := targets[animation.Frames[index].ID]; !selected {
-			continue
-		}
-		generatedIndex := index - contextStart
+	for index, frameIndex := range indices {
+		frame := animation.Frames[frameIndex]
+		generatedIndex := targetFrameIndices[index]
 		persisted, persistErr := e.persistAnimationFrame(ctx, generated.Frames[generatedIndex], rawFrameAt(generated.RawFrames, generatedIndex), generated.FrameDurationMS)
 		if persistErr != nil {
 			return nil, persistErr
 		}
-		persisted.ID = animation.Frames[index].ID
-		persisted.Metadata = append(json.RawMessage(nil), animation.Frames[index].Metadata...)
+		persisted.ID = frame.ID
+		persisted.Metadata = append(json.RawMessage(nil), frame.Metadata...)
 		if persisted.Duration == 0 {
-			persisted.Duration = animation.Frames[index].Duration
+			persisted.Duration = frame.Duration
 		}
-		updated[index] = persisted
+		updated[frameIndex] = persisted
 	}
+
 	if err := updater.UpdateAnimationFrames(ctx, payload.AssetID, payload.AnimationID, updated); err != nil {
 		return nil, fmt.Errorf("generator: update animation %d frames: %w", payload.AnimationID, err)
 	}
@@ -234,60 +212,4 @@ func (e *executor) persistAnimationFrame(ctx context.Context, frame imageprocess
 		}
 	}
 	return assetdomain.Frame{URL: &key, Duration: duration}, nil
-}
-
-func (e *executor) loadFrameImage(ctx context.Context, rawReference, fallbackReference string) (image.Image, error) {
-	value, err := e.loadFrameReference(ctx, rawReference)
-	if err != nil && rawReference != fallbackReference {
-		value, err = e.loadFrameReference(ctx, fallbackReference)
-	}
-	if err != nil {
-		return nil, err
-	}
-	decoded, err := imageprocessor.DecodeBase64Image(value)
-	if err != nil {
-		return nil, err
-	}
-	return decoded, nil
-}
-
-func (e *executor) loadFrameReference(ctx context.Context, reference string) (string, error) {
-	reference = strings.TrimSpace(reference)
-	if reference == "" {
-		return "", fmt.Errorf("frame reference is empty")
-	}
-	if e.references != nil && !strings.HasPrefix(reference, "data:") {
-		resolved, err := e.references.ResolveReference(ctx, reference)
-		if err != nil {
-			return "", err
-		}
-		reference = strings.TrimSpace(resolved)
-	}
-	if strings.HasPrefix(reference, "data:") {
-		return reference, nil
-	}
-	parsed, err := url.Parse(reference)
-	if err != nil || !parsed.IsAbs() {
-		return "", fmt.Errorf("frame reference is not readable")
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, reference, nil)
-	if err != nil {
-		return "", err
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", fmt.Errorf("frame reference download returned HTTP %d", response.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxAnimationReferenceBytes+1))
-	if err != nil {
-		return "", err
-	}
-	if len(body) > maxAnimationReferenceBytes {
-		return "", fmt.Errorf("frame reference exceeds %d bytes", maxAnimationReferenceBytes)
-	}
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(body), nil
 }
