@@ -123,7 +123,7 @@ describe("useGenerationRunsQuery", () => {
     );
   });
 
-  it("keeps polling when the completed asset record cannot be reloaded", async () => {
+  it("does not retry a completed run when the asset record reload fails", async () => {
     mocks.listRuns
       .mockResolvedValueOnce([generationRun("processing")])
       .mockResolvedValueOnce([]);
@@ -147,8 +147,40 @@ describe("useGenerationRunsQuery", () => {
     await act(() => result.current.refetch());
 
     await waitFor(() => expect(loadRecord).toHaveBeenCalledOnce());
-    expect(result.current.data?.[0]?.status).toBe("processing");
-    expect(mocks.forgetGenerationRunMetadata).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.data).toEqual([]));
+    await act(() => result.current.refetch());
+
+    expect(loadRecord).toHaveBeenCalledOnce();
+    expect(mocks.runDetail).toHaveBeenCalledOnce();
+    expect(mocks.forgetGenerationRunMetadata).toHaveBeenCalledWith("42", ["1"]);
+  });
+
+  it("bounds reconciliation retries when run details stay unavailable", async () => {
+    mocks.listRuns
+      .mockResolvedValueOnce([generationRun("processing")])
+      .mockResolvedValue([]);
+    mocks.runDetail.mockRejectedValue(new Error("run unavailable"));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useGenerationRunsQuery("42", "9"), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await act(() => result.current.refetch());
+      await waitFor(() =>
+        expect(mocks.runDetail).toHaveBeenCalledTimes(attempt),
+      );
+    }
+    await waitFor(() => expect(result.current.data).toEqual([]));
+
+    await act(() => result.current.refetch());
+    expect(mocks.runDetail).toHaveBeenCalledTimes(3);
   });
 });
 

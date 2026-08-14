@@ -14,6 +14,8 @@ import {
 import type { GenerationRun } from "./types";
 import { readAuthenticatedUserId } from "@/model/auth";
 
+const MAX_RECONCILIATION_ATTEMPTS = 3;
+
 export function useGenerationRunsQuery(
   projectId: string | undefined,
   assetId?: string,
@@ -22,6 +24,7 @@ export function useGenerationRunsQuery(
   const queryClient = useQueryClient();
   const reconcilingRunIds = useRef(new Set<string>());
   const handledRunIds = useRef(new Set<string>());
+  const reconciliationAttempts = useRef(new Map<string, number>());
   const previousRuns = useRef<{
     projectId: string | undefined;
     assetId: string | undefined;
@@ -42,6 +45,7 @@ export function useGenerationRunsQuery(
       previousRuns.current = { projectId, assetId, runs: query.data ?? [] };
       reconcilingRunIds.current.clear();
       handledRunIds.current.clear();
+      reconciliationAttempts.current.clear();
       return;
     }
     if (!projectId || !query.data) return;
@@ -90,17 +94,21 @@ export function useGenerationRunsQuery(
 
     void Promise.all(
       reconciliationRuns.map(async (run) => {
+        const attempt = (reconciliationAttempts.current.get(run.id) ?? 0) + 1;
+        reconciliationAttempts.current.set(run.id, attempt);
         try {
           const detail = await coreGenerationApi.detail(coreRunId(run.id));
           if (detail.status === "completed") {
-            await refreshSettledAssets(queryClient, userID, projectId, assetId);
-            forgetGenerationRunMetadata(projectId, [run.id]);
             handledRunIds.current.add(run.id);
+            reconciliationAttempts.current.delete(run.id);
+            forgetGenerationRunMetadata(projectId, [run.id]);
             removeRun(queryClient, queryKey, run.id);
+            await refreshSettledAssets(queryClient, userID, projectId, assetId);
             return;
           }
           if (detail.status === "failed") {
             handledRunIds.current.add(run.id);
+            reconciliationAttempts.current.delete(run.id);
             queryClient.setQueryData<GenerationRun[]>(
               queryKey,
               (current = []) =>
@@ -115,9 +123,21 @@ export function useGenerationRunsQuery(
           if (detail.status === "cancelled") {
             forgetGenerationRunMetadata(projectId, [run.id]);
             handledRunIds.current.add(run.id);
+            reconciliationAttempts.current.delete(run.id);
+            removeRun(queryClient, queryKey, run.id);
+            return;
+          }
+          if (attempt >= MAX_RECONCILIATION_ATTEMPTS) {
+            reconciliationAttempts.current.delete(run.id);
             removeRun(queryClient, queryKey, run.id);
           }
         } catch {
+          if (handledRunIds.current.has(run.id)) return;
+          if (attempt >= MAX_RECONCILIATION_ATTEMPTS) {
+            reconciliationAttempts.current.delete(run.id);
+            removeRun(queryClient, queryKey, run.id);
+            return;
+          }
           queryClient.setQueryData<GenerationRun[]>(queryKey, (current = []) =>
             current.some((currentRun) => currentRun.id === run.id)
               ? current
