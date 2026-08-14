@@ -67,6 +67,7 @@ describe("asset creation", () => {
       expect.objectContaining({
         kind: "uiset",
         reference,
+        canvasSize: "1024 x 768 px",
         dimensions: { width: 1024, height: 768 },
         components: [{ name: "", description: "" }],
       }),
@@ -74,6 +75,18 @@ describe("asset creation", () => {
     ]);
     expect(requests[0]).not.toHaveProperty("directionCount");
     expect(requests[1]).not.toHaveProperty("directionCount");
+  });
+
+  it("derives the UI Set canvas size from its dimensions", () => {
+    const draft = createAssetCreationDraft("uiset");
+    if (draft.kind !== "uiset") throw new Error("Expected a UI Set draft.");
+
+    draft.dimensions = { width: 1280, height: 720 };
+
+    expect(toCreationRequest(draft)).toMatchObject({
+      canvasSize: "1280 x 720 px",
+      dimensions: { width: 1280, height: 720 },
+    });
   });
 
   it.each(["0 × 0 px", "0 × 32 px", "32 × 0 px", "large"])(

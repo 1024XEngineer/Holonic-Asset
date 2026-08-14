@@ -15,6 +15,16 @@ const commonAssetCreationDraftShape = {
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
 
+function formatCanvasSize({
+  width,
+  height,
+}: {
+  width: number;
+  height: number;
+}) {
+  return `${width} x ${height} px`;
+}
+
 export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
@@ -105,10 +115,12 @@ export function createAssetCreationDraft<Reference = unknown>(
         tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
       };
     case "uiset":
+      const dimensions = { width: 1024, height: 768 };
       return {
         ...common,
         kind,
-        dimensions: { width: 1024, height: 768 },
+        canvasSize: formatCanvasSize(dimensions),
+        dimensions,
         style: "",
         reference: undefined,
         components: [{ name: "", description: "" }],
@@ -148,6 +160,7 @@ export function toCreationRequest<Reference>(
     case "uiset":
       return {
         ...common,
+        canvasSize: formatCanvasSize(draft.dimensions),
         dimensions: draft.dimensions,
         style: draft.style,
         reference: draft.reference,
