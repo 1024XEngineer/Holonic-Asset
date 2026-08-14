@@ -87,3 +87,12 @@ func TestAnimationVideoRetryMapsForegroundMediaErrorToSubjectCorrection(t *testi
 		t.Fatalf("foreground error did not select subject correction: %s", retry)
 	}
 }
+
+func TestBuildAnimationVideoDefaultsContextTargetsToAllSamples(t *testing.T) {
+	prompt := BuildAnimationVideo(AnimationOptions{
+		Description: "hero", Action: "change pose", FrameCount: 4, ContextSheet: true,
+	})
+	if !strings.Contains(prompt, "TARGET OUTPUT SAMPLES: all 4") {
+		t.Fatalf("context prompt did not default to every output sample:\n%s", prompt)
+	}
+}

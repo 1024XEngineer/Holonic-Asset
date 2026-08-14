@@ -163,6 +163,90 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsUnifiedEditFramesPayload(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:     42,
+		AssetID:       &assetID,
+		Kind:          generator.EditFrames,
+		CreativeBrief: "make the stride longer",
+		Parameters:    json.RawMessage(`{"animationId":3,"frameIds":[5,7]}`),
+	})
+	if err != nil {
+		t.Fatalf("create edit frames: %v", err)
+	}
+	var payload generator.EditFramesPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode edit frames payload: %v", err)
+	}
+	want := generator.EditFramesPayload{
+		AssetID: 9, ProjectID: 42, AnimationID: 3,
+		FrameIDs: []uint{5, 7}, Prompt: "make the stride longer",
+	}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("unexpected edit frames payload: got %+v want %+v", payload, want)
+	}
+}
+
+func TestCreateEditFramesValidatesParameters(t *testing.T) {
+	assetID := uint(9)
+	tests := []struct {
+		name       string
+		parameters json.RawMessage
+		want       string
+		noBrief    bool
+	}{
+		{name: "missing animation", parameters: json.RawMessage(`{"frameIds":[1]}`), want: "animation id is required"},
+		{name: "missing frames", parameters: json.RawMessage(`{"animationId":3}`), want: "frame ids are required"},
+		{name: "invalid parameters", parameters: json.RawMessage(`{"animationId":`), want: "decode edit_frames parameters"},
+		{name: "missing creative brief", parameters: json.RawMessage(`{"animationId":3,"frameIds":[1]}`), want: "creative brief is required", noBrief: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tasks := &taskManagerStub{createID: 17}
+			engine := generator.NewEngine(tasks, nil)
+			brief := "change pose"
+			if test.noBrief {
+				brief = "   "
+			}
+			_, err := engine.Create(context.Background(), &generator.Request{
+				ProjectID: 42, AssetID: &assetID, Kind: generator.EditFrames,
+				CreativeBrief: brief, Parameters: test.parameters,
+			})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+			if tasks.createdTask != nil {
+				t.Fatalf("invalid edit parameters published task: %+v", tasks.createdTask)
+			}
+		})
+	}
+}
+
+func TestCreateEditFramesUsesCreativeBriefAsPrompt(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42, AssetID: &assetID, Kind: generator.EditFrames,
+		CreativeBrief: "make the stride longer",
+		Parameters:    json.RawMessage(`{"animationId":3,"frameIds":[1]}`),
+	})
+	if err != nil {
+		t.Fatalf("create edit frames: %v", err)
+	}
+	var payload generator.EditFramesPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Prompt != "make the stride longer" {
+		t.Fatalf("creative brief not mapped: %+v", payload)
+	}
+}
+
 func TestCreateDerivesAnimationStyleAndRejectsRemovedParameters(t *testing.T) {
 	assetID := uint(9)
 
@@ -304,84 +388,6 @@ func TestCreateEditAnimationDoesNotPrepareProjectReference(t *testing.T) {
 	}
 	if projects.calls != 0 || len(references.persisted) != 0 {
 		t.Fatalf("animation edit prepared an extra reference: project_calls=%d persisted=%v", projects.calls, references.persisted)
-	}
-}
-
-func TestCreateBuildsUnifiedEditFramesPayload(t *testing.T) {
-	assetID := uint(9)
-	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(tasks, nil)
-
-	_, err := engine.Create(context.Background(), &generator.Request{
-		ProjectID:     42,
-		AssetID:       &assetID,
-		Kind:          generator.EditFrames,
-		CreativeBrief: "make the stride longer",
-		Parameters:    json.RawMessage(`{"animationId":3,"frameIds":[5,7]}`),
-	})
-	if err != nil {
-		t.Fatalf("create edit frames: %v", err)
-	}
-	var payload generator.EditFramesPayload
-	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
-		t.Fatalf("decode edit frames payload: %v", err)
-	}
-	want := generator.EditFramesPayload{
-		AssetID: 9, ProjectID: 42, AnimationID: 3,
-		FrameIDs: []uint{5, 7}, Prompt: "make the stride longer",
-	}
-	if !reflect.DeepEqual(payload, want) {
-		t.Fatalf("unexpected edit frames payload: got %+v want %+v", payload, want)
-	}
-}
-
-func TestCreateEditFramesValidatesParameters(t *testing.T) {
-	assetID := uint(9)
-	tests := []struct {
-		name       string
-		parameters json.RawMessage
-		want       string
-	}{
-		{name: "missing animation", parameters: json.RawMessage(`{"frameIds":[1]}`), want: "animation id is required"},
-		{name: "missing frames", parameters: json.RawMessage(`{"animationId":3}`), want: "frame ids are required"},
-		{name: "invalid parameters", parameters: json.RawMessage(`{"animationId":`), want: "decode edit_frames parameters"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tasks := &taskManagerStub{createID: 17}
-			engine := generator.NewEngine(tasks, nil)
-			_, err := engine.Create(context.Background(), &generator.Request{
-				ProjectID: 42, AssetID: &assetID, Kind: generator.EditFrames,
-				CreativeBrief: "change pose", Parameters: test.parameters,
-			})
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("expected %q, got %v", test.want, err)
-			}
-			if tasks.createdTask != nil {
-				t.Fatalf("invalid edit parameters published task: %+v", tasks.createdTask)
-			}
-		})
-	}
-}
-
-func TestCreateEditFramesUsesCreativeBriefAsPrompt(t *testing.T) {
-	assetID := uint(9)
-	tasks := &taskManagerStub{createID: 17}
-	engine := generator.NewEngine(tasks, nil)
-	_, err := engine.Create(context.Background(), &generator.Request{
-		ProjectID: 42, AssetID: &assetID, Kind: generator.EditFrames,
-		CreativeBrief: "make the stride longer",
-		Parameters:    json.RawMessage(`{"animationId":3,"frameIds":[1]}`),
-	})
-	if err != nil {
-		t.Fatalf("create edit frames: %v", err)
-	}
-	var payload generator.EditFramesPayload
-	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload.Prompt != "make the stride longer" {
-		t.Fatalf("creative brief not mapped: %+v", payload)
 	}
 }
 
@@ -851,11 +857,16 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dispatch generation task: %v", err)
 			}
-			if executor.calls != 1 || executor.taskType != tt.taskType ||
-				!reflect.DeepEqual(executor.payload, tt.payload) ||
-				!reflect.DeepEqual(result, executor.result) {
-				t.Fatalf("unexpected executor call: calls=%d type=%s payload=%s result=%s",
-					executor.calls, executor.taskType, executor.payload, result)
+			shouldExecute := true
+			if shouldExecute {
+				if executor.calls != 1 || executor.taskType != tt.taskType ||
+					!reflect.DeepEqual(executor.payload, tt.payload) ||
+					!reflect.DeepEqual(result, executor.result) {
+					t.Fatalf("unexpected executor call: calls=%d type=%s payload=%s result=%s",
+						executor.calls, executor.taskType, executor.payload, result)
+				}
+			} else if executor.calls != 0 || result != nil {
+				t.Fatalf("tileset handler must remain deferred: calls=%d result=%v", executor.calls, result)
 			}
 			if len(tasks.statusUpdates) != 0 {
 				t.Fatalf("task queue owns status updates, got %+v", tasks.statusUpdates)
@@ -1333,4 +1344,19 @@ func validTileSetParametersWith(field string, value any) string {
 		panic(err)
 	}
 	return string(encoded)
+}
+
+func TestCreateEditFramesRequiresAssetID(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+	_, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID: 42, Kind: generator.EditFrames, CreativeBrief: "change pose",
+		Parameters: json.RawMessage(`{"animationId":3,"frameIds":[1]}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "asset id is required for edit_frames") {
+		t.Fatalf("expected missing asset error, got %v", err)
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("missing asset published task: %+v", tasks.createdTask)
+	}
 }

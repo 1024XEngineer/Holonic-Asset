@@ -3,6 +3,7 @@ package generator_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -187,4 +188,148 @@ func editFrameDataURL(t *testing.T, value uint8) string {
 		t.Fatal(err)
 	}
 	return "data:image/png;base64," + encoded
+}
+
+func TestExecutorEditFramesValidatesContextAndAssetErrors(t *testing.T) {
+	parent := editFramesAsset(t, 40)
+	tests := []struct {
+		name     string
+		payload  generator.EditFramesPayload
+		asset    assetdomain.Asset
+		assetErr error
+		want     string
+	}{
+		{name: "asset required", payload: generator.EditFramesPayload{ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, want: "asset is required"},
+		{name: "project required", payload: generator.EditFramesPayload{AssetID: 7, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, want: "project is required"},
+		{name: "prompt required", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}}, want: "prompt is required"},
+		{name: "asset lookup", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, assetErr: errors.New("lookup failed"), want: "get edit frames asset 7"},
+		{name: "asset missing", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: assetdomain.Asset{}, want: "not found"},
+		{name: "project mismatch", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 99, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: parent, want: "belongs to project"},
+		{name: "bad content", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: assetdomain.Asset{ID: 7, ProjectID: 11, Content: json.RawMessage(`{`)}, want: "decode edit frames asset 7 content"},
+		{name: "animation missing", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 99, FrameIDs: []uint{1}, Prompt: "x"}, asset: parent, want: "animation 99 not found"},
+		{name: "animation has no frames", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: emptyAnimationAsset(t), want: "has no frames"},
+		{name: "zero frame", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{0}, Prompt: "x"}, asset: parent, want: "frame id must be positive"},
+		{name: "context too large", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1, 40}, Prompt: "x"}, asset: parent, want: "context contains 40 frames"},
+		{name: "missing URL", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: assetWithMissingFrameURL(t), want: "has no image URL"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			assetStub := &generationAssetWriterStub{events: &events, parentAsset: parent, getDetailErr: test.assetErr}
+			if test.name == "asset missing" || test.asset.ID != 0 || test.asset.Content != nil {
+				assetStub.parentAsset = test.asset
+			}
+			executor := generator.NewExecutorWithDependencies(nil, nil, assetStub, generator.ExecutorDependencies{
+				Animations: &animationGenerationServiceStub{events: &events}, References: editFrameReferenceStore(t, 40),
+			})
+			_, err := executor.Generate(context.Background(), generator.EditFrames, mustJSON(t, test.payload))
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+			if assetStub.updateCalls != 0 {
+				t.Fatalf("invalid edit updated animation: %d", assetStub.updateCalls)
+			}
+		})
+	}
+}
+
+func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
+	parent := editFramesAsset(t, 3)
+	tests := []struct {
+		name       string
+		result     *generator.AnimationGenerationResult
+		generation error
+		store      *executorReferenceStoreStub
+		updateErr  error
+		want       string
+	}{
+		{name: "generation error", generation: errors.New("provider failed"), want: "generate edited frames"},
+		{name: "nil result", result: nil, want: "edited frame result contains 0 frames"},
+		{name: "wrong processed count", result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited"}}, RawFrames: []imageprocessor.ImageRegion{{ImageBase64: "raw"}}}, want: "expected 3"},
+		{name: "wrong raw count", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(2, "raw")}, want: "edited raw frame result contains 2"},
+		{name: "processed persist error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistErr: errors.New("processed upload failed")}, want: "persist edited animation frame"},
+		{name: "invalid processed key", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistValue: "data:image/png;base64,bad"}, want: "non-object-key"},
+		{name: "update error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw"), FrameDurationMS: 80}, store: editFrameReferenceStore(t, 3), updateErr: errors.New("update failed"), want: "update animation 42 frames"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			animations := &animationGenerationServiceStub{events: &events, result: test.result, err: test.generation}
+			assets := &generationAssetWriterStub{events: &events, parentAsset: parent, updateAnimationErr: test.updateErr}
+			store := test.store
+			if store == nil {
+				store = editFrameReferenceStore(t, 3)
+			} else {
+				store.resolveValues = editFrameReferenceStore(t, 3).resolveValues
+			}
+			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{Animations: animations, References: store})
+			_, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`))
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+			if test.name != "update error" && assets.updateCalls != 0 {
+				t.Fatalf("failed edit updated animation: %d", assets.updateCalls)
+			}
+		})
+	}
+}
+
+func TestExecutorEditFramesPreservesOriginalDurationWhenGeneratedDurationIsZero(t *testing.T) {
+	parent := editFramesAsset(t, 1)
+	events := []string{}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	animations := &animationGenerationServiceStub{events: &events, result: &generator.AnimationGenerationResult{
+		Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited"}}, RawFrames: []imageprocessor.ImageRegion{{ImageBase64: "raw"}},
+	}}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{Animations: animations, References: editFrameReferenceStore(t, 1)})
+	if _, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`)); err != nil {
+		t.Fatalf("edit frame: %v", err)
+	}
+	if assets.frames[0].Duration != 10 {
+		t.Fatalf("generated zero duration did not preserve original duration: %+v", assets.frames[0])
+	}
+}
+
+func mustJSON(t *testing.T, value any) json.RawMessage {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func makeImageRegions(count int, prefix string) []imageprocessor.ImageRegion {
+	regions := make([]imageprocessor.ImageRegion, count)
+	for index := range regions {
+		regions[index] = imageprocessor.ImageRegion{Index: index, ImageBase64: fmt.Sprintf("%s-%d", prefix, index), MIMEType: "image/png"}
+	}
+	return regions
+}
+
+func emptyAnimationAsset(t *testing.T) assetdomain.Asset {
+	t.Helper()
+	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
+	content.Animations = []assetdomain.Animation{{ID: 42}}
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Content: encoded}
+}
+
+func assetWithMissingFrameURL(t *testing.T) assetdomain.Asset {
+	t.Helper()
+	asset := editFramesAsset(t, 1)
+	var content assetdomain.AssetContent
+	if err := json.Unmarshal(asset.Content, &content); err != nil {
+		t.Fatal(err)
+	}
+	content.Animations[0].Frames[0].URL = nil
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset.Content = encoded
+	return asset
 }
