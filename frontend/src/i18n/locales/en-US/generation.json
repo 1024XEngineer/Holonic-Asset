@@ -43,7 +43,6 @@
   "generateAnimation": "Generate animation",
   "animationDescription": "Describe a motion and add the generated clip to this asset.",
   "animationName": "Animation name",
-  "generationPrompt": "Generation prompt",
   "motionPlaceholder": "Describe the motion arc, timing, weight, and key poses...",
   "castSpellPlaceholder": "e.g. Cast spell",
   "direction": "Direction",

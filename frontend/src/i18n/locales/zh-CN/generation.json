@@ -43,7 +43,6 @@
   "generateAnimation": "生成动画",
   "animationDescription": "描述动作并将生成的动画片段添加到此资产。",
   "animationName": "动画名称",
-  "generationPrompt": "生成提示词",
   "motionPlaceholder": "描述动作轨迹、节奏、重量感和关键姿势……",
   "castSpellPlaceholder": "例如：施放法术",
   "direction": "朝向",
