@@ -180,6 +180,9 @@ func TestLoadTileSetImageSupportsHTTPAndReportsInvalidResponses(t *testing.T) {
 			t.Fatalf("expected %q error, got %v", test.want, loadErr)
 		}
 	}
+	if _, loadErr := loadTileSetImage(context.Background(), "http://[::1"); loadErr == nil {
+		t.Fatal("expected invalid HTTP URL error")
+	}
 }
 
 func TestVerifyTileSetImageRejectsInvalidReports(t *testing.T) {
@@ -222,18 +225,27 @@ func TestReconstructTileSetItemRejectsMalformedFootprints(t *testing.T) {
 	dimensions := assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 2, Height: 2}}
 	url := "tile"
 	tests := []struct {
-		name string
-		item assetdomain.TileSetItem
-		want string
+		name        string
+		item        assetdomain.TileSetItem
+		resolved    string
+		resolvedErr error
+		want        string
 	}{
 		{name: "empty", item: assetdomain.TileSetItem{Name: "empty"}, want: "has no Tiles"},
 		{name: "missing resource", item: assetdomain.TileSetItem{Name: "missing", Tiles: []assetdomain.Tile{{}}}, want: "has no resource"},
 		{name: "duplicate", item: assetdomain.TileSetItem{Name: "duplicate", Tiles: []assetdomain.Tile{{URL: &url}, {URL: &url}}}, want: "duplicate position"},
 		{name: "oversized", item: assetdomain.TileSetItem{Name: "large", Tiles: []assetdomain.Tile{{URL: &url}, {URL: &url, Position: assetdomain.TilePosition{X: maxGeneratedItemImageEdge, Y: 0}}}}, want: "processing limits"},
+		{name: "resolve failure", item: assetdomain.TileSetItem{Name: "resolve", Tiles: []assetdomain.Tile{{URL: &url}}}, resolvedErr: errors.New("resolve unavailable"), want: "resolve unavailable"},
+		{name: "invalid image", item: assetdomain.TileSetItem{Name: "invalid", Tiles: []assetdomain.Tile{{URL: &url}}}, resolved: "invalid", want: "load Tileset Item"},
+		{name: "wrong size", item: assetdomain.TileSetItem{Name: "wrong-size", Tiles: []assetdomain.Tile{{URL: &url}}}, resolved: tileSetEditTestImage(t, 1, 1), want: "want 2x2"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			executor := &executor{references: &tileSetEditReferenceStub{resolved: tileSetEditTestImage(t, 2, 2)}}
+			resolved := test.resolved
+			if resolved == "" && test.resolvedErr == nil {
+				resolved = tileSetEditTestImage(t, 2, 2)
+			}
+			executor := &executor{references: &tileSetEditReferenceStub{resolved: resolved, resolveErr: test.resolvedErr}}
 			_, _, _, _, err := executor.reconstructTileSetItem(context.Background(), test.item, dimensions)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q error, got %v", test.want, err)
@@ -276,13 +288,14 @@ func (s *tileSetEditProjectStub) GetDetail(context.Context, uint) (*projectdomai
 }
 
 type tileSetEditReferenceStub struct {
-	resolved string
-	key      string
-	keyErr   error
+	resolved   string
+	resolveErr error
+	key        string
+	keyErr     error
 }
 
 func (s *tileSetEditReferenceStub) ResolveReference(context.Context, string) (string, error) {
-	return s.resolved, nil
+	return s.resolved, s.resolveErr
 }
 
 func (*tileSetEditReferenceStub) PersistReference(context.Context, string) (string, error) {
