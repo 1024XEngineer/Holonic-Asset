@@ -64,6 +64,26 @@ describe("generationApi", () => {
     },
   );
 
+  it("normalizes a Qiniu S3 presigned reference before sending it", async () => {
+    const reference =
+      "https://xe-6-2.s3.cn-east-1.qiniucs.com/uploads/reference.png" +
+      "?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+      "&X-Amz-Credential=access%2Fscope" +
+      "&X-Amz-Date=20260814T063100Z" +
+      "&X-Amz-Expires=1800" +
+      "&X-Amz-SignedHeaders=host" +
+      "&X-Amz-Signature=signature";
+
+    await expect(
+      toCreateGenerationRequest(creationRequest({ reference })),
+    ).resolves.toMatchObject({
+      parameters: {
+        reference:
+          "https://xe-6-2.s3.cn-east-1.qiniucs.com/uploads/reference.png",
+      },
+    });
+  });
+
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 

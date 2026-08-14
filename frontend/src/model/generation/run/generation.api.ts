@@ -1,4 +1,5 @@
 import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
+import { normalizeReferenceUrl } from "@/lib/normalize-reference-url";
 
 import {
   assetCanvasSizeDimensionsSchema,
@@ -188,7 +189,9 @@ function isVisibleGenerationStatus(
 
 async function resolveReference(reference: unknown) {
   if (reference === undefined) return "";
-  if (typeof reference === "string") return reference.trim();
+  if (typeof reference === "string") {
+    return normalizeReferenceUrl(reference);
+  }
   if (typeof File !== "undefined" && reference instanceof File) {
     return readFileAsDataUrl(reference);
   }

@@ -143,6 +143,27 @@ describe("projectApi", () => {
     );
   });
 
+  it("does not submit an expired Qiniu S3 signature", async () => {
+    const signedReference =
+      "https://xe-6-2.s3.cn-east-1.qiniucs.com/uploads/reference.png" +
+      "?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+      "&X-Amz-Credential=access%2Fscope" +
+      "&X-Amz-Date=20260814T063100Z" +
+      "&X-Amz-Expires=1800" +
+      "&X-Amz-SignedHeaders=host" +
+      "&X-Amz-Signature=signature";
+    const signedInput = { ...input, reference: signedReference };
+
+    await projectApi.generateReference(signedInput);
+
+    expect(mocks.core.generateReference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reference:
+          "https://xe-6-2.s3.cn-east-1.qiniucs.com/uploads/reference.png",
+      }),
+    );
+  });
+
   it("preserves game types from the current string contract", () => {
     expect(toProjectSummary(remoteProject)).toMatchObject({
       id: "7",

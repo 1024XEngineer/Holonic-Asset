@@ -1,4 +1,5 @@
 import { DataApiError } from "@/lib/data-api-error";
+import { normalizeReferenceUrl } from "@/lib/normalize-reference-url";
 import { readAuthenticatedUserId } from "@/model/auth";
 
 import { coreProjectApi } from "./core-project.api";
@@ -96,7 +97,7 @@ function toCoreProjectFields(
     perspective: input.perspective,
     targetPlatform: toCorePlatform(input.platform),
     description: input.description,
-    reference: input.reference,
+    reference: normalizeReferenceUrl(input.reference),
     style: input.style,
   };
 }
