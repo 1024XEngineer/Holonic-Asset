@@ -27,7 +27,13 @@ type CreateAnimationTriggerProps = {
   onGenerate: (request: GenerateAnimationRequest) => void;
 };
 
-const defaultRequest: GenerateAnimationRequest = {
+type AnimationRequestDraft = Omit<
+  GenerateAnimationRequest,
+  "frameCount" | "fps" | "duration"
+> &
+  Partial<Pick<GenerateAnimationRequest, "frameCount" | "fps" | "duration">>;
+
+const defaultRequest: AnimationRequestDraft = {
   animationName: "",
   direction: "front",
   creativeBrief: "",
@@ -183,9 +189,9 @@ export function CreateAnimationTrigger({
 
           <p className="-mt-3 text-xs text-muted-foreground">
             {t("animationSummary", {
-              frames: request.frameCount,
-              fps: request.fps,
-              seconds: request.duration,
+              frames: request.frameCount ?? "",
+              fps: request.fps ?? "",
+              seconds: request.duration ?? "",
             })}
           </p>
 
@@ -221,11 +227,11 @@ function NumberField({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | undefined;
   min: number;
   max: number;
   suffix?: string;
-  onChange: (value: number) => void;
+  onChange: (value: number | undefined) => void;
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium">
@@ -240,9 +246,13 @@ function NumberField({
           required
           min={min}
           max={max}
-          value={value}
+          value={value ?? ""}
           className={suffix ? "pr-8" : undefined}
           onChange={(event) => {
+            if (event.currentTarget.value === "") {
+              onChange(undefined);
+              return;
+            }
             const nextValue = event.currentTarget.valueAsNumber;
             if (Number.isFinite(nextValue)) onChange(nextValue);
           }}

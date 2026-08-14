@@ -82,6 +82,13 @@ describe("CreateAnimationTrigger", () => {
       name: /^Source duration/,
     });
     fireEvent.change(frames, { target: { value: "" } });
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Generate animation",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
     fireEvent.change(frames, { target: { value: "16" } });
     fireEvent.change(frameRate, { target: { value: "24" } });
     fireEvent.change(duration, { target: { value: "8" } });
