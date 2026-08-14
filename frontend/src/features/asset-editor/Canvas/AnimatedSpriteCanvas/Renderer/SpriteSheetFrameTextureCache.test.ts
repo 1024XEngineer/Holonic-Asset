@@ -40,7 +40,7 @@ describe("SpriteSheetFrameTextureCache", () => {
 
     expect(cache.get(sheet, 1)).toBe(cache.get(sheet, 1));
 
-    expect(createTexture).toHaveBeenCalledWith(sheet, 1, 0, "back.png");
+    expect(createTexture).toHaveBeenCalledWith(sheet, 0, 0, "back.png");
     expect(createTexture).toHaveBeenCalledOnce();
   });
 
