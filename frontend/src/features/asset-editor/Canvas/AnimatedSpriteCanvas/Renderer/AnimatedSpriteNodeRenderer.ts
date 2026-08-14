@@ -2,7 +2,10 @@ import { Container, Graphics, Text } from "pixi.js";
 import type { CharacterAnimation, CharacterSpriteSheet } from "@/model";
 import { getAnimatedSpritePixelScale } from "../animated-sprite-scale";
 import { getGridRowCount } from "../grid-row-count";
-import { getSpriteSheetFrameCount } from "../sprite-sheet-grid";
+import {
+  getSpriteSheetFrameCount,
+  resolveSpriteSheetFrame,
+} from "../sprite-sheet-grid";
 import {
   getAnimatedSpriteAnimation,
   getAnimatedSpriteNodeLabel,
@@ -155,7 +158,7 @@ export function isSpriteSheetFrameAvailable(
   frame: number,
   unavailableTextureUrls?: ReadonlySet<string>,
 ) {
-  const imageUrl = spriteSheet.frameUrls?.[frame] ?? spriteSheet.imageUrl;
+  const { imageUrl } = resolveSpriteSheetFrame(spriteSheet, frame);
   return Boolean(imageUrl) && !unavailableTextureUrls?.has(imageUrl);
 }
 
