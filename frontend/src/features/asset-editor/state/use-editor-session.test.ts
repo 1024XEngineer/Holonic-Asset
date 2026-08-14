@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   refValues: [] as unknown[],
   saveRevision: vi.fn(),
   saveSession: vi.fn(),
+  syncExternalRecord: vi.fn(),
   saveStateValue: undefined as unknown,
   stateSetters: [] as ReturnType<typeof vi.fn>[],
   store: {
@@ -58,6 +59,7 @@ vi.mock("./editor-session-store", () => ({
   createEditorSessionStore: mocks.createStore,
   dispatchEditorCommand: mocks.dispatchCommand,
   getEditorSessionSnapshot: mocks.getSnapshot,
+  syncEditorSessionExternalRecord: mocks.syncExternalRecord,
 }));
 
 import { useEditorSession } from "./use-editor-session";
@@ -95,6 +97,7 @@ describe("useEditorSession", () => {
     });
 
     session.dispatch({ type: "prompt.set", value: "Updated" });
+    session.syncExternalRecord(record);
 
     expect(mocks.createStore).toHaveBeenCalledWith(record);
     expect(mocks.useStore).toHaveBeenCalledTimes(4);
@@ -102,6 +105,7 @@ describe("useEditorSession", () => {
       type: "prompt.set",
       value: "Updated",
     });
+    expect(mocks.syncExternalRecord).toHaveBeenCalledWith(mocks.store, record);
     expect(mocks.stateSetters[0]).toHaveBeenCalled();
     expect(session.snapshot).toEqual({ record, dirty: false });
   });

@@ -36,6 +36,14 @@ describe("query keys", () => {
       "runs",
       "project-1",
     ]);
+    expect(generationKeys.runs(7, "project-1", "asset-1")).toEqual([
+      "generation",
+      7,
+      "runs",
+      "project-1",
+      "asset",
+      "asset-1",
+    ]);
     expect(quickGenerationKeys.assets(7)).toEqual([
       "quick-generation",
       7,

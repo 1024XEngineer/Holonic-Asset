@@ -30,7 +30,10 @@ export function useEditorWorkspace({
   });
   const { snapshot } = session;
   const animationMutation = useGenerateAnimationMutation();
-  const { data: generationRuns = [] } = useGenerationRunsQuery(asset.projectId);
+  const { data: generationRuns = [] } = useGenerationRunsQuery(
+    asset.projectId,
+    asset.id,
+  );
   const [animationTask, setAnimationTask] =
     useState<EditorGenerationTask | null>(null);
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
@@ -48,16 +51,28 @@ export function useEditorWorkspace({
     setInspectorPrompt("");
   }, [asset.id, asset.projectId]);
 
+  useEffect(() => {
+    session.syncExternalRecord(data.record);
+  }, [data.record, session.syncExternalRecord]);
+
   const generationTasks = useMemo<EditorGenerationTask[]>(
     () => [
       ...generationRuns.flatMap((run) =>
-        run.status === "pending" || run.status === "processing"
+        run.status === "pending" ||
+        run.status === "processing" ||
+        run.status === "failed"
           ? [
               {
                 id: run.id,
                 name: run.name,
                 prompt: run.prompt,
-                status: run.status === "pending" ? "queued" : "processing",
+                status:
+                  run.status === "pending"
+                    ? "queued"
+                    : run.status === "failed"
+                      ? "failed"
+                      : "processing",
+                ...(run.error ? { error: run.error } : {}),
               } satisfies EditorGenerationTask,
             ]
           : [],
@@ -105,24 +120,19 @@ export function useEditorWorkspace({
     const taskId = `animation-${crypto.randomUUID()}`;
     setAnimationTask({
       id: taskId,
-      name: request.label,
-      prompt: request.prompt,
+      name: request.animationName,
+      prompt: request.creativeBrief,
       status: "processing",
     });
 
     try {
-      const result = await animationMutation.mutateAsync({
+      await animationMutation.mutateAsync({
         ...request,
         projectId: asset.projectId,
         assetId: asset.id,
         assetKind,
-        prototype: sprite.prototype,
       });
-      session.dispatch({
-        type: "sprite.animation.generated",
-        animation: result.animation,
-      });
-      reportAction(`${request.label} generated`);
+      reportAction(`${request.animationName} queued`);
     } catch {
       reportAction("Animation generation failed");
     } finally {
@@ -181,6 +191,7 @@ export function useEditorWorkspace({
       onSave: () => void save(),
     },
     sprite: {
+      perspective: asset.perspective,
       prototype: sprite.prototype,
       animations: sprite.animations ?? [],
       nodePositions: sprite.nodePositions,

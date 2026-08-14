@@ -3,7 +3,11 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CreateAnimationTrigger } from "@/features/generation";
-import type { CharacterAnimation, GenerateAnimationRequest } from "@/model";
+import type {
+  CharacterAnimation,
+  GenerateAnimationRequest,
+  Perspective,
+} from "@/model";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
@@ -14,6 +18,7 @@ import { useAnimationActions } from "./animation-actions";
 
 export function AssetTree({
   animations,
+  perspective,
   selectedNode,
   selectedFrames,
   onSelect,
@@ -24,6 +29,7 @@ export function AssetTree({
   isGeneratingAnimation,
 }: {
   animations: CharacterAnimation[];
+  perspective: Perspective;
   selectedNode: AnimatedSpriteNodeId | null;
   selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
   onSelect: (node: AnimatedSpriteNodeId) => void;
@@ -42,6 +48,7 @@ export function AssetTree({
   return (
     <CreateAnimationTrigger
       isGenerating={isGeneratingAnimation}
+      perspective={perspective}
       onGenerate={onGenerateAnimation}
     >
       {(openGenerationDialog) => (

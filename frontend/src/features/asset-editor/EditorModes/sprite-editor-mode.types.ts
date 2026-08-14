@@ -4,6 +4,7 @@ import type {
   CharacterAnimation,
   CharacterSpriteSheet,
   GenerateAnimationRequest,
+  Perspective,
 } from "@/model";
 
 import type { EditorHeaderProps } from "../Header/editor-header";
@@ -12,6 +13,7 @@ import type { InspectorSubmitRequest } from "../Inspector/inspector.types";
 export type SpriteEditorModeProps = {
   header: EditorHeaderProps;
   sprite: {
+    perspective: Perspective;
     prototype: CharacterSpriteSheet;
     animations: CharacterAnimation[];
     nodePositions: Record<string, AssetCanvasPosition>;

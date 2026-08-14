@@ -95,8 +95,12 @@ export function drawAnimatedSpriteNode({
       unavailableTextureUrls,
     );
   } else if (
-    spriteSheet?.imageUrl &&
-    !unavailableTextureUrls?.has(spriteSheet.imageUrl)
+    spriteSheet &&
+    isSpriteSheetFrameAvailable(
+      spriteSheet,
+      previewFrame,
+      unavailableTextureUrls,
+    )
   ) {
     drawSpriteSheetFrame({
       container,

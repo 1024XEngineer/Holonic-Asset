@@ -1,4 +1,7 @@
 export {
+  assetDirectionSchema,
+  assetDirections,
+  assetDirectionsByPerspective,
   assetApi,
   assetKinds,
   assetKeys,
@@ -31,6 +34,7 @@ export type {
   AssetRevision,
   AssetRevisionStatus,
   AssetCanvasPosition,
+  AssetDirection,
   AssetRecord,
   AssetRecordApi,
   AssetRecordForKind,
@@ -164,7 +168,5 @@ export {
   generateAnimationRequestSchema,
   type GenerateAnimationInput,
   type GenerateAnimationRequest,
-  type GenerateAnimationResult,
-  type GeneratedCharacterAnimation,
   type SpriteAssetKind,
 } from "./generation";

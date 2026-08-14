@@ -15,11 +15,13 @@ const mocks = vi.hoisted(() => ({
     name: string;
     prompt: string;
     status: string;
+    error?: string;
   }>,
   schedules: [] as Array<{ callback: () => void; delay: number }>,
   session: {
     dispatch: vi.fn(),
     save: vi.fn(),
+    syncExternalRecord: vi.fn(),
     snapshot: {} as {
       record: AssetRecord;
       dirty: boolean;
@@ -122,6 +124,13 @@ describe("useEditorWorkspace", () => {
         status: "processing",
       },
       { id: "done", name: "Done", prompt: "Three", status: "completed" },
+      {
+        id: "failed",
+        name: "Failed",
+        prompt: "Four",
+        status: "failed",
+        error: "Video provider rejected the request",
+      },
     ];
     mocks.stateValues.push(null, null, null);
     const onBack = vi.fn();
@@ -139,7 +148,7 @@ describe("useEditorWorkspace", () => {
     editor.sprite.onPositionChange("prototype", { x: 12, y: 18 });
     editor.tree.onAnimationRename("walk", "Walking");
     editor.tree.onAnimationDelete("walk");
-    editor.tree.onAnimationGenerate({ label: "Walk", prompt: "Walk north" });
+    editor.tree.onAnimationGenerate(animationRequest());
     editor.inspector.onPromptChange("New prompt");
     await editor.inspector.onSubmit({
       prompt: "Refine hero",
@@ -160,6 +169,13 @@ describe("useEditorWorkspace", () => {
         prompt: "Two",
         status: "processing",
       },
+      {
+        id: "failed",
+        name: "Failed",
+        prompt: "Four",
+        status: "failed",
+        error: "Video provider rejected the request",
+      },
     ]);
     expect(onBack).toHaveBeenCalledOnce();
     expect(mocks.session.save).toHaveBeenCalledOnce();
@@ -173,9 +189,6 @@ describe("useEditorWorkspace", () => {
     expect(mocks.coreCreate).toHaveBeenCalledWith(
       7,
       expect.objectContaining({ assetId: 8, kind: "edit_character_prototype" }),
-    );
-    expect(mocks.session.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "sprite.animation.generated" }),
     );
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(1800);
@@ -247,7 +260,12 @@ describe("useEditorWorkspace", () => {
     if (!editor) return;
 
     editor.header.onSave();
-    editor.tree.onAnimationGenerate({ label: "Open", prompt: "Open chest" });
+    editor.tree.onAnimationGenerate(
+      animationRequest({
+        animationName: "Open",
+        creativeBrief: "Open chest",
+      }),
+    );
     await expect(
       editor.inspector.onSubmit({
         prompt: "Refine chest",
@@ -255,10 +273,6 @@ describe("useEditorWorkspace", () => {
       }),
     ).rejects.toThrow("prompt failed");
     await flushPromises();
-
-    expect(mocks.session.dispatch).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "sprite.animation.generated" }),
-    );
   });
 
   it("skips save and remote prompt creation for clean non-numeric assets", async () => {
@@ -324,6 +338,7 @@ function workspace(
       projectId,
       kind: record.mode,
       name: "Asset",
+      perspective: "Top-Down",
       version: "v1",
       history: [],
     },
@@ -334,4 +349,16 @@ function workspace(
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+function animationRequest(overrides: Record<string, unknown> = {}) {
+  return {
+    animationName: "Walk",
+    direction: "front" as const,
+    creativeBrief: "Walk north",
+    frameCount: 8,
+    fps: 12,
+    duration: 5,
+    ...overrides,
+  };
 }

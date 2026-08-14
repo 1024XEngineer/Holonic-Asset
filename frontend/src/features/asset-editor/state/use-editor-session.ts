@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState } from "react";
 import { useStore } from "zustand";
 
-import { useSaveAssetRevisionMutation } from "@/model";
+import { useSaveAssetRevisionMutation, type AssetRecord } from "@/model";
 
 import { saveEditorSessionRevision } from "./editor-session-save";
 import {
   createEditorSessionStore,
   dispatchEditorCommand,
   getEditorSessionSnapshot,
+  syncEditorSessionExternalRecord,
   type EditorSessionStore,
 } from "./editor-session-store";
 import type {
@@ -69,6 +70,10 @@ export function useEditorSession({
     },
     [store],
   );
+  const syncExternalRecord = useCallback(
+    (record: AssetRecord) => syncEditorSessionExternalRecord(store, record),
+    [store],
+  );
 
   const save = useCallback(async () => {
     const saveToken = Symbol("editor-save");
@@ -102,6 +107,7 @@ export function useEditorSession({
   return {
     snapshot: getEditorSessionSnapshot(store, saveState),
     dispatch,
+    syncExternalRecord,
     save,
   };
 }

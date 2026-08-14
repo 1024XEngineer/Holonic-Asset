@@ -34,6 +34,7 @@ export function getMockAssetRecord(
         projectId: input.projectId,
         kind: asset.kind,
         name: asset.name,
+        perspective: asset.perspective,
         version: asset.version,
         history: structuredClone(asset.history),
       },

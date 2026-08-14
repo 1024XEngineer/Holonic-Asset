@@ -5,6 +5,12 @@ export {
   type AssetKind,
   type CreatableAssetKind,
 } from "./asset-kind";
+export {
+  assetDirectionSchema,
+  assetDirections,
+  assetDirectionsByPerspective,
+  type AssetDirection,
+} from "./directional-asset";
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 export {
   getPerspectiveDirectionLayout,

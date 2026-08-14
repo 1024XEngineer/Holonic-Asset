@@ -1,4 +1,4 @@
-import { Rectangle, Texture } from "pixi.js";
+import { Assets, Rectangle, Texture } from "pixi.js";
 
 import type { CharacterSpriteSheet } from "@/model";
 
@@ -9,7 +9,7 @@ type CreateFrameTexture = (
   column: number,
   row: number,
   frameUrl?: string,
-) => Texture;
+) => Texture | undefined;
 
 type FrameTextureEntry = {
   spriteSheetKey: string;
@@ -37,9 +37,11 @@ export class SpriteSheetFrameTextureCache {
     let entry = this.textures.get(cacheKey);
 
     if (!entry) {
+      const texture = this.createTexture(spriteSheet, column, row, frameUrl);
+      if (!texture) return undefined;
       entry = {
         spriteSheetKey,
-        texture: this.createTexture(spriteSheet, column, row, frameUrl),
+        texture,
       };
       this.textures.set(cacheKey, entry);
     }
@@ -82,11 +84,12 @@ function createSpriteSheetFrameTexture(
   row: number,
   frameUrl?: string,
 ) {
-  if (frameUrl) {
-    return new Texture({ source: Texture.from(frameUrl).source });
-  }
+  const sourceUrl = frameUrl ?? spriteSheet.imageUrl;
+  if (!Assets.cache.has(sourceUrl)) return undefined;
+  const sourceTexture = Assets.cache.get<Texture>(sourceUrl);
+  if (frameUrl) return new Texture({ source: sourceTexture.source });
   return new Texture({
-    source: Texture.from(spriteSheet.imageUrl).source,
+    source: sourceTexture.source,
     frame: new Rectangle(
       column * spriteSheet.frameWidth,
       row * spriteSheet.frameHeight,

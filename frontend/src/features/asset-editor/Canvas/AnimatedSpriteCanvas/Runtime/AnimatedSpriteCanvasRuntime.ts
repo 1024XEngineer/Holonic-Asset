@@ -154,11 +154,12 @@ export class AnimatedSpriteCanvasRuntime {
       [
         model.prototype.imageUrl,
         ...(model.prototype.frameUrls ?? []),
-        ...model.animations.flatMap((animation) =>
-          animation.spriteSheet?.imageUrl
-            ? [animation.spriteSheet.imageUrl]
-            : [],
-        ),
+        ...model.animations.flatMap((animation) => {
+          const spriteSheet = animation.spriteSheet;
+          return spriteSheet
+            ? [spriteSheet.imageUrl, ...(spriteSheet.frameUrls ?? [])]
+            : [];
+        }),
       ].filter(Boolean),
     );
     await Promise.all(

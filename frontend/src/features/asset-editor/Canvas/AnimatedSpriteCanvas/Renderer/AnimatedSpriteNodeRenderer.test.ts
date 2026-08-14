@@ -108,4 +108,44 @@ describe("prototype frame rendering", () => {
       expect.objectContaining({ frame: 0, spriteSheet: prototype }),
     );
   });
+
+  it("uses the selected independent frame for a collapsed animation", () => {
+    const animation = {
+      kind: "clip" as const,
+      id: "walk",
+      label: "Walk",
+      frameCount: 2,
+      spriteSheet: {
+        ...prototype,
+        imageUrl: "walk-1.png",
+        frameUrls: ["walk-1.png", "walk-2.png"],
+      },
+    };
+    const drawNode = (previewFrame: number) =>
+      drawAnimatedSpriteNode({
+        node: "walk",
+        frameTextures: {} as never,
+        position: { x: 0, y: 0 },
+        selected: false,
+        selectedFrames: [],
+        expanded: false,
+        playing: false,
+        previewFrame,
+        animations: [animation],
+        prototype,
+        unavailableTextureUrls: new Set(["walk-2.png"]),
+      });
+
+    vi.mocked(drawSpriteSheetFrame).mockClear();
+    drawNode(1);
+    expect(drawSpriteSheetFrame).not.toHaveBeenCalled();
+
+    drawNode(0);
+    expect(drawSpriteSheetFrame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frame: 0,
+        spriteSheet: animation.spriteSheet,
+      }),
+    );
+  });
 });
