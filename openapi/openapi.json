@@ -843,10 +843,12 @@
             "format": "int64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "content": {}
         },
         "required": [
-          "assetId"
+          "assetId",
+          "content"
         ],
         "type": "object"
       },

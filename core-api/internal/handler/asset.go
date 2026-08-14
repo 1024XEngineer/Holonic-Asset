@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -12,17 +15,24 @@ import (
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
+type referencePersister interface {
+	PersistReference(context.Context, string) (string, error)
+}
+
 type Handler struct {
 	AssetManager domain.Manager
 	references   referenceResolver
+	persister    referencePersister
 }
 
 func NewHandler(manager domain.Manager, references ...referenceResolver) *Handler {
 	var resolver referenceResolver
+	var persister referencePersister
 	if len(references) > 0 {
 		resolver = references[0]
+		persister, _ = resolver.(referencePersister)
 	}
-	return &Handler{AssetManager: manager, references: resolver}
+	return &Handler{AssetManager: manager, references: resolver, persister: persister}
 }
 
 func (h *Handler) GetAssets(
@@ -98,10 +108,18 @@ func (h *Handler) Record(
 	x context.Context,
 	asset dto.RecordAssetRequest,
 ) (dto.SuccessResponse[dto.RecordAssetResponse], error) {
-	if asset.AssetID == 0 {
+	content := bytes.TrimSpace(asset.Content)
+	if asset.AssetID == 0 || len(content) == 0 || bytes.Equal(content, []byte("null")) {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, echo.ErrBadRequest
 	}
-	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{AssetID: asset.AssetID}, 0)
+	persistedContent, err := h.persistAssetContent(x, content)
+	if err != nil {
+		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
+	}
+	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{
+		AssetID: asset.AssetID,
+		Content: persistedContent,
+	}, 0)
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}
@@ -152,6 +170,8 @@ func (h *Handler) Records(
 	return dto.NewTypedSuccessResponse(dto.GetAssetRecordsResponse{Records: items}), nil
 }
 
+type referenceTransform func(context.Context, string) (string, error)
+
 func (h *Handler) resolveAssetContent(
 	ctx context.Context,
 	raw json.RawMessage,
@@ -159,6 +179,26 @@ func (h *Handler) resolveAssetContent(
 	if len(raw) == 0 {
 		return raw, nil
 	}
+	var transform referenceTransform
+	if h.references != nil {
+		transform = h.references.ResolveReference
+	}
+	return h.transformAssetContentReferences(ctx, raw, "resolve", transform)
+}
+
+func (h *Handler) persistAssetContent(
+	ctx context.Context,
+	raw json.RawMessage,
+) (json.RawMessage, error) {
+	return h.transformAssetContentReferences(ctx, raw, "persist", h.persistAssetReference)
+}
+
+func (h *Handler) transformAssetContentReferences(
+	ctx context.Context,
+	raw json.RawMessage,
+	operation string,
+	transform referenceTransform,
+) (json.RawMessage, error) {
 	var content map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &content); err != nil {
 		return nil, fmt.Errorf("handler: decode asset content: %w", err)
@@ -167,42 +207,58 @@ func (h *Handler) resolveAssetContent(
 		return raw, nil
 	}
 
-	if value, ok := content["animations"]; ok {
-		sanitized, err := stripAnimationGeneration(value)
-		if err != nil {
-			return nil, err
+	if operation == "resolve" {
+		if value, ok := content["animations"]; ok {
+			sanitized, err := stripAnimationGeneration(value)
+			if err != nil {
+				return nil, err
+			}
+			content["animations"] = sanitized
 		}
-		content["animations"] = sanitized
 	}
 
-	if h.references != nil {
-		if value, ok := content["prototype"]; ok {
-			resolved, err := h.resolveImageArray(ctx, value, "prototype", "")
-			if err != nil {
-				return nil, err
-			}
-			content["prototype"] = resolved
+	if transform != nil {
+		imageArrays := []struct {
+			field      string
+			childField string
+		}{
+			{field: "prototype"},
+			{field: "animations", childField: "frames"},
+			{field: "items", childField: "tiles"},
 		}
-		if value, ok := content["animations"]; ok {
-			resolved, err := h.resolveImageArray(ctx, value, "animations", "frames")
+		for _, imageArray := range imageArrays {
+			value, ok := content[imageArray.field]
+			if !ok {
+				continue
+			}
+			transformed, err := transformReferenceArray(
+				ctx,
+				value,
+				imageArray.field,
+				imageArray.childField,
+				"url",
+				operation,
+				transform,
+			)
 			if err != nil {
 				return nil, err
 			}
-			content["animations"] = resolved
-		}
-		if value, ok := content["items"]; ok {
-			resolved, err := h.resolveImageArray(ctx, value, "items", "tiles")
-			if err != nil {
-				return nil, err
-			}
-			content["items"] = resolved
+			content[imageArray.field] = transformed
 		}
 		if value, ok := content["layers"]; ok {
-			resolved, err := h.resolveResourceArray(ctx, value, "layers")
+			transformed, err := transformReferenceArray(
+				ctx,
+				value,
+				"layers",
+				"",
+				"resource",
+				operation,
+				transform,
+			)
 			if err != nil {
 				return nil, err
 			}
-			content["layers"] = resolved
+			content["layers"] = transformed
 		}
 	}
 
@@ -211,30 +267,6 @@ func (h *Handler) resolveAssetContent(
 		return nil, fmt.Errorf("handler: encode asset content: %w", err)
 	}
 	return json.RawMessage(encoded), nil
-}
-
-func (h *Handler) resolveResourceArray(ctx context.Context, raw json.RawMessage, field string) (json.RawMessage, error) {
-	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return raw, nil
-	}
-	var values []json.RawMessage
-	if err := json.Unmarshal(raw, &values); err != nil {
-		return nil, fmt.Errorf("handler: decode asset content %s: %w", field, err)
-	}
-	for index, value := range values {
-		object, err := decodeJSONObject(value)
-		if err != nil {
-			return nil, fmt.Errorf("handler: decode asset content %s[%d]: %w", field, index, err)
-		}
-		if err := h.resolveReferenceField(ctx, object, "resource"); err != nil {
-			return nil, fmt.Errorf("handler: resolve asset content %s[%d].resource: %w", field, index, err)
-		}
-		values[index], err = json.Marshal(object)
-		if err != nil {
-			return nil, fmt.Errorf("handler: encode asset content %s[%d]: %w", field, index, err)
-		}
-	}
-	return json.Marshal(values)
 }
 
 func stripAnimationGeneration(raw json.RawMessage) (json.RawMessage, error) {
@@ -263,11 +295,14 @@ func stripAnimationGeneration(raw json.RawMessage) (json.RawMessage, error) {
 	return encoded, nil
 }
 
-func (h *Handler) resolveImageArray(
+func transformReferenceArray(
 	ctx context.Context,
 	raw json.RawMessage,
 	field string,
 	childField string,
+	referenceField string,
+	operation string,
+	transform referenceTransform,
 ) (json.RawMessage, error) {
 	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 		return raw, nil
@@ -282,15 +317,30 @@ func (h *Handler) resolveImageArray(
 			return nil, fmt.Errorf("handler: decode asset content %s[%d]: %w", field, index, err)
 		}
 		if childField == "" {
-			if err := h.resolveURLField(ctx, object); err != nil {
-				return nil, fmt.Errorf("handler: resolve asset content %s[%d].url: %w", field, index, err)
+			if err := transformReferenceField(ctx, object, referenceField, transform); err != nil {
+				return nil, fmt.Errorf(
+					"handler: %s asset content %s[%d].%s: %w",
+					operation,
+					field,
+					index,
+					referenceField,
+					err,
+				)
 			}
 		} else if child, ok := object[childField]; ok {
-			resolved, err := h.resolveImageArray(ctx, child, fmt.Sprintf("%s[%d].%s", field, index, childField), "")
+			transformed, err := transformReferenceArray(
+				ctx,
+				child,
+				fmt.Sprintf("%s[%d].%s", field, index, childField),
+				"",
+				referenceField,
+				operation,
+				transform,
+			)
 			if err != nil {
 				return nil, err
 			}
-			object[childField] = resolved
+			object[childField] = transformed
 		}
 		values[index], err = json.Marshal(object)
 		if err != nil {
@@ -315,32 +365,59 @@ func decodeJSONObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 	return object, nil
 }
 
-func (h *Handler) resolveURLField(ctx context.Context, object map[string]json.RawMessage) error {
-	return h.resolveReferenceField(ctx, object, "url")
-}
-
-func (h *Handler) resolveReferenceField(ctx context.Context, object map[string]json.RawMessage, field string) error {
-	rawURL, ok := object[field]
-	if !ok || len(rawURL) == 0 || rawURL[0] != '"' {
+func transformReferenceField(
+	ctx context.Context,
+	object map[string]json.RawMessage,
+	field string,
+	transform referenceTransform,
+) error {
+	rawReference, ok := object[field]
+	if !ok || len(rawReference) == 0 || rawReference[0] != '"' {
 		return nil
 	}
 	var reference string
-	if err := json.Unmarshal(rawURL, &reference); err != nil {
+	if err := json.Unmarshal(rawReference, &reference); err != nil {
 		return err
 	}
-	if reference == "" {
+	if strings.TrimSpace(reference) == "" {
 		return nil
 	}
-	resolved, err := h.references.ResolveReference(ctx, reference)
+	transformed, err := transform(ctx, reference)
 	if err != nil {
 		return err
 	}
-	encoded, err := json.Marshal(resolved)
+	encoded, err := json.Marshal(transformed)
 	if err != nil {
 		return err
 	}
 	object[field] = encoded
 	return nil
+}
+
+func (h *Handler) persistAssetReference(ctx context.Context, reference string) (string, error) {
+	reference = strings.TrimSpace(reference)
+	persisted := reference
+	var err error
+	if h.persister != nil {
+		persisted, err = h.persister.PersistReference(ctx, reference)
+		if err != nil {
+			return "", err
+		}
+		persisted = strings.TrimSpace(persisted)
+	}
+	if persisted == "" || strings.HasPrefix(persisted, "/") || isURLReference(persisted) {
+		cause := fmt.Errorf("asset image reference %q is not a persisted object key", reference)
+		return "", echo.NewHTTPError(http.StatusBadRequest, cause.Error()).SetInternal(cause)
+	}
+	return persisted, nil
+}
+
+func isURLReference(reference string) bool {
+	if strings.HasPrefix(strings.ToLower(reference), "data:") || strings.HasPrefix(reference, "//") {
+		return true
+	}
+	parsed, err := url.Parse(reference)
+	return err == nil && (parsed.IsAbs() || parsed.Host != "")
 }
 
 func (h *Handler) CopyAsset(

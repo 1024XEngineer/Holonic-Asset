@@ -148,7 +148,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 	})
 
 	t.Run("binds asset record", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/asset/save", strings.NewReader(`{"assetId":7}`))
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/asset/save", strings.NewReader(`{"assetId":7,"content":{"prototype":[{"id":2,"url":"new.png"}]}}`))
 		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		recorder := httptest.NewRecorder()
 
@@ -157,7 +157,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 		}
-		if assetStub.record.AssetID != 7 {
+		if assetStub.record.AssetID != 7 || string(assetStub.record.Content) != `{"prototype":[{"id":2,"url":"new.png"}]}` {
 			t.Fatalf("unexpected record request: %+v", assetStub.record)
 		}
 	})
