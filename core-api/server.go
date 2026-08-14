@@ -160,6 +160,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		workspaceModule.Assets,
 		generator.ExecutorDependencies{
 			References: references,
+			Projects:   workspaceModule.Projects,
 			Resources:  resources,
 			LLM:        llmService,
 			Animations: animations,

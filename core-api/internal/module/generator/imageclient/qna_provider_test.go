@@ -86,13 +86,14 @@ func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
 			Prompt string   `json:"prompt"`
 			Image  []string `json:"image"`
 			Mask   string   `json:"mask"`
+			N      int      `json:"n"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request payload: %v", err)
 		}
 		if payload.Prompt != "make it blue" ||
 			!reflect.DeepEqual(payload.Image, []string{"data:image/png;base64,ref"}) ||
-			payload.Mask != "data:image/png;base64,mask" {
+			payload.Mask != "data:image/png;base64,mask" || payload.N != 2 {
 			t.Fatalf("unexpected edit payload: %+v", payload)
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -106,6 +107,7 @@ func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
 		Prompt:          "make it blue",
 		ReferenceImages: []string{"data:image/png;base64,ref"},
 		MaskImage:       "data:image/png;base64,mask",
+		N:               2,
 	})
 	if err != nil {
 		t.Fatalf("edit image: %v", err)

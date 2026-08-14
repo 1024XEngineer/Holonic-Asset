@@ -2,6 +2,8 @@ package generator
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -13,6 +15,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -27,6 +30,25 @@ type processedTileSetItem struct {
 	MIMEType    string
 	LocalShape  []TileSetCoordinate
 	Tiles       []imageprocessor.ImageRegion
+	Perspective assetdomain.Perspective
+}
+
+func (e *executor) generateTileSet(
+	ctx context.Context,
+	request CreateTileSetPayload,
+) (json.RawMessage, error) {
+	if err := validateCreateTileSetPayload(&request); err != nil {
+		return nil, err
+	}
+	items, err := e.processTileSetItems(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	layout, err := assignTileSetLayout(request)
+	if err != nil {
+		return nil, err
+	}
+	return e.publishTileSet(ctx, request, items, layout)
 }
 
 func (e *executor) processTileSetItems(
@@ -146,15 +168,52 @@ func (e *executor) processTileSetItem(
 		Prompt:          prompt,
 		ReferenceImages: references,
 		MaskImage:       "data:image/png;base64," + shapeMask,
+		N:               2,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: generate Tileset Item %d: %w", index, err)
 	}
-	if generated == nil || len(generated.Images) != 1 || strings.TrimSpace(generated.Images[0].Base64) == "" {
-		return nil, fmt.Errorf("generator: generate Tileset Item %d: expected one non-empty image", index)
+	if generated == nil || len(generated.Images) == 0 {
+		return nil, fmt.Errorf("generator: generate Tileset Item %d: expected at least one image", index)
 	}
+	var candidateErrors []error
+	for candidateIndex, candidate := range generated.Images {
+		result, candidateErr := e.processTileSetItemCandidate(
+			ctx, request, item, index, candidateIndex, columns, rows, localShape, candidate,
+			assetdomain.Perspective(project.Perspective),
+		)
+		if candidateErr == nil {
+			return result, nil
+		}
+		candidateErrors = append(candidateErrors, candidateErr)
+	}
+	return nil, fmt.Errorf(
+		"generator: process Tileset Item %d candidates: %w",
+		index,
+		errors.Join(candidateErrors...),
+	)
+}
+
+func (e *executor) processTileSetItemCandidate(
+	ctx context.Context,
+	request CreateTileSetPayload,
+	item TileSetItemDefinition,
+	itemIndex int,
+	candidateIndex int,
+	columns int,
+	rows int,
+	localShape []TileSetCoordinate,
+	candidate imageclient.GeneratedImage,
+	perspective assetdomain.Perspective,
+) (*processedTileSetItem, error) {
+	if strings.TrimSpace(candidate.Base64) == "" {
+		return nil, fmt.Errorf("candidate %d is empty", candidateIndex)
+	}
+	index := itemIndex
+	tileWidth := int(request.Dimensions.TileSize.Width)
+	tileHeight := int(request.Dimensions.TileSize.Height)
 	removed, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64: generated.Images[0].Base64,
+		ImageBase64: candidate.Base64,
 		MatteColor:  imageprocessor.DefaultMatteColor,
 	})
 	if err != nil || removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
@@ -235,7 +294,7 @@ func (e *executor) processTileSetItem(
 		if !shouldContain {
 			transparent, encodeErr := transparentTileSetRegion(regionIndex, tileWidth, tileHeight)
 			if encodeErr != nil {
-				return nil, fmt.Errorf("generator: mask Tileset Item %d cell %d: %w", index, regionIndex, encodeErr)
+				return nil, fmt.Errorf("generator: mask Tileset Item %d candidate %d cell %d: %w", index, candidateIndex, regionIndex, encodeErr)
 			}
 			split.Regions[regionIndex] = transparent
 		}
@@ -263,7 +322,166 @@ func (e *executor) processTileSetItem(
 		MIMEType:    resized.MIMEType,
 		LocalShape:  localShape,
 		Tiles:       tiles,
+		Perspective: perspective,
 	}, nil
+}
+
+type tileSetTileUpload struct {
+	itemIndex int
+	tileIndex int
+	position  TileSetCoordinate
+	region    imageprocessor.ImageRegion
+	objectKey string
+}
+
+func (e *executor) publishTileSet(
+	ctx context.Context,
+	request CreateTileSetPayload,
+	items []processedTileSetItem,
+	layout []tileSetPlacement,
+) (json.RawMessage, error) {
+	uploads, err := buildTileSetUploads(e.references, items, layout)
+	if err != nil {
+		return nil, err
+	}
+	uploadedKeys, err := e.persistTileSetUploads(ctx, uploads)
+	if err != nil {
+		return nil, err
+	}
+	cleanup := func(cause error) error {
+		if cleanupErr := e.references.DeleteObjects(context.WithoutCancel(ctx), uploadedKeys); cleanupErr != nil {
+			return errors.Join(cause, fmt.Errorf("generator: clean up Tileset uploads: %w", cleanupErr))
+		}
+		return cause
+	}
+	dimensions, err := json.Marshal(request.Dimensions)
+	if err != nil {
+		return nil, cleanup(fmt.Errorf("generator: encode Tileset dimensions: %w", err))
+	}
+	contentItems := make([]assetdomain.TileSetItem, len(items))
+	for _, upload := range uploads {
+		if contentItems[upload.itemIndex].Name == "" {
+			contentItems[upload.itemIndex].Name = items[upload.itemIndex].Name
+		}
+		key := upload.objectKey
+		contentItems[upload.itemIndex].Tiles = append(contentItems[upload.itemIndex].Tiles, assetdomain.Tile{
+			URL:      &key,
+			Position: assetdomain.TilePosition{X: upload.position[0], Y: upload.position[1]},
+		})
+	}
+	content, err := assetdomain.EncodeContent(assetdomain.AssetContent{Items: contentItems})
+	if err != nil {
+		return nil, cleanup(fmt.Errorf("generator: encode Tileset content: %w", err))
+	}
+	perspective := assetdomain.PerspectiveTopDown
+	if len(items) > 0 {
+		perspective = items[0].Perspective
+	}
+	if !perspective.Valid() {
+		return nil, cleanup(fmt.Errorf("generator: invalid Tileset project perspective %q", perspective))
+	}
+	assetID, err := e.assets.CreateTileSetAsset(ctx, &assetdomain.Asset{
+		Name: request.AssetName, ProjectID: request.ProjectID, Type: assetdomain.AssetTypeTileSet,
+		Description: request.CreativeBrief, Perspective: perspective,
+		Dimensions: dimensions, Content: content,
+	})
+	if err != nil {
+		return nil, cleanup(fmt.Errorf("generator: create Tileset asset: %w", err))
+	}
+	if assetID == 0 {
+		return nil, cleanup(fmt.Errorf("generator: create Tileset asset: empty ID"))
+	}
+	return encodeExecutionResult(ExecutionResult{AssetID: assetID, Version: 1})
+}
+
+func buildTileSetUploads(
+	references ReferenceStore,
+	items []processedTileSetItem,
+	layout []tileSetPlacement,
+) ([]tileSetTileUpload, error) {
+	if len(items) != len(layout) {
+		return nil, fmt.Errorf("generator: Tileset layout count does not match Item count")
+	}
+	total := 0
+	for _, item := range items {
+		total += len(item.Tiles)
+	}
+	uploads := make([]tileSetTileUpload, 0, total)
+	allocated := make(map[string]struct{}, total)
+	for itemIndex, item := range items {
+		placement := layout[itemIndex]
+		if placement.ItemIndex != itemIndex || len(item.Tiles) != len(placement.Positions) {
+			return nil, fmt.Errorf("generator: Tileset Item %d layout does not match processed Tiles", itemIndex)
+		}
+		for tileIndex, region := range item.Tiles {
+			key, err := references.NewObjectKey("image/png")
+			if err != nil {
+				return nil, fmt.Errorf("generator: allocate Tileset Item %d Tile %d key: %w", itemIndex, tileIndex, err)
+			}
+			if _, duplicate := allocated[key]; duplicate {
+				return nil, fmt.Errorf("generator: allocate Tileset Item %d Tile %d key: duplicate object key %q", itemIndex, tileIndex, key)
+			}
+			allocated[key] = struct{}{}
+			uploads = append(uploads, tileSetTileUpload{
+				itemIndex: itemIndex, tileIndex: tileIndex, position: placement.Positions[tileIndex],
+				region: region, objectKey: key,
+			})
+		}
+	}
+	return uploads, nil
+}
+
+func (e *executor) persistTileSetUploads(
+	ctx context.Context,
+	uploads []tileSetTileUpload,
+) ([]string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	semaphore := make(chan struct{}, maxTileSetItemConcurrency)
+	uploaded := make([]bool, len(uploads))
+	var group sync.WaitGroup
+	var firstErr error
+	var errOnce sync.Once
+	for index := range uploads {
+		group.Go(func() {
+			select {
+			case semaphore <- struct{}{}:
+				defer func() { <-semaphore }()
+			case <-ctx.Done():
+				return
+			}
+			upload := uploads[index]
+			dataURL := "data:" + upload.region.MIMEType + ";base64," + upload.region.ImageBase64
+			if err := e.references.PersistReferenceAt(ctx, upload.objectKey, dataURL); err != nil {
+				errOnce.Do(func() {
+					firstErr = fmt.Errorf("generator: upload Tileset Item %d Tile %d: %w", upload.itemIndex, upload.tileIndex, err)
+					cancel()
+				})
+				return
+			}
+			uploaded[index] = true
+		})
+	}
+	group.Wait()
+	keys := make([]string, 0, len(uploads))
+	for index, ok := range uploaded {
+		if ok {
+			keys = append(keys, uploads[index].objectKey)
+		}
+	}
+	if firstErr != nil {
+		if cleanupErr := e.references.DeleteObjects(context.WithoutCancel(ctx), keys); cleanupErr != nil {
+			return nil, errors.Join(firstErr, fmt.Errorf("generator: clean up partial Tileset uploads: %w", cleanupErr))
+		}
+		return nil, firstErr
+	}
+	if err := ctx.Err(); err != nil {
+		if cleanupErr := e.references.DeleteObjects(context.WithoutCancel(ctx), keys); cleanupErr != nil {
+			return nil, errors.Join(err, fmt.Errorf("generator: clean up canceled Tileset uploads: %w", cleanupErr))
+		}
+		return nil, err
+	}
+	return keys, nil
 }
 
 func buildTileSetShapeGuide(
@@ -356,7 +574,9 @@ func transparentTileSetRegion(index int, width int, height int) (imageprocessor.
 }
 
 // alignTileSetImageToShape translates or shrinks content before splitting. It
-// rejects candidates that would require silently clipping protected pixels.
+// prefers the safety-margin-inset occupied bounds and then clips any remaining
+// model spill from omitted cells. Every occupied cell must still contain
+// meaningful content after placement.
 func alignTileSetImageToShape(
 	imageBase64 string,
 	shape []TileSetCoordinate,
@@ -397,6 +617,7 @@ func alignTileSetImageToShape(
 	minimumCellPixels := max(1, tileWidth*tileHeight/100)
 	safetyMargin := tileSetShapeSafetyMargin(tileWidth, tileHeight)
 	best := tileSetShapePlacement{}
+	relaxed := tileSetShapePlacement{}
 	for scalePercent := 100; scalePercent >= 50; scalePercent -= 2 {
 		scaledWidth := max(1, (visibleBounds.Dx()*scalePercent+50)/100)
 		scaledHeight := max(1, (visibleBounds.Dy()*scalePercent+50)/100)
@@ -430,15 +651,28 @@ func alignTileSetImageToShape(
 			best = candidate
 			break
 		}
+		fallback := findTileSetShapeImagePlacement(
+			scaled,
+			occupied,
+			expectedWidth,
+			expectedHeight,
+			tileWidth,
+			tileHeight,
+			minimumCellPixels,
+			0,
+			visibleBounds,
+		)
+		fallback.scalePercent = scalePercent
+		if fallback.valid && fallback.outsidePixels == 0 &&
+			(!relaxed.valid || tileSetShapePlacementLess(fallback, relaxed)) {
+			relaxed = fallback
+		}
+	}
+	if (!best.valid || best.outsidePixels != 0) && relaxed.valid {
+		best = relaxed
 	}
 	if !best.valid {
 		return "", fmt.Errorf("no placement preserves content in every occupied Shape cell")
-	}
-	if best.outsidePixels != 0 {
-		return "", fmt.Errorf(
-			"generated content cannot fit Shape without clipping (%d pixels cross protected boundaries)",
-			best.outsidePixels,
-		)
 	}
 	aligned := image.NewRGBA(image.Rect(0, 0, expectedWidth, expectedHeight))
 	destination := image.Rectangle{
@@ -701,8 +935,15 @@ func verifyTileSetImage(
 	if report == nil {
 		return fmt.Errorf("missing verification report")
 	}
-	if !report.IsPNG || !report.HasAlpha {
-		return fmt.Errorf("image must be a PNG with alpha")
+	if !report.IsPNG {
+		return fmt.Errorf("image must be a PNG")
+	}
+	if expectedWidth <= 0 || expectedHeight <= 0 {
+		return fmt.Errorf("expected image dimensions must be positive")
+	}
+	totalPixels := uint64(expectedWidth) * uint64(expectedHeight)
+	if !report.HasAlpha && (!shouldContainContent || report.NontransparentPixels != totalPixels) {
+		return fmt.Errorf("non-opaque image must be a PNG with alpha")
 	}
 	if report.Width != expectedWidth || report.Height != expectedHeight {
 		return fmt.Errorf(

@@ -94,6 +94,10 @@ func (s *executorReferenceStoreStub) PersistReferenceAt(_ context.Context, key, 
 	return nil
 }
 
+func (s *executorReferenceStoreStub) DeleteObjects(context.Context, []string) error {
+	return nil
+}
+
 func (s *imageProcessorStub) RemoveBackground(
 	_ context.Context,
 	request *imageprocessor.RemoveBackgroundRequest,
@@ -155,6 +159,8 @@ func (s *imageGenerationServiceStub) Generate(
 	s.request = &imageclient.GenerateRequest{
 		Prompt:          request.Prompt,
 		ReferenceImages: append([]string(nil), request.ReferenceImages...),
+		MaskImage:       request.MaskImage,
+		N:               request.N,
 		Model:           request.Model,
 		Size:            request.Size,
 		Params:          request.Params,
@@ -250,6 +256,17 @@ func (s *generationAssetWriterStub) CreateSceneryAsset(
 		*s.events = append(*s.events, "create_scenery_asset")
 	}
 	s.sceneryAsset = value
+	if s.err != nil {
+		return 0, s.err
+	}
+	return 43, nil
+}
+
+func (s *generationAssetWriterStub) CreateTileSetAsset(
+	_ context.Context,
+	value *assetdomain.Asset,
+) (uint, error) {
+	s.asset = *value
 	if s.err != nil {
 		return 0, s.err
 	}

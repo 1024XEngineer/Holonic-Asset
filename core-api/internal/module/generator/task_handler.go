@@ -86,7 +86,7 @@ func (e *Engine) handleScenery(
 }
 
 func (e *Engine) handleTileSet(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateTileSetPayload{}
@@ -96,11 +96,11 @@ func (e *Engine) handleTileSet(
 	if err := validateCreateTileSetPayload(&payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // Execution starts in the Tileset generation phase.
+	return e.execute(ctx, GenerateTileSet, message.Payload)
 }
 
 func (e *Engine) handleEditTilesetItem(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := EditTilesetItemPayload{}
@@ -110,11 +110,11 @@ func (e *Engine) handleEditTilesetItem(
 	if err := validateEditTilesetItemPayload(&payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // Execution starts in the Item editing phase.
+	return e.execute(ctx, EditTilesetItem, message.Payload)
 }
 
 func (e *Engine) handleEditTiles(
-	_ context.Context,
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := EditTilesPayload{}
@@ -124,7 +124,7 @@ func (e *Engine) handleEditTiles(
 	if err := validateEditTilesPayload(&payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // Execution starts in the Tile editing phase.
+	return e.execute(ctx, EditTiles, message.Payload)
 }
 
 func (e *Engine) handleEmptyTask(

@@ -18,9 +18,11 @@ type GenerateRequest struct {
 	// image dimensions; transparent pixels are editable and opaque pixels are
 	// protected.
 	MaskImage string
-	Model     string
-	Size      string
-	Params    Params
+	// N requests multiple independent candidates from providers that support it.
+	N      int
+	Model  string
+	Size   string
+	Params Params
 }
 
 // GeneratedImage is one normalized image returned by a model provider.

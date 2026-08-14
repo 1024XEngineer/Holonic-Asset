@@ -7,6 +7,7 @@ type ProviderRequest struct {
 	Prompt          string
 	ReferenceImages []string
 	MaskImage       string
+	N               int
 	Model           string
 	Size            string
 	Params          Params
