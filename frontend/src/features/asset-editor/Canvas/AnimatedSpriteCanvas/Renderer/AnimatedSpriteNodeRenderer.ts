@@ -2,7 +2,10 @@ import { Container, Graphics, Text } from "pixi.js";
 import type { CharacterAnimation, CharacterSpriteSheet } from "@/model";
 import { getAnimatedSpritePixelScale } from "../animated-sprite-scale";
 import { getGridRowCount } from "../grid-row-count";
-import { getSpriteSheetFrameCount } from "../sprite-sheet-grid";
+import {
+  getSpriteSheetFrameCount,
+  resolveSpriteSheetFrame,
+} from "../sprite-sheet-grid";
 import {
   getAnimatedSpriteAnimation,
   getAnimatedSpriteNodeLabel,
@@ -81,8 +84,7 @@ export function drawAnimatedSpriteNode({
     );
   } else if (
     node === "prototype" &&
-    prototype.imageUrl &&
-    !unavailableTextureUrls?.has(prototype.imageUrl)
+    hasAvailablePrototypeFrame(prototype, unavailableTextureUrls)
   ) {
     drawSpriteSheetPreview(
       container,
@@ -90,6 +92,7 @@ export function drawAnimatedSpriteNode({
       prototype,
       layout.bounds.width,
       pixelScale,
+      unavailableTextureUrls,
     );
   } else if (
     spriteSheet?.imageUrl &&
@@ -139,6 +142,36 @@ export function drawAnimatedSpriteNode({
     );
   }
   return container;
+}
+
+function hasAvailablePrototypeFrame(
+  prototype: CharacterSpriteSheet,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  return (
+    getAvailableSpriteSheetFrames(prototype, unavailableTextureUrls).length > 0
+  );
+}
+
+export function isSpriteSheetFrameAvailable(
+  spriteSheet: CharacterSpriteSheet,
+  frame: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  const { imageUrl } = resolveSpriteSheetFrame(spriteSheet, frame);
+  return Boolean(imageUrl) && !unavailableTextureUrls?.has(imageUrl);
+}
+
+export function getAvailableSpriteSheetFrames(
+  spriteSheet: CharacterSpriteSheet,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  return Array.from(
+    { length: getSpriteSheetFrameCount(spriteSheet) },
+    (_, frame) => frame,
+  ).filter((frame) =>
+    isSpriteSheetFrameAvailable(spriteSheet, frame, unavailableTextureUrls),
+  );
 }
 
 function drawLabel(
@@ -193,8 +226,8 @@ function drawFrame(
         .stroke({ color: STAGE_ACCENT, width: 2 }),
     );
   if (
-    spriteSheet?.imageUrl &&
-    !unavailableTextureUrls?.has(spriteSheet.imageUrl)
+    spriteSheet &&
+    isSpriteSheetFrameAvailable(spriteSheet, index, unavailableTextureUrls)
   ) {
     drawSpriteSheetFrame({
       container,
@@ -213,6 +246,7 @@ function drawSpriteSheetPreview(
   spriteSheet: CharacterSpriteSheet,
   containerWidth: number,
   pixelScale: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
 ) {
   const frameCount = getSpriteSheetFrameCount(spriteSheet);
   const columns = frameCount === 1 ? 1 : 2;
@@ -223,7 +257,11 @@ function drawSpriteSheetPreview(
   const startX = (containerWidth - width) / 2;
   const startY =
     frameCount === 1 ? COLLAPSED_PREVIEW_Y : 48 + (200 - height) / 2;
-  for (let frame = 0; frame < frameCount; frame += 1)
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    if (
+      !isSpriteSheetFrameAvailable(spriteSheet, frame, unavailableTextureUrls)
+    )
+      continue;
     drawSpriteSheetFrame({
       container,
       frameTextures,
@@ -237,6 +275,7 @@ function drawSpriteSheetPreview(
       },
       pixelScale,
     });
+  }
 }
 
 function drawControl(

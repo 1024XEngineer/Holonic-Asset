@@ -4,7 +4,7 @@ import {
   getAnimatedSpriteNodeLabel,
   type AnimatedSpriteNodeId,
 } from "../Canvas/AnimatedSpriteCanvas";
-import { getSpriteSheetFramePosition } from "../Canvas/AnimatedSpriteCanvas/sprite-sheet-grid";
+import { resolveSpriteSheetFrame } from "../Canvas/AnimatedSpriteCanvas/sprite-sheet-grid";
 import type {
   InspectorFrameSelection,
   InspectorTargetSummary,
@@ -22,9 +22,9 @@ export function getInspectorTargetSummary(
     const frames = selectedFrames.map((frame) => frame.index + 1).join(", ");
     const frameLabel = selectedFrames.length === 1 ? "Frame" : "Frames";
     const spriteSheet = getSpriteSheet(nodeId, animations, prototype);
-    const position = getSpriteSheetFramePosition(
-      selectedFrame?.index ?? 0,
+    const resolvedFrame = resolveSpriteSheetFrame(
       spriteSheet,
+      selectedFrame?.index ?? 0,
     );
     return {
       label: nodeId
@@ -32,10 +32,11 @@ export function getInspectorTargetSummary(
         : `${frameLabel} ${frames}`,
       detail: "Selected on canvas",
       thumbnail: {
-        imageUrl: spriteSheet.imageUrl,
-        ...position,
-        columns: spriteSheet.columns,
-        rows: spriteSheet.rows,
+        imageUrl: resolvedFrame.imageUrl,
+        column: resolvedFrame.column,
+        row: resolvedFrame.row,
+        columns: resolvedFrame.columns,
+        rows: resolvedFrame.rows,
       },
     };
   }
@@ -43,17 +44,18 @@ export function getInspectorTargetSummary(
   if (selectedNodes.length > 0) {
     const nodeId = selectedNodes[0] ?? "prototype";
     const spriteSheet = getSpriteSheet(nodeId, animations, prototype);
+    const resolvedFrame = resolveSpriteSheetFrame(spriteSheet, 0);
     return {
       label: selectedNodes
         .map((nodeId) => getAnimatedSpriteNodeLabel(nodeId, animations))
         .join(", "),
       detail: "Selected item",
       thumbnail: {
-        imageUrl: spriteSheet.imageUrl,
-        column: 0,
-        row: spriteSheet.row ?? 0,
-        columns: spriteSheet.columns,
-        rows: spriteSheet.rows,
+        imageUrl: resolvedFrame.imageUrl,
+        column: resolvedFrame.column,
+        row: resolvedFrame.row,
+        columns: resolvedFrame.columns,
+        rows: resolvedFrame.rows,
       },
     };
   }

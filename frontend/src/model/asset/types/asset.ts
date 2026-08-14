@@ -5,6 +5,7 @@ import { z } from "zod";
 export type CharacterSpriteSheet = {
   format: "png-sprite-sheet";
   imageUrl: string;
+  frameUrls?: string[];
   frameWidth: number;
   frameHeight: number;
   columns: number;
@@ -71,6 +72,7 @@ export type ProjectAsset = {
   perspective: Perspective;
   tags: string[];
   thumbnailUrl?: string;
+  prototypeUrls?: string[];
   previewCrop?: AssetPreviewCrop;
   previewFrame?: AssetPreviewFrame;
   previewOffset?: AssetPreviewOffset;

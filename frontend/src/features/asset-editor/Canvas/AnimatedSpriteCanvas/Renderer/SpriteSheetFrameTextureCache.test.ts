@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Texture } from "pixi.js";
+import { Texture, type Texture as TextureType } from "pixi.js";
 
 import type { CharacterSpriteSheet } from "@/model";
 
@@ -19,7 +19,7 @@ function spriteSheet(imageUrl: string): CharacterSpriteSheet {
 describe("SpriteSheetFrameTextureCache", () => {
   it("reuses the texture for the same sprite-sheet frame", () => {
     const createTexture = vi.fn(
-      () => ({ destroy: vi.fn() }) as unknown as Texture,
+      () => ({ destroy: vi.fn() }) as unknown as TextureType,
     );
     const cache = new SpriteSheetFrameTextureCache(createTexture);
     const sheet = spriteSheet("idle.png");
@@ -28,12 +28,56 @@ describe("SpriteSheetFrameTextureCache", () => {
     expect(createTexture).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the matching source URL for independent direction frames", () => {
+    const createTexture = vi.fn(
+      () => ({ destroy: vi.fn() }) as unknown as TextureType,
+    );
+    const cache = new SpriteSheetFrameTextureCache(createTexture);
+    const sheet = {
+      ...spriteSheet("front.png"),
+      frameUrls: ["front.png", "back.png"],
+    };
+
+    expect(cache.get(sheet, 1)).toBe(cache.get(sheet, 1));
+
+    expect(createTexture).toHaveBeenCalledWith(sheet, 0, 0, "back.png");
+    expect(createTexture).toHaveBeenCalledOnce();
+  });
+
+  it("passes no independent URL for existing sprite-sheet frames", () => {
+    const createTexture = vi.fn(
+      () => ({ destroy: vi.fn() }) as unknown as Texture,
+    );
+    const cache = new SpriteSheetFrameTextureCache(createTexture);
+    const sheet = spriteSheet("idle.png");
+
+    cache.get(sheet, 1);
+
+    expect(createTexture).toHaveBeenCalledWith(sheet, 1, 0, undefined);
+  });
+
+  it("creates a texture from an independent URL with the default factory", () => {
+    const from = vi
+      .spyOn(Texture, "from")
+      .mockReturnValue({ source: {} } as never);
+    const cache = new SpriteSheetFrameTextureCache();
+    const sheet = {
+      ...spriteSheet("front.png"),
+      frameUrls: ["front.png", "back.png"],
+    };
+
+    expect(cache.get(sheet, 1)).toBeInstanceOf(Texture);
+    expect(from).toHaveBeenCalledWith("back.png");
+    cache.destroy();
+    from.mockRestore();
+  });
+
   it("releases stale sprite sheets and destroys remaining textures on disposal", () => {
     const created: Array<{ destroy: ReturnType<typeof vi.fn> }> = [];
     const cache = new SpriteSheetFrameTextureCache(() => {
       const texture = { destroy: vi.fn() };
       created.push(texture);
-      return texture as unknown as Texture;
+      return texture as unknown as TextureType;
     });
 
     const attack = spriteSheet("attack.png");
@@ -54,7 +98,7 @@ describe("SpriteSheetFrameTextureCache", () => {
     const cache = new SpriteSheetFrameTextureCache(() => {
       const texture = { destroy: vi.fn() };
       created.push(texture);
-      return texture as unknown as Texture;
+      return texture as unknown as TextureType;
     });
     const original = spriteSheet("idle.png");
     const resized = { ...original, frameWidth: 16 };
@@ -72,7 +116,7 @@ describe("SpriteSheetFrameTextureCache", () => {
     const cache = new SpriteSheetFrameTextureCache(() => {
       const texture = { destroy: vi.fn() };
       created.push(texture);
-      return texture as unknown as Texture;
+      return texture as unknown as TextureType;
     });
     const rowZero = { ...spriteSheet("idle.png"), row: 0 };
     const rowOne = { ...rowZero, row: 1 };

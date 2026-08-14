@@ -105,6 +105,52 @@ describe("Inspector", () => {
     });
   });
 
+  it("uses an independent direction image for the selected prototype frame", () => {
+    const directionalPrototype = {
+      ...prototype,
+      frameUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
+    };
+
+    expect(
+      getInspectorTargetSummary(
+        ["prototype"],
+        [{ nodeId: "prototype", index: 2 }],
+        animations,
+        directionalPrototype,
+      ),
+    ).toMatchObject({
+      thumbnail: {
+        imageUrl: "/left.png",
+        column: 0,
+        row: 0,
+        columns: 1,
+        rows: 1,
+      },
+    });
+  });
+
+  it("uses the first independent direction image for a prototype node target", () => {
+    const directionalPrototype = {
+      ...prototype,
+      frameUrls: ["/front.png", "/back.png"],
+    };
+
+    expect(
+      getInspectorTargetSummary(
+        ["prototype"],
+        [],
+        animations,
+        directionalPrototype,
+      ),
+    ).toMatchObject({
+      thumbnail: {
+        imageUrl: "/front.png",
+        columns: 1,
+        rows: 1,
+      },
+    });
+  });
+
   it("renders the selected frame thumbnail in the target control", () => {
     const html = renderToStaticMarkup(
       withI18n(

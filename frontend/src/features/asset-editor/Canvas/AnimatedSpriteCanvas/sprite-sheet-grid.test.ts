@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSpriteSheetFrameCount,
   getSpriteSheetFramePosition,
+  resolveSpriteSheetFrame,
 } from "./sprite-sheet-grid";
 
 describe("sprite-sheet-grid", () => {
@@ -27,5 +28,36 @@ describe("sprite-sheet-grid", () => {
     expect(
       getSpriteSheetFramePosition(5, { columns: 4, rows: 2, row: 7 }),
     ).toEqual({ column: 1, row: 7 });
+  });
+
+  it("resolves sprite-sheet crops and independent frame URLs", () => {
+    const spriteSheet = {
+      format: "png-sprite-sheet" as const,
+      imageUrl: "sheet.png",
+      frameUrls: ["front.png", "back.png"],
+      frameWidth: 32,
+      frameHeight: 32,
+      columns: 2,
+      rows: 1,
+    };
+
+    expect(resolveSpriteSheetFrame(spriteSheet, 1)).toEqual({
+      imageUrl: "back.png",
+      column: 0,
+      row: 0,
+      columns: 1,
+      rows: 1,
+      independent: true,
+    });
+    expect(
+      resolveSpriteSheetFrame({ ...spriteSheet, frameUrls: undefined }, 1),
+    ).toEqual({
+      imageUrl: "sheet.png",
+      column: 1,
+      row: 0,
+      columns: 2,
+      rows: 1,
+      independent: false,
+    });
   });
 });

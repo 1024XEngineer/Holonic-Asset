@@ -2,12 +2,13 @@ import { Rectangle, Texture } from "pixi.js";
 
 import type { CharacterSpriteSheet } from "@/model";
 
-import { getSpriteSheetFramePosition } from "../sprite-sheet-grid";
+import { resolveSpriteSheetFrame } from "../sprite-sheet-grid";
 
 type CreateFrameTexture = (
   spriteSheet: CharacterSpriteSheet,
   column: number,
   row: number,
+  frameUrl?: string,
 ) => Texture;
 
 type FrameTextureEntry = {
@@ -26,15 +27,19 @@ export class SpriteSheetFrameTextureCache {
   }
 
   get(spriteSheet: CharacterSpriteSheet, frame: number) {
-    const { column, row } = getSpriteSheetFramePosition(frame, spriteSheet);
+    const resolvedFrame = resolveSpriteSheetFrame(spriteSheet, frame);
+    const { column, row } = resolvedFrame;
+    const frameUrl = resolvedFrame.independent
+      ? resolvedFrame.imageUrl
+      : undefined;
     const spriteSheetKey = getSpriteSheetKey(spriteSheet);
-    const cacheKey = `${spriteSheetKey}:${column}:${row}`;
+    const cacheKey = `${spriteSheetKey}:${frameUrl ?? "sheet"}:${column}:${row}`;
     let entry = this.textures.get(cacheKey);
 
     if (!entry) {
       entry = {
         spriteSheetKey,
-        texture: this.createTexture(spriteSheet, column, row),
+        texture: this.createTexture(spriteSheet, column, row, frameUrl),
       };
       this.textures.set(cacheKey, entry);
     }
@@ -67,6 +72,7 @@ function getSpriteSheetKey(spriteSheet: CharacterSpriteSheet) {
     spriteSheet.columns,
     spriteSheet.rows,
     spriteSheet.row,
+    spriteSheet.frameUrls?.join(","),
   ].join(":");
 }
 
@@ -74,7 +80,11 @@ function createSpriteSheetFrameTexture(
   spriteSheet: CharacterSpriteSheet,
   column: number,
   row: number,
+  frameUrl?: string,
 ) {
+  if (frameUrl) {
+    return new Texture({ source: Texture.from(frameUrl).source });
+  }
   return new Texture({
     source: Texture.from(spriteSheet.imageUrl).source,
     frame: new Rectangle(
