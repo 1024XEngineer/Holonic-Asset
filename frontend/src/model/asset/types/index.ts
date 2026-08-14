@@ -7,6 +7,11 @@ export {
 } from "./asset-kind";
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 export {
+  getPerspectiveDirectionLayout,
+  perspectiveDirectionLayouts,
+} from "./perspective-direction";
+export type { DirectionCountForPerspective } from "./perspective-direction";
+export {
   assetMetadataUpdateSchema,
   type AssetAnimation,
   type AssetMetadataUpdate,

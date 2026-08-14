@@ -23,3 +23,28 @@ export function getSpriteSheetFramePosition(
     row: spriteSheet.row ?? Math.floor(safeFrame / columns),
   };
 }
+
+export function resolveSpriteSheetFrame(
+  spriteSheet: CharacterSpriteSheet,
+  frame: number,
+) {
+  const frameUrl = spriteSheet.frameUrls?.[frame];
+  if (frameUrl) {
+    return {
+      imageUrl: frameUrl,
+      column: 0,
+      row: 0,
+      columns: 1,
+      rows: 1,
+      independent: true,
+    } as const;
+  }
+
+  return {
+    imageUrl: spriteSheet.imageUrl,
+    ...getSpriteSheetFramePosition(frame, spriteSheet),
+    columns: spriteSheet.columns,
+    rows: spriteSheet.rows,
+    independent: false,
+  } as const;
+}

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { Assets } from "pixi.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAnimatedSpriteCanvasActions } from "../animated-sprite-canvas-events";
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
@@ -19,6 +20,37 @@ const model = (): AnimatedSpriteCanvasModel => ({
 });
 
 describe("AnimatedSpriteCanvasRuntime", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("preloads every independent prototype direction", async () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue({
+      source: { scaleMode: "linear" },
+    } as never);
+    const directionalModel = {
+      ...model(),
+      prototype: {
+        ...model().prototype,
+        frameUrls: ["front.png", "back.png"],
+      },
+    };
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: directionalModel,
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+
+    await (
+      runtime as unknown as {
+        preloadAnimatedSpriteTextures: (
+          value: AnimatedSpriteCanvasModel,
+        ) => Promise<void>;
+      }
+    ).preloadAnimatedSpriteTextures(directionalModel);
+
+    expect(load).toHaveBeenCalledWith("prototype.png");
+    expect(load).toHaveBeenCalledWith("front.png");
+    expect(load).toHaveBeenCalledWith("back.png");
+  });
+
   it("sets a finite zoom around the current viewport center", () => {
     const runtime = new AnimatedSpriteCanvasRuntime({
       model: model(),

@@ -18,8 +18,6 @@ export type {
   AssetSizeResponse,
   AudioAssetContent,
   CharacterAssetContent,
-  DirectionCountByPerspective,
-  DirectionCountForPerspective,
   ObjectAssetContent,
   SceneryAssetContent,
   SceneryLayerResponse,

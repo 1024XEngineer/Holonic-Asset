@@ -19,6 +19,7 @@ import type {
   ObjectAssetRecord,
   SpriteAssetRecordData,
 } from "../types/asset-record";
+import { getPerspectiveDirectionLayout } from "../../types/perspective-direction";
 
 const swordsmanPrototype: CharacterSpriteSheet = {
   format: "png-sprite-sheet",
@@ -149,19 +150,26 @@ function getSpriteDefaultSourceId(assetId: string) {
 }
 
 function createFallbackSpritePrototype(
-  asset: Pick<ProjectAsset, "canvasSize" | "thumbnailUrl">,
+  asset: Pick<
+    ProjectAsset,
+    "canvasSize" | "perspective" | "thumbnailUrl" | "prototypeUrls"
+  >,
 ): CharacterSpriteSheet {
   const dimensions = asset.canvasSize.match(/(\d+)\D+(\d+)/);
   const frameWidth = Number(dimensions?.[1]) || 64;
   const frameHeight = Number(dimensions?.[2]) || frameWidth;
 
+  const frameUrls = asset.prototypeUrls?.filter(Boolean);
+  const layout = getPerspectiveDirectionLayout(asset.perspective);
+
   return {
     format: "png-sprite-sheet",
-    imageUrl: asset.thumbnailUrl ?? "",
+    imageUrl: frameUrls?.[0] ?? asset.thumbnailUrl ?? "",
+    ...(frameUrls && frameUrls.length > 1 ? { frameUrls } : {}),
     frameWidth,
     frameHeight,
-    columns: 1,
-    rows: 1,
+    columns: layout.columns,
+    rows: layout.rows,
   };
 }
 

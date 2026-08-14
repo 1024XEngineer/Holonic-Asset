@@ -100,6 +100,44 @@ describe("toAssetGroups", () => {
     ]);
   });
 
+  it("keeps every prototype direction URL for the editor", () => {
+    const [group] = toAssetGroups(
+      [
+        {
+          ...assetItemBase,
+          type: "character",
+          dimensions: { width: 48, height: 64 },
+        },
+      ] satisfies AssetListItemResponse[],
+      new Map([
+        [
+          1,
+          {
+            ...assetItemBase,
+            assetId: 1,
+            projectId: 10,
+            type: "character",
+            dimensions: { width: 48, height: 64 },
+            content: {
+              directionCount: 4,
+              prototype: [
+                { id: 1, url: "/front.png" },
+                { id: 2, url: "/back.png" },
+                { id: 3, url: "/left.png" },
+                { id: 4, url: "/right.png" },
+              ],
+            },
+          },
+        ],
+      ]),
+    );
+
+    expect(group.assets[0]).toMatchObject({
+      thumbnailUrl: "/front.png",
+      prototypeUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
+    });
+  });
+
   it("does not report a visual canvas size for audio assets", () => {
     const [group] = toAssetGroups([
       {
