@@ -196,6 +196,27 @@ describe("editor session store", () => {
     expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(true);
   });
 
+  it("preserves a locally edited animation removed by a server refresh", () => {
+    const store = createEditorSessionStore(createCharacterRecord());
+    dispatchEditorCommand(store, {
+      type: "sprite.animation.rename",
+      animationId: "idle",
+      label: "Local idle edit",
+    });
+    const incoming = createCharacterRecord();
+    incoming.character.animations = [];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(store.getState().record).toMatchObject({
+      mode: "character",
+      character: {
+        animations: [{ id: "idle", label: "Local idle edit" }],
+      },
+    });
+    expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(true);
+  });
+
   it("rejects sprite commands for non-sprite asset records", () => {
     const record: AssetRecord = {
       mode: "scenery",

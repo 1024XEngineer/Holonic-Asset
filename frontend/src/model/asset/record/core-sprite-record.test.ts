@@ -1,10 +1,74 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   AssetDetailResponse,
   AssetRecordResponse,
 } from "../library/asset.contract";
-import { toCoreSpriteAssetWorkspace } from "./core-sprite-record";
+
+const mocks = vi.hoisted(() => ({
+  assetDetail: vi.fn(),
+  assetRecords: vi.fn(),
+  projectDetail: vi.fn(),
+}));
+
+vi.mock("../library/core-asset.api", () => ({
+  coreAssetApi: {
+    detail: mocks.assetDetail,
+    records: mocks.assetRecords,
+  },
+}));
+vi.mock("../../project", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../project")>()),
+  projectApi: { detail: mocks.projectDetail },
+}));
+
+import {
+  loadCoreSpriteAssetWorkspace,
+  toCoreSpriteAssetWorkspace,
+} from "./core-sprite-record";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.projectDetail.mockResolvedValue({ name: "Demo" });
+  mocks.assetRecords.mockResolvedValue({ records: [] });
+});
+
+describe("loadCoreSpriteAssetWorkspace", () => {
+  it.each(["draft", "0", "1.5"])(
+    "skips a non-persisted asset ID: %s",
+    async (assetId) => {
+      await expect(
+        loadCoreSpriteAssetWorkspace({ projectId: "11", assetId }),
+      ).resolves.toBeUndefined();
+      expect(mocks.assetDetail).not.toHaveBeenCalled();
+    },
+  );
+
+  it("skips Core assets without a sprite workspace", async () => {
+    mocks.assetDetail.mockResolvedValue(sceneryDetail());
+
+    await expect(
+      loadCoreSpriteAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toBeUndefined();
+    expect(mocks.projectDetail).not.toHaveBeenCalled();
+    expect(mocks.assetRecords).not.toHaveBeenCalled();
+  });
+
+  it("loads a persisted object with its project and record history", async () => {
+    mocks.assetDetail.mockResolvedValue(objectDetail());
+
+    await expect(
+      loadCoreSpriteAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toMatchObject({
+      projectName: "Demo",
+      asset: { id: "9", kind: "object" },
+      record: { mode: "object" },
+    });
+    expect(mocks.assetDetail).toHaveBeenCalledWith(9);
+    expect(mocks.projectDetail).toHaveBeenCalledWith("11");
+    expect(mocks.assetRecords).toHaveBeenCalledWith(9);
+  });
+});
 
 describe("toCoreSpriteAssetWorkspace", () => {
   it("maps Core animation frames into an editor sprite record", () => {
@@ -76,6 +140,47 @@ describe("toCoreSpriteAssetWorkspace", () => {
       },
     });
   });
+
+  it("rejects non-sprite Core assets", () => {
+    expect(() =>
+      toCoreSpriteAssetWorkspace({
+        projectId: "11",
+        projectName: "Demo",
+        detail: sceneryDetail(),
+        records: [],
+      }),
+    ).toThrow("require a Character or Object asset");
+  });
+
+  it("omits independent frame metadata when no usable frames exist", () => {
+    const detail = objectDetail();
+    if (detail.type !== "object") throw new Error("Expected object detail");
+    detail.content = {
+      directionCount: 2,
+      prototype: [{ id: 1 }],
+      animations: [{ id: 8, name: "Idle", frames: [{ id: 2 }] }],
+    };
+
+    const workspace = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "object",
+      object: {
+        prototype: { imageUrl: "" },
+        animations: [{ id: "8", frameCount: 0 }],
+      },
+    });
+    if (workspace.record.mode !== "object") return;
+    expect(workspace.record.object.prototype).not.toHaveProperty("frameUrls");
+    expect(workspace.record.object.animations?.[0]).not.toHaveProperty(
+      "spriteSheet",
+    );
+  });
 });
 
 function characterDetail(): AssetDetailResponse {
@@ -109,4 +214,16 @@ function characterDetail(): AssetDetailResponse {
       ],
     },
   };
+}
+
+function objectDetail(): AssetDetailResponse {
+  return { ...characterDetail(), type: "object" } as AssetDetailResponse;
+}
+
+function sceneryDetail(): AssetDetailResponse {
+  return {
+    ...characterDetail(),
+    type: "scenery",
+    content: undefined,
+  } as AssetDetailResponse;
 }
