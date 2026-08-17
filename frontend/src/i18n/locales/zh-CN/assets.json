@@ -1,5 +1,6 @@
 {
   "openEditor": "打开资产编辑器",
+  "openUISetEditor": "打开 UI Set 编辑器",
   "copy": "复制资产",
   "editDetails": "编辑资产详情",
   "deleteConfirm": "删除 {{name}}？",
@@ -31,6 +32,5 @@
     "canvas": "画布",
     "perspective": "视角",
     "saving": "保存中..."
-  },
-  "openUISetEditor": "打开 UI Set 编辑器"
+  }
 }
