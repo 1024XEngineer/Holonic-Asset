@@ -162,3 +162,22 @@ func animationImageHasTransparency(source image.Image) bool {
 	}
 	return false
 }
+
+func (s *animationGenerationService) loadAnimationContextFrames(
+	ctx context.Context,
+	references []string,
+) ([]image.Image, error) {
+	frames := make([]image.Image, len(references))
+	for index, reference := range references {
+		loaded, err := s.loadAnimationReference(ctx, reference)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load animation edit context frame %d: %w", index+1, err)
+		}
+		frame, err := imageprocessor.DecodeBase64Image(loaded)
+		if err != nil {
+			return nil, fmt.Errorf("generator: decode animation edit context frame %d: %w", index+1, err)
+		}
+		frames[index] = frame
+	}
+	return frames, nil
+}

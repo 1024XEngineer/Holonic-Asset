@@ -223,6 +223,23 @@ func TestSelectEditFrameContextIndicesRejectsUnsafeFrame(t *testing.T) {
 	}
 }
 
+func TestSelectEditFrameContextIndicesRejectsSplitSafeRuns(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{
+			{Safe: true}, {Safe: true}, {Safe: true},
+			{Safe: false},
+			{Safe: true}, {Safe: true}, {Safe: true},
+		},
+	}
+	_, err := selectEditFrameContextIndices(analysis, 4)
+	var qualityError *videoprocessor.QualityError
+	if !errors.As(err, &qualityError) || qualityError.Kind != "framing" ||
+		!strings.Contains(err.Error(), "continuous safe interval") {
+		t.Fatalf("expected split safe runs to be rejected, got %v", err)
+	}
+}
+
 func TestPackAnimationVideoFramesValidatesGridInputs(t *testing.T) {
 	frame := image.NewNRGBA(image.Rect(0, 0, 8, 8))
 	if _, err := packAnimationVideoFrames([]image.Image{frame}, 0); err == nil {

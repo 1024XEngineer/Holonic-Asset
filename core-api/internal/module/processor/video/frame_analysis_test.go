@@ -97,3 +97,45 @@ func drawSubject(frame draw.Image, bounds image.Rectangle) {
 }
 
 var _ frameExtractor = frameExtractorStub{}
+
+func TestAnalyzeFramePairsMeasuresMaskAndAppearanceChanges(t *testing.T) {
+	original := testGreenFrame(96, 96)
+	drawSubject(original, image.Rect(30, 18, 66, 88))
+
+	shifted := testGreenFrame(96, 96)
+	drawSubject(shifted, image.Rect(36, 18, 72, 88))
+	differences, err := AnalyzeFramePairs(
+		[]image.Image{original, original},
+		[]image.Image{original, shifted},
+		testGreenChromaKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if differences[0].ForegroundMaskDifference != 0 || differences[0].AppearanceMSE != 0 {
+		t.Fatalf("identical frame difference = %+v, want zero", differences[0])
+	}
+	if differences[1].ForegroundMaskDifference <= 0 || differences[1].AppearanceMSE <= 0 {
+		t.Fatalf("shifted frame difference = %+v, want positive mask and appearance changes", differences[1])
+	}
+
+	recoloured := testGreenFrame(96, 96)
+	draw.Draw(recoloured, image.Rect(30, 18, 66, 88), &image.Uniform{C: color.NRGBA{R: 230, G: 210, B: 40, A: 255}}, image.Point{}, draw.Src)
+	differences, err = AnalyzeFramePairs([]image.Image{original}, []image.Image{recoloured}, testGreenChromaKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if differences[0].ForegroundMaskDifference != 0 || differences[0].AppearanceMSE <= 0 {
+		t.Fatalf("recoloured frame difference = %+v, want appearance-only change", differences[0])
+	}
+}
+
+func TestAnalyzeFramePairsValidatesSequences(t *testing.T) {
+	frame := testGreenFrame(96, 96)
+	if _, err := AnalyzeFramePairs(nil, nil, testGreenChromaKey); err == nil {
+		t.Fatal("expected empty original sequence to be rejected")
+	}
+	if _, err := AnalyzeFramePairs([]image.Image{frame}, nil, testGreenChromaKey); err == nil {
+		t.Fatal("expected mismatched frame pair lengths to be rejected")
+	}
+}

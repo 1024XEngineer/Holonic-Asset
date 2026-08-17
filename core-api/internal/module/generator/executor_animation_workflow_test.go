@@ -29,6 +29,7 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{
 		Direction:   "back_right",
 		Style:       "painted pixel art",
+		Action:      "walking cycle",
 		FrameCount:  8,
 		Columns:     4,
 		FrameWidth:  128,
@@ -356,6 +357,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	wantGeneration := &assetdomain.AnimationGenerationConfig{
 		Direction:   "back_right",
 		Style:       "painted pixel art",
+		Action:      "walking cycle",
 		FrameCount:  8,
 		Columns:     3,
 		FrameWidth:  128,
@@ -419,6 +421,7 @@ func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
 	want := &assetdomain.AnimationGenerationConfig{
 		Direction:   "front",
 		Style:       "finely drawn production-quality 2D game asset art",
+		Action:      "idle",
 		FrameCount:  16,
 		Columns:     4,
 		FrameWidth:  128,

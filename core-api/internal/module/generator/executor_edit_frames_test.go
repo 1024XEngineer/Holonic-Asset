@@ -14,6 +14,7 @@ import (
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -81,8 +82,18 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	if !reflect.DeepEqual(request.TargetFrameIndices, []int{1, 3}) {
 		t.Fatalf("unexpected target frame indices: %+v", request.TargetFrameIndices)
 	}
-	if animations.request.Action != "make the sword glow" {
-		t.Fatalf("unexpected edit prompt: %+v", animations.request)
+	if !reflect.DeepEqual(request.ContextReferenceImages, []string{
+		"animations/original-4-unprocessed.png",
+		"animations/original-5-unprocessed.png",
+		"animations/original-6-unprocessed.png",
+		"animations/original-7-unprocessed.png",
+		"animations/original-8-unprocessed.png",
+	}) {
+		t.Fatalf("unexpected continuity context references: %+v", request.ContextReferenceImages)
+	}
+	if animations.request.Action != "make the sword glow" ||
+		animations.request.OriginalAction != "raise the hat in greeting" {
+		t.Fatalf("unexpected edit prompt or original action: %+v", animations.request)
 	}
 	if assets.updateCalls != 1 || assets.updatedAnimationID != 42 || len(assets.frames) != 12 {
 		t.Fatalf("unexpected updated animation: calls=%d id=%d frames=%d", assets.updateCalls, assets.updatedAnimationID, len(assets.frames))
@@ -249,7 +260,7 @@ func editFramesAsset(t *testing.T, frameCount int) assetdomain.Asset {
 	t.Helper()
 	content := assetdomain.NewAssetContent(assetdomain.AssetTypeCharacter)
 	content.Animations = []assetdomain.Animation{{ID: 42, Name: "walk", Frames: make([]assetdomain.Frame, frameCount), Generation: &assetdomain.AnimationGenerationConfig{
-		Direction: "front", Style: "pixel art", FrameCount: frameCount, Columns: 4, FrameWidth: 64, FrameHeight: 64, FPS: 10, Resolution: "720p", Duration: 5, AspectRatio: "1:1",
+		Direction: "front", Style: "pixel art", Action: "raise the hat in greeting", FrameCount: frameCount, Columns: 4, FrameWidth: 64, FrameHeight: 64, FPS: 10, Resolution: "720p", Duration: 5, AspectRatio: "1:1",
 	}}}
 	for index := range content.Animations[0].Frames {
 		value := fmt.Sprintf("animations/original-%d.png", index+1)
@@ -366,6 +377,7 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 		want       string
 	}{
 		{name: "generation error", generation: errors.New("provider failed"), want: "generate edited frames"},
+		{name: "continuity gate error", generation: &videoprocessor.QualityError{Kind: "continuity", Message: "abrupt pose change"}, want: "abrupt pose change"},
 		{name: "nil result", result: nil, want: "edited frame result contains 0 frames"},
 		{name: "wrong processed count", result: &generator.AnimationGenerationResult{Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited"}}, RawFrames: []imageprocessor.ImageRegion{{ImageBase64: "raw"}}}, want: "expected 3"},
 		{name: "wrong raw count", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(2, "raw")}, want: "edited raw frame result contains 2"},
@@ -391,6 +403,9 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 			}
 			if test.name != "update error" && assets.updateCalls != 0 {
 				t.Fatalf("failed edit updated animation: %d", assets.updateCalls)
+			}
+			if test.name == "continuity gate error" && (len(store.persisted) != 0 || len(store.uploads) != 0) {
+				t.Fatalf("continuity-rejected edit persisted frames: processed=%d raw=%d", len(store.persisted), len(store.uploads))
 			}
 		})
 	}

@@ -108,14 +108,24 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 	if endFrame.URL == nil || strings.TrimSpace(*endFrame.URL) == "" {
 		return nil, fmt.Errorf("generator: frame %d has no image URL", endFrame.ID)
 	}
+	contextReferences := make([]string, contextCount)
+	for index := range contextCount {
+		frame := animation.Frames[contextStart+index]
+		if frame.URL == nil || strings.TrimSpace(*frame.URL) == "" {
+			return nil, fmt.Errorf("generator: frame %d has no image URL", frame.ID)
+		}
+		contextReferences[index] = animationUnprocessedImageURL(strings.TrimSpace(*frame.URL))
+	}
 	request := &AnimationGenerationRequest{
-		Description:           description,
-		Style:                 generation.Style,
-		Action:                prompt,
-		ReferenceImage:        animationUnprocessedImageURL(strings.TrimSpace(*startFrame.URL)),
-		EndReferenceImage:     animationUnprocessedImageURL(strings.TrimSpace(*endFrame.URL)),
-		ReferenceImageContext: true,
-		TargetFrameIndices:    targetFrameIndices,
+		Description:            description,
+		Style:                  generation.Style,
+		Action:                 prompt,
+		OriginalAction:         generation.Action,
+		ReferenceImage:         animationUnprocessedImageURL(strings.TrimSpace(*startFrame.URL)),
+		EndReferenceImage:      animationUnprocessedImageURL(strings.TrimSpace(*endFrame.URL)),
+		ReferenceImageContext:  true,
+		TargetFrameIndices:     targetFrameIndices,
+		ContextReferenceImages: contextReferences,
 		// Generate one ordered context segment, then replace only the requested
 		// samples in the original animation.
 		FrameCount:  contextCount,

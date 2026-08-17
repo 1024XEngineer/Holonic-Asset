@@ -417,23 +417,32 @@ func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testi
 			},
 		},
 	}
+	editedFrames := animationTestVideoFrames(3)
+	editedMiddle := editedFrames[1].(*image.NRGBA)
+	draw.Draw(editedMiddle, image.Rect(67, 44, 77, 54), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
 	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
-		Frames: animationTestVideoFrames(3),
+		Frames: editedFrames,
 	}}}
 	service := newAnimationGenerationService(videos, processor, videoProcessor)
+	contextFrames := animationTestVideoFrames(3)
+	contextReferences := make([]string, len(contextFrames))
+	for index, frame := range contextFrames {
+		contextReferences[index] = animationTestImageDataURL(t, frame)
+	}
 
 	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
-		Description:           "knight",
-		Action:                "raise the sword",
-		ReferenceImage:        startReference,
-		EndReferenceImage:     endReference,
-		ReferenceImageContext: true,
-		TargetFrameIndices:    []int{1},
-		FrameCount:            3,
-		Columns:               3,
-		FrameWidth:            64,
-		FrameHeight:           64,
-		FPS:                   10,
+		Description:            "knight",
+		Action:                 "raise the sword",
+		ReferenceImage:         startReference,
+		EndReferenceImage:      endReference,
+		ReferenceImageContext:  true,
+		TargetFrameIndices:     []int{1},
+		ContextReferenceImages: contextReferences,
+		FrameCount:             3,
+		Columns:                3,
+		FrameWidth:             64,
+		FrameHeight:            64,
+		FPS:                    10,
 	})
 	if err != nil {
 		t.Fatalf("generate edited frame segment: %v", err)
@@ -452,8 +461,7 @@ func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testi
 		t.Fatalf("video request contains an empty boundary reference: %+v", videos.requests[0])
 	}
 	if !strings.Contains(videos.requests[0].Prompt, "BOUNDARY FRAME REFERENCES") ||
-		!strings.Contains(videos.requests[0].Prompt, "start input") ||
-		!strings.Contains(videos.requests[0].Prompt, "end input") ||
+		!strings.Contains(videos.requests[0].Prompt, "start/end inputs") ||
 		strings.Contains(videos.requests[0].Prompt, "ordered image array") ||
 		strings.Contains(videos.requests[0].Prompt, "@Image") {
 		t.Fatalf("unexpected boundary-frame edit prompt: %s", videos.requests[0].Prompt)
@@ -591,6 +599,15 @@ func animationTestOpaquePrototypeColor(t *testing.T, background color.NRGBA) str
 	encoded, err := imageprocessor.EncodePNGBase64(frame)
 	if err != nil {
 		t.Fatalf("encode opaque prototype: %v", err)
+	}
+	return "data:image/png;base64," + encoded
+}
+
+func animationTestImageDataURL(t *testing.T, frame image.Image) string {
+	t.Helper()
+	encoded, err := imageprocessor.EncodePNGBase64(frame)
+	if err != nil {
+		t.Fatalf("encode animation test frame: %v", err)
 	}
 	return "data:image/png;base64," + encoded
 }

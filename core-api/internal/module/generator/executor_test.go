@@ -35,6 +35,7 @@ func (s *animationGenerationServiceStub) Generate(
 	*s.events = append(*s.events, "generate_animation")
 	copy := *request
 	copy.TargetFrameIndices = append([]int(nil), request.TargetFrameIndices...)
+	copy.ContextReferenceImages = append([]string(nil), request.ContextReferenceImages...)
 	s.request = &copy
 	s.requests = append(s.requests, &copy)
 	call := len(s.requests) - 1

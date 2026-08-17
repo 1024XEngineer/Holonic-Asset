@@ -9,7 +9,7 @@ import (
 const (
 	DefaultAnimationStyle         = "finely drawn production-quality 2D game asset art"
 	MaxAnimationVideoCharacters   = 2450
-	maxAnimationBaseCharacters    = 2000
+	maxAnimationBaseCharacters    = 1700
 	maxAnimationDescriptionLength = 240
 	maxAnimationStyleLength       = 180
 	maxAnimationActionLength      = 320
@@ -19,6 +19,7 @@ type AnimationOptions struct {
 	Description        string
 	Style              string
 	Action             string
+	OriginalAction     string
 	FrameCount         int
 	LocalFrameEdit     bool
 	TargetFrameIndices []int
@@ -32,6 +33,7 @@ func BuildAnimationVideo(options AnimationOptions) string {
 	description := limit(options.Description, maxAnimationDescriptionLength)
 	style := limit(options.Style, maxAnimationStyleLength)
 	action := limit(options.Action, maxAnimationActionLength)
+	originalAction := limit(options.OriginalAction, maxAnimationActionLength)
 	if style == "" {
 		style = DefaultAnimationStyle
 	}
@@ -47,25 +49,30 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose`
 	if options.LocalFrameEdit {
 		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
+		originalActionInstruction := "- the stored original action is unavailable; preserve every pre-existing motion implied by the user's edit wording and the boundary poses"
+		if originalAction != "" {
+			originalActionInstruction = fmt.Sprintf("- ORIGINAL ACTION — MUST BE PRESERVED: %s", originalAction)
+		}
 		referenceInstructions = `BOUNDARY FRAME REFERENCES:
-- the start input is the original unprocessed frame immediately before the selected interval, clamped to the animation start when necessary
-- the end input is the original unprocessed frame immediately after the selected interval, clamped to the animation end when necessary
-- generate one normal video that starts exactly from the start frame and arrives exactly at the end frame
-- the two inputs are separate full-frame boundary anchors, never a contact sheet, collage, grid, storyboard, multi-frame canvas, or spritesheet
-- preserve exact identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
+- start/end inputs are the original unprocessed frames immediately outside the selected interval, clamped at the animation start or end when necessary
+- generate one normal full-frame video that matches the start frame exactly and arrives at the end frame exactly
+- inputs are separate full-frame anchors, never a contact sheet, collage, grid, storyboard, multi-frame canvas, or spritesheet
+- preserve identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
 		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
-- the user's requested change is authoritative inside those target samples and must be clearly visible there
-- schedule and compress the requested motion so it begins in the first target sample and completes by the last target sample; do not place it only before or after them
-- preserve timing and pose progression in non-target samples, using them only to enter and exit the edited motion smoothly
-- preserve everything not requested; do not restart the full action, invent a new cycle, subject, direction, camera, or canvas layout
-- produce one smooth ordered video segment whose target samples can be inserted back into the original animation`, targetFrames, options.FrameCount)
+%s
+- one continuous chronological take; no restart, montage, unrelated motion, or phase reordering; boundary images may omit an internal action extreme
+- ADDITIVE EDIT: keep the pre-existing action recognizable while performing the requested change; never replace it
+- PRIMARY REQUIREMENT: the requested change must be unmistakably visible; copying original target pixels or making only a token change is invalid
+- retain the original action's identity and principal phase/extreme, but allow local pose, path, and timing adjustments needed to show the change clearly
+- begin the change by the first target, keep it readable across most target samples, and complete it by the last
+- non-target samples are seam context only: match entry/exit smoothly, but do not force target poses to resemble the originals`, targetFrames, options.FrameCount, originalActionInstruction)
 	}
 	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image inputs.
 
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
 - every frame contains exactly ONE complete subject and its attached or held props
-- normal full-frame video, never a contact sheet, collage, grid, storyboard, or spritesheet
-- never show multiple directions, multiple poses, copies, cells, borders, labels, or the reference layout
+- normal full-frame video; never a contact sheet, collage, grid, storyboard, spritesheet, multiple views, poses, or copies
+- fixed camera and root; keep the whole subject inside the inner 70%% on a uniform pure-green #00FF00 background
 
 USER SPECIFICATION — AUTHORITATIVE:
 - subject: %s
@@ -115,6 +122,35 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 - preserve the exact subject, attached parts, and opaque silhouette in every frame
 - keep the background uniformly #00FF00 with strong colour separation
 - do not fade, dissolve, blur away, or merge any body or object part into the background`
+	}
+	if issueKind == "continuity" {
+		correction = `Generate a fresh take; the previous local edit created an abrupt motion discontinuity.
+- match the supplied start and end boundary poses at the two seams; target samples do not need to copy their original pixels or exact poses
+- keep the pre-existing action recognizable, including its principal phase or extreme, while giving the requested change enough pose freedom to be obvious
+- smooth only the entry and exit of the requested change; never shrink, hide, or remove that change merely to resemble the original target frames
+- allow no sudden root displacement, scale jump, silhouette pop, or isolated one-frame spike at the edit boundaries
+- the requested change remains the primary requirement throughout the target interval`
+	}
+	if issueKind == "motion_preservation" {
+		correction = `Generate a fresh take; the previous local edit erased or weakened motion that already existed in the selected interval.
+- restore enough of the pre-existing action to keep its identity and principal phase or extreme recognizable
+- treat the requested change as an additive simultaneous layer, never as a replacement for the original action
+- local pose, path, and timing adjustments are allowed when needed to make the requested change clearly visible
+- do not solve preservation by copying the original target frames or weakening the requested change`
+	}
+	if issueKind == "temporal_coherence" {
+		correction = `Generate exactly one continuous chronological action interval; the previous local edit mixed or reordered motion phases.
+- no repeated take, restart, alternate pose sequence, pose montage, unrelated motion, or phase reversal
+- keep the pre-existing action recognizable and retain its chronological phase order
+- layer the requested change simultaneously onto that action instead of starting a second action
+- allow the requested change to depart visibly from the original target poses while progressing smoothly once from the supplied start boundary to the end boundary`
+	}
+	if issueKind == "edit_application" {
+		correction = `Generate a fresh take; the previous local edit reproduced the original animation but failed to visibly perform the requested addition.
+- the requested change is mandatory, not optional; make it unmistakably readable across most target samples
+- keep the pre-existing action recognizable instead of replacing it, but do not prioritize pixel similarity over the requested change
+- visibly transform the exact subject part, object, pose, or effect named by the user specification
+- use a clear pose difference, not a token movement; do not return the unedited original motion, a barely changed pose, or a change hidden outside the target interval`
 	}
 	return limit(strings.TrimSpace(base+"\n\nQUALITY RETRY OVERRIDE — FOLLOW THESE MORE STRICTLY:\n"+correction), MaxAnimationVideoCharacters)
 }

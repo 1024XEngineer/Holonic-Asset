@@ -120,6 +120,7 @@ type AnimationGenerationRequest struct {
 	Description       string
 	Style             string
 	Action            string
+	OriginalAction    string
 	ReferenceImage    string
 	EndReferenceImage string
 	// ReferenceImagePrepared marks an original high-resolution green-screen
@@ -133,14 +134,20 @@ type AnimationGenerationRequest struct {
 	// TargetFrameIndices identifies the zero-based output samples that will be
 	// replaced when ReferenceImageContext is true.
 	TargetFrameIndices []int
-	FrameCount         int
-	Columns            int
-	FrameWidth         int
-	FrameHeight        int
-	FPS                int
-	Resolution         string
-	Duration           int
-	AspectRatio        string
+	// ContextReferenceImages contains the original unprocessed frames for the
+	// complete local-edit interval. The continuity gate temporarily replaces the
+	// target positions in this sequence before accepting generated output.
+	ContextReferenceImages []string
+	FrameCount             int
+	Columns                int
+	FrameWidth             int
+	FrameHeight            int
+	FPS                    int
+	Resolution             string
+	Duration               int
+	AspectRatio            string
+
+	continuityReferenceFrames []image.Image
 }
 
 type AnimationGenerationResult struct {
@@ -225,10 +232,17 @@ func (s *animationGenerationService) Generate(
 	if err != nil {
 		return nil, err
 	}
+	if options.ReferenceImageContext {
+		options.continuityReferenceFrames, err = s.loadAnimationContextFrames(ctx, options.ContextReferenceImages)
+		if err != nil {
+			return nil, err
+		}
+	}
 	promptOptions := prompts.AnimationOptions{
 		Description:        options.Description,
 		Style:              options.Style,
 		Action:             options.Action,
+		OriginalAction:     options.OriginalAction,
 		FrameCount:         options.FrameCount,
 		LocalFrameEdit:     options.ReferenceImageContext,
 		TargetFrameIndices: options.TargetFrameIndices,
@@ -304,7 +318,12 @@ func normalizeAnimationGenerationRequest(
 	value.Description = strings.TrimSpace(value.Description)
 	value.Style = strings.TrimSpace(value.Style)
 	value.Action = strings.TrimSpace(value.Action)
+	value.OriginalAction = strings.TrimSpace(value.OriginalAction)
 	value.TargetFrameIndices = append([]int(nil), value.TargetFrameIndices...)
+	value.ContextReferenceImages = append([]string(nil), value.ContextReferenceImages...)
+	for index := range value.ContextReferenceImages {
+		value.ContextReferenceImages[index] = strings.TrimSpace(value.ContextReferenceImages[index])
+	}
 	value.ReferenceImage = strings.TrimSpace(value.ReferenceImage)
 	value.EndReferenceImage = strings.TrimSpace(value.EndReferenceImage)
 	value.Resolution = strings.TrimSpace(value.Resolution)
@@ -379,6 +398,18 @@ func normalizeAnimationGenerationRequest(
 	if value.ReferenceImageContext && value.EndReferenceImage == "" {
 		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame edit end reference image is required")
 	}
+	if value.ReferenceImageContext && len(value.ContextReferenceImages) != value.FrameCount {
+		return AnimationGenerationRequest{}, fmt.Errorf(
+			"generator: animation frame edit requires %d context reference images; got %d",
+			value.FrameCount,
+			len(value.ContextReferenceImages),
+		)
+	}
+	for index, reference := range value.ContextReferenceImages {
+		if reference == "" {
+			return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame edit context reference image %d is required", index+1)
+		}
+	}
 	return value, nil
 }
 
@@ -390,11 +421,7 @@ func (s *animationGenerationService) processVideo(
 	var loop AnimationLoopSelection
 	processed, err := s.videoProcessor.Process(ctx, video, videoprocessor.ProcessOptions{
 		AnalysisFPS: animationAnalysisFPS,
-		ChromaKey: videoprocessor.ChromaKey{
-			HueMin: animationChromaHueMin, HueMax: animationChromaHueMax,
-			HighSaturationMin: animationChromaHighSaturationMin, HighValueMin: animationChromaHighValueMin,
-			BrightSaturationMin: animationChromaBrightSaturationMin, BrightValueMin: animationChromaBrightValueMin,
-		},
+		ChromaKey:   animationVideoChromaKey(),
 		Select: func(analysis videoprocessor.FrameSequenceAnalysis) ([]int, error) {
 			if request.ReferenceImageContext {
 				indices, selectErr := selectEditFrameContextIndices(analysis, request.FrameCount)
@@ -420,6 +447,11 @@ func (s *animationGenerationService) processVideo(
 	})
 	if err != nil {
 		return nil, err
+	}
+	if request.ReferenceImageContext {
+		if err := validateEditFrameContinuity(request, processed.Frames); err != nil {
+			return nil, err
+		}
 	}
 	rawFrames := make([]imageprocessor.ImageRegion, 0, len(processed.Frames))
 	for index, frame := range processed.Frames {
@@ -486,24 +518,32 @@ func selectEditFrameContextIndices(analysis videoprocessor.FrameSequenceAnalysis
 	if len(analysis.Frames) < frameCount {
 		return nil, fmt.Errorf("generator: video has %d candidate frames; need at least %d", len(analysis.Frames), frameCount)
 	}
-	safeIndices := make([]int, 0, len(analysis.Frames))
-	for index, frame := range analysis.Frames {
-		if frame.Safe {
-			safeIndices = append(safeIndices, index)
+	bestStart, bestEnd := -1, -1
+	for start := 0; start < len(analysis.Frames); {
+		for start < len(analysis.Frames) && !analysis.Frames[start].Safe {
+			start++
 		}
+		end := start
+		for end < len(analysis.Frames) && analysis.Frames[end].Safe {
+			end++
+		}
+		if end-start > bestEnd-bestStart {
+			bestStart, bestEnd = start, end
+		}
+		start = max(end, start+1)
 	}
-	if len(safeIndices) < frameCount {
+	if bestEnd-bestStart < frameCount {
 		return nil, &videoprocessor.QualityError{
-			Kind: "framing", Message: fmt.Sprintf("generator: edit context video has %d safe candidate frames; need at least %d", len(safeIndices), frameCount),
+			Kind: "framing", Message: fmt.Sprintf("generator: edit context video has no continuous safe interval with %d frames", frameCount),
 		}
 	}
 	indices := make([]int, frameCount)
 	if frameCount == 1 {
-		indices[0] = safeIndices[(len(safeIndices)-1)/2]
+		indices[0] = bestStart + (bestEnd-bestStart-1)/2
 	} else {
-		last := len(safeIndices) - 1
+		last := bestEnd - bestStart - 1
 		for index := range frameCount {
-			indices[index] = safeIndices[(index*last+(frameCount-1)/2)/(frameCount-1)]
+			indices[index] = bestStart + (index*last+(frameCount-1)/2)/(frameCount-1)
 		}
 	}
 	return indices, nil
@@ -728,6 +768,7 @@ func (e *executor) generateAnimation(
 		Generation: &assetdomain.AnimationGenerationConfig{
 			Direction:   strings.ToLower(strings.TrimSpace(payload.Direction)),
 			Style:       generationRequest.Style,
+			Action:      generationRequest.Action,
 			FrameCount:  generationRequest.FrameCount,
 			Columns:     generationRequest.Columns,
 			FrameWidth:  generationRequest.FrameWidth,
