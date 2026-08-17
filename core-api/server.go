@@ -148,8 +148,13 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	// Business modules.
 	workspaceModule := workspace.New(projectStore, assetStore, imageService, references)
 	videoProvider := videoclient.NewQNAProvider(videoclient.QNAConfig{
-		BaseURL: cfg.Video.BaseURL,
-		APIKey:  cfg.Video.APIKey,
+		BaseURL:      cfg.Video.BaseURL,
+		APIKey:       cfg.Video.APIKey,
+		PollInterval: cfg.Video.PollInterval,
+		PollTimeout:  cfg.Video.PollTimeout,
+		MaxRetries:   cfg.Video.MaxRetries,
+		RetryDelay:   cfg.Video.RetryDelay,
+		Logger:       appLogger,
 	})
 	videos := videoclient.NewVideoGenerationService(videoProvider)
 	imageProcessor := InitImageProcessor()

@@ -7,16 +7,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
 
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
 func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 	var polls atomic.Int32
+	logs := &recordingLogger{}
 	var received struct {
 		Prompt        string `json:"prompt"`
 		ImageURL      string `json:"image_url"`
@@ -70,6 +73,7 @@ func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 		APIKey:       "test-key",
 		PollInterval: time.Millisecond,
 		HTTPClient:   server.Client(),
+		Logger:       logs,
 	})
 	longPrompt := strings.Repeat("角色和道具必须保持完整。", 400)
 	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
@@ -91,6 +95,26 @@ func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 	}
 	if !utf8.ValidString(received.Prompt) {
 		t.Fatal("provider prompt is not valid UTF-8")
+	}
+	inProgress, ok := logs.find("qna video task still in progress")
+	if !ok {
+		t.Fatal("expected in-progress poll log")
+	}
+	for key, want := range map[string]any{
+		"stage":           "poll",
+		"request_id":      "request-1",
+		"status_code":     http.StatusBadRequest,
+		"task_status":     "IN_PROGRESS",
+		"detail_type":     "request_in_progress",
+		"will_retry":      false,
+		"will_poll_again": true,
+	} {
+		if got := inProgress.fields[key]; got != want {
+			t.Errorf("in-progress log field %q = %#v, want %#v", key, got, want)
+		}
+	}
+	if _, ok := logs.find("qna video API request failed"); ok {
+		t.Fatal("in-progress poll must not be logged as an API failure")
 	}
 
 	video, err := provider.Download(context.Background(), result.VideoURL)
@@ -149,6 +173,68 @@ func TestQNAProviderSendsStartAndEndImages(t *testing.T) {
 	}
 }
 
+func TestQNAProviderRetriesPollTimeoutAndLogsWillRetry(t *testing.T) {
+	var polls atomic.Int32
+	logs := &recordingLogger{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Method {
+		case http.MethodPost:
+			_ = json.NewEncoder(writer).Encode(map[string]string{"request_id": "request-timeout"})
+		case http.MethodGet:
+			if polls.Add(1) == 1 {
+				<-request.Context().Done()
+				return
+			}
+			_ = json.NewEncoder(writer).Encode(map[string]any{
+				"status": "COMPLETED",
+				"video":  map[string]string{"url": "https://cdn.example.test/video.mp4"},
+			})
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL:      server.URL,
+		APIKey:       "test-key",
+		PollInterval: time.Millisecond,
+		PollTimeout:  20 * time.Millisecond,
+		MaxRetries:   1,
+		RetryDelay:   time.Millisecond,
+		HTTPClient:   server.Client(),
+		Logger:       logs,
+	})
+	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "fixed camera",
+		StartImageURL: "data:image/png;base64,cG5n",
+	})
+	if err != nil {
+		t.Fatalf("generate video: %v", err)
+	}
+	if polls.Load() != 2 || result.RequestID != "request-timeout" {
+		t.Fatalf("polls=%d result=%+v", polls.Load(), result)
+	}
+
+	entry, ok := logs.find("qna video API transport failure")
+	if !ok {
+		t.Fatal("expected poll timeout log")
+	}
+	for key, want := range map[string]any{
+		"stage":        "poll",
+		"request_id":   "request-timeout",
+		"attempt":      1,
+		"max_attempts": 2,
+		"error_kind":   string(videoclient.ErrorKindTimeout),
+		"transient":    true,
+		"will_retry":   true,
+	} {
+		if got := entry.fields[key]; got != want {
+			t.Errorf("timeout log field %q = %#v, want %#v", key, got, want)
+		}
+	}
+}
+
 func TestQNAProviderRetriesTransientCreateStatus(t *testing.T) {
 	var creates atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -186,6 +272,72 @@ func TestQNAProviderRetriesTransientCreateStatus(t *testing.T) {
 	}
 	if result.RequestID != "request-retry" {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestQNAProviderUsesDefaultRetriesAndLogsRequestStage(t *testing.T) {
+	var creates atomic.Int32
+	logs := &recordingLogger{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != videoclient.DefaultQNACreatePath {
+			http.NotFound(writer, request)
+			return
+		}
+		if creates.Add(1) < 3 {
+			writer.Header().Set("Server", "test-edge")
+			writer.Header().Set("CF-Ray", "test-ray")
+			writer.WriteHeader(522)
+			return
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"request_id": "request-default-retry",
+			"video":      map[string]string{"url": "https://cdn.example.test/video.mp4"},
+		})
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL:    server.URL,
+		APIKey:     "test-key",
+		RetryDelay: time.Millisecond,
+		HTTPClient: server.Client(),
+		Logger:     logs,
+	})
+	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "fixed camera",
+		StartImageURL: "data:image/png;base64,cG5n",
+	})
+	if err != nil {
+		t.Fatalf("generate video: %v", err)
+	}
+	if creates.Load() != 3 {
+		t.Fatalf("create calls = %d, want 3", creates.Load())
+	}
+	if result.RequestID != "request-default-retry" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	entry, ok := logs.find("qna video API request failed")
+	if !ok {
+		t.Fatal("expected staged QNA failure log")
+	}
+	for key, want := range map[string]any{
+		"provider":        "qna",
+		"stage":           "create",
+		"method":          http.MethodPost,
+		"endpoint":        videoclient.DefaultQNACreatePath,
+		"attempt":         1,
+		"max_attempts":    4,
+		"status_code":     522,
+		"upstream_server": "test-edge",
+		"cf_ray":          "test-ray",
+		"will_retry":      true,
+		"error_kind":      string(videoclient.ErrorKindUnavailable),
+		"transient":       true,
+	} {
+		if got := entry.fields[key]; got != want {
+			t.Errorf("log field %q = %#v, want %#v", key, got, want)
+		}
 	}
 }
 
@@ -245,6 +397,7 @@ func TestQNAProviderRetriesTransientPollAndDownloadStatus(t *testing.T) {
 }
 
 func TestQNAProviderReturnsStableTaskFailure(t *testing.T) {
+	logs := &recordingLogger{}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.Method {
 		case http.MethodPost:
@@ -263,6 +416,7 @@ func TestQNAProviderReturnsStableTaskFailure(t *testing.T) {
 		APIKey:       "test-key",
 		PollInterval: time.Millisecond,
 		HTTPClient:   server.Client(),
+		Logger:       logs,
 	})
 	_, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
 		Prompt:        "fixed camera",
@@ -278,4 +432,68 @@ func TestQNAProviderReturnsStableTaskFailure(t *testing.T) {
 	if !strings.Contains(providerErr.Message, "content rejected") {
 		t.Fatalf("unexpected error message: %q", providerErr.Message)
 	}
+	entry, ok := logs.find("qna video task failed")
+	if !ok {
+		t.Fatal("expected QNA task failure log")
+	}
+	for key, want := range map[string]any{
+		"provider":    "qna",
+		"stage":       "poll",
+		"request_id":  "request-failed",
+		"task_status": "FAILED",
+		"error_kind":  string(videoclient.ErrorKindTaskFailed),
+	} {
+		if got := entry.fields[key]; got != want {
+			t.Errorf("log field %q = %#v, want %#v", key, got, want)
+		}
+	}
+}
+
+type recordedLogEntry struct {
+	message string
+	fields  map[string]any
+}
+
+type recordingLogger struct {
+	mu      sync.Mutex
+	entries []recordedLogEntry
+}
+
+func (l *recordingLogger) Debug(message string, fields ...logger.Field) {
+	l.record(message, fields)
+}
+
+func (l *recordingLogger) Info(message string, fields ...logger.Field) {
+	l.record(message, fields)
+}
+
+func (l *recordingLogger) Warn(message string, fields ...logger.Field) {
+	l.record(message, fields)
+}
+
+func (l *recordingLogger) Error(message string, fields ...logger.Field) {
+	l.record(message, fields)
+}
+
+func (*recordingLogger) Sync() error { return nil }
+
+func (l *recordingLogger) record(message string, fields []logger.Field) {
+	values := make(map[string]any, len(fields))
+	for _, field := range fields {
+		values[field.Key] = field.Val
+	}
+	l.mu.Lock()
+	l.entries = append(l.entries, recordedLogEntry{message: message, fields: values})
+	l.mu.Unlock()
+}
+
+func (l *recordingLogger) find(message string) (recordedLogEntry, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, entry := range l.entries {
+		if entry.message == message {
+			return entry, true
+		}
+	}
+	return recordedLogEntry{}, false
 }
