@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   coreList: vi.fn(),
@@ -62,6 +62,10 @@ beforeEach(() => {
   mocks.coreUpdate.mockResolvedValue({});
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("assetApi Core routing", () => {
   it("loads and maps assets from the Core API", async () => {
     await expect(assetApi.listGroups("42")).resolves.toEqual([
@@ -89,6 +93,36 @@ describe("assetApi Core routing", () => {
         assets: [expect.objectContaining({ id: "8" })],
       }),
     ]);
+  });
+
+  it("adds the development UI Set fixture with and without an existing UI Set group", async () => {
+    vi.stubEnv("MODE", "development");
+
+    const withoutUISet = await assetApi.listGroups("42");
+    expect(withoutUISet).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "uiset",
+          assets: [expect.objectContaining({ id: "demo-ui-set" })],
+        }),
+      ]),
+    );
+
+    mocks.coreList.mockResolvedValueOnce({
+      assets: [
+        ...remoteAssets.assets,
+        { ...remoteAssets.assets[0], assetId: 9, name: "HUD", type: "uiset" },
+      ],
+    });
+    const withUISet = await assetApi.listGroups("42");
+    const group = withUISet.find((candidate) => candidate.kind === "uiset");
+
+    expect(group?.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "9" }),
+        expect.objectContaining({ id: "demo-ui-set" }),
+      ]),
+    );
   });
 
   it("uses Core API copy and refreshes the remote library", async () => {

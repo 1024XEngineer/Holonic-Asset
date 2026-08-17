@@ -202,6 +202,43 @@ describe("editor session store", () => {
     });
   });
 
+  it("ignores no-op UI Set edits and rejects UI Set commands for other assets", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    const record = store.getState().record;
+    if (record.mode !== "uiset") throw new Error("Expected a UI Set record.");
+    const component = record.uiset.components[0];
+    if (!component) throw new Error("Expected a UI Set component.");
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: component.id,
+      label: "   ",
+    });
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: "missing",
+      label: "Rename",
+    });
+    dispatchEditorCommand(store, {
+      type: "uiset.component.restore",
+      component,
+    });
+    expect(store.temporal.getState().pastStates).toHaveLength(0);
+
+    const sceneryStore = createEditorSessionStore({
+      mode: "scenery",
+      prompt: "Forest",
+      scenery: { layers: [] },
+    });
+    expect(() =>
+      dispatchEditorCommand(sceneryStore, {
+        type: "uiset.component.label.set",
+        componentId: "panel",
+        label: "Panel",
+      }),
+    ).toThrow("UI Set editing requires a UI Set record.");
+  });
+
   it("merges generated server animations without overwriting local edits", () => {
     const store = createEditorSessionStore(createCharacterRecord());
     dispatchEditorCommand(store, {
