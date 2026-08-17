@@ -409,8 +409,38 @@ func applyTileSetWorkflowCandidate(t *testing.T, assets *tileSetWorkflowAssets, 
 	if err != nil {
 		t.Fatalf("decode Tileset candidate content: %v", err)
 	}
-	assets.content = content
-	assets.asset.Content = append(json.RawMessage(nil), result.Content...)
+	for _, candidate := range content.Items {
+		index := -1
+		for itemIndex := range assets.content.Items {
+			if assets.content.Items[itemIndex].Name == candidate.Name {
+				index = itemIndex
+				break
+			}
+		}
+		if index >= 0 {
+			for _, candidateTile := range candidate.Tiles {
+				tileIndex := -1
+				for currentIndex, currentTile := range assets.content.Items[index].Tiles {
+					if currentTile.Position == candidateTile.Position {
+						tileIndex = currentIndex
+						break
+					}
+				}
+				if tileIndex >= 0 {
+					assets.content.Items[index].Tiles[tileIndex] = candidateTile
+				} else {
+					assets.content.Items[index].Tiles = append(assets.content.Items[index].Tiles, candidateTile)
+				}
+			}
+		} else {
+			assets.content.Items = append(assets.content.Items, candidate)
+		}
+	}
+	encoded, err := assetdomain.EncodeContent(assets.content)
+	if err != nil {
+		t.Fatalf("encode merged Tileset candidate: %v", err)
+	}
+	assets.asset.Content = encoded
 	assets.asset.Version++
 }
 

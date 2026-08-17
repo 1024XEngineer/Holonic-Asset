@@ -110,9 +110,11 @@ func (e *executor) editCharacterPrototype(
 		return nil, err
 	}
 	prototype := assetdomain.Prototype(resources)
-	content.Prototype = &prototype
-	content.DirectionCount = directionCount
-	encoded, err := assetdomain.EncodeContent(content)
+	candidate := assetdomain.AssetContent{
+		DirectionCount: directionCount,
+		Prototype:      &prototype,
+	}
+	encoded, err := assetdomain.EncodeContent(candidate)
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited character asset %d content: %w", asset.ID, err)
 	}
@@ -452,9 +454,11 @@ func (e *executor) editObjectPrototype(
 		return nil, err
 	}
 	prototype := assetdomain.Prototype(resources)
-	content.Prototype = &prototype
-	content.DirectionCount = directionCount
-	encoded, err := assetdomain.EncodeContent(content)
+	candidate := assetdomain.AssetContent{
+		DirectionCount: directionCount,
+		Prototype:      &prototype,
+	}
+	encoded, err := assetdomain.EncodeContent(candidate)
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited object asset %d content: %w", asset.ID, err)
 	}

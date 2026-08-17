@@ -100,8 +100,8 @@ func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testin
 	if updated.DirectionCount != 4 || updated.Prototype == nil || len(*updated.Prototype) != 4 {
 		t.Fatalf("unexpected edited prototype content: %+v", updated)
 	}
-	if len(updated.Animations) != 1 || updated.Animations[0].ID != 7 || updated.Animations[0].Name != "idle" {
-		t.Fatalf("existing animations were not preserved: %+v", updated.Animations)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)
@@ -574,8 +574,8 @@ func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T
 	if updated.DirectionCount != 8 || updated.Prototype == nil || len(*updated.Prototype) != 8 {
 		t.Fatalf("unexpected edited object content: %+v", updated)
 	}
-	if len(updated.Items) != 1 || updated.Items[0].Name != "loot" || updated.Metadata["material"] != "wood" {
-		t.Fatalf("existing object content was not preserved: %+v", updated)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)

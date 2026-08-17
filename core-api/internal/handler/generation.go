@@ -14,11 +14,16 @@ import (
 )
 
 type GenerationHandler struct {
-	runs generator.RunManager
+	runs       generator.RunManager
+	references referenceResolver
 }
 
-func NewGenerationHandler(runs generator.RunManager) *GenerationHandler {
-	return &GenerationHandler{runs: runs}
+func NewGenerationHandler(runs generator.RunManager, references ...referenceResolver) *GenerationHandler {
+	var resolver referenceResolver
+	if len(references) > 0 {
+		resolver = references[0]
+	}
+	return &GenerationHandler{runs: runs, references: resolver}
 }
 
 func (h *GenerationHandler) Create(
@@ -96,6 +101,22 @@ func (h *GenerationHandler) Get(
 		result = &dto.GenerationResult{}
 		if err := json.Unmarshal(run.Result, result); err != nil {
 			return dto.SuccessResponse[dto.GetGenerationResponse]{}, fmt.Errorf("handler: decode generation result: %w", err)
+		}
+		if len(result.Content) > 0 && string(result.Content) != "null" {
+			var transform referenceTransform
+			if h.references != nil {
+				transform = h.references.ResolveReference
+			}
+			result.Content, err = transformAssetContentReferences(
+				ctx,
+				result.Content,
+				"resolve generation result",
+				transform,
+				false,
+			)
+			if err != nil {
+				return dto.SuccessResponse[dto.GetGenerationResponse]{}, err
+			}
 		}
 	}
 

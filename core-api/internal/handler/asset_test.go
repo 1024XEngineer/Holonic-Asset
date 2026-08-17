@@ -348,6 +348,48 @@ func TestAssetHandlerRecordPersistsImageReferencesAsObjectKeys(t *testing.T) {
 	}
 }
 
+func TestAssetHandlerRecordPreservesAnimationGenerationMetadata(t *testing.T) {
+	managerStub := &assetManagerStub{
+		asset: domain.Asset{
+			ID:   7,
+			Type: domain.AssetTypeCharacter,
+			Content: json.RawMessage(`{
+				"animations":[
+					{"id":2,"name":"idle","frames":[{"id":1,"url":"uploads/idle.png"}],"generation":{"direction":"front","frameCount":8}},
+					{"id":3,"name":"deleted","frames":[],"generation":{"direction":"back","frameCount":4}}
+				]
+			}`),
+		},
+		record: &domain.AssetRecord{ID: 15, AssetID: 7, Version: 3, ContentID: 21},
+	}
+	h := handler.NewHandler(managerStub)
+
+	_, err := h.Record(context.Background(), dto.RecordAssetRequest{
+		AssetID: 7,
+		Content: json.RawMessage(`{
+			"animations":[{"id":2,"name":"idle renamed","frames":[{"id":1,"url":"uploads/idle.png"}]}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("record asset: %v", err)
+	}
+	var content struct {
+		Animations []struct {
+			ID         uint            `json:"id"`
+			Name       string          `json:"name"`
+			Generation json.RawMessage `json:"generation"`
+		} `json:"animations"`
+	}
+	if managerStub.recordRequest == nil || json.Unmarshal(managerStub.recordRequest.Content, &content) != nil {
+		t.Fatalf("decode recorded content: %+v", managerStub.recordRequest)
+	}
+	if len(content.Animations) != 1 || content.Animations[0].ID != 2 ||
+		content.Animations[0].Name != "idle renamed" ||
+		string(content.Animations[0].Generation) != `{"direction":"front","frameCount":8}` {
+		t.Fatalf("generation metadata was not preserved: %s", managerStub.recordRequest.Content)
+	}
+}
+
 func TestAssetHandlerRecordRejectsReferencesThatAreNotObjectKeys(t *testing.T) {
 	for _, reference := range []string{
 		"https://images.example.org/external.png",
