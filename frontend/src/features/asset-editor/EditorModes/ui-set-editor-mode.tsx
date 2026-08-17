@@ -10,12 +10,14 @@ import {
   TextCursorInput,
   ToggleRight,
   Type,
+  RotateCcw,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +48,17 @@ export function UISetEditorMode({
   onBack: () => void;
 }) {
   const { t } = useTranslation("editor");
+  const sessionIdentity = `${data.asset.projectId}\0${data.asset.id}`;
+  const initialRecordRef = useRef({
+    identity: sessionIdentity,
+    record: structuredClone(data.record),
+  });
+  if (initialRecordRef.current.identity !== sessionIdentity) {
+    initialRecordRef.current = {
+      identity: sessionIdentity,
+      record: structuredClone(data.record),
+    };
+  }
   const session = useEditorSession({
     target: { projectId: data.asset.projectId, assetId: data.asset.id },
     initialRecord: data.record,
@@ -61,6 +74,13 @@ export function UISetEditorMode({
   const components =
     snapshot.record.mode === "uiset" ? snapshot.record.uiset.components : [];
   const selectedComponent = components.find(
+    (component) => component.id === selectedComponentId,
+  );
+  const initialComponents =
+    initialRecordRef.current.record.mode === "uiset"
+      ? initialRecordRef.current.record.uiset.components
+      : [];
+  const initialSelectedComponent = initialComponents.find(
     (component) => component.id === selectedComponentId,
   );
   useEffect(() => {
@@ -112,6 +132,21 @@ export function UISetEditorMode({
           prompt={snapshot.record.prompt}
           history={data.asset.history}
           onClearSelection={() => setSelectedComponentId(null)}
+          onComponentLabelChange={(value) => {
+            if (!selectedComponent) return;
+            session.dispatch({
+              type: "uiset.component.label.set",
+              componentId: selectedComponent.id,
+              label: value,
+            });
+          }}
+          onRestoreComponent={() => {
+            if (!initialSelectedComponent) return;
+            session.dispatch({
+              type: "uiset.component.restore",
+              component: initialSelectedComponent,
+            });
+          }}
           onPromptChange={(value) =>
             session.dispatch({ type: "prompt.set", value })
           }
@@ -179,12 +214,16 @@ function UISetInspector({
   prompt,
   history,
   onClearSelection,
+  onComponentLabelChange,
+  onRestoreComponent,
   onPromptChange,
 }: {
   component: UISetComponent | undefined;
   prompt: string;
   history: AssetWorkspaceData["asset"]["history"];
   onClearSelection: () => void;
+  onComponentLabelChange: (value: string) => void;
+  onRestoreComponent: () => void;
   onPromptChange: (value: string) => void;
 }) {
   const { t } = useTranslation("editor");
@@ -231,6 +270,33 @@ function UISetInspector({
                     </Button>
                   </div>
                 ) : null}
+                {component ? (
+                  <div className="mb-3 grid gap-2">
+                    <label className="grid gap-1.5 text-xs font-medium">
+                      {t("uiSetComponentLabel")}
+                      <Input
+                        aria-label={t("uiSetComponentLabel")}
+                        value={component.label}
+                        onChange={(event) =>
+                          onComponentLabelChange(event.target.value)
+                        }
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={onRestoreComponent}
+                    >
+                      <RotateCcw aria-hidden="true" />
+                      {t("restoreGeneratedVersion")}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    {t("selectUISetComponent")}
+                  </p>
+                )}
                 <Textarea
                   aria-label={t("editPrompt")}
                   className="min-h-28 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0"
