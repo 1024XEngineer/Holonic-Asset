@@ -11,12 +11,14 @@ const (
 	EditObjectProtoType     TaskType = "edit_object_prototype"
 	EditObjectFrames        TaskType = "edit_object_frames"
 
-	GenerateAnimation TaskType = "generate_animation"
-	EditAnimation     TaskType = "edit_animation"
-	GenerateScenery   TaskType = "generate_scenery"
-	GenerateTileSet   TaskType = "generate_tileset"
-	EditTilesetItem   TaskType = "edit_tileset_item"
-	EditTiles         TaskType = "edit_tiles"
+	GenerateAnimation   TaskType = "generate_animation"
+	EditAnimation       TaskType = "edit_animation"
+	GenerateScenery     TaskType = "generate_scenery"
+	GenerateTileSet     TaskType = "generate_tileset"
+	EditTilesetItem     TaskType = "edit_tileset_item"
+	EditTiles           TaskType = "edit_tiles"
+	GenerateUISet       TaskType = "generate_uiset"
+	EditUISetComponents TaskType = "edit_uiset_components"
 )
 
 func ProjectLevelTaskTypes() []TaskType {
@@ -25,6 +27,7 @@ func ProjectLevelTaskTypes() []TaskType {
 		GenerateObjectProtoType,
 		GenerateScenery,
 		GenerateTileSet,
+		GenerateUISet,
 	}
 }
 
@@ -42,5 +45,7 @@ func TaskTypes() []TaskType {
 		GenerateTileSet,
 		EditTilesetItem,
 		EditTiles,
+		GenerateUISet,
+		EditUISetComponents,
 	}
 }

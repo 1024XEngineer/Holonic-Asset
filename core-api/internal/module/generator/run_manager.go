@@ -146,6 +146,41 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		value.Reference, err = persistEditReference(value.Reference)
 		return value, err
+	case CreateUISetPayload:
+		if e.projects == nil {
+			return nil, ErrProjectReaderRequired
+		}
+		project, err := e.projects.GetDetail(ctx, projectID)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load project %d context: %w", projectID, err)
+		}
+		if project == nil {
+			return nil, fmt.Errorf("generator: load project %d context: empty result", projectID)
+		}
+		value.ProjectContext = UISetProjectContext{
+			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(project.GameType),
+			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
+		}
+		if e.references != nil && strings.TrimSpace(value.Reference) != "" {
+			value.Reference, err = e.references.PersistReference(ctx, value.Reference)
+			if err != nil {
+				return nil, fmt.Errorf("generator: persist UI Set reference: %w", err)
+			}
+		}
+		if err := validateCreateUISetPayload(&value); err != nil {
+			return nil, err
+		}
+		return value, nil
+	case EditUISetComponentsPayload:
+		var err error
+		value.Reference, err = persistEditReference(value.Reference)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateEditUISetComponentsPayload(&value); err != nil {
+			return nil, err
+		}
+		return value, nil
 	default:
 		return payload, nil
 	}
@@ -324,6 +359,48 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.AssetID = *request.AssetID
 		}
 		if err := validateEditTilesPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case GenerateUISet:
+		parameters := struct {
+			AssetName  string                     `json:"asset_name"`
+			Dimensions assetdomain.Size           `json:"dimensions"`
+			Style      string                     `json:"style"`
+			Components []UISetComponentDefinition `json:"components"`
+			Reference  string                     `json:"reference,omitempty"`
+		}{}
+		if request.AssetID != nil || len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("generate_uiset does not accept assetId or targetAssetPaths")
+		}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := CreateUISetPayload{
+			AssetName: parameters.AssetName, ProjectID: request.ProjectID,
+			CreativeBrief: request.CreativeBrief, Style: parameters.Style,
+			Dimensions: parameters.Dimensions, Components: append([]UISetComponentDefinition(nil), parameters.Components...),
+			Reference: parameters.Reference,
+		}
+		if err := validateCreateUISetPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case EditUISetComponents:
+		parameters := struct {
+			Reference string `json:"reference,omitempty"`
+		}{}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := EditUISetComponentsPayload{
+			ProjectID: request.ProjectID, CreativeBrief: request.CreativeBrief,
+			TargetAssetPaths: append([]string(nil), request.TargetAssetPaths...), Reference: parameters.Reference,
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if err := validateEditUISetComponentsPayload(&payload); err != nil {
 			return nil, err
 		}
 		return payload, nil

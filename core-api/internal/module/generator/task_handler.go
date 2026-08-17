@@ -90,7 +90,7 @@ func (e *Engine) handleTileSet(
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := CreateTileSetPayload{}
-	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+	if err := decodeStrictTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
 	if err := validateCreateTileSetPayload(&payload); err != nil {
@@ -104,7 +104,7 @@ func (e *Engine) handleEditTilesetItem(
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := EditTilesetItemPayload{}
-	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+	if err := decodeStrictTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
 	if err := validateEditTilesetItemPayload(&payload); err != nil {
@@ -118,13 +118,41 @@ func (e *Engine) handleEditTiles(
 	message *taskdomain.Task,
 ) (any, error) {
 	payload := EditTilesPayload{}
-	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+	if err := decodeStrictTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
 	if err := validateEditTilesPayload(&payload); err != nil {
 		return nil, err
 	}
 	return e.execute(ctx, EditTiles, message.Payload)
+}
+
+func (e *Engine) handleUISet(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := CreateUISetPayload{}
+	if err := decodeStrictTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateCreateUISetPayload(&payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, GenerateUISet, message.Payload)
+}
+
+func (e *Engine) handleEditUISetComponents(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := EditUISetComponentsPayload{}
+	if err := decodeStrictTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateEditUISetComponentsPayload(&payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, EditUISetComponents, message.Payload)
 }
 
 func (e *Engine) handleEmptyTask(
@@ -148,7 +176,7 @@ func decodeTaskPayload(message *taskdomain.Task, payload any) error {
 	return nil
 }
 
-func decodeTileSetTaskPayload(message *taskdomain.Task, payload any) error {
+func decodeStrictTaskPayload(message *taskdomain.Task, payload any) error {
 	if message == nil {
 		return ErrTaskRequired
 	}
@@ -181,6 +209,8 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
 	manager.Register(string(EditTilesetItem), taskdomain.HandlerFunc(e.handleEditTilesetItem))
 	manager.Register(string(EditTiles), taskdomain.HandlerFunc(e.handleEditTiles))
+	manager.Register(string(GenerateUISet), taskdomain.HandlerFunc(e.handleUISet))
+	manager.Register(string(EditUISetComponents), taskdomain.HandlerFunc(e.handleEditUISetComponents))
 
 	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
 	for _, taskType := range []TaskType{

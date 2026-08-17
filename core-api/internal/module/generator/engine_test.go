@@ -867,6 +867,18 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 				"asset_id":7,"project_id":11,"creative_brief":"add moss",
 				"targets":[{"position":{"x":2,"y":3}}]
 			}`)
+		case generator.GenerateUISet:
+			payload = json.RawMessage(`{
+				"asset_name":"inventory","project_id":11,"creative_brief":"fantasy inventory","style":"brass frames",
+				"dimensions":{"width":1024,"height":768},
+				"components":[{"name":"panel","description":"main inventory panel"}],
+				"project_context":{}
+			}`)
+		case generator.EditUISetComponents:
+			payload = json.RawMessage(`{
+				"asset_id":7,"project_id":11,"creative_brief":"brighter controls",
+				"target_asset_paths":["components.0"]
+			}`)
 		}
 		message := &taskdomain.Task{
 			ID:      uint(len(tasks.statusUpdates) + 1),
@@ -877,8 +889,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 10 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected ten implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 12 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected twelve implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
