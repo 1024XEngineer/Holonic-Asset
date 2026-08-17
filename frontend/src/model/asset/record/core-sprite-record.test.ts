@@ -75,6 +75,89 @@ describe("saveCoreSpriteAssetRevision", () => {
       }),
     });
   });
+
+  it("serializes object sprites with fallback IDs and no invalid version", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 5 });
+    const record = {
+      mode: "object" as const,
+      prompt: "Chest",
+      object: {
+        prototype: {
+          format: "png-sprite-sheet" as const,
+          imageUrl: "/chest.png",
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 1,
+          rows: 1,
+        },
+        animations: [
+          {
+            kind: "clip" as const,
+            id: "draft-animation",
+            label: "Open",
+            frameCount: 1,
+            spriteSheet: {
+              format: "png-sprite-sheet" as const,
+              imageUrl: "/open.png",
+              frameUrls: ["/open.png"],
+              frameWidth: 32,
+              frameHeight: 32,
+              columns: 1,
+              rows: 1,
+            },
+          },
+        ],
+        nodePositions: {},
+      },
+    };
+
+    const result = await saveCoreSpriteAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      version: "draft",
+      record,
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      content: {
+        directionCount: 1,
+        prototype: [{ id: 1, url: "/chest.png" }],
+        animations: [
+          {
+            id: 1,
+            name: "Open",
+            frames: [{ id: 1, url: "/open.png" }],
+          },
+        ],
+        metadata: { nodePositions: {} },
+      },
+    });
+    expect(result).toMatchObject({ version: "v5", record });
+    expect(result?.record).not.toBe(record);
+  });
+
+  it.each([
+    {
+      name: "non-persisted asset",
+      input: {
+        projectId: "11",
+        assetId: "draft",
+        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+      },
+    },
+    {
+      name: "unsupported record",
+      input: {
+        projectId: "11",
+        assetId: "9",
+        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+      },
+    },
+  ])("skips $name saves", async ({ input }) => {
+    await expect(saveCoreSpriteAssetRevision(input)).resolves.toBeUndefined();
+    expect(mocks.assetRecord).not.toHaveBeenCalled();
+  });
 });
 
 describe("loadCoreSpriteAssetWorkspace", () => {
@@ -224,6 +307,45 @@ describe("toCoreSpriteAssetWorkspace", () => {
     expect(workspace.record.object.animations?.[0]).not.toHaveProperty(
       "spriteSheet",
     );
+  });
+
+  it("keeps only valid persisted node positions", () => {
+    const detail = characterDetail();
+    if (detail.type !== "character" || !detail.content) {
+      throw new Error("Expected character detail");
+    }
+    detail.content.metadata = {
+      nodePositions: {
+        prototype: { x: 10, y: 20 },
+        missingCoordinate: { x: 5 },
+        arrayValue: [1, 2],
+        emptyValue: null,
+      },
+    };
+
+    const workspace = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "character",
+      character: { nodePositions: { prototype: { x: 10, y: 20 } } },
+    });
+
+    detail.content.metadata = { nodePositions: [] };
+    const withoutPositions = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+    expect(withoutPositions.record).toMatchObject({
+      mode: "character",
+      character: { nodePositions: {} },
+    });
   });
 });
 

@@ -23,6 +23,8 @@ type taskManagerStub struct {
 	listFilter    *taskdomain.ListFilter
 	listedTasks   []*taskdomain.Task
 	listErr       error
+	detailErr     error
+	completeErr   error
 }
 
 type taskStatusUpdate struct {
@@ -47,7 +49,7 @@ func (s *taskManagerStub) Publish(_ context.Context, message *taskdomain.Task) (
 }
 
 func (s *taskManagerStub) GetDetail(context.Context, uint) (*taskdomain.Task, error) {
-	return s.detail, nil
+	return s.detail, s.detailErr
 }
 
 func (s *taskManagerStub) List(
@@ -70,7 +72,7 @@ func (s *taskManagerStub) Cancel(_ context.Context, taskID uint) error {
 
 func (s *taskManagerStub) Complete(_ context.Context, taskID uint) error {
 	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: taskdomain.StatusCompleted})
-	return nil
+	return s.completeErr
 }
 
 func (s *taskManagerStub) dispatch(
@@ -831,6 +833,62 @@ func TestResolveApplicationRejectsNonAwaitingRun(t *testing.T) {
 	if len(tasks.statusUpdates) != 0 {
 		t.Fatalf("non-awaiting task was completed: %+v", tasks.statusUpdates)
 	}
+}
+
+func TestResolveApplicationReturnsDependencyAndDiscardErrors(t *testing.T) {
+	t.Run("task manager required", func(t *testing.T) {
+		if err := generator.NewEngine(nil, nil).ResolveApplication(context.Background(), 17, true); !errors.Is(err, generator.ErrTaskManagerRequired) {
+			t.Fatalf("expected task manager error, got %v", err)
+		}
+	})
+
+	t.Run("task lookup", func(t *testing.T) {
+		wantErr := errors.New("lookup failed")
+		err := generator.NewEngine(&taskManagerStub{detailErr: wantErr}, nil).
+			ResolveApplication(context.Background(), 17, true)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected lookup error, got %v", err)
+		}
+	})
+
+	t.Run("malformed discard result", func(t *testing.T) {
+		tasks := &taskManagerStub{detail: &taskdomain.Task{
+			Status: taskdomain.StatusAwaitingApplication,
+			Result: json.RawMessage(`{`),
+		}}
+		err := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+			References: &referenceStoreStub{},
+		}).ResolveApplication(context.Background(), 17, false)
+		if err == nil || !strings.Contains(err.Error(), "decode run 17 result") {
+			t.Fatalf("expected decode error, got %v", err)
+		}
+	})
+
+	t.Run("resource deletion", func(t *testing.T) {
+		wantErr := errors.New("delete failed")
+		tasks := &taskManagerStub{detail: &taskdomain.Task{
+			Status: taskdomain.StatusAwaitingApplication,
+			Result: json.RawMessage(`{"generated_resources":["generated/a.png"]}`),
+		}}
+		err := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+			References: &referenceStoreStub{deleteErr: wantErr},
+		}).ResolveApplication(context.Background(), 17, false)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected deletion error, got %v", err)
+		}
+	})
+
+	t.Run("task completion", func(t *testing.T) {
+		wantErr := errors.New("completion failed")
+		tasks := &taskManagerStub{
+			detail:      &taskdomain.Task{Status: taskdomain.StatusAwaitingApplication},
+			completeErr: wantErr,
+		}
+		err := generator.NewEngine(tasks, nil).ResolveApplication(context.Background(), 17, true)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected completion error, got %v", err)
+		}
+	})
 }
 
 type executorStub struct {

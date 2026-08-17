@@ -246,7 +246,7 @@ describe("useEditorWorkspace", () => {
     expect(mocks.coreCreate).not.toHaveBeenCalled();
   });
 
-  it("lets the editor apply an awaiting generation result", async () => {
+  it("lets the editor apply or discard an awaiting generation result", async () => {
     mocks.generationRuns = [
       {
         id: "ready",
@@ -262,14 +262,51 @@ describe("useEditorWorkspace", () => {
     });
 
     editor?.header.generationTasks[0]?.onApply?.();
+    editor?.header.generationTasks[0]?.onDiscard?.();
+    await flushPromises();
+
+    expect(mocks.applicationMutation.mutateAsync).toHaveBeenNthCalledWith(1, {
+      projectId: "7",
+      assetId: "8",
+      runId: "ready",
+      applied: true,
+    });
+    expect(mocks.applicationMutation.mutateAsync).toHaveBeenNthCalledWith(2, {
+      projectId: "7",
+      assetId: "8",
+      runId: "ready",
+      applied: false,
+    });
+  });
+
+  it("handles a generation application failure", async () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Walk",
+        prompt: "A relaxed walk",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.applicationMutation.mutateAsync.mockRejectedValue(
+      new Error("application failed"),
+    );
+    mocks.stateValues.push(null, null, null);
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    editor?.header.generationTasks[0]?.onDiscard?.();
     await flushPromises();
 
     expect(mocks.applicationMutation.mutateAsync).toHaveBeenCalledWith({
       projectId: "7",
       assetId: "8",
       runId: "ready",
-      applied: true,
+      applied: false,
     });
+    expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
   });
 
   it("reports failed saves, animation generation, and prompt submission", async () => {

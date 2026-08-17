@@ -28,6 +28,7 @@ type runManagerStub struct {
 	cancelErr     error
 	resolveID     generator.RunID
 	resolved      bool
+	resolveErr    error
 }
 
 func (s *runManagerStub) Create(
@@ -75,7 +76,7 @@ func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error 
 func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.RunID, applied bool) error {
 	s.resolveID = runID
 	s.resolved = applied
-	return nil
+	return s.resolveErr
 }
 
 func TestCreateMapsTransportRequest(t *testing.T) {
@@ -197,5 +198,28 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	)
 	if err != nil || !response.Data.Cancelled || stub.cancelID != 7 {
 		t.Fatalf("unexpected cancel response: %+v, id=%d, err=%v", response, stub.cancelID, err)
+	}
+}
+
+func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
+	stub := &runManagerStub{}
+	response, err := handler.NewGenerationHandler(stub).ResolveApplication(
+		context.Background(),
+		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
+	)
+	if err != nil || !response.Data.Completed || stub.resolveID != 7 || !stub.resolved {
+		t.Fatalf("unexpected application response: %+v, stub=%+v, err=%v", response, stub, err)
+	}
+}
+
+func TestResolveApplicationReturnsManagerError(t *testing.T) {
+	wantErr := errors.New("transition failed")
+	stub := &runManagerStub{resolveErr: wantErr}
+	_, err := handler.NewGenerationHandler(stub).ResolveApplication(
+		context.Background(),
+		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected manager error, got %v", err)
 	}
 }

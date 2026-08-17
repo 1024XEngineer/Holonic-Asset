@@ -242,6 +242,28 @@ describe("generationApi", () => {
     expect(mocks.assetDetail).toHaveBeenCalledWith(8);
   });
 
+  it("keeps awaiting animation runs visible without local metadata", async () => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 24,
+          projectId: 42,
+          kind: "generate_animation",
+          status: "awaiting_application",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "24",
+        kind: "character",
+        status: "awaiting_application",
+      }),
+    ]);
+    expect(mocks.assetDetail).not.toHaveBeenCalled();
+  });
+
   it("forgets animation metadata after a settled run is reconciled", async () => {
     rememberGenerationRunMetadata("42", 23, {
       kind: "character",
