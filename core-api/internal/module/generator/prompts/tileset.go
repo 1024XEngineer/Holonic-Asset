@@ -79,13 +79,13 @@ NON-OVERRIDABLE RULES:
 - Preserve every pixel on the outermost one-pixel canvas border exactly so this Tile continues to connect seamlessly to all neighbouring Tiles.
 - You may redraw, reinterpret, recolour, relight, or replace the complete visible Tile interior when needed to apply the requested edit. Interior colour fidelity to the current Tile is not required.
 - Keep all new artwork strictly inside the original alpha silhouette. Do not expand, contract, translate, rotate, flip, crop, pad, or rescale the silhouette.
-- Do not add a black background, opaque rectangle, new ground plane, frame, matte, canvas-sized backing shape, or pixels outside the original occupied footprint.
+- Render any transparent or unoccupied background area as exactly one flat, opaque pure green #00ff00 matte for deterministic background removal. Do not draw a white background, black box, or checkerboard pattern.
 - Apply only this edit: %s
 - Project context: %s
 - Item name: %s
 - Tile size: %dx%d pixels
 - Perspective: %s
-- Return exactly one transparent PNG image and no variants.`
+- Return exactly one Tile image on the specified pure-green matte and no variants.`
 
 // TileSetTileEdit constrains one independently edited Tile.
 func TileSetTileEdit(

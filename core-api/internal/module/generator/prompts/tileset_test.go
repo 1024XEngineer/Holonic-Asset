@@ -72,8 +72,7 @@ func TestTileSetTileEditAllowsInteriorRedrawAndPreservesStructure(t *testing.T) 
 		"redraw, reinterpret, recolour, relight, or replace the complete visible Tile interior",
 		"Interior colour fidelity to the current Tile is not required",
 		"strictly inside the original alpha silhouette",
-		"black background",
-		"canvas-sized backing shape",
+		"pure green #00ff00 matte",
 	} {
 		if !strings.Contains(prompt, required) {
 			t.Fatalf("Tile edit prompt does not contain %q:\n%s", required, prompt)
