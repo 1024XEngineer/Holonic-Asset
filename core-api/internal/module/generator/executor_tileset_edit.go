@@ -807,17 +807,12 @@ func (e *executor) commitTileSetEdits(
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode edited Tileset asset %d content: %w", assetID, err))
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: assetID,
-		Content: encoded,
-	}, expectedVersion)
-	if err != nil {
-		return nil, cleanup(fmt.Errorf("generator: revise Tileset asset %d: %w", assetID, err))
-	}
-	if record == nil || record.AssetID != assetID || record.Version == 0 {
-		return nil, cleanup(fmt.Errorf("generator: revise Tileset asset %d: empty result", assetID))
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: assetID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            assetID,
+		Version:            expectedVersion,
+		Content:            encoded,
+		GeneratedResources: uploadedKeys,
+	})
 }
 
 func formatTileSetCoordinates(cells []TileSetCoordinate) string {

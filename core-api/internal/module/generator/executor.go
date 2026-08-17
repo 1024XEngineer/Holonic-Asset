@@ -34,9 +34,11 @@ type ResourceStore interface {
 }
 
 type ExecutionResult struct {
-	AssetID     uint `json:"asset_id"`
-	AnimationID uint `json:"animation_id,omitempty"`
-	Version     uint `json:"version,omitempty"`
+	AssetID            uint            `json:"asset_id"`
+	AnimationID        uint            `json:"animation_id,omitempty"`
+	Version            uint            `json:"version,omitempty"`
+	Content            json.RawMessage `json:"content,omitempty"`
+	GeneratedResources []string        `json:"generated_resources,omitempty"`
 }
 
 // AssetWriter is the subset of Workspace asset operations used by generation.
@@ -46,9 +48,6 @@ type AssetWriter interface {
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateSceneryAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateTileSetAsset(context.Context, *assetdomain.Asset) (uint, error)
-	CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error)
-	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
-	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
 // AnimationFrameUpdater is an optional asset capability used by edit_frames.
@@ -301,6 +300,37 @@ func encodeExecutionResult(result ExecutionResult) (json.RawMessage, error) {
 		return nil, fmt.Errorf("generator: encode execution result: %w", err)
 	}
 	return encoded, nil
+}
+
+func generatedPrototypeResourceKeys(resources []assetdomain.ImageResource) []string {
+	keys := make([]string, 0, len(resources)*2)
+	for _, resource := range resources {
+		if resource.URL == nil || *resource.URL == "" {
+			continue
+		}
+		keys = append(keys, *resource.URL, addObjectKeySuffix(*resource.URL, "-unprocessed"))
+	}
+	return keys
+}
+
+func generatedFrameResourceKeys(frames []assetdomain.Frame) []string {
+	keys := make([]string, 0, len(frames))
+	for _, frame := range frames {
+		if frame.URL != nil && *frame.URL != "" {
+			keys = append(keys, *frame.URL)
+		}
+	}
+	return keys
+}
+
+func nextGeneratedAnimationID(animations []assetdomain.Animation) uint {
+	var id uint
+	for _, animation := range animations {
+		if animation.ID > id {
+			id = animation.ID
+		}
+	}
+	return id + 1
 }
 
 var _ Executor = (*executor)(nil)

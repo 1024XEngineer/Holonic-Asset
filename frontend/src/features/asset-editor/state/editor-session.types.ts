@@ -3,6 +3,7 @@ import type { AssetCanvasPosition, AssetRecord } from "@/model";
 export type EditorTarget = {
   projectId: string;
   assetId: string;
+  version?: string;
 };
 
 export type EditorCommand =

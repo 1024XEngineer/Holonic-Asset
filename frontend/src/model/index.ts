@@ -36,7 +36,7 @@ export type {
   AssetCanvasPosition,
   AssetDirection,
   AssetRecord,
-  AssetRecordApi,
+  AssetWorkspaceApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
   AssetWorkspaceAsset,
@@ -119,6 +119,7 @@ export {
   useGenerateAnimationMutation,
   useGenerateQuickAssetMutation,
   useGenerationRunsQuery,
+  useResolveGenerationApplicationMutation,
   useQuickAssetsQuery,
 } from "./generation";
 export type {

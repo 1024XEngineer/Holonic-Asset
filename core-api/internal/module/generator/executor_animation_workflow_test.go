@@ -55,7 +55,7 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("edit animation: %v", err)
 	}
-	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "update_animation_frames"}) {
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
 		t.Fatalf("unexpected edit workflow order: %v", events)
 	}
 	wantRequest := &generator.AnimationGenerationRequest{
@@ -79,21 +79,25 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	if assets.animationAssetID != 0 || assets.animationID != 0 {
 		t.Fatalf("edit animation must not create a new animation: %+v", assets)
 	}
-	if assets.updatedAnimationAssetID != 7 || assets.updatedAnimationID != 3 || len(assets.updatedFrames) != 2 {
-		t.Fatalf("unexpected edited animation update: %+v", assets)
+	application, content := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if assets.updatedAnimationID != 0 || len(content.Animations) != 1 || len(content.Animations[0].Frames) != 2 {
+		t.Fatalf("generation must return, not persist, edited frames: result=%+v assets=%+v", application, assets)
 	}
-	if assets.updatedFrames[0].ID != 1 || assets.updatedFrames[0].URL == nil ||
-		*assets.updatedFrames[0].URL != "uploads/generated-1.png" || assets.updatedFrames[0].Duration != 83 ||
-		assets.updatedFrames[1].ID != 2 || assets.updatedFrames[1].URL == nil ||
-		*assets.updatedFrames[1].URL != "uploads/generated-2.png" {
-		t.Fatalf("unexpected replacement frames: %+v", assets.updatedFrames)
+	frames := content.Animations[0].Frames
+	if frames[0].ID != 1 || frames[0].URL == nil ||
+		*frames[0].URL != "uploads/generated-1.png" || frames[0].Duration != 83 ||
+		frames[1].ID != 2 || frames[1].URL == nil ||
+		*frames[1].URL != "uploads/generated-2.png" {
+		t.Fatalf("unexpected replacement frames: %+v", frames)
 	}
 	if len(references.persisted) != 2 ||
 		references.persisted[0] != "data:image/png;base64,edited-first" ||
 		references.persisted[1] != "data:image/png;base64,edited-second" {
 		t.Fatalf("unexpected persisted edited frames: %#v", references.persisted)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
+	if application.AssetID != 7 || application.AnimationID != 3 || len(application.GeneratedResources) != 2 {
+		t.Fatalf("unexpected animation application candidate: %+v", application)
+	}
 }
 
 func TestExecutorEditAnimationRejectsMissingGeneration(t *testing.T) {
@@ -227,36 +231,6 @@ func TestExecutorEditAnimationDoesNotReplaceFramesWhenPersistenceFails(t *testin
 	}
 }
 
-func TestExecutorEditAnimationReportsFrameUpdateFailure(t *testing.T) {
-	events := []string{}
-	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{Direction: "front"})
-	assets := &generationAssetWriterStub{
-		events:             &events,
-		parentAsset:        parent,
-		updateAnimationErr: errors.New("write conflict"),
-	}
-	animations := &animationGenerationServiceStub{
-		events: &events,
-		result: &generator.AnimationGenerationResult{
-			Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited", MIMEType: "image/png"}},
-		},
-	}
-	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
-		Animations: animations,
-		References: &executorReferenceStoreStub{},
-	})
-
-	_, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
-		"asset_id":7,"animation_id":3,"project_id":11,"creative_brief":"attack"
-	}`))
-	if err == nil || !strings.Contains(err.Error(), "update animation 3 frames for asset 7") {
-		t.Fatalf("expected frame update error, got %v", err)
-	}
-	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "update_animation_frames"}) {
-		t.Fatalf("unexpected update failure workflow: %v", events)
-	}
-}
-
 func animationParentAssetWithAnimation(t *testing.T, generation *assetdomain.AnimationGenerationConfig) assetdomain.Asset {
 	t.Helper()
 	parent := animationParentAsset(t)
@@ -325,11 +299,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate animation: %v", err)
 	}
-	if !reflect.DeepEqual(events, []string{
-		"get_asset",
-		"generate_animation",
-		"create_animation",
-	}) {
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	wantRequest := &generator.AnimationGenerationRequest{
@@ -350,10 +320,11 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	if !reflect.DeepEqual(animations.request, wantRequest) {
 		t.Fatalf("unexpected animation request: got %+v want %+v", animations.request, wantRequest)
 	}
-	if assets.animationAssetID != 7 || assets.animationID != 3 ||
-		assets.animationName != "walk" || len(assets.frames) != 2 {
-		t.Fatalf("unexpected animation update: %+v", assets)
+	application, content := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if assets.animationAssetID != 0 || len(content.Animations) != 1 {
+		t.Fatalf("generation must return, not persist, an animation: result=%+v assets=%+v", application, assets)
 	}
+	generatedAnimation := content.Animations[0]
 	wantGeneration := &assetdomain.AnimationGenerationConfig{
 		Direction:   "back_right",
 		Style:       "painted pixel art",
@@ -367,19 +338,20 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		Duration:    8,
 		AspectRatio: "1:1",
 	}
-	if !reflect.DeepEqual(assets.animation.Generation, wantGeneration) {
-		t.Fatalf("unexpected persisted animation generation config: got %+v want %+v", assets.animation.Generation, wantGeneration)
+	if !reflect.DeepEqual(generatedAnimation.Generation, wantGeneration) {
+		t.Fatalf("unexpected generated animation config: got %+v want %+v", generatedAnimation.Generation, wantGeneration)
 	}
-	if assets.frames[0].ID != 1 || assets.frames[0].URL == nil ||
-		*assets.frames[0].URL != "uploads/generated-1.png" ||
-		assets.frames[0].Duration != 100 ||
-		assets.frames[1].ID != 2 || assets.frames[1].URL == nil ||
-		*assets.frames[1].URL != "uploads/generated-2.png" ||
-		assets.frames[1].Duration != 100 {
-		t.Fatalf("unexpected animation frames: %+v", assets.frames)
+	frames := generatedAnimation.Frames
+	if frames[0].ID != 1 || frames[0].URL == nil ||
+		*frames[0].URL != "uploads/generated-1.png" ||
+		frames[0].Duration != 100 ||
+		frames[1].ID != 2 || frames[1].URL == nil ||
+		*frames[1].URL != "uploads/generated-2.png" ||
+		frames[1].Duration != 100 {
+		t.Fatalf("unexpected animation frames: %+v", frames)
 	}
-	if len(assets.frames[0].Metadata) != 0 || len(assets.frames[1].Metadata) != 0 {
-		t.Fatalf("animation frames should not persist generator metadata: %+v", assets.frames)
+	if len(frames[0].Metadata) != 0 || len(frames[1].Metadata) != 0 {
+		t.Fatalf("animation frames should not include generator metadata: %+v", frames)
 	}
 	if !reflect.DeepEqual(references.persisted, []string{
 		"data:image/png;base64,first",
@@ -393,7 +365,9 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected persisted raw animation frames: %+v", references.uploads)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 3})
+	if application.AssetID != 7 || application.AnimationID != 1 || len(application.GeneratedResources) != 2 {
+		t.Fatalf("unexpected animation application candidate: %+v", application)
+	}
 }
 
 func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
@@ -410,7 +384,7 @@ func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
 		References: &executorReferenceStoreStub{},
 	})
 
-	_, err := executor.Generate(
+	result, err := executor.Generate(
 		context.Background(),
 		generator.GenerateAnimation,
 		json.RawMessage(`{"animation_name":"idle","asset_id":7,"direction":" FRONT "}`),
@@ -431,8 +405,9 @@ func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
 		Duration:    5,
 		AspectRatio: "1:1",
 	}
-	if !reflect.DeepEqual(assets.animation.Generation, want) {
-		t.Fatalf("unexpected persisted animation generation defaults: got %+v want %+v", assets.animation.Generation, want)
+	_, content := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if len(content.Animations) != 1 || !reflect.DeepEqual(content.Animations[0].Generation, want) {
+		t.Fatalf("unexpected generated animation defaults: %+v", content.Animations)
 	}
 }
 
@@ -636,7 +611,7 @@ func TestExecutorGeneratesObjectAnimationForSelectedDirection(t *testing.T) {
 	if animations.request.Action != "slowly open the chest lid, then close it" {
 		t.Fatalf("unexpected object action: %+v", animations.request)
 	}
-	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation", "create_animation"}) {
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
 		t.Fatalf("unexpected object animation workflow: %v", events)
 	}
 }

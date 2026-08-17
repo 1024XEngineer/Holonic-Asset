@@ -3,6 +3,7 @@ export {
   isGenerationRunActive,
   useEnqueueGenerationMutation,
   useGenerationRunsQuery,
+  useResolveGenerationApplicationMutation,
 } from "./run";
 export type { CreationRequest, GenerationRun } from "./run";
 export {

@@ -128,7 +128,7 @@ func (h *Handler) Record(
 	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{
 		AssetID: asset.AssetID,
 		Content: persistedContent,
-	}, 0)
+	}, asset.ExpectedVersion)
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}

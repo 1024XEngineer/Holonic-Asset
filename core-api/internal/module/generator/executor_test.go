@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -417,9 +418,30 @@ func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.Exe
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatalf("decode execution result: %v", err)
 	}
-	if got != want {
+	if got.AssetID != want.AssetID ||
+		(want.AnimationID != 0 && got.AnimationID != want.AnimationID) ||
+		(want.Version != 0 && got.Version != want.Version) ||
+		(want.Content != nil && !reflect.DeepEqual(got.Content, want.Content)) ||
+		(want.GeneratedResources != nil && !reflect.DeepEqual(got.GeneratedResources, want.GeneratedResources)) {
 		t.Fatalf("unexpected execution result: got %+v want %+v", got, want)
 	}
+}
+
+func decodeExecutionContent(
+	t *testing.T,
+	raw json.RawMessage,
+	assetType assetdomain.AssetType,
+) (generator.ExecutionResult, assetdomain.AssetContent) {
+	t.Helper()
+	var result generator.ExecutionResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("decode execution result: %v", err)
+	}
+	content, err := (assetdomain.Asset{Type: assetType, Content: result.Content}).DecodeContent()
+	if err != nil {
+		t.Fatalf("decode execution content: %v", err)
+	}
+	return result, content
 }
 
 var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)

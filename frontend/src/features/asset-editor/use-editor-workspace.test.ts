@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     mutateAsync: vi.fn(),
   },
+  applicationMutation: {
+    isPending: false,
+    mutateAsync: vi.fn(),
+  },
   coreCreate: vi.fn(),
   generationRuns: [] as Array<{
     id: string;
@@ -72,6 +76,7 @@ vi.mock("@/model", async (importOriginal) => {
     ...actual,
     coreGenerationApi: { create: mocks.coreCreate },
     useGenerateAnimationMutation: () => mocks.animationMutation,
+    useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
     useGenerationRunsQuery: () => ({ data: mocks.generationRuns }),
   };
 });
@@ -88,6 +93,8 @@ beforeEach(() => {
   mocks.stateValues.length = 0;
   mocks.generationRuns = [];
   mocks.animationMutation.isPending = false;
+  mocks.applicationMutation.isPending = false;
+  mocks.applicationMutation.mutateAsync.mockResolvedValue(undefined);
   mocks.animationMutation.mutateAsync.mockResolvedValue({
     generationId: "generation-1",
     animation: { kind: "clip", label: "Walk", frameCount: 4 },
@@ -237,6 +244,32 @@ describe("useEditorWorkspace", () => {
     expect(editor.header.generationTasks).toEqual([animationTask, promptTask]);
     expect(editor.inspector.isSubmitting).toBe(true);
     expect(mocks.coreCreate).not.toHaveBeenCalled();
+  });
+
+  it("lets the editor apply an awaiting generation result", async () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Walk",
+        prompt: "A relaxed walk",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.stateValues.push(null, null, null);
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    editor?.header.generationTasks[0]?.onApply?.();
+    await flushPromises();
+
+    expect(mocks.applicationMutation.mutateAsync).toHaveBeenCalledWith({
+      projectId: "7",
+      assetId: "8",
+      runId: "ready",
+      applied: true,
+    });
   });
 
   it("reports failed saves, animation generation, and prompt submission", async () => {

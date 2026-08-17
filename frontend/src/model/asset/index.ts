@@ -21,7 +21,7 @@ export { useRecordQuery, useSaveAssetRevisionMutation } from "./record";
 export type {
   AssetCanvasPosition,
   AssetRecord,
-  AssetRecordApi,
+  AssetWorkspaceApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
   AssetWorkspaceAsset,

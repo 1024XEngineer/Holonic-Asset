@@ -8,6 +8,7 @@ import type {
 const mocks = vi.hoisted(() => ({
   assetDetail: vi.fn(),
   assetRecords: vi.fn(),
+  assetRecord: vi.fn(),
   projectDetail: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("../library/core-asset.api", () => ({
   coreAssetApi: {
     detail: mocks.assetDetail,
     records: mocks.assetRecords,
+    record: mocks.assetRecord,
   },
 }));
 vi.mock("../../project", async (importOriginal) => ({
@@ -24,6 +26,7 @@ vi.mock("../../project", async (importOriginal) => ({
 
 import {
   loadCoreSpriteAssetWorkspace,
+  saveCoreSpriteAssetRevision,
   toCoreSpriteAssetWorkspace,
 } from "./core-sprite-record";
 
@@ -31,6 +34,47 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.projectDetail.mockResolvedValue({ name: "Demo" });
   mocks.assetRecords.mockResolvedValue({ records: [] });
+});
+
+describe("saveCoreSpriteAssetRevision", () => {
+  it("persists a Core sprite revision with its loaded base version", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 4 });
+    mocks.assetRecords.mockResolvedValue({ records: [] });
+
+    await expect(
+      saveCoreSpriteAssetRevision({
+        projectId: "11",
+        assetId: "9",
+        version: "v3",
+        record: {
+          mode: "character",
+          prompt: "Hero",
+          character: {
+            prototype: {
+              format: "png-sprite-sheet",
+              imageUrl: "/front.png",
+              frameUrls: ["/front.png", "/back.png"],
+              frameWidth: 32,
+              frameHeight: 32,
+              columns: 2,
+              rows: 1,
+            },
+            animations: [],
+            nodePositions: { prototype: { x: 10, y: 20 } },
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ version: "v4" });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      expectedVersion: 3,
+      content: expect.objectContaining({
+        directionCount: 2,
+        metadata: { nodePositions: { prototype: { x: 10, y: 20 } } },
+      }),
+    });
+  });
 });
 
 describe("loadCoreSpriteAssetWorkspace", () => {

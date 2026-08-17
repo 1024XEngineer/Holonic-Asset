@@ -1,7 +1,15 @@
-import { AlertCircle, ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  LoaderCircle,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +20,11 @@ export type EditorGenerationTask = {
   id: string;
   name: string;
   prompt: string;
-  status: "queued" | "processing" | "failed";
+  status: "queued" | "processing" | "awaiting_application" | "failed";
   error?: string;
+  isResolving?: boolean;
+  onApply?: () => void;
+  onDiscard?: () => void;
 };
 
 export function GenerationTaskDropdown({
@@ -23,20 +34,34 @@ export function GenerationTaskDropdown({
 }) {
   const { t } = useTranslation("editor");
   if (tasks.length === 0) return null;
-  const hasActiveTasks = tasks.some((task) => task.status !== "failed");
+  const hasActiveTasks = tasks.some(
+    (task) => task.status === "queued" || task.status === "processing",
+  );
+  const hasAwaitingTasks = tasks.some(
+    (task) => task.status === "awaiting_application",
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="inline-flex h-8 max-w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         {hasActiveTasks ? (
           <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+        ) : hasAwaitingTasks ? (
+          <Sparkles className="size-3.5 shrink-0" />
         ) : (
           <AlertCircle className="size-3.5 shrink-0 text-destructive" />
         )}
         <span className="hidden truncate sm:inline">
-          {t(hasActiveTasks ? "generationActive" : "generationFailed", {
-            count: tasks.length,
-          })}
+          {t(
+            hasActiveTasks
+              ? "generationActive"
+              : hasAwaitingTasks
+                ? "generationReady"
+                : "generationFailed",
+            {
+              count: tasks.length,
+            },
+          )}
         </span>
         <Badge
           variant="outline"
@@ -75,7 +100,9 @@ export function GenerationTaskDropdown({
                       ? t("queued")
                       : task.status === "failed"
                         ? t("failed")
-                        : t("generating")}
+                        : task.status === "awaiting_application"
+                          ? t("awaitingApplication")
+                          : t("generating")}
                   </Badge>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
@@ -85,6 +112,27 @@ export function GenerationTaskDropdown({
                   <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-destructive">
                     {task.error}
                   </p>
+                ) : null}
+                {task.status === "awaiting_application" ? (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <Button
+                      size="xs"
+                      disabled={task.isResolving}
+                      onClick={task.onApply}
+                    >
+                      <Check data-icon="inline-start" />
+                      {t("applyGeneration")}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={task.isResolving}
+                      onClick={task.onDiscard}
+                    >
+                      <X data-icon="inline-start" />
+                      {t("discardGeneration")}
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             </div>

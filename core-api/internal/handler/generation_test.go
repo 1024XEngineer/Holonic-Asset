@@ -26,6 +26,8 @@ type runManagerStub struct {
 	run           *generator.Run
 	cancelID      generator.RunID
 	cancelErr     error
+	resolveID     generator.RunID
+	resolved      bool
 }
 
 func (s *runManagerStub) Create(
@@ -68,6 +70,12 @@ func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, 
 func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
 	s.cancelID = runID
 	return s.cancelErr
+}
+
+func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.RunID, applied bool) error {
+	s.resolveID = runID
+	s.resolved = applied
+	return nil
 }
 
 func TestCreateMapsTransportRequest(t *testing.T) {

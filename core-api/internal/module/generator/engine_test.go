@@ -68,6 +68,11 @@ func (s *taskManagerStub) Cancel(_ context.Context, taskID uint) error {
 	return nil
 }
 
+func (s *taskManagerStub) Complete(_ context.Context, taskID uint) error {
+	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: taskdomain.StatusCompleted})
+	return nil
+}
+
 func (s *taskManagerStub) dispatch(
 	ctx context.Context,
 	message *taskdomain.Task,
@@ -92,7 +97,9 @@ type projectReaderStub struct {
 
 type referenceStoreStub struct {
 	persisted  []string
+	deleted    []string
 	persistErr error
+	deleteErr  error
 }
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
@@ -115,8 +122,9 @@ func (s *referenceStoreStub) PersistReferenceAt(context.Context, string, string)
 	return nil
 }
 
-func (s *referenceStoreStub) DeleteObjects(context.Context, []string) error {
-	return nil
+func (s *referenceStoreStub) DeleteObjects(_ context.Context, keys []string) error {
+	s.deleted = append(s.deleted, keys...)
+	return s.deleteErr
 }
 
 func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
@@ -146,7 +154,8 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		t.Fatalf("unexpected task creation: run=%d task=%+v", runID, tasks.createdTask)
 	}
 	if tasks.createdTask.Type != string(request.Kind) ||
-		tasks.createdTask.Status != taskdomain.StatusPending {
+		tasks.createdTask.Status != taskdomain.StatusPending ||
+		tasks.createdTask.CompletionStatus != taskdomain.StatusAwaitingApplication {
 		t.Fatalf("unexpected task envelope: %+v", tasks.createdTask)
 	}
 
@@ -786,6 +795,44 @@ func TestCancelUpdatesTaskStatus(t *testing.T) {
 	}
 }
 
+func TestResolveApplicationCompletesAwaitingRun(t *testing.T) {
+	for _, applied := range []bool{true, false} {
+		t.Run(fmt.Sprintf("applied=%t", applied), func(t *testing.T) {
+			tasks := &taskManagerStub{detail: &taskdomain.Task{
+				ID:     17,
+				Status: taskdomain.StatusAwaitingApplication,
+				Result: json.RawMessage(`{"asset_id":9,"generated_resources":["generated/a.png"]}`),
+			}}
+			references := &referenceStoreStub{}
+			engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+			if err := engine.ResolveApplication(context.Background(), 17, applied); err != nil {
+				t.Fatalf("resolve generation application: %v", err)
+			}
+			if len(tasks.statusUpdates) != 1 || tasks.statusUpdates[0].status != taskdomain.StatusCompleted {
+				t.Fatalf("unexpected task completion: %+v", tasks.statusUpdates)
+			}
+			if applied && len(references.deleted) != 0 {
+				t.Fatalf("applied resources were deleted: %v", references.deleted)
+			}
+			if !applied && !reflect.DeepEqual(references.deleted, []string{"generated/a.png"}) {
+				t.Fatalf("discarded resources were not deleted: %v", references.deleted)
+			}
+		})
+	}
+}
+
+func TestResolveApplicationRejectsNonAwaitingRun(t *testing.T) {
+	tasks := &taskManagerStub{detail: &taskdomain.Task{ID: 17, Status: taskdomain.StatusCompleted}}
+	err := generator.NewEngine(tasks, nil).ResolveApplication(context.Background(), 17, true)
+	if err == nil || !strings.Contains(err.Error(), "not awaiting application") {
+		t.Fatalf("expected invalid application transition, got %v", err)
+	}
+	if len(tasks.statusUpdates) != 0 {
+		t.Fatalf("non-awaiting task was completed: %+v", tasks.statusUpdates)
+	}
+}
+
 type executorStub struct {
 	taskType generator.TaskType
 	payload  json.RawMessage
@@ -962,7 +1009,14 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			Type:    string(taskType),
 			Payload: payload,
 		}
-		if _, err := tasks.dispatch(context.Background(), message); err != nil {
+		_, err := tasks.dispatch(context.Background(), message)
+		if taskType == generator.EditCharacterFrames || taskType == generator.EditObjectFrames {
+			if !errors.Is(err, generator.ErrUnsupportedTaskType) {
+				t.Fatalf("unimplemented task type %q returned %v", taskType, err)
+			}
+			continue
+		}
+		if err != nil {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}

@@ -207,7 +207,12 @@ async function resolveAnimationAssetKind(
 function isVisibleGenerationStatus(
   status: GenerationRunListItemResponse["status"],
 ): status is GenerationRun["status"] {
-  return status === "pending" || status === "processing" || status === "failed";
+  return (
+    status === "pending" ||
+    status === "processing" ||
+    status === "awaiting_application" ||
+    status === "failed"
+  );
 }
 
 async function resolveReference(reference: unknown) {

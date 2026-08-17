@@ -80,6 +80,7 @@
   "status": {
     "pending": "待处理",
     "processing": "处理中",
+    "awaiting_application": "待应用",
     "failed": "失败"
   },
   "pageTitle": "创建 {{kind}}",

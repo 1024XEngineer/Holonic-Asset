@@ -27,6 +27,20 @@ func ProjectLevelTaskTypes() []TaskType {
 	}
 }
 
+func (t TaskType) AwaitsApplication() bool {
+	switch t {
+	case EditCharacterProtoType,
+		EditObjectProtoType,
+		GenerateAnimation,
+		EditAnimation,
+		EditTilesetItem,
+		EditTiles:
+		return true
+	default:
+		return false
+	}
+}
+
 func TaskTypes() []TaskType {
 	return []TaskType{
 		GenerateCharacterProtoType,

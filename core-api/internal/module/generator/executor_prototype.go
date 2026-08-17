@@ -116,17 +116,12 @@ func (e *executor) editCharacterPrototype(
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited character asset %d content: %w", asset.ID, err)
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: asset.ID,
-		Content: encoded,
-	}, asset.Version)
-	if err != nil {
-		return nil, fmt.Errorf("generator: create character asset %d version: %w", asset.ID, err)
-	}
-	if record == nil || record.Version == 0 {
-		return nil, fmt.Errorf("generator: create character asset %d version: empty result", asset.ID)
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            asset.ID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedPrototypeResourceKeys(resources),
+	})
 }
 
 func (e *executor) generateObjectPrototype(
@@ -463,15 +458,10 @@ func (e *executor) editObjectPrototype(
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited object asset %d content: %w", asset.ID, err)
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: asset.ID,
-		Content: encoded,
-	}, asset.Version)
-	if err != nil {
-		return nil, fmt.Errorf("generator: create object asset %d version: %w", asset.ID, err)
-	}
-	if record == nil || record.Version == 0 {
-		return nil, fmt.Errorf("generator: create object asset %d version: empty result", asset.ID)
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            asset.ID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedPrototypeResourceKeys(resources),
+	})
 }

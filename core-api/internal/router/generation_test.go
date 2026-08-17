@@ -49,6 +49,13 @@ func (*generationRouterStub) Cancel(
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{}), nil
 }
 
+func (*generationRouterStub) ResolveApplication(
+	context.Context,
+	dto.ResolveGenerationApplicationRequest,
+) (dto.SuccessResponse[dto.ResolveGenerationApplicationResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{Completed: true}), nil
+}
+
 func TestGenerationRoutesAreRegistered(t *testing.T) {
 	stub := &generationRouterStub{}
 	e := router.Register(nil, nil, stub, nil)
@@ -75,6 +82,11 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/api/v1/generation-runs/7/cancel",
 			body:   `{}`,
+		},
+		{
+			method: http.MethodPost,
+			path:   "/api/v1/generation-runs/7/application",
+			body:   `{"applied":true}`,
 		},
 	}
 

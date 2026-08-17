@@ -120,3 +120,14 @@ func (h *GenerationHandler) Cancel(
 	}
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{Cancelled: true}), nil
 }
+
+func (h *GenerationHandler) ResolveApplication(
+	ctx context.Context,
+	request dto.ResolveGenerationApplicationRequest,
+) (dto.SuccessResponse[dto.ResolveGenerationApplicationResponse], error) {
+	err := h.runs.ResolveApplication(ctx, request.GenerationRunID, request.Applied)
+	if err != nil {
+		return dto.SuccessResponse[dto.ResolveGenerationApplicationResponse]{}, err
+	}
+	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{Completed: true}), nil
+}

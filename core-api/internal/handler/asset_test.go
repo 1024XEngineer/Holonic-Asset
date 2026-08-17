@@ -28,6 +28,7 @@ type assetManagerStub struct {
 	update          *domain.AssetUpdate
 	record          *domain.AssetRecord
 	recordRequest   *domain.AssetRecord
+	expectedVersion uint
 	records         []domain.AssetRecord
 	rollbackAsset   uint
 	rollbackVersion uint
@@ -36,8 +37,9 @@ type assetManagerStub struct {
 	deleteErr       error
 }
 
-func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, _ uint) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	s.recordRequest = record
+	s.expectedVersion = expectedVersion
 	return s.record, nil
 }
 
@@ -238,14 +240,15 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 
 	content := json.RawMessage(`{"prototype":[{"id":2,"url":"new.png"}]}`)
 	response, err := h.Record(context.Background(), dto.RecordAssetRequest{
-		AssetID: 7,
-		Content: content,
+		AssetID:         7,
+		ExpectedVersion: 2,
+		Content:         content,
 	})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
 	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 ||
-		string(managerStub.recordRequest.Content) != string(content) {
+		string(managerStub.recordRequest.Content) != string(content) || managerStub.expectedVersion != 2 {
 		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
 	data := response.Data

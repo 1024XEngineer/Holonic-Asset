@@ -5,6 +5,7 @@ import {
   coreGenerationApi,
   useGenerateAnimationMutation,
   useGenerationRunsQuery,
+  useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
   type GenerateAnimationRequest,
 } from "@/model";
@@ -25,11 +26,16 @@ export function useEditorWorkspace({
 }): SpriteEditorModeProps | null {
   const { asset, projectName } = data;
   const session = useEditorSession({
-    target: { projectId: asset.projectId, assetId: asset.id },
+    target: {
+      projectId: asset.projectId,
+      assetId: asset.id,
+      version: asset.version,
+    },
     initialRecord: data.record,
   });
   const { snapshot } = session;
   const animationMutation = useGenerateAnimationMutation();
+  const applicationMutation = useResolveGenerationApplicationMutation();
   const { data: generationRuns = [] } = useGenerationRunsQuery(
     asset.projectId,
     asset.id,
@@ -55,11 +61,30 @@ export function useEditorWorkspace({
     session.syncExternalRecord(data.record);
   }, [data.record, session.syncExternalRecord]);
 
+  const reportAction = (message: string) => {
+    setNotice(message);
+    scheduleNoticeReset(() => setNotice(null), 2400);
+  };
+  const resolveApplication = async (runId: string, applied: boolean) => {
+    try {
+      await applicationMutation.mutateAsync({
+        projectId: asset.projectId,
+        assetId: asset.id,
+        runId,
+        applied,
+      });
+      reportAction(applied ? "Generation applied" : "Generation discarded");
+    } catch {
+      reportAction("Unable to consume generation result");
+    }
+  };
+
   const generationTasks = useMemo<EditorGenerationTask[]>(
     () => [
       ...generationRuns.flatMap((run) =>
         run.status === "pending" ||
         run.status === "processing" ||
+        run.status === "awaiting_application" ||
         run.status === "failed"
           ? [
               {
@@ -71,8 +96,15 @@ export function useEditorWorkspace({
                     ? "queued"
                     : run.status === "failed"
                       ? "failed"
-                      : "processing",
+                      : run.status,
                 ...(run.error ? { error: run.error } : {}),
+                ...(run.status === "awaiting_application"
+                  ? {
+                      isResolving: applicationMutation.isPending,
+                      onApply: () => void resolveApplication(run.id, true),
+                      onDiscard: () => void resolveApplication(run.id, false),
+                    }
+                  : {}),
               } satisfies EditorGenerationTask,
             ]
           : [],
@@ -80,13 +112,9 @@ export function useEditorWorkspace({
       ...(animationTask ? [animationTask] : []),
       ...(promptTask ? [promptTask] : []),
     ],
-    [animationTask, generationRuns, promptTask],
+    [animationTask, applicationMutation.isPending, generationRuns, promptTask],
   );
 
-  const reportAction = (message: string) => {
-    setNotice(message);
-    scheduleNoticeReset(() => setNotice(null), 2400);
-  };
   const status = getEditorStatus({
     saveState: snapshot.saveState,
     isPromptSubmitting: promptTask !== null,

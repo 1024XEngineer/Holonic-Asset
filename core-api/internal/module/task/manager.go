@@ -26,6 +26,7 @@ type Manager interface {
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
 	List(ctx context.Context, filter *ListFilter) ([]*Task, error)
 	Cancel(ctx context.Context, taskID uint) error
+	Complete(ctx context.Context, taskID uint) error
 }
 
 type manager struct {
@@ -136,6 +137,10 @@ func (m *manager) List(ctx context.Context, filter *ListFilter) ([]*Task, error)
 
 func (m *manager) Cancel(ctx context.Context, taskID uint) error {
 	return m.store.UpdateTaskStatus(ctx, taskID, StatusCancelled)
+}
+
+func (m *manager) Complete(ctx context.Context, taskID uint) error {
+	return m.store.CompleteTask(ctx, taskID)
 }
 
 func (m *manager) runOutbox(ctx context.Context) {

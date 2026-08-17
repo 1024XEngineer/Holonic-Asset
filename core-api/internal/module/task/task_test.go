@@ -25,3 +25,9 @@ func TestRegistryDispatchReturnsErrorForUnknownType(t *testing.T) {
 		t.Fatal("expected unknown task type error")
 	}
 }
+
+func TestAwaitingApplicationStatusString(t *testing.T) {
+	if got := StatusAwaitingApplication.String(); got != "awaiting_application" {
+		t.Fatalf("unexpected awaiting application status: %q", got)
+	}
+}

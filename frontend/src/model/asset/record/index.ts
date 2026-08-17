@@ -7,7 +7,7 @@ export type {
   CharacterAssetRecord,
   AssetCanvasPosition,
   AssetRecord,
-  AssetRecordApi,
+  AssetWorkspaceApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
   TilesetItem,

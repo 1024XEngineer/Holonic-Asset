@@ -16,6 +16,7 @@ type GenerationRouter interface {
 	List(context.Context, dto.ListGenerationRunsRequest) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error)
 	Get(context.Context, dto.GetGenerationRequest) (dto.SuccessResponse[dto.GetGenerationResponse], error)
 	Cancel(context.Context, dto.CancelGenerationRequest) (dto.SuccessResponse[dto.CancelGenerationResponse], error)
+	ResolveApplication(context.Context, dto.ResolveGenerationApplicationRequest) (dto.SuccessResponse[dto.ResolveGenerationApplicationResponse], error)
 }
 
 type createGenerationInput struct {
@@ -68,6 +69,15 @@ type cancelGenerationInput dto.CancelGenerationRequest
 
 type cancelGenerationOutput struct {
 	Body dto.SuccessResponse[dto.CancelGenerationResponse]
+}
+
+type resolveGenerationApplicationInput struct {
+	RunID generator.RunID `path:"run_id" minimum:"1"`
+	Body  dto.ResolveGenerationApplicationRequest
+}
+
+type resolveGenerationApplicationOutput struct {
+	Body dto.SuccessResponse[dto.ResolveGenerationApplicationResponse]
 }
 
 // RegisterGenerationRoutes exposes task-backed generation use cases. AI Service
@@ -128,5 +138,19 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 	}, func(ctx context.Context, input *cancelGenerationInput) (*cancelGenerationOutput, error) {
 		response, err := r.Cancel(ctx, dto.CancelGenerationRequest(*input))
 		return &cancelGenerationOutput{Body: response}, openAPIError(err)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "resolveGenerationApplication",
+		Method:      http.MethodPost,
+		Path:        "/generation-runs/{run_id}/application",
+		Summary:     "Apply or discard a generation result",
+		Tags:        []string{"Generation"},
+		Errors:      []int{http.StatusBadRequest, http.StatusConflict},
+	}, func(ctx context.Context, input *resolveGenerationApplicationInput) (*resolveGenerationApplicationOutput, error) {
+		request := input.Body
+		request.GenerationRunID = input.RunID
+		response, err := r.ResolveApplication(ctx, request)
+		return &resolveGenerationApplicationOutput{Body: response}, openAPIError(err)
 	})
 }
