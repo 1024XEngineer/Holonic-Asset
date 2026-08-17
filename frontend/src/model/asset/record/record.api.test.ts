@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   saveMock: vi.fn(),
 }));
 
-vi.mock("./core-sprite-record", () => ({
-  loadCoreSpriteAssetWorkspace: mocks.loadCore,
+vi.mock("./core-asset-record", () => ({
+  loadCoreAssetWorkspace: mocks.loadCore,
 }));
 vi.mock("./mock", () => ({
   getMockAssetRecord: mocks.loadMock,
@@ -21,7 +21,7 @@ const input = { projectId: "11", assetId: "9" };
 beforeEach(() => vi.clearAllMocks());
 
 describe("recordApi", () => {
-  it("returns a persisted Core sprite workspace without loading mock data", async () => {
+  it("returns a persisted Core workspace without loading mock data", async () => {
     const workspace = { projectName: "Core project" };
     mocks.loadCore.mockResolvedValue(workspace);
 
