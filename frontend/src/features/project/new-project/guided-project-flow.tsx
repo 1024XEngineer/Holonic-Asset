@@ -1,8 +1,10 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isPerspective } from "@/model/project";
@@ -17,6 +19,7 @@ export function GuidedProjectFlow({
   const { t } = useTranslation("projects");
   const { form, preview } = project;
   const { instance: newProjectForm, step } = form;
+  const [previewImage, setPreviewImage] = useState<string>();
 
   return (
     <form
@@ -115,13 +118,26 @@ export function GuidedProjectFlow({
             <TabsTrigger value="upload">{t("upload")}</TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="grid gap-3">
-            <div className="aspect-[16/9] overflow-hidden rounded-md border bg-muted/30">
-              {preview.url ? (
-                <img
-                  src={preview.url}
-                  alt={t("generatedOverview")}
-                  className="size-full object-cover"
+            <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+              {preview.isGenerating ? (
+                <LoaderCircle
+                  className="size-8 animate-spin text-muted-foreground"
+                  role="status"
+                  aria-label={t("generatePreview")}
                 />
+              ) : preview.url ? (
+                <button
+                  type="button"
+                  className="size-full cursor-zoom-in"
+                  aria-label={t("previewReference")}
+                  onClick={() => setPreviewImage(preview.url)}
+                >
+                  <img
+                    src={preview.url}
+                    alt={t("generatedOverview")}
+                    className="size-full object-cover"
+                  />
+                </button>
               ) : null}
             </div>
             <Button
@@ -147,6 +163,26 @@ export function GuidedProjectFlow({
           </TabsContent>
         </Tabs>
       )}
+      <Dialog
+        open={Boolean(previewImage)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImage(undefined);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[92vh] w-[96vw] max-w-none items-center justify-center rounded-none border-none bg-transparent p-0 shadow-none ring-0"
+        >
+          <DialogTitle className="sr-only">{t("previewReference")}</DialogTitle>
+          {previewImage ? (
+            <img
+              src={previewImage}
+              alt={t("generatedOverview")}
+              className="max-h-[92vh] max-w-[96vw] object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <div className="mt-2 flex justify-between border-t pt-6">
         <button
           type="button"
@@ -158,6 +194,7 @@ export function GuidedProjectFlow({
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
+          disabled={step === 2 && preview.isGenerating}
         >
           {step === 2 ? t("submit") : t("next")}
           <ArrowRight size={16} />
