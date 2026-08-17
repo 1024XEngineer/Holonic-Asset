@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssetRecord, CharacterAssetRecord } from "@/model";
+import type {
+  AssetRecord,
+  CharacterAssetRecord,
+  UISetAssetRecord,
+} from "@/model";
 
 import {
   createEditorSessionStore,
@@ -28,6 +32,23 @@ function createCharacterRecord(): CharacterAssetRecord {
       },
       animations: [{ kind: "clip", id: "idle", label: "Idle", frameCount: 4 }],
       nodePositions: { idle: { x: 10, y: 20 } },
+    },
+  };
+}
+
+function createUISetRecord(): UISetAssetRecord {
+  return {
+    mode: "uiset",
+    prompt: "Inventory menu",
+    uiset: {
+      components: [
+        {
+          id: "primary-action",
+          label: "Start",
+          kind: "button",
+          bounds: { x: 20, y: 60, width: 50, height: 16 },
+        },
+      ],
     },
   };
 }
@@ -145,6 +166,83 @@ describe("editor session store", () => {
     expect(record.character.nodePositions.idle).toBeUndefined();
   });
 
+  it("updates and restores UI Set components through editor history", () => {
+    const generatedRecord = createUISetRecord();
+    const store = createEditorSessionStore(generatedRecord);
+    const generatedComponent = generatedRecord.uiset.components[0];
+    if (!generatedComponent) throw new Error("Expected a generated component.");
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: generatedComponent.id,
+      label: "Play now ",
+    });
+    expect(store.getState().record).toMatchObject({
+      mode: "uiset",
+      uiset: {
+        components: [{ id: "primary-action", label: "Play now " }],
+      },
+    });
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.restore",
+      component: generatedComponent,
+    });
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: {
+        mode: "uiset",
+        uiset: { components: [{ id: "primary-action", label: "Start" }] },
+      },
+      dirty: false,
+      canUndo: true,
+    });
+
+    dispatchEditorCommand(store, { type: "history.undo" });
+    expect(store.getState().record).toMatchObject({
+      mode: "uiset",
+      uiset: {
+        components: [{ id: "primary-action", label: "Play now " }],
+      },
+    });
+  });
+
+  it("ignores no-op UI Set edits and rejects UI Set commands for other assets", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    const record = store.getState().record;
+    if (record.mode !== "uiset") throw new Error("Expected a UI Set record.");
+    const component = record.uiset.components[0];
+    if (!component) throw new Error("Expected a UI Set component.");
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: component.id,
+      label: "Start",
+    });
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: "missing",
+      label: "Rename",
+    });
+    dispatchEditorCommand(store, {
+      type: "uiset.component.restore",
+      component,
+    });
+    expect(store.temporal.getState().pastStates).toHaveLength(0);
+
+    const sceneryStore = createEditorSessionStore({
+      mode: "scenery",
+      prompt: "Forest",
+      scenery: { layers: [] },
+    });
+    expect(() =>
+      dispatchEditorCommand(sceneryStore, {
+        type: "uiset.component.label.set",
+        componentId: "panel",
+        label: "Panel",
+      }),
+    ).toThrow("UI Set editing requires a UI Set record.");
+  });
+
   it("merges generated server animations without overwriting local edits", () => {
     const store = createEditorSessionStore(createCharacterRecord());
     dispatchEditorCommand(store, {
@@ -171,6 +269,80 @@ describe("editor session store", () => {
       },
     });
     expect(snapshot.dirty).toBe(true);
+  });
+
+  it("synchronizes refreshed UI Set components and prompt", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    const incoming = createUISetRecord();
+    incoming.prompt = "Updated inventory menu";
+    incoming.uiset.components = [
+      {
+        id: "inventory-panel",
+        label: "Inventory panel",
+        kind: "panel",
+        bounds: { x: 10, y: 10, width: 80, height: 70 },
+      },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toEqual({
+      record: incoming,
+      dirty: false,
+      canUndo: false,
+      canRedo: false,
+      saveState: idleSaveState,
+    });
+  });
+
+  it("preserves locally edited UI Set components during a server refresh", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: "primary-action",
+      label: "Play now",
+    });
+    dispatchEditorCommand(store, {
+      type: "prompt.set",
+      value: "Locally edited inventory menu",
+    });
+    const incoming = createUISetRecord();
+    incoming.prompt = "Server inventory menu";
+    incoming.uiset.components = [
+      {
+        ...incoming.uiset.components[0],
+        label: "Server start",
+        kind: "input",
+        bounds: { x: 36, y: 48, width: 64, height: 24 },
+      },
+      {
+        id: "inventory-panel",
+        label: "Inventory panel",
+        kind: "panel",
+        bounds: { x: 10, y: 10, width: 80, height: 70 },
+      },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: {
+        mode: "uiset",
+        prompt: "Locally edited inventory menu",
+        uiset: {
+          components: [
+            {
+              id: "primary-action",
+              label: "Play now",
+              kind: "input",
+              bounds: { x: 36, y: 48, width: 64, height: 24 },
+            },
+            { id: "inventory-panel", label: "Inventory panel" },
+          ],
+        },
+      },
+      dirty: true,
+    });
   });
 
   it("keeps external synchronization out of undo history", () => {

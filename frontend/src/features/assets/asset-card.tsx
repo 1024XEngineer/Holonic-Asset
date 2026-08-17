@@ -1,4 +1,10 @@
-import { Copy, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import {
+  Copy,
+  LoaderCircle,
+  PanelsTopLeft,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -45,6 +51,7 @@ export function AssetCard({
   projectId?: string;
 }) {
   const { t } = useTranslation(["assets", "common"]);
+  const isActionDisabled = asset.isReadOnly || isCopying || isDeleting;
 
   return (
     <Card
@@ -125,7 +132,7 @@ export function AssetCard({
                 variant="outline"
                 size="icon-sm"
                 className="bg-background/90 shadow-xs backdrop-blur-sm"
-                disabled={isCopying || isDeleting}
+                disabled={isActionDisabled}
                 onClick={onCopy}
               />
             }
@@ -137,6 +144,26 @@ export function AssetCard({
       </div>
 
       <div className="absolute right-2 top-2 z-30 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {asset.kind === "uiset" && onOpenEditor ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  aria-label={t("openUISetEditor")}
+                  variant="outline"
+                  size="icon-sm"
+                  className="bg-background/90 shadow-xs backdrop-blur-sm"
+                  disabled={isCopying || isDeleting}
+                  onClick={onOpenEditor}
+                />
+              }
+            >
+              <PanelsTopLeft />
+            </TooltipTrigger>
+            <TooltipContent>{t("openUISetEditor")}</TooltipContent>
+          </Tooltip>
+        ) : null}
         <Tooltip>
           <TooltipTrigger
             render={
@@ -146,7 +173,7 @@ export function AssetCard({
                 variant="outline"
                 size="icon-sm"
                 className="bg-background/90 shadow-xs backdrop-blur-sm"
-                disabled={isCopying || isDeleting}
+                disabled={isActionDisabled}
                 onClick={onEdit}
               />
             }
@@ -165,7 +192,7 @@ export function AssetCard({
                     variant="outline"
                     size="icon-sm"
                     className="bg-background/90 text-muted-foreground shadow-xs backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive"
-                    disabled={isCopying || isDeleting}
+                    disabled={isActionDisabled}
                   />
                 }
               >

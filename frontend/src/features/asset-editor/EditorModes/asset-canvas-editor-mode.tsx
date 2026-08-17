@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -6,7 +5,6 @@ import type {
   AssetWorkspaceData,
   SceneryLayer,
   TilesetItem,
-  UISetComponent,
 } from "@/model";
 
 import {
@@ -17,7 +15,6 @@ import {
   TilesetCanvas,
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
-import { UISetCanvas } from "../Canvas/UISetCanvas";
 import {
   EditorHeader,
   type EditorGenerationTask,
@@ -62,13 +59,6 @@ export function AssetCanvasEditorMode({
           {...frameProps}
           gridSize={data.record.tileset.gridSize}
           items={data.record.tileset.items}
-        />
-      );
-    case "uiset":
-      return (
-        <UISetEditor
-          {...frameProps}
-          components={data.record.uiset.components}
         />
       );
     default:
@@ -117,45 +107,6 @@ function TilesetEditor({
           selectedCellIndexes: canvas.selectedCellIndexes,
         }}
         onEvent={canvas.send}
-      />
-    </CanvasEditorFrame>
-  );
-}
-
-function UISetEditor({
-  components,
-  ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
-  components: UISetComponent[];
-}) {
-  const componentIds = useMemo(
-    () => components.map((component) => component.id),
-    [components],
-  );
-  const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>(
-    [],
-  );
-
-  useEffect(() => {
-    setSelectedComponentIds((current) => {
-      const next = current.filter((componentId) =>
-        componentIds.includes(componentId),
-      );
-      return next.length === current.length ? current : next;
-    });
-  }, [componentIds]);
-
-  return (
-    <CanvasEditorFrame {...frameProps} assetKind="uiset">
-      <UISetCanvas
-        model={{ components, selectedComponentIds }}
-        onEvent={({ componentId }) =>
-          setSelectedComponentIds((current) =>
-            current.includes(componentId)
-              ? current.filter((id) => id !== componentId)
-              : [...current, componentId],
-          )
-        }
       />
     </CanvasEditorFrame>
   );

@@ -77,6 +77,7 @@ export type ProjectAsset = {
   previewFrame?: AssetPreviewFrame;
   previewOffset?: AssetPreviewOffset;
   previewScale?: number;
+  isReadOnly?: boolean;
   history: AssetRevision[];
   animations: AssetAnimation[];
   scenery?: SceneryAssetData;

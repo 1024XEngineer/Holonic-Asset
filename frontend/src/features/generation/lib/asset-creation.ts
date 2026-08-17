@@ -20,6 +20,28 @@ const commonAssetCreationDraftShape = {
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
 
+const validationMessageKeys = {
+  "Asset name is required.": "validation.assetNameRequired",
+  "Creative brief is required.": "validation.creativeBriefRequired",
+  "Canvas size is required.": "validation.canvasSizeRequired",
+  "Canvas size must use a positive width × height value.":
+    "validation.canvasSizeInvalid",
+  "Each tileset item must have at least one occupied tile.":
+    "validation.tilesetItemRequired",
+  "Select a supported canvas width.": "validation.uiSetCanvasWidthUnsupported",
+  "Select a supported canvas height.":
+    "validation.uiSetCanvasHeightUnsupported",
+  "UI Set style is required.": "validation.uiSetStyleRequired",
+  "Every component needs a name.": "validation.uiSetComponentNameRequired",
+  "Every component needs a description.":
+    "validation.uiSetComponentDescriptionRequired",
+  "Add at least one UI Set component.": "validation.uiSetComponentRequired",
+} as const;
+
+export function getAssetCreationValidationMessageKey(message: string) {
+  return validationMessageKeys[message as keyof typeof validationMessageKeys];
+}
+
 export function createUISetComponent() {
   return { id: crypto.randomUUID(), name: "", description: "" };
 }

@@ -6,6 +6,7 @@ import type {
   AssetCanvasPosition,
   AssetRecord,
   SpriteAssetRecordData,
+  UISetComponent,
 } from "@/model";
 
 import type {
@@ -24,6 +25,8 @@ type EditorSessionState = {
   ) => void;
   renameSpriteAnimation: (animationId: string, label: string) => void;
   deleteSpriteAnimation: (animationId: string) => void;
+  setUISetComponentLabel: (componentId: string, label: string) => void;
+  restoreUISetComponent: (component: UISetComponent) => void;
 };
 
 const SPRITE_RECORD_REQUIRED_MESSAGE =
@@ -116,6 +119,45 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
               })),
             };
           }),
+        setUISetComponentLabel: (componentId, label) =>
+          set((state) => {
+            const components = getUISetComponents(state.record);
+            const target = components.find(
+              (component) => component.id === componentId,
+            );
+            if (!target || target.label === label) {
+              return state;
+            }
+
+            return {
+              record: updateUISetRecord(state.record, (current) => ({
+                ...current,
+                components: current.components.map((component) =>
+                  component.id === componentId
+                    ? { ...component, label }
+                    : component,
+                ),
+              })),
+            };
+          }),
+        restoreUISetComponent: (component) =>
+          set((state) => {
+            const current = getUISetComponents(state.record).find(
+              (candidate) => candidate.id === component.id,
+            );
+            if (!current || deepEqual(current, component)) return state;
+
+            return {
+              record: updateUISetRecord(state.record, (currentRecord) => ({
+                ...currentRecord,
+                components: currentRecord.components.map((candidate) =>
+                  candidate.id === component.id
+                    ? structuredClone(component)
+                    : candidate,
+                ),
+              })),
+            };
+          }),
       }),
       {
         limit: 100,
@@ -152,7 +194,13 @@ export function syncEditorSessionExternalRecord(
   incomingRecord: AssetRecord,
 ) {
   const state = store.getState();
-  if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) return;
+  if (isUISetRecord(state.record) && isUISetRecord(incomingRecord)) {
+    syncEditorSessionExternalUISetRecord(store, state, incomingRecord);
+    return;
+  }
+  if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) {
+    return;
+  }
   if (state.record.mode !== incomingRecord.mode) return;
 
   const incomingSprite = getSpriteRecordData(incomingRecord);
@@ -179,6 +227,51 @@ export function syncEditorSessionExternalRecord(
         ? {
             ...snapshot,
             record: syncExternalAnimations(
+              snapshot.record,
+              state.savedRecord,
+              incomingRecord,
+            ),
+          }
+        : snapshot,
+    );
+  const wasTracking = temporalState.isTracking;
+  if (wasTracking) temporalState.pause();
+  try {
+    store.setState({ record, savedRecord });
+    store.temporal.setState({
+      pastStates: rebaseHistory(temporalState.pastStates),
+      futureStates: rebaseHistory(temporalState.futureStates),
+    });
+  } finally {
+    if (wasTracking) store.temporal.getState().resume();
+  }
+}
+
+function syncEditorSessionExternalUISetRecord(
+  store: EditorSessionStore,
+  state: EditorSessionState,
+  incomingRecord: Extract<AssetRecord, { mode: "uiset" }>,
+) {
+  const record = syncExternalUISetRecord(
+    state.record,
+    state.savedRecord,
+    incomingRecord,
+  );
+  const savedRecord = structuredClone(incomingRecord);
+  if (
+    recordsMatch(record, state.record) &&
+    recordsMatch(savedRecord, state.savedRecord)
+  ) {
+    return;
+  }
+
+  const temporalState = store.temporal.getState();
+  const rebaseHistory = (history: typeof temporalState.pastStates) =>
+    history.map((snapshot) =>
+      snapshot.record
+        ? {
+            ...snapshot,
+            record: syncExternalUISetRecord(
               snapshot.record,
               state.savedRecord,
               incomingRecord,
@@ -226,6 +319,36 @@ function syncExternalAnimations(
   }));
 }
 
+function syncExternalUISetRecord(
+  record: AssetRecord,
+  savedRecord: AssetRecord,
+  incomingRecord: Extract<AssetRecord, { mode: "uiset" }>,
+) {
+  if (
+    !isUISetRecord(record) ||
+    !isUISetRecord(savedRecord) ||
+    record.mode !== savedRecord.mode
+  ) {
+    return record;
+  }
+
+  return {
+    ...structuredClone(incomingRecord),
+    prompt:
+      record.prompt === savedRecord.prompt
+        ? incomingRecord.prompt
+        : record.prompt,
+    uiset: {
+      ...structuredClone(incomingRecord.uiset),
+      components: mergeExternalUISetComponents(
+        record.uiset.components,
+        savedRecord.uiset.components,
+        incomingRecord.uiset.components,
+      ),
+    },
+  };
+}
+
 export function dispatchEditorCommand(
   store: EditorSessionStore,
   command: EditorCommand,
@@ -244,6 +367,14 @@ export function dispatchEditorCommand(
       return;
     case "sprite.animation.delete":
       store.getState().deleteSpriteAnimation(command.animationId);
+      return;
+    case "uiset.component.label.set":
+      store
+        .getState()
+        .setUISetComponentLabel(command.componentId, command.label);
+      return;
+    case "uiset.component.restore":
+      store.getState().restoreUISetComponent(command.component);
       return;
     case "history.undo":
       store.temporal.getState().undo();
@@ -272,6 +403,23 @@ function updateSpriteRecord(
   throw new Error(SPRITE_RECORD_REQUIRED_MESSAGE);
 }
 
+function getUISetComponents(record: AssetRecord): UISetComponent[] {
+  if (record.mode === "uiset") return record.uiset.components;
+  throw new Error("UI Set editing requires a UI Set record.");
+}
+
+function updateUISetRecord(
+  record: AssetRecord,
+  update: (
+    data: Extract<AssetRecord, { mode: "uiset" }>["uiset"],
+  ) => Extract<AssetRecord, { mode: "uiset" }>["uiset"],
+): AssetRecord {
+  if (record.mode !== "uiset") {
+    throw new Error("UI Set editing requires a UI Set record.");
+  }
+  return { ...record, uiset: update(record.uiset) };
+}
+
 export function getEditorSessionSnapshot(
   store: EditorSessionStore,
   saveState: EditorSaveState,
@@ -294,6 +442,12 @@ function recordsMatch(left: AssetRecord, right: AssetRecord) {
 
 function isSpriteRecord(record: AssetRecord) {
   return record.mode === "character" || record.mode === "object";
+}
+
+function isUISetRecord(
+  record: AssetRecord,
+): record is Extract<AssetRecord, { mode: "uiset" }> {
+  return record.mode === "uiset";
 }
 
 function mergeExternalAnimations(
@@ -329,4 +483,58 @@ function mergeExternalAnimations(
     }
   }
   return merged;
+}
+
+function mergeExternalUISetComponents(
+  current: UISetComponent[],
+  saved: UISetComponent[],
+  incoming: UISetComponent[],
+) {
+  const savedById = new Map(
+    saved.map((component) => [component.id, component]),
+  );
+  const currentById = new Map(
+    current.map((component) => [component.id, component]),
+  );
+  const incomingIds = new Set(incoming.map((component) => component.id));
+  const merged = incoming.flatMap((component) => {
+    const currentComponent = currentById.get(component.id);
+    const savedComponent = savedById.get(component.id);
+    if (savedComponent && !currentComponent) return [];
+    return [
+      currentComponent &&
+      savedComponent &&
+      !deepEqual(currentComponent, savedComponent)
+        ? mergeExternalUISetComponent(
+            currentComponent,
+            savedComponent,
+            component,
+          )
+        : structuredClone(component),
+    ];
+  });
+
+  for (const component of current) {
+    if (incomingIds.has(component.id)) continue;
+    const savedComponent = savedById.get(component.id);
+    if (!savedComponent || !deepEqual(component, savedComponent)) {
+      merged.push(structuredClone(component));
+    }
+  }
+  return merged;
+}
+
+function mergeExternalUISetComponent(
+  current: UISetComponent,
+  saved: UISetComponent,
+  incoming: UISetComponent,
+) {
+  const merged = structuredClone(incoming) as Record<string, unknown>;
+  const savedFields = saved as Record<string, unknown>;
+  for (const [key, value] of Object.entries(current)) {
+    if (!deepEqual(value, savedFields[key])) {
+      merged[key] = structuredClone(value);
+    }
+  }
+  return merged as UISetComponent;
 }

@@ -1,4 +1,4 @@
-import type { AssetCanvasPosition, AssetRecord } from "@/model";
+import type { AssetCanvasPosition, AssetRecord, UISetComponent } from "@/model";
 
 export type EditorTarget = {
   projectId: string;
@@ -18,6 +18,8 @@ export type EditorCommand =
       label: string;
     }
   | { type: "sprite.animation.delete"; animationId: string }
+  | { type: "uiset.component.label.set"; componentId: string; label: string }
+  | { type: "uiset.component.restore"; component: UISetComponent }
   | { type: "history.undo" }
   | { type: "history.redo" };
 
