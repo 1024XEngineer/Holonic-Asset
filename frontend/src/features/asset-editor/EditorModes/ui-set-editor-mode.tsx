@@ -95,9 +95,11 @@ export function UISetEditorMode({
   const status =
     snapshot.saveState.phase === "saving"
       ? t("savingChanges")
-      : snapshot.dirty
-        ? t("unsavedChanges")
-        : t("allChangesSaved");
+      : snapshot.saveState.phase === "failed"
+        ? snapshot.saveState.message
+        : snapshot.dirty
+          ? t("unsavedChanges")
+          : t("allChangesSaved");
 
   return (
     <>

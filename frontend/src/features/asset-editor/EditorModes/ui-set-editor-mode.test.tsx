@@ -21,7 +21,9 @@ let sessionSnapshot: {
   dirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  saveState: { phase: "idle" | "saving" };
+  saveState:
+    | { phase: "idle" | "saving" }
+    | { phase: "failed"; message: string };
 };
 
 vi.mock("../state", () => ({
@@ -151,5 +153,19 @@ describe("UISetEditorMode", () => {
     );
 
     expect(html).toContain("Saving changes");
+  });
+
+  it("renders a failed UI Set save message", () => {
+    sessionSnapshot = {
+      ...sessionSnapshot,
+      dirty: true,
+      saveState: { phase: "failed", message: "Save rejected" },
+    };
+
+    const html = renderToStaticMarkup(
+      withI18n(<UISetEditorMode data={workspaceData} onBack={vi.fn()} />),
+    );
+
+    expect(html).toContain("Save rejected");
   });
 });
