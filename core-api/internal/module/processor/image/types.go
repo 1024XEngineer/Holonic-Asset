@@ -25,15 +25,18 @@ const (
 type Profile string
 
 const (
-	ProfileGeneric     Profile = "generic"
-	ProfileIcon        Profile = "icon"
-	ProfileProduct     Profile = "product"
-	ProfileSticker     Profile = "sticker"
-	ProfileSeal        Profile = "seal"
-	ProfileTranslucent Profile = "translucent"
-	ProfileGlow        Profile = "glow"
-	ProfileShadow      Profile = "shadow"
-	ProfileEffect      Profile = "effect"
+	ProfileGeneric Profile = "generic"
+	// ProfileOpaqueBackground accepts a non-empty PNG that covers the full
+	// canvas. Transparent pixels indicate invalid letterboxing or holes.
+	ProfileOpaqueBackground Profile = "opaque-background"
+	ProfileIcon             Profile = "icon"
+	ProfileProduct          Profile = "product"
+	ProfileSticker          Profile = "sticker"
+	ProfileSeal             Profile = "seal"
+	ProfileTranslucent      Profile = "translucent"
+	ProfileGlow             Profile = "glow"
+	ProfileShadow           Profile = "shadow"
+	ProfileEffect           Profile = "effect"
 )
 
 type Material string
@@ -118,6 +121,7 @@ type ExtractionReport struct {
 	MatteDecontaminationApplied bool                 `json:"matte_decontamination_applied"`
 	RGBScrubbed                 bool                 `json:"rgb_scrubbed"`
 	EdgeNoisePixelsRemoved      uint64               `json:"edge_noise_pixels_removed,omitempty"`
+	FallbackApplied             bool                 `json:"fallback_applied,omitempty"`
 	DualAlignment               *DualAlignmentReport `json:"dual_alignment,omitempty"`
 }
 
@@ -163,14 +167,16 @@ type VerificationReport struct {
 
 // RemoveBackgroundRequest configures local chroma-key background removal.
 // ImageBase64 accepts raw Base64 or a data URL. MatteColor accepts a named
-// colour, #RRGGBB, or "auto" for edge sampling.
+// colour, #RRGGBB, or "auto" for edge sampling. AllowSampledMatteFallback lets
+// callers explicitly recover when a supplied matte does not match the source.
 type RemoveBackgroundRequest struct {
-	ImageBase64      string   `json:"image_base64"`
-	MatteColor       string   `json:"matte_color,omitempty"`
-	Material         Material `json:"material,omitempty"`
-	Threshold        *float64 `json:"threshold,omitempty"`
-	Softness         *float64 `json:"softness,omitempty"`
-	SpillSuppression *float64 `json:"spill_suppression,omitempty"`
+	ImageBase64               string   `json:"image_base64"`
+	MatteColor                string   `json:"matte_color,omitempty"`
+	AllowSampledMatteFallback bool     `json:"allow_sampled_matte_fallback,omitempty"`
+	Material                  Material `json:"material,omitempty"`
+	Threshold                 *float64 `json:"threshold,omitempty"`
+	Softness                  *float64 `json:"softness,omitempty"`
+	SpillSuppression          *float64 `json:"spill_suppression,omitempty"`
 }
 
 type RemoveBackgroundResult struct {

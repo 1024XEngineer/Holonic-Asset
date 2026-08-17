@@ -52,6 +52,7 @@ transparentPNGBase64 := result.ImageBase64
 Optional parameters:
 
 - `matte_color`: a named color, `#RRGGBB`, or `auto`; defaults to `#00ff00` when empty.
+- `allow_sampled_matte_fallback`: when true, a supplied matte that produces no usable transparent subject may be replaced by an edge-sampled matte; inspect `fallback_applied` and `matte_color_source` in the report.
 - `material`: selects a threshold preset based on the material type.
 - `threshold`, `softness`, `spill_suppression`: override the preset parameters.
 

@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
@@ -20,6 +21,8 @@ import (
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
+
+const maxSceneryLayerGenerationAttempts = 3
 
 func (e *executor) planSceneryLayers(
 	ctx context.Context,
@@ -83,55 +86,133 @@ func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateScen
 		references = []string{reference}
 	}
 	layers := make([]ProcessedSceneryLayer, 0, len(plan))
-	for _, layer := range plan {
+	for layerIndex, layer := range plan {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		prompt := prompts.SceneryLayer(prompts.SceneryLayerInput{AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style, Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType, TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description, Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, LayerID: layer.ID, LayerName: layer.Name, LayerCreativeBrief: layer.CreativeBrief, HasReference: len(references) > 0}, prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor))
-		generated, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
-			Prompt:          prompt,
-			ReferenceImages: append([]string(nil), references...),
-			Size:            fmt.Sprintf("%dx%d", payload.Dimensions.Width, payload.Dimensions.Height),
-		})
+		// The planner contract is back-to-front, so the first layer is the
+		// authoritative opaque backdrop used by generation and layout.
+		processed, err := e.generateSceneryLayer(ctx, payload, layer, layerIndex == 0, references)
 		if err != nil {
-			return nil, fmt.Errorf("generator: generate scenery layer %d: %w", layer.ID, err)
+			return nil, err
 		}
-		if generated == nil || len(generated.Images) != 1 || strings.TrimSpace(generated.Images[0].Base64) == "" {
-			return nil, fmt.Errorf("generator: generate scenery layer %d: expected exactly one image", layer.ID)
-		}
-		removed, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{ImageBase64: generated.Images[0].Base64, MatteColor: imageprocessor.DefaultMatteColor})
-		if err != nil {
-			return nil, fmt.Errorf("generator: remove scenery layer %d background: %w", layer.ID, err)
-		}
-		if removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
-			return nil, fmt.Errorf("generator: remove scenery layer %d background: empty result", layer.ID)
-		}
-		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-			ImageBase64: removed.ImageBase64,
-			Options: imageprocessor.ResizeOptions{
-				Width:       int(payload.Dimensions.Width),
-				Height:      int(payload.Dimensions.Height),
-				Margin:      0,
-				CropContent: false,
-				Mode:        imageprocessor.RasterModePixel,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generator: resize scenery layer %d: %w", layer.ID, err)
-		}
-		if resized == nil || strings.TrimSpace(resized.ImageBase64) == "" || resized.MIMEType != "image/png" {
-			return nil, fmt.Errorf("generator: resize scenery layer %d: invalid PNG result", layer.ID)
-		}
-		verified, err := e.processor.Verify(ctx, &imageprocessor.VerifyRequest{ImageBase64: resized.ImageBase64, Profile: imageprocessor.ProfileGeneric, ExpectedMatteColor: imageprocessor.DefaultMatteColor})
-		if err != nil {
-			return nil, fmt.Errorf("generator: verify scenery layer %d: %w", layer.ID, err)
-		}
-		if verified == nil || !verified.Passed {
-			return nil, fmt.Errorf("generator: verify scenery layer %d failed", layer.ID)
-		}
-		layers = append(layers, ProcessedSceneryLayer{ID: layer.ID, Name: layer.Name, ImageBase64: resized.ImageBase64, MediaType: "image/png"})
+		layers = append(layers, *processed)
 	}
 	return layers, nil
+}
+
+func (e *executor) generateSceneryLayer(
+	ctx context.Context,
+	payload CreateSceneryPayload,
+	layer SceneryLayerDefinition,
+	isBackmost bool,
+	references []string,
+) (*ProcessedSceneryLayer, error) {
+	prompt := prompts.SceneryLayer(prompts.SceneryLayerInput{
+		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style,
+		Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType,
+		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
+		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, LayerID: layer.ID,
+		LayerName: layer.Name, LayerCreativeBrief: layer.CreativeBrief, HasReference: len(references) > 0,
+		IsBackmost: isBackmost,
+	}, prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor))
+
+	var attemptErrors []error
+	attemptsPerformed := 0
+	for attempt := 1; attempt <= maxSceneryLayerGenerationAttempts; attempt++ {
+		attemptsPerformed = attempt
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		generated, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
+			Prompt: prompt, ReferenceImages: append([]string(nil), references...),
+			Size: fmt.Sprintf("%dx%d", payload.Dimensions.Width, payload.Dimensions.Height),
+		})
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, err))
+			if imageclient.IsPermanent(err) {
+				break
+			}
+			continue
+		}
+		if generated == nil || len(generated.Images) == 0 {
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
+			continue
+		}
+		for candidateIndex, candidate := range generated.Images {
+			processed, processErr := e.processSceneryLayerCandidate(ctx, payload, layer, isBackmost, candidate)
+			if processErr == nil {
+				return processed, nil
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d candidate %d: %w", attempt, candidateIndex, processErr))
+		}
+	}
+	return nil, fmt.Errorf("generator: generate scenery layer %d after %d attempts: %w", layer.ID, attemptsPerformed, errors.Join(attemptErrors...))
+}
+
+func (e *executor) processSceneryLayerCandidate(
+	ctx context.Context,
+	payload CreateSceneryPayload,
+	layer SceneryLayerDefinition,
+	isBackmost bool,
+	candidate imageclient.GeneratedImage,
+) (*ProcessedSceneryLayer, error) {
+	imageBase64 := strings.TrimSpace(candidate.Base64)
+	if imageBase64 == "" {
+		return nil, fmt.Errorf("empty image")
+	}
+	if !isBackmost {
+		removed, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
+			ImageBase64:               imageBase64,
+			MatteColor:                imageprocessor.DefaultMatteColor,
+			AllowSampledMatteFallback: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("remove background: %w", err)
+		}
+		if removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
+			return nil, fmt.Errorf("remove background: empty result")
+		}
+		imageBase64 = removed.ImageBase64
+	}
+	resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+		ImageBase64: imageBase64,
+		Options: imageprocessor.ResizeOptions{
+			Width: int(payload.Dimensions.Width), Height: int(payload.Dimensions.Height), Margin: 0,
+			CropContent: false, CoverCanvas: isBackmost, Mode: imageprocessor.RasterModePixel,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("resize: %w", err)
+	}
+	if resized == nil || strings.TrimSpace(resized.ImageBase64) == "" || resized.MIMEType != "image/png" {
+		return nil, fmt.Errorf("resize: invalid PNG result")
+	}
+	profile := imageprocessor.ProfileGeneric
+	expectedMatte := imageprocessor.DefaultMatteColor
+	if isBackmost {
+		profile = imageprocessor.ProfileOpaqueBackground
+		expectedMatte = ""
+	}
+	verified, err := e.processor.Verify(ctx, &imageprocessor.VerifyRequest{
+		ImageBase64: resized.ImageBase64, Profile: profile, ExpectedMatteColor: expectedMatte,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("verify: %w", err)
+	}
+	if verified == nil {
+		return nil, fmt.Errorf("verify: empty report")
+	}
+	if !verified.Passed {
+		return nil, fmt.Errorf("verify rejected image: %s", strings.Join(verified.FailureReasons, ","))
+	}
+	return &ProcessedSceneryLayer{ID: layer.ID, Name: layer.Name, ImageBase64: resized.ImageBase64, MediaType: "image/png"}, nil
 }
 
 func (e *executor) analyzeSceneryLayout(
@@ -231,7 +312,49 @@ func decodeSceneryLayouts(raw []byte, layers []ProcessedSceneryLayer, dimensions
 			return nil, invalid(fmt.Sprintf("layer ID %d is missing", id))
 		}
 	}
+	normalizeSceneryLayouts(layouts, layers)
 	return layouts, nil
+}
+
+func normalizeSceneryLayouts(layouts map[uint]SceneryLayerLayout, layers []ProcessedSceneryLayer) {
+	if len(layers) == 0 {
+		return
+	}
+	backdropID := layers[0].ID
+	backdrop := layouts[backdropID]
+	backdrop.Position = SceneryLayoutVector{}
+	backdrop.Scale = SceneryLayoutVector{X: 1, Y: 1}
+	backdrop.Rotation = 0
+	backdrop.Opacity = 1
+	layouts[backdropID] = backdrop
+
+	seen := make(map[int]struct{}, len(layers))
+	validOrder := true
+	for _, layer := range layers {
+		zIndex := layouts[layer.ID].ZIndex
+		if _, duplicate := seen[zIndex]; duplicate {
+			validOrder = false
+		}
+		seen[zIndex] = struct{}{}
+		if layer.ID != backdropID && backdrop.ZIndex >= zIndex {
+			validOrder = false
+		}
+	}
+	if validOrder {
+		return
+	}
+
+	overlays := append([]ProcessedSceneryLayer(nil), layers[1:]...)
+	sort.SliceStable(overlays, func(left, right int) bool {
+		return layouts[overlays[left].ID].ZIndex < layouts[overlays[right].ID].ZIndex
+	})
+	backdrop.ZIndex = 0
+	layouts[backdropID] = backdrop
+	for index, layer := range overlays {
+		layout := layouts[layer.ID]
+		layout.ZIndex = index + 1
+		layouts[layer.ID] = layout
+	}
 }
 
 func validateSceneryLayoutCandidate(candidate sceneryLayoutCandidate, dimensions assetdomain.Size) (SceneryLayerLayout, uint, error) {

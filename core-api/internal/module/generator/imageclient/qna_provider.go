@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
 const (
@@ -31,6 +33,7 @@ type QNAConfig struct {
 	APIKey       string
 	DefaultModel string
 	HTTPClient   *http.Client
+	Logger       logger.Logger
 }
 
 // QNAProvider calls QNA's text-to-image and image-to-image APIs.
@@ -39,6 +42,7 @@ type QNAProvider struct {
 	apiKey       string
 	defaultModel string
 	httpClient   *http.Client
+	logger       logger.Logger
 }
 
 // NewQNAProvider creates a QNA provider with documented production defaults.
@@ -63,6 +67,7 @@ func NewQNAProvider(config QNAConfig) *QNAProvider {
 		apiKey:       config.APIKey,
 		defaultModel: defaultModel,
 		httpClient:   httpClient,
+		logger:       config.Logger,
 	}
 }
 
@@ -79,7 +84,33 @@ func (p *QNAProvider) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
-	return p.call(ctx, qnaEditPath, request, request.ReferenceImages)
+	result, err := p.call(ctx, qnaEditPath, request, request.ReferenceImages)
+	if !shouldRetryQNAEditWithoutMask(request, err) {
+		return result, err
+	}
+	if p.logger != nil {
+		p.logger.Warn(
+			"qna rejected the documented edit mask format; retrying without native mask",
+			logger.Error(err),
+		)
+	}
+	fallback := *request
+	fallback.MaskImage = ""
+	return p.call(ctx, qnaEditPath, &fallback, fallback.ReferenceImages)
+}
+
+func shouldRetryQNAEditWithoutMask(request *ProviderRequest, err error) bool {
+	if request == nil || strings.TrimSpace(request.MaskImage) == "" || err == nil {
+		return false
+	}
+	var providerErr *ProviderError
+	if !errors.As(err, &providerErr) || providerErr.Kind != ErrorKindInvalidRequest ||
+		providerErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	message := strings.ToLower(providerErr.Message)
+	return strings.Contains(message, "mask must be an object") ||
+		strings.Contains(message, "unable to download content from the provided url")
 }
 
 func (p *QNAProvider) call(

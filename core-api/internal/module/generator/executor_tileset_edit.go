@@ -22,7 +22,11 @@ import (
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
-const maxTileSetEditImageBytes = 32 << 20
+const (
+	maxTileSetEditImageBytes         = 32 << 20
+	maxTileSetEditGenerationAttempts = 3
+	tileSetTileEditSeamBorder        = 1
+)
 
 type tileSetResolvedTarget struct {
 	itemIndex int
@@ -241,34 +245,166 @@ func (e *executor) generateTileSetTileEdit(
 		return imageprocessor.ImageRegion{}, fmt.Errorf("generator: Tile at (%d,%d) size is %dx%d, want %dx%d",
 			tile.Position.X, tile.Position.Y, original.Bounds().Dx(), original.Bounds().Dy(), tileWidth, tileHeight)
 	}
+	if !tileSetImageHasVisiblePixels(original) {
+		return imageprocessor.ImageRegion{}, fmt.Errorf(
+			"generator: Tile at (%d,%d) has no visible pixels", tile.Position.X, tile.Position.Y,
+		)
+	}
 	originalBase64, err := imageprocessor.EncodePNGBase64(original)
 	if err != nil {
 		return imageprocessor.ImageRegion{}, err
 	}
 	references := append([]string{"data:image/png;base64," + originalBase64}, editReferences...)
-	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
-		Prompt: prompts.TileSetTileEdit(
-			brief, formatTileSetProjectContext(project), itemName, tileWidth, tileHeight, string(project.Perspective),
-		),
-		ReferenceImages: references,
-	})
-	if err != nil {
-		return imageprocessor.ImageRegion{}, fmt.Errorf("generator: edit Tile at (%d,%d): %w", tile.Position.X, tile.Position.Y, err)
+	prompt := prompts.TileSetTileEdit(
+		brief, formatTileSetProjectContext(project), itemName, tileWidth, tileHeight, string(project.Perspective),
+	)
+	var attemptErrors []error
+	attemptsPerformed := 0
+	for attempt := 1; attempt <= maxTileSetEditGenerationAttempts; attempt++ {
+		attemptsPerformed = attempt
+		if err := ctx.Err(); err != nil {
+			return imageprocessor.ImageRegion{}, err
+		}
+		result, generateErr := e.images.Generate(ctx, &imageclient.GenerateRequest{
+			Prompt: prompt, ReferenceImages: references, N: 2,
+		})
+		if generateErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return imageprocessor.ImageRegion{}, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, generateErr))
+			if imageclient.IsPermanent(generateErr) {
+				break
+			}
+			continue
+		}
+		if result == nil || len(result.Images) == 0 {
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
+			continue
+		}
+		for candidateIndex, candidate := range result.Images {
+			processed, processErr := e.processTileSetTileEditCandidate(
+				ctx, candidate, originalBase64, tileWidth, tileHeight,
+			)
+			if processErr == nil {
+				return processed, nil
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return imageprocessor.ImageRegion{}, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf(
+				"attempt %d candidate %d: %w", attempt, candidateIndex, processErr,
+			))
+		}
 	}
-	processed, err := e.processTileSetEditImage(ctx, result, tileWidth, tileHeight, []TileSetCoordinate{{0, 0}})
-	if err != nil {
-		return imageprocessor.ImageRegion{}, fmt.Errorf("generator: process edited Tile at (%d,%d): %w", tile.Position.X, tile.Position.Y, err)
+	return imageprocessor.ImageRegion{}, fmt.Errorf(
+		"generator: edit Tile at (%d,%d) after %d attempts: %w",
+		tile.Position.X, tile.Position.Y, attemptsPerformed, errors.Join(attemptErrors...),
+	)
+}
+
+func tileSetImageHasVisiblePixels(img image.Image) bool {
+	if img == nil {
+		return false
 	}
-	stabilized, err := stabilizeTileSetTileEdit(originalBase64, processed.ImageBase64, tileWidth, tileHeight)
-	if err != nil {
-		return imageprocessor.ImageRegion{}, fmt.Errorf("generator: stabilize edited Tile at (%d,%d): %w", tile.Position.X, tile.Position.Y, err)
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			_, _, _, alpha := img.At(x, y).RGBA()
+			if alpha>>8 > uint32(imageprocessor.TransparentAlphaMax) {
+				return true
+			}
+		}
 	}
-	if err := verifyTileSetImage(ctx, e.processor, stabilized, tileWidth, tileHeight, true); err != nil {
-		return imageprocessor.ImageRegion{}, fmt.Errorf("generator: verify edited Tile at (%d,%d): %w", tile.Position.X, tile.Position.Y, err)
+	return false
+}
+
+func (e *executor) processTileSetTileEditCandidate(
+	ctx context.Context,
+	candidate imageclient.GeneratedImage,
+	originalBase64 string,
+	width int,
+	height int,
+) (imageprocessor.ImageRegion, error) {
+	processed, err := e.processTileSetEditImage(
+		ctx, &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{candidate}},
+		width, height, []TileSetCoordinate{{0, 0}},
+	)
+	if err != nil {
+		return imageprocessor.ImageRegion{}, fmt.Errorf("process: %w", err)
+	}
+	stabilized, err := stabilizeTileSetTileEdit(originalBase64, processed.ImageBase64, width, height)
+	if err != nil {
+		return imageprocessor.ImageRegion{}, fmt.Errorf("stabilize: %w", err)
+	}
+	if err := validateTileSetTileEditStructure(originalBase64, stabilized); err != nil {
+		return imageprocessor.ImageRegion{}, fmt.Errorf("structure: %w", err)
+	}
+	if err := validateTileSetEditChanged(originalBase64, stabilized); err != nil {
+		return imageprocessor.ImageRegion{}, fmt.Errorf("change: %w", err)
+	}
+	if err := verifyTileSetImage(ctx, e.processor, stabilized, width, height, true, false); err != nil {
+		return imageprocessor.ImageRegion{}, fmt.Errorf("verify: %w", err)
 	}
 	processed.ImageBase64 = stabilized
 	processed.Index = 0
 	return processed, nil
+}
+
+func validateTileSetTileEditStructure(originalBase64, editedBase64 string) error {
+	original, err := imageprocessor.DecodeBase64Image(originalBase64)
+	if err != nil {
+		return fmt.Errorf("decode original Tile: %w", err)
+	}
+	edited, err := imageprocessor.DecodeBase64Image(editedBase64)
+	if err != nil {
+		return fmt.Errorf("decode edited Tile: %w", err)
+	}
+	if original.Bounds().Dx() != edited.Bounds().Dx() || original.Bounds().Dy() != edited.Bounds().Dy() {
+		return fmt.Errorf("edited Tile dimensions changed")
+	}
+	width, height := original.Bounds().Dx(), original.Bounds().Dy()
+	for y := range height {
+		for x := range width {
+			before := original.RGBAAt(original.Bounds().Min.X+x, original.Bounds().Min.Y+y)
+			after := edited.RGBAAt(edited.Bounds().Min.X+x, edited.Bounds().Min.Y+y)
+			if before.A != after.A {
+				return fmt.Errorf("edited Tile alpha silhouette changed at (%d,%d)", x, y)
+			}
+			if tileSetTileEditInSeamBorder(x, y, width, height) && before != after {
+				return fmt.Errorf("edited Tile seam border changed at (%d,%d)", x, y)
+			}
+		}
+	}
+	return nil
+}
+
+func validateTileSetEditChanged(originalBase64, editedBase64 string) error {
+	original, err := imageprocessor.DecodeBase64Image(originalBase64)
+	if err != nil {
+		return fmt.Errorf("decode original Tileset image: %w", err)
+	}
+	edited, err := imageprocessor.DecodeBase64Image(editedBase64)
+	if err != nil {
+		return fmt.Errorf("decode edited Tileset image: %w", err)
+	}
+	if original.Bounds().Dx() != edited.Bounds().Dx() || original.Bounds().Dy() != edited.Bounds().Dy() {
+		return fmt.Errorf("edited Tileset image dimensions changed")
+	}
+	for y := range original.Bounds().Dy() {
+		for x := range original.Bounds().Dx() {
+			before := original.RGBAAt(original.Bounds().Min.X+x, original.Bounds().Min.Y+y)
+			after := edited.RGBAAt(edited.Bounds().Min.X+x, edited.Bounds().Min.Y+y)
+			if (before.A > imageprocessor.TransparentAlphaMax || after.A > imageprocessor.TransparentAlphaMax) && before != after {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("candidate left every pixel unchanged")
+}
+
+func tileSetTileEditInSeamBorder(x, y, width, height int) bool {
+	return x < tileSetTileEditSeamBorder || y < tileSetTileEditSeamBorder ||
+		x >= width-tileSetTileEditSeamBorder || y >= height-tileSetTileEditSeamBorder
 }
 
 // stabilizeTileSetTileEdit keeps persisted geometry authoritative. The model
@@ -299,7 +435,7 @@ func stabilizeTileSetTileEdit(
 			if originalPixel.A == 0 {
 				continue
 			}
-			if x == 0 || y == 0 || x == width-1 || y == height-1 {
+			if tileSetTileEditInSeamBorder(x, y, width, height) {
 				output.SetRGBA(x, y, originalPixel)
 				continue
 			}
@@ -340,50 +476,85 @@ func (e *executor) generateTileSetItemEdit(
 		"data:image/png;base64," + itemBase64,
 	}
 	references = append(references, editReferences...)
-	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
-		Prompt: prompts.TileSetItemEdit(
-			brief, formatTileSetProjectContext(project), item.Name, formatTileSetCoordinates(shape),
-			tileWidth, tileHeight, string(project.Perspective),
-		),
-		ReferenceImages: references,
-		MaskImage:       "data:image/png;base64," + mask,
-		N:               2,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: edit complete Tileset Item %q: %w", item.Name, err)
-	}
-	if result == nil || len(result.Images) == 0 {
-		return nil, fmt.Errorf("generator: edit complete Tileset Item %q: expected at least one image", item.Name)
-	}
-	var aligned string
-	var candidateErrors []error
-	for candidateIndex, candidate := range result.Images {
-		processed, processErr := e.processTileSetEditImage(
-			ctx,
-			&imageclient.GenerateResult{Images: []imageclient.GeneratedImage{candidate}},
-			columns*tileWidth,
-			rows*tileHeight,
-			shape,
-		)
-		if processErr != nil {
-			candidateErrors = append(candidateErrors, fmt.Errorf("candidate %d: %w", candidateIndex, processErr))
+	prompt := prompts.TileSetItemEdit(
+		brief, formatTileSetProjectContext(project), item.Name, formatTileSetCoordinates(shape),
+		tileWidth, tileHeight, string(project.Perspective),
+	)
+	var attemptErrors []error
+	attemptsPerformed := 0
+	for attempt := 1; attempt <= maxTileSetEditGenerationAttempts; attempt++ {
+		attemptsPerformed = attempt
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		result, generateErr := e.images.Generate(ctx, &imageclient.GenerateRequest{
+			Prompt: prompt, ReferenceImages: references,
+			MaskImage: "data:image/png;base64," + mask, N: 2,
+		})
+		if generateErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, generateErr))
+			if imageclient.IsPermanent(generateErr) {
+				break
+			}
 			continue
 		}
-		aligned, processErr = alignTileSetImageToShape(
-			processed.ImageBase64, shape, columns, rows, tileWidth, tileHeight,
-		)
-		if processErr == nil {
-			break
+		if result == nil || len(result.Images) == 0 {
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
+			continue
 		}
-		candidateErrors = append(candidateErrors, fmt.Errorf("candidate %d: %w", candidateIndex, processErr))
-		aligned = ""
+		for candidateIndex, candidate := range result.Images {
+			regions, processErr := e.processTileSetItemEditCandidate(
+				ctx, candidate, itemBase64, shape, columns, rows, tileWidth, tileHeight,
+			)
+			if processErr == nil {
+				return regions, nil
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf(
+				"attempt %d candidate %d: %w", attempt, candidateIndex, processErr,
+			))
+		}
 	}
-	if aligned == "" {
-		return nil, fmt.Errorf("generator: process complete Tileset Item %q edit: %w", item.Name, errors.Join(candidateErrors...))
-	}
-	aligned, err = stabilizeTileSetItemEdit(itemBase64, aligned, tileWidth, tileHeight)
+	return nil, fmt.Errorf(
+		"generator: edit complete Tileset Item %q after %d attempts: %w",
+		item.Name, attemptsPerformed, errors.Join(attemptErrors...),
+	)
+}
+
+func (e *executor) processTileSetItemEditCandidate(
+	ctx context.Context,
+	candidate imageclient.GeneratedImage,
+	originalBase64 string,
+	shape []TileSetCoordinate,
+	columns int,
+	rows int,
+	tileWidth int,
+	tileHeight int,
+) ([]imageprocessor.ImageRegion, error) {
+	processed, err := e.processTileSetEditImage(
+		ctx, &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{candidate}},
+		columns*tileWidth, rows*tileHeight, shape,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("generator: stabilize complete Tileset Item %q edit: %w", item.Name, err)
+		return nil, fmt.Errorf("process: %w", err)
+	}
+	aligned, err := alignTileSetImageToShape(
+		processed.ImageBase64, shape, columns, rows, tileWidth, tileHeight,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("align: %w", err)
+	}
+	aligned, err = stabilizeTileSetItemEdit(originalBase64, aligned, tileWidth, tileHeight)
+	if err != nil {
+		return nil, fmt.Errorf("stabilize: %w", err)
+	}
+	if err := validateTileSetEditChanged(originalBase64, aligned); err != nil {
+		return nil, fmt.Errorf("change: %w", err)
 	}
 	split, err := e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 		ImageBase64: aligned, Mode: imageprocessor.ImageSplitModeGrid, Columns: columns, Rows: rows,
@@ -393,13 +564,13 @@ func (e *executor) generateTileSetItemEdit(
 		if err == nil {
 			err = fmt.Errorf("expected %d regions", columns*rows)
 		}
-		return nil, fmt.Errorf("generator: split complete Tileset Item %q edit: %w", item.Name, err)
+		return nil, fmt.Errorf("split: %w", err)
 	}
 	regions := make([]imageprocessor.ImageRegion, len(shape))
 	for index, cell := range shape {
 		region := split.Regions[cell[1]*columns+cell[0]]
-		if err := verifyTileSetImage(ctx, e.processor, region.ImageBase64, tileWidth, tileHeight, true); err != nil {
-			return nil, fmt.Errorf("generator: verify complete Tileset Item %q cell %d: %w", item.Name, index, err)
+		if err := verifyTileSetImage(ctx, e.processor, region.ImageBase64, tileWidth, tileHeight, true, true); err != nil {
+			return nil, fmt.Errorf("verify cell %d: %w", index, err)
 		}
 		region.Index = index
 		regions[index] = region
@@ -458,11 +629,13 @@ func tileSetEditPixelContaminated(pixel color.RGBA) bool {
 		return true
 	}
 	// Image-edit providers sometimes flatten transparent input onto a white or
-	// chroma-key matte. Neither colour is valid edit detail; retaining the
-	// current pixel prevents matte blocks from entering the persisted footprint.
+	// chroma-key matte, or leak black pixels from the occupancy guide. None are
+	// valid edit detail; retaining the current pixel prevents guide/matte blocks
+	// from entering the persisted footprint.
 	nearWhite := pixel.R >= 238 && pixel.G >= 238 && pixel.B >= 238
 	nearGreenMatte := pixel.G >= 220 && pixel.R <= 48 && pixel.B <= 48
-	return nearWhite || nearGreenMatte
+	nearBlackGuide := pixel.R <= 12 && pixel.G <= 12 && pixel.B <= 12
+	return nearWhite || nearGreenMatte || nearBlackGuide
 }
 
 func (e *executor) processTileSetEditImage(
@@ -482,7 +655,9 @@ func (e *executor) processTileSetEditImage(
 			continue
 		}
 		removed, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-			ImageBase64: candidate.Base64, MatteColor: imageprocessor.DefaultMatteColor,
+			ImageBase64:               candidate.Base64,
+			MatteColor:                imageprocessor.DefaultMatteColor,
+			AllowSampledMatteFallback: true,
 		})
 		if err != nil || removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
 			if err == nil {

@@ -3,6 +3,7 @@ package image
 import (
 	"context"
 	"fmt"
+	"image"
 	"strings"
 )
 
@@ -23,6 +24,8 @@ func NewProcessor() Processor {
 }
 
 // RemoveBackground extracts alpha from a controlled single-colour background.
+// A supplied matte remains authoritative unless sampled fallback is explicitly
+// enabled; applied fallback is reported through ExtractionReport.
 func (p *processor) RemoveBackground(
 	ctx context.Context,
 	request *RemoveBackgroundRequest,
@@ -57,7 +60,16 @@ func (p *processor) RemoveBackground(
 		request.Softness,
 		request.SpillSuppression,
 	)
-	output, report := ExtractChromaWithReport(ToRGBA(input.image), matte, settings)
+	source := ToRGBA(input.image)
+	output, report := ExtractChromaWithReport(source, matte, settings)
+	if matte != nil && request.AllowSampledMatteFallback && !hasUsableTransparentSubject(output) {
+		fallback, fallbackReport := ExtractChromaWithReport(source, nil, settings)
+		if hasUsableTransparentSubject(fallback) {
+			output = fallback
+			report = fallbackReport
+			report.FallbackApplied = true
+		}
+	}
 	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
@@ -70,6 +82,29 @@ func (p *processor) RemoveBackground(
 		MIMEType:    pngMIMEType,
 		Report:      report,
 	}, nil
+}
+
+func hasUsableTransparentSubject(img image.Image) bool {
+	if img == nil {
+		return false
+	}
+	bounds := img.Bounds()
+	if bounds.Empty() {
+		return false
+	}
+	var total, transparent, nontransparent uint64
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			total++
+			_, _, _, alpha := img.At(x, y).RGBA()
+			if colorChannel8(alpha) <= TransparentAlphaMax {
+				transparent++
+			} else {
+				nontransparent++
+			}
+		}
+	}
+	return nontransparent > 0 && ratio(transparent, total) >= MinTransparentRatio
 }
 
 // Resize converts an image to a deterministic final game-asset canvas.

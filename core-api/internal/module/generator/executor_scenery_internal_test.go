@@ -24,6 +24,28 @@ func TestDecodeSceneryLayoutsAssociatesUnorderedResponseByStableID(t *testing.T)
 	}
 }
 
+func TestDecodeSceneryLayoutsNormalizesOpaqueBackdrop(t *testing.T) {
+	layers := []ProcessedSceneryLayer{{ID: 1, Name: "Sky"}, {ID: 2, Name: "Trees"}, {ID: 3, Name: "Mountains"}}
+	layouts, err := decodeSceneryLayouts([]byte(`{
+		"layers":[
+			{"id":1,"position":{"x":20,"y":10},"scale":{"x":0.5,"y":0.5},"rotation":5,"opacity":0.5,"zIndex":10},
+			{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":10},
+			{"id":3,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":-5}
+		]
+	}`), layers, sceneryLayoutTestDimensions())
+	if err != nil {
+		t.Fatalf("decode scenery layout: %v", err)
+	}
+	backdrop := layouts[1]
+	if backdrop.Position != (SceneryLayoutVector{}) || backdrop.Scale != (SceneryLayoutVector{X: 1, Y: 1}) ||
+		backdrop.Rotation != 0 || backdrop.Opacity != 1 || backdrop.ZIndex != 0 {
+		t.Fatalf("backdrop was not normalized: %+v", backdrop)
+	}
+	if layouts[3].ZIndex != 1 || layouts[2].ZIndex != 2 {
+		t.Fatalf("overlay order was not normalized deterministically: %+v", layouts)
+	}
+}
+
 func TestDecodeSceneryLayoutsRejectsInvalidModelOutput(t *testing.T) {
 	first := `{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}`
 	second := `{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}`

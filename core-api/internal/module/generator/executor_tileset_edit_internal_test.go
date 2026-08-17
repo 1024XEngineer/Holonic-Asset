@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -151,6 +152,202 @@ func TestProcessTileSetEditImageReportsCandidateFailures(t *testing.T) {
 	}
 }
 
+func TestTileSetEditPixelContaminatedRejectsGuideAndMatteColours(t *testing.T) {
+	for _, pixel := range []color.RGBA{
+		{R: 255, G: 255, B: 255, A: 255},
+		{G: 255, A: 255},
+		{R: 8, G: 8, B: 8, A: 255},
+		{},
+	} {
+		if !tileSetEditPixelContaminated(pixel) {
+			t.Fatalf("expected contaminated pixel: %+v", pixel)
+		}
+	}
+	if tileSetEditPixelContaminated(color.RGBA{R: 70, G: 40, B: 100, A: 255}) {
+		t.Fatal("valid dark-purple edit colour was rejected")
+	}
+}
+
+func TestValidateTileSetTileEditStructureAllowsCompleteInteriorRedraw(t *testing.T) {
+	original := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	redrawn := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			base := color.RGBA{R: 70, G: 40, B: 100, A: 255}
+			original.SetRGBA(x, y, base)
+			if tileSetTileEditInSeamBorder(x, y, 16, 16) {
+				redrawn.SetRGBA(x, y, base)
+			} else {
+				redrawn.SetRGBA(x, y, color.RGBA{R: 190, G: 140, B: 30, A: 255})
+			}
+		}
+	}
+	encode := func(value image.Image) string {
+		encoded, err := imageprocessor.EncodePNGBase64(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return encoded
+	}
+	originalBase64 := encode(original)
+	if err := validateTileSetTileEditStructure(originalBase64, encode(redrawn)); err != nil {
+		t.Fatalf("complete interior redraw was rejected: %v", err)
+	}
+	if err := validateTileSetEditChanged(originalBase64, encode(redrawn)); err != nil {
+		t.Fatalf("complete interior redraw was treated as a no-op: %v", err)
+	}
+	if err := validateTileSetEditChanged(originalBase64, originalBase64); err == nil || !strings.Contains(err.Error(), "every pixel unchanged") {
+		t.Fatalf("expected exact no-op rejection, got %v", err)
+	}
+}
+
+func TestValidateTileSetTileEditStructureRejectsGeometryChanges(t *testing.T) {
+	encode := func(value image.Image) string {
+		encoded, err := imageprocessor.EncodePNGBase64(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return encoded
+	}
+	original := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := range 4 {
+		for x := range 4 {
+			original.SetRGBA(x, y, color.RGBA{R: 70, G: 40, B: 100, A: 255})
+		}
+	}
+	original.SetRGBA(2, 2, color.RGBA{})
+
+	tests := []struct {
+		name   string
+		edited *image.RGBA
+		want   string
+	}{
+		{name: "dimensions", edited: image.NewRGBA(image.Rect(0, 0, 5, 4)), want: "dimensions changed"},
+		{name: "alpha silhouette", edited: func() *image.RGBA {
+			value := image.NewRGBA(original.Bounds())
+			draw.Draw(value, value.Bounds(), original, original.Bounds().Min, draw.Src)
+			value.SetRGBA(2, 2, color.RGBA{R: 90, G: 80, B: 70, A: 255})
+			return value
+		}(), want: "alpha silhouette changed"},
+		{name: "seam border", edited: func() *image.RGBA {
+			value := image.NewRGBA(original.Bounds())
+			draw.Draw(value, value.Bounds(), original, original.Bounds().Min, draw.Src)
+			value.SetRGBA(0, 2, color.RGBA{R: 190, G: 140, B: 30, A: 255})
+			return value
+		}(), want: "seam border changed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateTileSetTileEditStructure(encode(original), encode(test.edited))
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q error, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func TestGenerateTileSetTileEditRetriesProviderBatch(t *testing.T) {
+	original := tileSetEditTransparentTestImage(t, 16, 16)
+	edited := tileSetEditTransparentTestImageWithColor(t, 16, 16, color.RGBA{R: 110, G: 70, B: 180, A: 255})
+	images := &tileSetEditImageStub{results: []*imageclient.GenerateResult{
+		nil,
+		tileSetEditCandidates("candidate"),
+	}}
+	processor := &tileSetEditProcessorStub{
+		removeResults: []*imageprocessor.RemoveBackgroundResult{{ImageBase64: original}},
+		resizeResults: []*imageprocessor.ResizeResult{{ImageBase64: edited}},
+		verifyResult: &imageprocessor.VerificationReport{
+			IsPNG: true, HasAlpha: true, Width: 16, Height: 16,
+			NontransparentPixels: 196, TransparentPixels: 60, TransparentRGBScrubbed: true,
+		},
+	}
+	url := "tile"
+	executor := &executor{
+		images: images, processor: processor,
+		references: &tileSetEditReferenceStub{resolved: original},
+	}
+	region, err := executor.generateTileSetTileEdit(
+		context.Background(), "add detail", &projectdomain.Project{}, "Plot",
+		assetdomain.Tile{URL: &url},
+		assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 16, Height: 16}}, nil,
+	)
+	if err != nil {
+		t.Fatalf("retry Tile edit: %v", err)
+	}
+	if region.ImageBase64 == "" || images.calls != 2 || len(images.requests) != 2 || images.requests[1].N != 2 {
+		t.Fatalf("unexpected retry result: region=%+v images=%+v", region, images)
+	}
+}
+
+func TestGenerateTileSetTileEditRejectsEmptyOriginalBeforeProvider(t *testing.T) {
+	original := tileSetEditTestImageWithColor(t, 16, 16, color.RGBA{})
+	images := &tileSetEditImageStub{}
+	url := "tile"
+	executor := &executor{
+		images: images, references: &tileSetEditReferenceStub{resolved: original},
+	}
+	_, err := executor.generateTileSetTileEdit(
+		context.Background(), "redraw", &projectdomain.Project{}, "Plot",
+		assetdomain.Tile{URL: &url},
+		assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 16, Height: 16}}, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "has no visible pixels") || images.calls != 0 {
+		t.Fatalf("expected preflight rejection without provider call: calls=%d err=%v", images.calls, err)
+	}
+}
+
+func TestGenerateTileSetTileEditStopsOnPermanentProviderError(t *testing.T) {
+	original := tileSetEditTransparentTestImage(t, 16, 16)
+	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+	images := &tileSetEditImageStub{errors: []error{providerErr}}
+	url := "tile"
+	executor := &executor{
+		images: images, references: &tileSetEditReferenceStub{resolved: original},
+	}
+	_, err := executor.generateTileSetTileEdit(
+		context.Background(), "redraw", &projectdomain.Project{}, "Plot",
+		assetdomain.Tile{URL: &url},
+		assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 16, Height: 16}}, nil,
+	)
+	if err == nil || !errors.Is(err, providerErr) || !strings.Contains(err.Error(), "after 1 attempts") || images.calls != 1 {
+		t.Fatalf("expected one permanent provider attempt: calls=%d err=%v", images.calls, err)
+	}
+}
+
+func TestGenerateTileSetItemEditRetriesProviderBatch(t *testing.T) {
+	original := tileSetEditTransparentTestImage(t, 16, 16)
+	edited := tileSetEditTransparentTestImageWithColor(t, 16, 16, color.RGBA{R: 110, G: 70, B: 180, A: 255})
+	images := &tileSetEditImageStub{results: []*imageclient.GenerateResult{
+		{Images: []imageclient.GeneratedImage{{}}},
+		tileSetEditCandidates("candidate"),
+	}}
+	processor := &tileSetEditProcessorStub{
+		removeResults: []*imageprocessor.RemoveBackgroundResult{{ImageBase64: original}},
+		resizeResults: []*imageprocessor.ResizeResult{{ImageBase64: edited}},
+		verifyResult: &imageprocessor.VerificationReport{
+			IsPNG: true, HasAlpha: true, Width: 16, Height: 16,
+			NontransparentPixels: 196, TransparentPixels: 60, TransparentRGBScrubbed: true,
+		},
+		splitResults: []*imageprocessor.SplitImageResult{{Regions: []imageprocessor.ImageRegion{{ImageBase64: original}}}},
+	}
+	url := "tile"
+	executor := &executor{
+		images: images, processor: processor,
+		references: &tileSetEditReferenceStub{resolved: original},
+	}
+	regions, err := executor.generateTileSetItemEdit(
+		context.Background(), "add detail", &projectdomain.Project{},
+		assetdomain.TileSetItem{Name: "Plot", Tiles: []assetdomain.Tile{{URL: &url}}},
+		assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 16, Height: 16}}, nil,
+	)
+	if err != nil {
+		t.Fatalf("retry Item edit: %v", err)
+	}
+	if len(regions) != 1 || images.calls != 2 || processor.splitCalls != 1 {
+		t.Fatalf("unexpected retry result: regions=%+v images=%+v processor=%+v", regions, images, processor)
+	}
+}
+
 func TestLoadTileSetImageSupportsHTTPAndReportsInvalidResponses(t *testing.T) {
 	pngBase64 := tileSetEditTestImage(t, 2, 2)
 	pngBytes, err := base64.StdEncoding.DecodeString(pngBase64)
@@ -213,11 +410,22 @@ func TestVerifyTileSetImageRejectsInvalidReports(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			processor := &tileSetEditProcessorStub{verifyResult: test.report, verifyErr: test.err}
-			err := verifyTileSetImage(context.Background(), processor, "image", test.width, test.height, true)
+			err := verifyTileSetImage(context.Background(), processor, "image", test.width, test.height, true, false)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q error, got %v", test.want, err)
 			}
 		})
+	}
+}
+
+func TestVerifyTileSetImageAllowsIntentionalEmptyOccupiedCell(t *testing.T) {
+	report := &imageprocessor.VerificationReport{
+		IsPNG: true, HasAlpha: true, Width: 16, Height: 16,
+		TransparentPixels: 256, TransparentRGBScrubbed: true,
+	}
+	processor := &tileSetEditProcessorStub{verifyResult: report}
+	if err := verifyTileSetImage(context.Background(), processor, "image", 16, 16, true, true); err != nil {
+		t.Fatalf("intentional empty occupied cell was rejected: %v", err)
 	}
 }
 
@@ -321,8 +529,11 @@ type tileSetEditProcessorStub struct {
 	resizeErrs    []error
 	verifyResult  *imageprocessor.VerificationReport
 	verifyErr     error
+	splitResults  []*imageprocessor.SplitImageResult
+	splitErrs     []error
 	removeCalls   int
 	resizeCalls   int
+	splitCalls    int
 }
 
 func (s *tileSetEditProcessorStub) RemoveBackground(context.Context, *imageprocessor.RemoveBackgroundRequest) (*imageprocessor.RemoveBackgroundResult, error) {
@@ -353,8 +564,36 @@ func (s *tileSetEditProcessorStub) Verify(context.Context, *imageprocessor.Verif
 	return s.verifyResult, s.verifyErr
 }
 
-func (*tileSetEditProcessorStub) SplitImage(context.Context, *imageprocessor.SplitImageRequest) (*imageprocessor.SplitImageResult, error) {
+func (s *tileSetEditProcessorStub) SplitImage(context.Context, *imageprocessor.SplitImageRequest) (*imageprocessor.SplitImageResult, error) {
+	index := s.splitCalls
+	s.splitCalls++
+	if index < len(s.splitErrs) && s.splitErrs[index] != nil {
+		return nil, s.splitErrs[index]
+	}
+	if index < len(s.splitResults) {
+		return s.splitResults[index], nil
+	}
 	return nil, fmt.Errorf("unexpected split")
+}
+
+type tileSetEditImageStub struct {
+	requests []*imageclient.GenerateRequest
+	results  []*imageclient.GenerateResult
+	errors   []error
+	calls    int
+}
+
+func (s *tileSetEditImageStub) Generate(_ context.Context, request *imageclient.GenerateRequest) (*imageclient.GenerateResult, error) {
+	index := s.calls
+	s.calls++
+	s.requests = append(s.requests, request)
+	if index < len(s.errors) && s.errors[index] != nil {
+		return nil, s.errors[index]
+	}
+	if index < len(s.results) {
+		return s.results[index], nil
+	}
+	return nil, fmt.Errorf("missing image result")
 }
 
 func tileSetEditCandidates(values ...string) *imageclient.GenerateResult {
@@ -384,10 +623,35 @@ func tileSetEditTestAsset(t *testing.T) assetdomain.Asset {
 
 func tileSetEditTestImage(t *testing.T, width, height int) string {
 	t.Helper()
+	return tileSetEditTestImageWithColor(t, width, height, color.RGBA{R: 20, G: 40, B: 60, A: 255})
+}
+
+func tileSetEditTestImageWithColor(t *testing.T, width, height int, pixel color.RGBA) string {
+	t.Helper()
 	value := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := range height {
 		for x := range width {
-			value.SetRGBA(x, y, color.RGBA{R: 20, G: 40, B: 60, A: 255})
+			value.SetRGBA(x, y, pixel)
+		}
+	}
+	encoded, err := imageprocessor.EncodePNGBase64(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func tileSetEditTransparentTestImage(t *testing.T, width, height int) string {
+	t.Helper()
+	return tileSetEditTransparentTestImageWithColor(t, width, height, color.RGBA{R: 20, G: 40, B: 60, A: 255})
+}
+
+func tileSetEditTransparentTestImageWithColor(t *testing.T, width, height int, pixel color.RGBA) string {
+	t.Helper()
+	value := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+			value.SetRGBA(x, y, pixel)
 		}
 	}
 	encoded, err := imageprocessor.EncodePNGBase64(value)

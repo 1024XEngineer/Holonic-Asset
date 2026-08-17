@@ -7,6 +7,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"strings"
 	"testing"
@@ -45,6 +46,62 @@ func TestProcessorSplitImageGrid(t *testing.T) {
 	}
 	if got := result.Regions[0].ContentBounds; got == nil || got.Width != 8 || got.Height != 6 {
 		t.Errorf("first content bounds = %+v, want 8x6", got)
+	}
+}
+
+func TestProcessorSplitImageGridReassemblesWithoutBoundaryLoss(t *testing.T) {
+	const tileSize = 16
+	src := image.NewNRGBA(image.Rect(0, 0, 3*tileSize, 3*tileSize))
+	for y := range src.Bounds().Dy() {
+		for x := range src.Bounds().Dx() {
+			if (x+y)%13 == 0 {
+				continue
+			}
+			src.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(40 + x*3),
+				G: uint8(30 + y*4),
+				B: uint8(20 + (x+y)*2),
+				A: 255,
+			})
+		}
+	}
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64: encodeImageForTest(t, src),
+		Mode:        ImageSplitModeGrid,
+		Columns:     3,
+		Rows:        3,
+	})
+	if err != nil {
+		t.Fatalf("split grid: %v", err)
+	}
+	if len(result.Regions) != 9 {
+		t.Fatalf("got %d regions, want 9", len(result.Regions))
+	}
+
+	reassembled := image.NewNRGBA(src.Bounds())
+	for index, region := range result.Regions {
+		decoded, decodeErr := DecodeBase64Image(region.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode region %d: %v", index, decodeErr)
+		}
+		if decoded.Bounds().Size() != image.Pt(tileSize, tileSize) {
+			t.Fatalf("region %d size = %v, want %dx%d", index, decoded.Bounds().Size(), tileSize, tileSize)
+		}
+		destination := image.Rect(
+			region.SourceBounds.X,
+			region.SourceBounds.Y,
+			region.SourceBounds.X+region.SourceBounds.Width,
+			region.SourceBounds.Y+region.SourceBounds.Height,
+		)
+		draw.Draw(reassembled, destination, decoded, decoded.Bounds().Min, draw.Src)
+	}
+	for y := range src.Bounds().Dy() {
+		for x := range src.Bounds().Dx() {
+			if got, want := reassembled.NRGBAAt(x, y), src.NRGBAAt(x, y); got != want {
+				t.Fatalf("reassembled pixel (%d,%d) = %+v, want %+v", x, y, got, want)
+			}
+		}
 	}
 }
 

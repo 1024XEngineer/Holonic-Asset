@@ -62,13 +62,17 @@ func (s *sceneryImageStub) Generate(_ context.Context, request *imageclient.Gene
 }
 
 type sceneryProcessorStub struct {
-	events    *[]string
-	removeErr error
-	resizeErr error
-	verifyErr error
-	removed   *imageprocessor.RemoveBackgroundResult
-	resized   *imageprocessor.ResizeResult
-	verified  *imageprocessor.VerificationReport
+	events          *[]string
+	removeErr       error
+	resizeErr       error
+	verifyErr       error
+	removed         *imageprocessor.RemoveBackgroundResult
+	resized         *imageprocessor.ResizeResult
+	verified        *imageprocessor.VerificationReport
+	verifiedResults []*imageprocessor.VerificationReport
+	verifyRequests  []*imageprocessor.VerifyRequest
+	resizeRequests  []*imageprocessor.ResizeRequest
+	verifyCalls     int
 }
 
 func (s *sceneryProcessorStub) RemoveBackground(_ context.Context, request *imageprocessor.RemoveBackgroundRequest) (*imageprocessor.RemoveBackgroundResult, error) {
@@ -84,6 +88,7 @@ func (s *sceneryProcessorStub) RemoveBackground(_ context.Context, request *imag
 
 func (s *sceneryProcessorStub) Resize(_ context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
 	*s.events = append(*s.events, "resize")
+	s.resizeRequests = append(s.resizeRequests, request)
 	if s.resizeErr != nil {
 		return nil, s.resizeErr
 	}
@@ -93,11 +98,18 @@ func (s *sceneryProcessorStub) Resize(_ context.Context, request *imageprocessor
 	return &imageprocessor.ResizeResult{ImageBase64: base64.StdEncoding.EncodeToString([]byte("processed:" + request.ImageBase64)), MIMEType: "image/png"}, nil
 }
 
-func (s *sceneryProcessorStub) Verify(context.Context, *imageprocessor.VerifyRequest) (*imageprocessor.VerificationReport, error) {
+func (s *sceneryProcessorStub) Verify(_ context.Context, request *imageprocessor.VerifyRequest) (*imageprocessor.VerificationReport, error) {
 	*s.events = append(*s.events, "verify")
+	s.verifyRequests = append(s.verifyRequests, request)
 	if s.verifyErr != nil {
 		return nil, s.verifyErr
 	}
+	if s.verifyCalls < len(s.verifiedResults) {
+		result := s.verifiedResults[s.verifyCalls]
+		s.verifyCalls++
+		return result, nil
+	}
+	s.verifyCalls++
 	if s.verified != nil {
 		return s.verified, nil
 	}
@@ -111,19 +123,20 @@ func TestExecutorStopsSceneryWorkflowAtFailedStage(t *testing.T) {
 		llm       *sceneryLLMStub
 		images    *sceneryImageStub
 		processor *sceneryProcessorStub
+		wantCause bool
 	}{
-		{name: "planning provider", llm: &sceneryLLMStub{errors: []error{wantErr}}},
+		{name: "planning provider", llm: &sceneryLLMStub{errors: []error{wantErr}}, wantCause: true},
 		{name: "empty planning result", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{nil}}},
 		{name: "invalid plan", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{{JSON: json.RawMessage(`{}`)}}}},
-		{name: "image provider", images: &sceneryImageStub{errors: []error{wantErr}}},
+		{name: "image provider", images: &sceneryImageStub{errors: []error{wantErr}}, wantCause: true},
 		{name: "empty image", images: &sceneryImageStub{results: []*imageclient.GenerateResult{nil}}},
-		{name: "remove background", processor: &sceneryProcessorStub{removeErr: wantErr}},
-		{name: "empty removed image", processor: &sceneryProcessorStub{removed: &imageprocessor.RemoveBackgroundResult{}}},
-		{name: "resize", processor: &sceneryProcessorStub{resizeErr: wantErr}},
+		{name: "remove background", llm: validSceneryLLM(nil), images: &sceneryImageStub{results: sceneryImageResults()}, processor: &sceneryProcessorStub{removeErr: wantErr}, wantCause: true},
+		{name: "empty removed image", llm: validSceneryLLM(nil), images: &sceneryImageStub{results: sceneryImageResults()}, processor: &sceneryProcessorStub{removed: &imageprocessor.RemoveBackgroundResult{}}},
+		{name: "resize", processor: &sceneryProcessorStub{resizeErr: wantErr}, wantCause: true},
 		{name: "invalid resized image", processor: &sceneryProcessorStub{resized: &imageprocessor.ResizeResult{ImageBase64: "png", MIMEType: "image/jpeg"}}},
-		{name: "verify", processor: &sceneryProcessorStub{verifyErr: wantErr}},
+		{name: "verify", processor: &sceneryProcessorStub{verifyErr: wantErr}, wantCause: true},
 		{name: "verification rejected", processor: &sceneryProcessorStub{verified: &imageprocessor.VerificationReport{Passed: false}}},
-		{name: "layout provider", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)}}, errors: []error{nil, wantErr}}},
+		{name: "layout provider", llm: &sceneryLLMStub{results: []*llmclient.CompletionResult{{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)}}, errors: []error{nil, wantErr}}, wantCause: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -150,6 +163,9 @@ func TestExecutorStopsSceneryWorkflowAtFailedStage(t *testing.T) {
 			_, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
 			if err == nil || assets.sceneryAsset != nil {
 				t.Fatalf("expected workflow failure before asset creation, got err=%v asset=%+v events=%v", err, assets.sceneryAsset, events)
+			}
+			if test.wantCause && !errors.Is(err, wantErr) {
+				t.Fatalf("workflow lost the injected failure cause: err=%v events=%v", err, events)
 			}
 		})
 	}
@@ -200,7 +216,7 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate scenery: %v", err)
 	}
-	wantEvents := []string{"llm", "image", "remove", "resize", "verify", "image", "remove", "resize", "verify", "llm", "create_scenery_asset"}
+	wantEvents := []string{"llm", "image", "resize", "verify", "image", "remove", "resize", "verify", "llm", "create_scenery_asset"}
 	if !reflect.DeepEqual(events, wantEvents) {
 		t.Fatalf("unexpected workflow: got %v want %v", events, wantEvents)
 	}
@@ -210,6 +226,14 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 	if len(images.requests) != 2 || images.requests[0].Size != "640x360" ||
 		!strings.Contains(images.requests[0].Prompt, "warm sky") || !strings.Contains(images.requests[1].Prompt, "distant peaks") {
 		t.Fatalf("planner output was not passed to image generation: %+v", images.requests)
+	}
+	if len(processor.verifyRequests) != 2 || processor.verifyRequests[0].Profile != imageprocessor.ProfileOpaqueBackground ||
+		processor.verifyRequests[1].Profile != imageprocessor.ProfileGeneric {
+		t.Fatalf("unexpected scenery verification profiles: %+v", processor.verifyRequests)
+	}
+	if len(processor.resizeRequests) != 2 || !processor.resizeRequests[0].Options.CoverCanvas ||
+		processor.resizeRequests[1].Options.CoverCanvas {
+		t.Fatalf("unexpected scenery resize modes: %+v", processor.resizeRequests)
 	}
 	var decoded generator.ExecutionResult
 	if err := json.Unmarshal(result, &decoded); err != nil || decoded.AssetID != 43 {
@@ -225,6 +249,50 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 	if len(content.Layers) != 2 || content.Layers[0].ID != 1 || *content.Layers[0].ZIndex != -10 ||
 		content.Layers[1].ID != 2 || content.Layers[1].Position.X != 100 || *content.Layers[1].ZIndex != 20 {
 		t.Fatalf("layouts were not associated by stable ID: %+v", content.Layers)
+	}
+}
+
+func TestExecutorRetriesRejectedSceneryLayer(t *testing.T) {
+	events := []string{}
+	images := &sceneryImageStub{events: &events, results: []*imageclient.GenerateResult{
+		{Images: []imageclient.GeneratedImage{{Base64: "first"}}},
+		{Images: []imageclient.GeneratedImage{{Base64: "second"}}},
+	}}
+	processor := &sceneryProcessorStub{
+		events: &events,
+		verifiedResults: []*imageprocessor.VerificationReport{
+			{Passed: false, FailureReasons: []string{"empty_subject"}},
+			{Passed: true},
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
+		LLM: validSingleLayerSceneryLLM(), Resources: &sceneryResourceStoreStub{},
+	})
+
+	_, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
+	if err != nil {
+		t.Fatalf("retry scenery layer: %v", err)
+	}
+	if len(images.requests) != 2 || processor.verifyCalls != 2 || assets.sceneryAsset == nil {
+		t.Fatalf("expected one automatic retry: imageRequests=%d verifyCalls=%d asset=%+v", len(images.requests), processor.verifyCalls, assets.sceneryAsset)
+	}
+}
+
+func TestExecutorStopsSceneryRetriesOnPermanentProviderError(t *testing.T) {
+	events := []string{}
+	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+	images := &sceneryImageStub{events: &events, errors: []error{providerErr}}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		&sceneryProcessorStub{events: &events},
+		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{LLM: validSingleLayerSceneryLLM(), Resources: &sceneryResourceStoreStub{}},
+	)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
+	if err == nil || !errors.Is(err, providerErr) || !strings.Contains(err.Error(), "after 1 attempts") || len(images.requests) != 1 {
+		t.Fatalf("expected one permanent provider attempt: requests=%d err=%v", len(images.requests), err)
 	}
 }
 

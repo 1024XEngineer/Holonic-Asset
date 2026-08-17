@@ -124,7 +124,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	projectStore := InitProjectStore(db)
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
-	imageService := InitImageService(cfg.Image)
+	imageService := InitImageService(cfg.Image, appLogger)
 	llmService := InitLLMService(cfg.LLM)
 	uploadStore, err := InitUploadStore(cfg.QiNiu)
 	if err != nil {
