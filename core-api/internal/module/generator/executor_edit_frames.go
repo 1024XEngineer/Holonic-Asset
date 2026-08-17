@@ -11,8 +11,6 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-const editFrameContextPadding = 4
-
 func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (json.RawMessage, error) {
 	if payload.AssetID == 0 {
 		return nil, fmt.Errorf("generator: edit frames asset is required")
@@ -75,20 +73,16 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		indices = append(indices, index)
 	}
 	slices.Sort(indices)
-	contextStart := max(indices[0]-editFrameContextPadding, 0)
-	contextEnd := indices[len(indices)-1] + editFrameContextPadding
-	if contextEnd >= len(animation.Frames) {
-		contextEnd = len(animation.Frames) - 1
-	}
+	contextStart := max(indices[0]-1, 0)
+	contextEnd := min(indices[len(indices)-1]+1, len(animation.Frames)-1)
 	contextCount := contextEnd - contextStart + 1
+	if contextCount > 32 {
+		return nil, fmt.Errorf("generator: edit frames boundary interval contains %d frames; maximum is 32", contextCount)
+	}
 	targetFrameIndices := make([]int, len(indices))
 	for index, frameIndex := range indices {
 		targetFrameIndices[index] = frameIndex - contextStart
 	}
-	if contextCount > 32 {
-		return nil, fmt.Errorf("generator: edit frames context contains %d frames; maximum is 32", contextCount)
-	}
-
 	if animation.Generation == nil {
 		return nil, fmt.Errorf(
 			"generator: animation %d in asset %d has no generation configuration for frame editing",
@@ -102,24 +96,26 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		description = strings.TrimSpace(asset.Name)
 	}
 
-	// edit_frames is one generation operation for the whole local context.
-	// The model still receives exactly one image: the original, unprocessed
-	// frame of the first selected target. Do not build a contact sheet from
-	// neighboring frames; that changes the reference canvas and can make the
-	// model generate a multi-frame sheet-like animation.
-	referenceFrame := animation.Frames[indices[0]]
-	if referenceFrame.URL == nil || strings.TrimSpace(*referenceFrame.URL) == "" {
-		return nil, fmt.Errorf("generator: frame %d has no image URL", referenceFrame.ID)
+	// Use the unprocessed frames immediately outside the selected interval as
+	// the image-to-video start and end anchors. Clamp at animation boundaries so
+	// selecting the first or last frame remains valid. Never combine frames into
+	// a contact sheet or spritesheet.
+	startFrame := animation.Frames[contextStart]
+	endFrame := animation.Frames[contextEnd]
+	if startFrame.URL == nil || strings.TrimSpace(*startFrame.URL) == "" {
+		return nil, fmt.Errorf("generator: frame %d has no image URL", startFrame.ID)
+	}
+	if endFrame.URL == nil || strings.TrimSpace(*endFrame.URL) == "" {
+		return nil, fmt.Errorf("generator: frame %d has no image URL", endFrame.ID)
 	}
 	request := &AnimationGenerationRequest{
-		Description:                description,
-		Style:                      generation.Style,
-		Action:                     prompt,
-		ReferenceImage:             animationUnprocessedImageURL(strings.TrimSpace(*referenceFrame.URL)),
-		ReferenceImagePrepared:     false,
-		ReferenceImageContext:      true,
-		ReferenceImageContextSheet: false,
-		TargetFrameIndices:         targetFrameIndices,
+		Description:           description,
+		Style:                 generation.Style,
+		Action:                prompt,
+		ReferenceImage:        animationUnprocessedImageURL(strings.TrimSpace(*startFrame.URL)),
+		EndReferenceImage:     animationUnprocessedImageURL(strings.TrimSpace(*endFrame.URL)),
+		ReferenceImageContext: true,
+		TargetFrameIndices:    targetFrameIndices,
 		// Generate one ordered context segment, then replace only the requested
 		// samples in the original animation.
 		FrameCount:  contextCount,

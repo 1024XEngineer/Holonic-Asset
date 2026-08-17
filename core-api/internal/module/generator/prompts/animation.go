@@ -20,7 +20,6 @@ type AnimationOptions struct {
 	Style              string
 	Action             string
 	FrameCount         int
-	ContextSheet       bool
 	LocalFrameEdit     bool
 	TargetFrameIndices []int
 }
@@ -46,33 +45,22 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - include preparation, every semantically required intermediate stage, the main extreme, complete follow-through and recovery
 - strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
 - do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose`
-	if options.ContextSheet {
+	if options.LocalFrameEdit {
 		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
-		referenceInstructions = fmt.Sprintf(`TEMPORAL CONTEXT REFERENCE:
-- the input is an ordered contact sheet of exactly %d neighboring animation frames, read left-to-right then top-to-bottom
-- use it only as temporal context; the output must be a normal video and must never reproduce the sheet layout
-- preserve the subject's exact identity, proportions, details, materials, palette, art style, orientation, scale, camera, and root position
-- non-target frames are continuity anchors; match the pose immediately before and after each target region`, options.FrameCount)
+		referenceInstructions = `BOUNDARY FRAME REFERENCES:
+- the start input is the original unprocessed frame immediately before the selected interval, clamped to the animation start when necessary
+- the end input is the original unprocessed frame immediately after the selected interval, clamped to the animation end when necessary
+- generate one normal video that starts exactly from the start frame and arrives exactly at the end frame
+- the two inputs are separate full-frame boundary anchors, never a contact sheet, collage, grid, storyboard, multi-frame canvas, or spritesheet
+- preserve exact identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
 		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
 - the user's requested change is authoritative inside those target samples and must be clearly visible there
-- schedule and compress the requested motion so it begins in the first target sample and completes by the last target sample; do not place the requested action only before or after them
+- schedule and compress the requested motion so it begins in the first target sample and completes by the last target sample; do not place it only before or after them
 - preserve timing and pose progression in non-target samples, using them only to enter and exit the edited motion smoothly
-- an explicitly requested held prop, equipment change, or pose change is allowed inside target samples; preserve everything the user did not ask to change
-- do not restart the full action, invent a new cycle, reverse time, loop early, or jump between motion phases
-- produce a smooth ordered segment whose target samples can be inserted back into the original animation`, targetFrames, options.FrameCount)
-	} else if options.LocalFrameEdit {
-		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
-		referenceInstructions = `SINGLE-FRAME EDIT REFERENCE:
-- the input is exactly ONE original high-resolution animation frame, not a contact sheet or multi-frame canvas
-- use it only as the subject identity, proportions, details, materials, palette, orientation, scale, camera, and root-position reference
-- keep exactly one complete subject in every output frame; never reproduce the reference as a grid, collage, storyboard, or spritesheet`
-		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
-- the user's requested change is authoritative inside those target samples and must be clearly visible there
-- preserve the supplied frame's exact identity, proportions, details, materials, equipment, and root position in every sample
-- schedule the requested change through the generated segment so the selected target samples can be inserted into the original animation
-- preserve everything the user did not ask to change; do not invent a new subject, direction, camera, or canvas layout`, targetFrames, options.FrameCount)
+- preserve everything not requested; do not restart the full action, invent a new cycle, subject, direction, camera, or canvas layout
+- produce one smooth ordered video segment whose target samples can be inserted back into the original animation`, targetFrames, options.FrameCount)
 	}
-	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image.
+	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image inputs.
 
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
 - every frame contains exactly ONE complete subject and its attached or held props

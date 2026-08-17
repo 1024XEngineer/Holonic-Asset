@@ -4,12 +4,13 @@ import "context"
 
 // ProviderRequest is the request passed from the call layer to a video provider.
 type ProviderRequest struct {
-	Prompt            string
-	ReferenceImageURL string
-	Resolution        string
-	Duration          int
-	AspectRatio       string
-	GenerateAudio     bool
+	Prompt        string
+	StartImageURL string
+	EndImageURL   string
+	Resolution    string
+	Duration      int
+	AspectRatio   string
+	GenerateAudio bool
 }
 
 // ProviderResult is the normalized response returned by a video provider.

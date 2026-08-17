@@ -33,8 +33,8 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	updated := parent
 	updated.Version = 9
 	events := []string{}
-	resultFrames := make([]imageprocessor.ImageRegion, 11)
-	rawFrames := make([]imageprocessor.ImageRegion, 11)
+	resultFrames := make([]imageprocessor.ImageRegion, 5)
+	rawFrames := make([]imageprocessor.ImageRegion, 5)
 	for index := range resultFrames {
 		resultFrames[index] = imageprocessor.ImageRegion{Index: index, ImageBase64: fmt.Sprintf("edited-%d", index), MIMEType: "image/png"}
 		rawFrames[index] = imageprocessor.ImageRegion{Index: index, ImageBase64: fmt.Sprintf("raw-%d", index), MIMEType: "image/png"}
@@ -64,12 +64,13 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		t.Fatalf("unexpected edit generation call count: %d", len(animations.requests))
 	}
 	request := animations.requests[0]
-	if request.FrameCount != 11 || request.Columns != 4 || !request.ReferenceImageContext ||
-		request.ReferenceImageContextSheet || request.ReferenceImagePrepared {
-		t.Fatalf("unexpected single-reference edit request: %+v", request)
+	if request.FrameCount != 5 || request.Columns != 4 || !request.ReferenceImageContext ||
+		request.ReferenceImagePrepared {
+		t.Fatalf("unexpected boundary-frame edit request: %+v", request)
 	}
-	if request.ReferenceImage != "animations/original-5-unprocessed.png" {
-		t.Fatalf("edit request did not use the raw single-frame reference: %q", request.ReferenceImage)
+	if request.ReferenceImage != "animations/original-4-unprocessed.png" ||
+		request.EndReferenceImage != "animations/original-8-unprocessed.png" {
+		t.Fatalf("edit request did not use raw boundary frames: start=%q end=%q", request.ReferenceImage, request.EndReferenceImage)
 	}
 	if animations.request.Style != "pixel art" ||
 		animations.request.FrameWidth != 64 || animations.request.FrameHeight != 64 ||
@@ -77,7 +78,7 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		animations.request.Duration != 5 || animations.request.AspectRatio != "1:1" {
 		t.Fatalf("edit frame request did not inherit animation generation config: %+v", animations.request)
 	}
-	if !reflect.DeepEqual(request.TargetFrameIndices, []int{4, 6}) {
+	if !reflect.DeepEqual(request.TargetFrameIndices, []int{1, 3}) {
 		t.Fatalf("unexpected target frame indices: %+v", request.TargetFrameIndices)
 	}
 	if animations.request.Action != "make the sword glow" {
@@ -102,14 +103,91 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		}
 	}
 	if !reflect.DeepEqual(references.persisted, []string{
-		"data:image/png;base64,edited-4", "data:image/png;base64,edited-6",
+		"data:image/png;base64,edited-1", "data:image/png;base64,edited-3",
 	}) {
 		t.Fatalf("unexpected processed persistence: %v", references.persisted)
 	}
-	if len(references.uploads) != 2 || references.uploads[0].key != "uploads/generated-1-unprocessed.png" || references.uploads[1].key != "uploads/generated-2-unprocessed.png" {
+	if len(references.uploads) != 2 ||
+		references.uploads[0].key != "uploads/generated-1-unprocessed.png" ||
+		references.uploads[0].reference != "data:image/png;base64,raw-1" ||
+		references.uploads[1].key != "uploads/generated-2-unprocessed.png" ||
+		references.uploads[1].reference != "data:image/png;base64,raw-3" {
 		t.Fatalf("unexpected raw persistence: %+v", references.uploads)
 	}
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 42, Version: 9})
+}
+
+func TestExecutorEditFramesClampsBoundaryReferences(t *testing.T) {
+	tests := []struct {
+		name              string
+		frameCount        int
+		selectedFrameID   uint
+		wantFrameCount    int
+		wantStart         string
+		wantEnd           string
+		wantTargetIndices []int
+	}{
+		{
+			name:              "first frame",
+			frameCount:        3,
+			selectedFrameID:   1,
+			wantFrameCount:    2,
+			wantStart:         "animations/original-1-unprocessed.png",
+			wantEnd:           "animations/original-2-unprocessed.png",
+			wantTargetIndices: []int{0},
+		},
+		{
+			name:              "last frame",
+			frameCount:        3,
+			selectedFrameID:   3,
+			wantFrameCount:    2,
+			wantStart:         "animations/original-2-unprocessed.png",
+			wantEnd:           "animations/original-3-unprocessed.png",
+			wantTargetIndices: []int{1},
+		},
+		{
+			name:              "single-frame animation",
+			frameCount:        1,
+			selectedFrameID:   1,
+			wantFrameCount:    1,
+			wantStart:         "animations/original-1-unprocessed.png",
+			wantEnd:           "animations/original-1-unprocessed.png",
+			wantTargetIndices: []int{0},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			animations := &animationGenerationServiceStub{
+				events: &events,
+				result: &generator.AnimationGenerationResult{
+					Frames:    makeImageRegions(test.wantFrameCount, "edited"),
+					RawFrames: makeImageRegions(test.wantFrameCount, "raw"),
+				},
+			}
+			assets := &generationAssetWriterStub{events: &events, parentAsset: editFramesAsset(t, test.frameCount)}
+			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+				Animations: animations,
+				References: editFrameReferenceStore(t, test.frameCount),
+			})
+			payload := generator.EditFramesPayload{
+				AssetID: 7, ProjectID: 11, AnimationID: 42,
+				FrameIDs: []uint{test.selectedFrameID}, Prompt: "change pose",
+			}
+			if _, err := executor.Generate(context.Background(), generator.EditFrames, mustJSON(t, payload)); err != nil {
+				t.Fatalf("edit boundary frame: %v", err)
+			}
+			if len(animations.requests) != 1 {
+				t.Fatalf("generation calls = %d, want 1", len(animations.requests))
+			}
+			request := animations.requests[0]
+			if request.FrameCount != test.wantFrameCount || request.ReferenceImage != test.wantStart ||
+				request.EndReferenceImage != test.wantEnd ||
+				!reflect.DeepEqual(request.TargetFrameIndices, test.wantTargetIndices) {
+				t.Fatalf("unexpected clamped boundary request: %+v", request)
+			}
+		})
+	}
 }
 
 func TestExecutorEditFramesRejectsMissingRawOutput(t *testing.T) {
@@ -253,7 +331,7 @@ func TestExecutorEditFramesValidatesContextAndAssetErrors(t *testing.T) {
 		{name: "animation missing", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 99, FrameIDs: []uint{1}, Prompt: "x"}, asset: parent, want: "animation 99 not found"},
 		{name: "animation has no frames", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: emptyAnimationAsset(t), want: "has no frames"},
 		{name: "zero frame", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{0}, Prompt: "x"}, asset: parent, want: "frame id must be positive"},
-		{name: "context too large", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1, 40}, Prompt: "x"}, asset: parent, want: "context contains 40 frames"},
+		{name: "context too large", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1, 40}, Prompt: "x"}, asset: parent, want: "boundary interval contains 40 frames"},
 		{name: "missing URL", payload: generator.EditFramesPayload{AssetID: 7, ProjectID: 11, AnimationID: 42, FrameIDs: []uint{1}, Prompt: "x"}, asset: assetWithMissingFrameURL(t), want: "has no image URL"},
 	}
 	for _, test := range tests {
@@ -307,7 +385,7 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 				store.resolveValues = editFrameReferenceStore(t, 3).resolveValues
 			}
 			executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{Animations: animations, References: store})
-			_, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`))
+			_, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[2],"prompt":"change pose"}`))
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}

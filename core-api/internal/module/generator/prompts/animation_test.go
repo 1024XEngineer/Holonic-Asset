@@ -36,21 +36,28 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 	}
 }
 
-func TestBuildAnimationVideoUsesTemporalContextInstructionsForFrameEdits(t *testing.T) {
+func TestBuildAnimationVideoUsesBoundaryFrameReferencesForEdits(t *testing.T) {
 	prompt := BuildAnimationVideo(AnimationOptions{
 		Description:        "travelling alchemist",
 		Style:              "painted 2D game art",
 		Action:             "make the flask glow",
-		FrameCount:         9,
-		ContextSheet:       true,
-		TargetFrameIndices: []int{4, 5},
+		FrameCount:         5,
+		LocalFrameEdit:     true,
+		TargetFrameIndices: []int{1, 3},
 	})
 	for _, expected := range []string{
-		"ordered contact sheet of exactly 9 neighboring animation frames",
+		"BOUNDARY FRAME REFERENCES",
+		"start input is the original unprocessed frame immediately before",
+		"end input is the original unprocessed frame immediately after",
+		"clamped to the animation start",
+		"clamped to the animation end",
+		"starts exactly from the start frame",
+		"arrives exactly at the end frame",
+		"never a contact sheet",
 		"LOCAL FRAME EDIT",
 		"do not restart the full action",
 		"target samples can be inserted back into the original animation",
-		"TARGET OUTPUT SAMPLES: 5, 6",
+		"TARGET OUTPUT SAMPLES: 2, 4",
 		"must be clearly visible there",
 		"begins in the first target sample and completes by the last target sample",
 		"non-target samples",
@@ -59,12 +66,20 @@ func TestBuildAnimationVideoUsesTemporalContextInstructionsForFrameEdits(t *test
 			t.Fatalf("context prompt does not contain %q:\n%s", expected, prompt)
 		}
 	}
-	if strings.Contains(prompt, "show one complete cycle from the initial pose") {
-		t.Fatalf("frame edit prompt must not request a new full cycle:\n%s", prompt)
+	for _, unexpected := range []string{
+		"show one complete cycle from the initial pose",
+		"ordered contact sheet",
+		"SINGLE-FRAME EDIT REFERENCE",
+		"ordered image array",
+		"@Image",
+	} {
+		if strings.Contains(prompt, unexpected) {
+			t.Fatalf("frame edit prompt unexpectedly contains %q:\n%s", unexpected, prompt)
+		}
 	}
 }
 
-func TestBuildAnimationVideoUsesSingleFrameInstructionsForLocalEdits(t *testing.T) {
+func TestBuildAnimationVideoDescribesClampedBoundaryFramesForSingleSample(t *testing.T) {
 	prompt := BuildAnimationVideo(AnimationOptions{
 		Description:        "travelling alchemist",
 		Style:              "painted 2D game art",
@@ -74,18 +89,19 @@ func TestBuildAnimationVideoUsesSingleFrameInstructionsForLocalEdits(t *testing.
 		TargetFrameIndices: []int{0},
 	})
 	for _, expected := range []string{
-		"exactly ONE original high-resolution animation frame",
-		"not a contact sheet or multi-frame canvas",
+		"BOUNDARY FRAME REFERENCES",
+		"clamped to the animation start when necessary",
+		"clamped to the animation end when necessary",
+		"two inputs are separate full-frame boundary anchors",
 		"LOCAL FRAME EDIT",
 		"TARGET OUTPUT SAMPLES: 1",
-		"exactly one complete subject",
 	} {
 		if !strings.Contains(prompt, expected) {
-			t.Fatalf("single-frame edit prompt does not contain %q:\n%s", expected, prompt)
+			t.Fatalf("single-sample edit prompt does not contain %q:\n%s", expected, prompt)
 		}
 	}
-	if strings.Contains(prompt, "ordered contact sheet") {
-		t.Fatalf("single-frame edit prompt must not describe a contact sheet:\n%s", prompt)
+	if strings.Contains(prompt, "ordered image array") || strings.Contains(prompt, "@Image") {
+		t.Fatalf("single-sample edit prompt must not describe an image array:\n%s", prompt)
 	}
 }
 
@@ -115,7 +131,8 @@ func TestAnimationVideoRetryMapsForegroundMediaErrorToSubjectCorrection(t *testi
 
 func TestBuildAnimationVideoDefaultsContextTargetsToAllSamples(t *testing.T) {
 	prompt := BuildAnimationVideo(AnimationOptions{
-		Description: "hero", Action: "change pose", FrameCount: 4, ContextSheet: true,
+		Description: "hero", Action: "change pose", FrameCount: 4,
+		LocalFrameEdit: true,
 	})
 	if !strings.Contains(prompt, "TARGET OUTPUT SAMPLES: all 4") {
 		t.Fatalf("context prompt did not default to every output sample:\n%s", prompt)

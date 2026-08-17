@@ -29,6 +29,10 @@ func (s *animationVideoServiceStub) Generate(
 	request *videoclient.GenerateRequest,
 ) (*videoclient.GenerateResult, error) {
 	copy := *request
+	if request.EndImage != nil {
+		endImage := *request.EndImage
+		copy.EndImage = &endImage
+	}
 	s.requests = append(s.requests, &copy)
 	if s.err != nil {
 		return nil, s.err
@@ -294,7 +298,7 @@ func TestAnimationGenerationKeepsPreparedGreenReference(t *testing.T) {
 	if len(videos.requests) != 1 {
 		t.Fatalf("video requests = %d, want 1", len(videos.requests))
 	}
-	got, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].ReferenceImageBase64)
+	got, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode provider reference: %v", decodeErr)
 	}
@@ -372,7 +376,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.resizeRequests[0].Options.Margin != imageprocessor.AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
-	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].ReferenceImageBase64)
+	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode video reference: %v", decodeErr)
 	}
@@ -392,6 +396,67 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Background == nil ||
 		processor.splitRequest.Background.MatteColor != "auto" {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
+	}
+}
+
+func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testing.T) {
+	startReference := animationTestOpaquePrototypeColor(t, color.NRGBA{R: 255, A: 255})
+	endReference := animationTestOpaquePrototypeColor(t, color.NRGBA{G: 120, B: 255, A: 255})
+	foreground := animationTestForeground(t)
+	videos := &animationVideoServiceStub{}
+	processor := &animationProcessorStub{
+		foregroundBase64: foreground,
+		splitResult: &imageprocessor.SplitImageResult{
+			Mode:        imageprocessor.ImageSplitModeAnimation,
+			ImageBase64: "spritesheet",
+			MIMEType:    "image/png",
+			Regions: []imageprocessor.ImageRegion{
+				{Index: 0, ImageBase64: "frame-1", MIMEType: "image/png"},
+				{Index: 1, ImageBase64: "frame-2", MIMEType: "image/png"},
+				{Index: 2, ImageBase64: "frame-3", MIMEType: "image/png"},
+			},
+		},
+	}
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+		Frames: animationTestVideoFrames(3),
+	}}}
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
+
+	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
+		Description:           "knight",
+		Action:                "raise the sword",
+		ReferenceImage:        startReference,
+		EndReferenceImage:     endReference,
+		ReferenceImageContext: true,
+		TargetFrameIndices:    []int{1},
+		FrameCount:            3,
+		Columns:               3,
+		FrameWidth:            64,
+		FrameHeight:           64,
+		FPS:                   10,
+	})
+	if err != nil {
+		t.Fatalf("generate edited frame segment: %v", err)
+	}
+	if len(processor.removeRequests) != 2 || len(processor.resizeRequests) != 2 {
+		t.Fatalf("boundary references were not independently prepared: removes=%d resizes=%d", len(processor.removeRequests), len(processor.resizeRequests))
+	}
+	if processor.removeRequests[0].ImageBase64 != startReference ||
+		processor.removeRequests[1].ImageBase64 != endReference {
+		t.Fatalf("boundary reference preparation order changed: %+v", processor.removeRequests)
+	}
+	if len(videos.requests) != 1 || videos.requests[0].EndImage == nil {
+		t.Fatalf("video request did not receive start and end references: %+v", videos.requests)
+	}
+	if videos.requests[0].StartImage.Base64 == "" || videos.requests[0].EndImage.Base64 == "" {
+		t.Fatalf("video request contains an empty boundary reference: %+v", videos.requests[0])
+	}
+	if !strings.Contains(videos.requests[0].Prompt, "BOUNDARY FRAME REFERENCES") ||
+		!strings.Contains(videos.requests[0].Prompt, "start input") ||
+		!strings.Contains(videos.requests[0].Prompt, "end input") ||
+		strings.Contains(videos.requests[0].Prompt, "ordered image array") ||
+		strings.Contains(videos.requests[0].Prompt, "@Image") {
+		t.Fatalf("unexpected boundary-frame edit prompt: %s", videos.requests[0].Prompt)
 	}
 }
 
@@ -515,8 +580,13 @@ func animationTestPreparedGreenReference(t *testing.T) string {
 
 func animationTestOpaquePrototype(t *testing.T) string {
 	t.Helper()
+	return animationTestOpaquePrototypeColor(t, color.NRGBA{R: 255, B: 255, A: 255})
+}
+
+func animationTestOpaquePrototypeColor(t *testing.T, background color.NRGBA) string {
+	t.Helper()
 	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
-	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{R: 255, B: 255, A: 255}}, image.Point{}, draw.Src)
+	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: background}, image.Point{}, draw.Src)
 	draw.Draw(frame, image.Rect(30, 16, 66, 88), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
 	encoded, err := imageprocessor.EncodePNGBase64(frame)
 	if err != nil {
