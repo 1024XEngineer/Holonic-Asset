@@ -39,6 +39,26 @@ func TestSceneryPromptsContainSharedVisualContract(t *testing.T) {
 	}
 }
 
+func TestSceneryLayerPromptDistinguishesBackdropAndOverlay(t *testing.T) {
+	input := prompts.SceneryLayerInput{
+		AssetName: "Valley", CreativeBrief: "dawn", Width: 640, Height: 360,
+		LayerID: 1, LayerName: "Sky", LayerCreativeBrief: "full sky",
+		IsBackmost: true,
+	}
+	backdrop := prompts.SceneryLayer(input, prompts.SolidMatteBackground("#00ff00"))
+	if !strings.Contains(backdrop, "backmost scenery layer") || !strings.Contains(backdrop, "may be fully opaque") ||
+		strings.Contains(backdrop, "continuous matte-only border") {
+		t.Fatalf("unexpected backdrop contract: %s", backdrop)
+	}
+	input.IsBackmost = false
+	input.LayerID = 2
+	overlay := prompts.SceneryLayer(input, prompts.SolidMatteBackground("#00ff00"))
+	if !strings.Contains(overlay, "overlay layer") || !strings.Contains(overlay, "continuous matte-only border") ||
+		!strings.Contains(overlay, "clearly non-matte opaque subject pixels") {
+		t.Fatalf("unexpected overlay contract: %s", overlay)
+	}
+}
+
 func TestSceneryPlanPromptContainsSceneContextAndPlanningRules(t *testing.T) {
 	prompt := prompts.SceneryPlan(prompts.SceneryPlanInput{
 		AssetName: "Valley", CreativeBrief: "dawn valley", Style: "pixel art",
@@ -68,6 +88,7 @@ func TestSceneryLayoutAnalysisPromptContainsContextAndImageMapping(t *testing.T)
 		"Valley", "dawn valley", "pixel art", "Side-On", "Starbound", "RPG", "PC", "exploration",
 		`<dimensions width="640" height="360" />`, "positive X to the right", "Rotation is clockwise",
 		"Return exactly one layout", "already registered to the complete final canvas", "Default to position (0, 0)",
+		"first attached image is the authoritative opaque full-canvas backdrop", "unique lowest zIndex",
 		`Attached image 1 corresponds to layer ID 1 named "Sky"`,
 		`Attached image 2 corresponds to layer ID 2 named "Mountains"`,
 	} {

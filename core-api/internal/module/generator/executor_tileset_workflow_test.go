@@ -212,17 +212,21 @@ func (*tileSetWorkflowImages) Generate(
 	_ context.Context,
 	request *imageclient.GenerateRequest,
 ) (*imageclient.GenerateResult, error) {
-	if request.N == 2 {
+	if request.N == 2 && request.MaskImage != "" {
 		guide, err := imageprocessor.DecodeBase64Image(strings.TrimPrefix(request.ReferenceImages[0], "data:image/png;base64,"))
 		if err != nil {
 			return nil, err
 		}
 		valid := image.NewRGBA(guide.Bounds())
+		artwork := color.RGBA{R: 110, G: 70, B: 190, A: 255}
+		if len(request.ReferenceImages) > 1 {
+			artwork = color.RGBA{R: 210, G: 140, B: 45, A: 255}
+		}
 		for y := guide.Bounds().Min.Y; y < guide.Bounds().Max.Y; y++ {
 			for x := guide.Bounds().Min.X; x < guide.Bounds().Max.X; x++ {
 				pixel := guide.RGBAAt(x, y)
 				if pixel.R == 0 && pixel.G == 0 && pixel.B == 0 {
-					valid.SetRGBA(x, y, color.RGBA{R: 110, G: 70, B: 190, A: 255})
+					valid.SetRGBA(x, y, artwork)
 				} else {
 					valid.SetRGBA(x, y, color.RGBA{G: 255, A: 255})
 				}

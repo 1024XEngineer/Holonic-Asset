@@ -4,6 +4,7 @@ import (
 	"context"
 	"image"
 	"image/color"
+	"image/draw"
 	"strings"
 	"sync"
 	"testing"
@@ -161,6 +162,195 @@ func TestProcessTileSetItemUsesSecondValidCandidate(t *testing.T) {
 	}
 	if len(processed) != 1 || len(processed[0].Tiles) != 3 || images.request == nil || images.request.N != 2 {
 		t.Fatalf("unexpected second-candidate result: processed=%+v request=%+v", processed, images.request)
+	}
+}
+
+type tileSetRetryImageStub struct {
+	calls int
+}
+
+func (s *tileSetRetryImageStub) Generate(
+	_ context.Context,
+	request *imageclient.GenerateRequest,
+) (*imageclient.GenerateResult, error) {
+	s.calls++
+	guide, err := imageprocessor.DecodeBase64Image(strings.TrimPrefix(request.ReferenceImages[0], "data:image/png;base64,"))
+	if err != nil {
+		return nil, err
+	}
+	empty, err := imageprocessor.EncodePNGBase64(image.NewRGBA(guide.Bounds()))
+	if err != nil {
+		return nil, err
+	}
+	if s.calls == 1 {
+		return &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{{Base64: empty}, {Base64: empty}}}, nil
+	}
+	valid := image.NewRGBA(guide.Bounds())
+	for y := guide.Bounds().Min.Y; y < guide.Bounds().Max.Y; y++ {
+		for x := guide.Bounds().Min.X; x < guide.Bounds().Max.X; x++ {
+			pixel := guide.RGBAAt(x, y)
+			if pixel.R == 0 && pixel.G == 0 && pixel.B == 0 {
+				valid.SetRGBA(x, y, color.RGBA{R: 160, G: 90, B: 30, A: 255})
+			} else {
+				valid.SetRGBA(x, y, color.RGBA{G: 255, A: 255})
+			}
+		}
+	}
+	encoded, err := imageprocessor.EncodePNGBase64(valid)
+	if err != nil {
+		return nil, err
+	}
+	return &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{{Base64: encoded}}}, nil
+}
+
+func TestProcessTileSetItemRegeneratesAfterInvalidCandidates(t *testing.T) {
+	images := &tileSetRetryImageStub{}
+	executor := &executor{
+		images: images, processor: imageprocessor.NewProcessor(),
+		projects: &tileSetGenerationProjectStub{project: &projectdomain.Project{
+			ID: 9, Name: "Forest", Perspective: projectdomain.PerspectiveTopDown,
+		}},
+	}
+	request := CreateTileSetPayload{
+		ProjectID: 9, AssetName: "Forest", CreativeBrief: "terrain",
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize:   assetdomain.Size{Width: 16, Height: 16},
+			TileAmount: assetdomain.TileAmount{Columns: 4, Rows: 4},
+		},
+		Items: []TileSetItemDefinition{{
+			Name: "L", Description: "corner", Shape: []TileSetCoordinate{{0, 0}, {0, 1}, {1, 1}},
+		}},
+	}
+
+	processed, err := executor.processTileSetItems(context.Background(), request)
+	if err != nil {
+		t.Fatalf("regenerate Tileset item: %v", err)
+	}
+	if images.calls != 2 || len(processed) != 1 || len(processed[0].Tiles) != 3 {
+		t.Fatalf("expected one provider retry: calls=%d processed=%+v", images.calls, processed)
+	}
+}
+
+func TestVerifyTileSetNoGuideLeakRejectsLargeNearBlackComponent(t *testing.T) {
+	encode := func(value image.Image) string {
+		encoded, err := imageprocessor.EncodePNGBase64(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return encoded
+	}
+	for _, size := range []int{16, 32, 64} {
+		outlined := image.NewRGBA(image.Rect(0, 0, size, size))
+		for y := 1; y < size-1; y++ {
+			for x := 1; x < size-1; x++ {
+				pixel := color.RGBA{R: 90, G: 55, B: 130, A: 255}
+				if x == 1 || y == 1 || x == size-2 || y == size-2 {
+					pixel = color.RGBA{R: 4, G: 4, B: 4, A: 255}
+				}
+				outlined.SetRGBA(x, y, pixel)
+			}
+		}
+		if err := verifyTileSetNoGuideLeak(encode(outlined)); err != nil {
+			t.Fatalf("%dx%d black outline was rejected: %v", size, size, err)
+		}
+	}
+	centralDarkSubject := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := 2; y < 14; y++ {
+		for x := 2; x < 14; x++ {
+			centralDarkSubject.SetRGBA(x, y, color.RGBA{R: 4, G: 4, B: 4, A: 255})
+		}
+	}
+	if err := verifyTileSetNoGuideLeak(encode(centralDarkSubject)); err != nil {
+		t.Fatalf("central solid dark subject was rejected: %v", err)
+	}
+
+	leaked := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			leaked.SetRGBA(x, y, color.RGBA{R: 4, G: 4, B: 4, A: 255})
+		}
+	}
+	if err := verifyTileSetNoGuideLeak(encode(leaked)); err == nil || !strings.Contains(err.Error(), "occupancy-guide") {
+		t.Fatalf("expected guide residue rejection, got %v", err)
+	}
+}
+
+func TestProcessTileSetItemCandidatePreservesWholeCanvasBeforeGridSplit(t *testing.T) {
+	const tileSize = 16
+	shape := []TileSetCoordinate{
+		{0, 0}, {1, 0}, {2, 0},
+		{0, 1}, {1, 1}, {2, 1},
+		{0, 2}, {1, 2}, {2, 2},
+	}
+	source := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := range 64 {
+		for x := range 64 {
+			source.SetRGBA(x, y, color.RGBA{G: 255, A: 255})
+		}
+	}
+	for y := 8; y < 56; y++ {
+		for x := 8; x < 56; x++ {
+			source.SetRGBA(x, y, color.RGBA{R: 150, G: 86, B: 43, A: 255})
+		}
+	}
+	encoded, err := imageprocessor.EncodePNGBase64(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := TileSetItemDefinition{Name: "Floor", Description: "continuous floor", Shape: shape}
+	result, err := (&executor{processor: imageprocessor.NewProcessor()}).processTileSetItemCandidate(
+		context.Background(),
+		CreateTileSetPayload{
+			Dimensions: assetdomain.TileSetDimensions{
+				TileSize:   assetdomain.Size{Width: tileSize, Height: tileSize},
+				TileAmount: assetdomain.TileAmount{Columns: 3, Rows: 3},
+			},
+		},
+		item,
+		0,
+		0,
+		3,
+		3,
+		shape,
+		imageclient.GeneratedImage{Base64: encoded, MediaType: "image/png"},
+		assetdomain.PerspectiveTopDown,
+	)
+	if err != nil {
+		t.Fatalf("process Tileset Item: %v", err)
+	}
+	if len(result.Tiles) != len(shape) {
+		t.Fatalf("got %d Tiles, want %d", len(result.Tiles), len(shape))
+	}
+	whole, err := imageprocessor.DecodeBase64Image(result.ImageBase64)
+	if err != nil {
+		t.Fatalf("decode whole Item: %v", err)
+	}
+	if whole.RGBAAt(0, 0).A != 0 || whole.RGBAAt(7, 7).A == 0 || whole.RGBAAt(47, 47).A != 0 {
+		t.Fatal("whole-canvas normalization did not preserve the model's transparent margin")
+	}
+	reassembled := image.NewRGBA(whole.Bounds())
+	for index, tile := range result.Tiles {
+		decoded, decodeErr := imageprocessor.DecodeBase64Image(tile.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode Tile %d: %v", index, decodeErr)
+		}
+		if decoded.Bounds().Size() != image.Pt(tileSize, tileSize) {
+			t.Fatalf("Tile %d size = %v, want %dx%d", index, decoded.Bounds().Size(), tileSize, tileSize)
+		}
+		destination := image.Rect(
+			(index%3)*tileSize,
+			(index/3)*tileSize,
+			(index%3+1)*tileSize,
+			(index/3+1)*tileSize,
+		)
+		draw.Draw(reassembled, destination, decoded, decoded.Bounds().Min, draw.Src)
+	}
+	for y := range whole.Bounds().Dy() {
+		for x := range whole.Bounds().Dx() {
+			if got, want := reassembled.RGBAAt(x, y), whole.RGBAAt(x, y); got != want {
+				t.Fatalf("reassembled pixel (%d,%d) = %+v, want %+v", x, y, got, want)
+			}
+		}
 	}
 }
 

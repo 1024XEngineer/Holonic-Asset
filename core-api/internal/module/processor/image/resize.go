@@ -14,6 +14,7 @@ type RasterMode string
 const (
 	resizeSamplingArea     = "alpha-aware-area"
 	resizeSamplingBilinear = "alpha-aware-bilinear"
+	hardAlphaThreshold     = uint8(112)
 
 	// RasterModeSmooth is intended for regular 2D game art. It uses alpha-aware
 	// area resampling and preserves semi-transparent edge coverage.
@@ -33,6 +34,7 @@ type ResizeOptions struct {
 	Margin      int        `json:"margin"`       // -1 chooses a proportional margin (about 6.25%).
 	PaletteSize int        `json:"palette_size"` // 0 preserves the source colours.
 	CropContent bool       `json:"crop_content"`
+	CoverCanvas bool       `json:"cover_canvas"` // Crops to fill the full target and requires Margin 0.
 	HardAlpha   bool       `json:"hard_alpha"`
 	Mode        RasterMode `json:"mode"`
 }
@@ -84,6 +86,7 @@ type ResizeReport struct {
 	OutputWidth      int        `json:"output_width"`
 	OutputHeight     int        `json:"output_height"`
 	CroppedToContent bool       `json:"cropped_to_content"`
+	CoveredCanvas    bool       `json:"covered_canvas"`
 	Margin           int        `json:"margin"`
 	PaletteSize      int        `json:"palette_size"`
 	HardAlpha        bool       `json:"hard_alpha"`
@@ -123,6 +126,9 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	if margin < 0 || margin*2 >= opts.Width || margin*2 >= opts.Height {
 		return nil, ResizeReport{}, fmt.Errorf("asset margin must be between 0 and half the target dimensions")
 	}
+	if opts.CoverCanvas && margin != 0 {
+		return nil, ResizeReport{}, fmt.Errorf("cover canvas requires zero margin")
+	}
 
 	img := toNRGBA(input)
 	inW, inH := img.Bounds().Dx(), img.Bounds().Dy()
@@ -132,19 +138,31 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	crop := image.Rect(0, 0, inW, inH)
 	cropped := false
 	if opts.CropContent {
-		if bounds, ok := alphaBounds(img); ok {
+		alphaThreshold := TransparentAlphaMax
+		if opts.HardAlpha {
+			alphaThreshold = hardAlphaThreshold - 1
+		}
+		if bounds, ok := alphaBounds(img, alphaThreshold); ok {
 			crop = bounds
 			cropped = crop != image.Rect(0, 0, inW, inH)
 		}
 	}
 
 	innerW, innerH := opts.Width-2*margin, opts.Height-2*margin
-	out, placement, sampling := resizeContain(img, crop, innerW, innerH)
+	var out *image.NRGBA
+	var placement image.Point
+	var sampling string
+	if opts.CoverCanvas {
+		crop = coverCrop(crop, innerW, innerH)
+		out, sampling = qualityResize(img, crop, innerW, innerH)
+	} else {
+		out, placement, sampling = resizeContain(img, crop, innerW, innerH)
+	}
 	if opts.PaletteSize > 0 {
 		applyPalette(out, opts.PaletteSize)
 	}
 	if opts.HardAlpha {
-		applyHardAlpha(out, 112)
+		applyHardAlpha(out, hardAlphaThreshold)
 	}
 
 	canvas := image.NewNRGBA(image.Rect(0, 0, opts.Width, opts.Height))
@@ -161,10 +179,21 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	return ToRGBA(canvas), ResizeReport{
 		InputWidth: inW, InputHeight: inH,
 		OutputWidth: opts.Width, OutputHeight: opts.Height,
-		CroppedToContent: cropped, Margin: margin,
+		CroppedToContent: cropped, CoveredCanvas: opts.CoverCanvas, Margin: margin,
 		PaletteSize: opts.PaletteSize, HardAlpha: opts.HardAlpha,
 		Mode: mode, Sampling: sampling,
 	}, nil
+}
+
+func coverCrop(src image.Rectangle, dstW, dstH int) image.Rectangle {
+	if int64(src.Dx())*int64(dstH) > int64(src.Dy())*int64(dstW) {
+		width := max(1, min(src.Dx(), int(int64(src.Dy())*int64(dstW)/int64(dstH))))
+		left := src.Min.X + (src.Dx()-width)/2
+		return image.Rect(left, src.Min.Y, left+width, src.Max.Y)
+	}
+	height := max(1, min(src.Dy(), int(int64(src.Dx())*int64(dstH)/int64(dstW))))
+	top := src.Min.Y + (src.Dy()-height)/2
+	return image.Rect(src.Min.X, top, src.Max.X, top+height)
 }
 
 func defaultAssetMargin(width, height int) int {
@@ -175,14 +204,14 @@ func defaultAssetMargin(width, height int) int {
 	return margin
 }
 
-func alphaBounds(img image.Image) (image.Rectangle, bool) {
+func alphaBounds(img image.Image, threshold uint8) (image.Rectangle, bool) {
 	b := img.Bounds()
 	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, b.Min.X, b.Min.Y
 	found := false
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			_, _, _, a := img.At(x, y).RGBA()
-			if colorChannel8(a) <= TransparentAlphaMax {
+			if colorChannel8(a) <= threshold {
 				continue
 			}
 			found = true

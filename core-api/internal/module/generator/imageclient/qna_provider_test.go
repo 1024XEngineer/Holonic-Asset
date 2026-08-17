@@ -9,7 +9,22 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
+
+type imageProviderLoggerStub struct {
+	warnings []string
+	fields   [][]logger.Field
+}
+
+func (*imageProviderLoggerStub) Debug(string, ...logger.Field) {}
+func (*imageProviderLoggerStub) Info(string, ...logger.Field)  {}
+func (s *imageProviderLoggerStub) Warn(message string, fields ...logger.Field) {
+	s.warnings = append(s.warnings, message)
+	s.fields = append(s.fields, fields)
+}
+func (*imageProviderLoggerStub) Error(string, ...logger.Field) {}
+func (*imageProviderLoggerStub) Sync() error                   { return nil }
 
 func TestQNAProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -114,5 +129,73 @@ func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.Images, []string{"edited-image"}) {
 		t.Fatalf("unexpected images: %+v", result.Images)
+	}
+}
+
+func TestQNAProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
+	requests := 0
+	providerLogger := &imageProviderLoggerStub{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		var payload struct {
+			Mask string `json:"mask"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request payload: %v", err)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		if requests == 1 {
+			if payload.Mask != "data:image/png;base64,mask" {
+				t.Fatalf("first request omitted mask: %+v", payload)
+			}
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = writer.Write([]byte(`{"error":{"message":"mask must be an object: json: cannot unmarshal string into Go value"}}`))
+			return
+		}
+		if payload.Mask != "" {
+			t.Fatalf("fallback request retained mask: %+v", payload)
+		}
+		_, _ = writer.Write([]byte(`{"data":[{"b64_json":"fallback-image"}]}`))
+	}))
+	defer server.Close()
+
+	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
+		BaseURL: server.URL, APIKey: "test-key", Logger: providerLogger,
+	})
+	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
+		Prompt:          "edit",
+		ReferenceImages: []string{"data:image/png;base64,ref"},
+		MaskImage:       "data:image/png;base64,mask",
+	})
+	if err != nil {
+		t.Fatalf("fallback edit: %v", err)
+	}
+	if requests != 2 || !reflect.DeepEqual(result.Images, []string{"fallback-image"}) {
+		t.Fatalf("unexpected fallback result: requests=%d result=%+v", requests, result)
+	}
+	if len(providerLogger.warnings) != 1 || len(providerLogger.fields) != 1 ||
+		len(providerLogger.fields[0]) != 1 || providerLogger.fields[0][0].Key != "errorx" {
+		t.Fatalf("unexpected fallback warning: %+v", providerLogger)
+	}
+}
+
+func TestQNAProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = writer.Write([]byte(`{"error":{"message":"invalid prompt"}}`))
+	}))
+	defer server.Close()
+
+	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "test-key"})
+	_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
+		Prompt:          "edit",
+		ReferenceImages: []string{"data:image/png;base64,ref"},
+		MaskImage:       "https://storage.test/mask.png",
+	})
+	if err == nil || requests != 1 {
+		t.Fatalf("unexpected unrelated-error fallback: requests=%d err=%v", requests, err)
 	}
 }

@@ -104,13 +104,14 @@ func verifyImage(
 	halo := haloScore(img)
 	totalPixels := uint64(width) * uint64(height)
 	transparentRatio := ratio(transparentPixels, totalPixels)
-	checkerboardDetected := (!hasAlpha || transparentRatio < MinTransparentRatio) && detectCheckerboard(img)
+	checkerboardDetected := opts.Profile != ProfileOpaqueBackground &&
+		(!hasAlpha || transparentRatio < MinTransparentRatio) && detectCheckerboard(img)
 
 	warnings := make([]string, 0, 4)
-	if touchesEdge || edgeNontransparentRatio > 0.15 {
+	if opts.Profile != ProfileOpaqueBackground && (touchesEdge || edgeNontransparentRatio > 0.15) {
 		warnings = append(warnings, "nontransparent pixels reach the image edge; consider adding margin before extraction")
 	}
-	if partialPixels == 0 {
+	if opts.Profile != ProfileOpaqueBackground && partialPixels == 0 {
 		warnings = append(warnings, "no semi-transparent pixels detected")
 	}
 	if checkerboardDetected {
@@ -119,7 +120,7 @@ func verifyImage(
 	if !transparentRGBScrubbed {
 		warnings = append(warnings, "fully transparent pixels contain non-zero RGB values; scrub them to avoid compositing artifacts")
 	}
-	if matteResidueScore != nil && *matteResidueScore > 0.12 {
+	if opts.Profile != ProfileOpaqueBackground && matteResidueScore != nil && *matteResidueScore > 0.12 {
 		warnings = append(warnings, "possible matte-color residue on semi-transparent edge pixels")
 	}
 	if !matteResidueChecked && (opts.Profile == ProfileIcon || opts.Profile == ProfileProduct || opts.Profile == ProfileSticker || opts.Profile == ProfileSeal) && partialPixels > 0 {
@@ -153,8 +154,15 @@ func verifyImage(
 		CheckerboardDetected:   checkerboardDetected,
 		TransparentRGBScrubbed: transparentRGBScrubbed,
 	})
-	residue := computeResidueScore(stats.AlphaNoiseScore, matteResidueScore, halo, touchesEdge)
-	quality := computeQualityScore(passed, touchesEdge, stats.AlphaNoiseScore, matteResidueScore, halo, checkerboardDetected, transparentRGBScrubbed)
+	scoreTouchesEdge := touchesEdge
+	scoreMatteResidue := matteResidueScore
+	if opts.Profile == ProfileOpaqueBackground {
+		alphaHealth = computeOpaqueAlphaHealthScore(isPNG, nontransparentPixels, alphaMin)
+		scoreTouchesEdge = false
+		scoreMatteResidue = nil
+	}
+	residue := computeResidueScore(stats.AlphaNoiseScore, scoreMatteResidue, halo, scoreTouchesEdge)
+	quality := computeQualityScore(passed, scoreTouchesEdge, stats.AlphaNoiseScore, scoreMatteResidue, halo, checkerboardDetected, transparentRGBScrubbed)
 
 	return VerificationReport{
 		Profile:                  opts.Profile,
@@ -218,6 +226,24 @@ func evaluateTransparencyGate(input TransparencyGateInput) (bool, []string) {
 	failures := make([]string, 0, 8)
 	if !input.IsPNG {
 		failures = append(failures, "not_png")
+	}
+	if input.Profile == ProfileOpaqueBackground {
+		if input.CheckerboardDetected {
+			failures = append(failures, "checkerboard_detected")
+		}
+		if input.NontransparentPixels == 0 {
+			failures = append(failures, "empty_subject")
+		}
+		if input.AlphaMin < MinOpaqueAlpha {
+			failures = append(failures, "background_not_fully_opaque")
+		}
+		if input.TransparentRatio > 0 {
+			failures = append(failures, "background_not_full_canvas")
+		}
+		if !input.TransparentRGBScrubbed {
+			failures = append(failures, "transparent_rgb_not_scrubbed")
+		}
+		return len(failures) == 0, failures
 	}
 	if !input.HasAlpha {
 		failures = append(failures, "missing_alpha_channel")
@@ -309,6 +335,20 @@ func evaluateTransparencyGate(input TransparencyGateInput) (bool, []string) {
 		}
 	}
 	return len(failures) == 0, failures
+}
+
+func computeOpaqueAlphaHealthScore(isPNG bool, nontransparentPixels uint64, alphaMin uint8) float64 {
+	score := 1.0
+	if !isPNG {
+		score -= 0.25
+	}
+	if nontransparentPixels == 0 {
+		score -= 0.5
+	}
+	if alphaMin < MinOpaqueAlpha {
+		score -= 0.5
+	}
+	return clamp(score, 0, 1)
 }
 
 type componentStats struct {

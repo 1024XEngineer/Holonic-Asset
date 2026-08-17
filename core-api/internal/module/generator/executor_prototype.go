@@ -213,8 +213,9 @@ func (e *executor) generatePrototypeResources(
 	}
 
 	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64: result.Images[0].Base64,
-		MatteColor:  imageprocessor.DefaultMatteColor,
+		ImageBase64:               result.Images[0].Base64,
+		MatteColor:                imageprocessor.DefaultMatteColor,
+		AllowSampledMatteFallback: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: remove %s background: %w", taskType, err)
