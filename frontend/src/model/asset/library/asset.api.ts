@@ -88,6 +88,7 @@ function withDemoUISet(groups: ReturnType<typeof toAssetGroups>) {
     perspective: "Top-Down",
     tags: ["demo", "ui"],
     thumbnailUrl: "/assets/uiset/uiset.png",
+    isReadOnly: true,
     history: [],
     animations: [],
   };

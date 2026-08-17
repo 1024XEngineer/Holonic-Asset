@@ -51,6 +51,7 @@ export function AssetCard({
   projectId?: string;
 }) {
   const { t } = useTranslation(["assets", "common"]);
+  const isActionDisabled = asset.isReadOnly || isCopying || isDeleting;
 
   return (
     <Card
@@ -131,7 +132,7 @@ export function AssetCard({
                 variant="outline"
                 size="icon-sm"
                 className="bg-background/90 shadow-xs backdrop-blur-sm"
-                disabled={isCopying || isDeleting}
+                disabled={isActionDisabled}
                 onClick={onCopy}
               />
             }
@@ -172,7 +173,7 @@ export function AssetCard({
                 variant="outline"
                 size="icon-sm"
                 className="bg-background/90 shadow-xs backdrop-blur-sm"
-                disabled={isCopying || isDeleting}
+                disabled={isActionDisabled}
                 onClick={onEdit}
               />
             }
@@ -191,7 +192,7 @@ export function AssetCard({
                     variant="outline"
                     size="icon-sm"
                     className="bg-background/90 text-muted-foreground shadow-xs backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive"
-                    disabled={isCopying || isDeleting}
+                    disabled={isActionDisabled}
                   />
                 }
               >

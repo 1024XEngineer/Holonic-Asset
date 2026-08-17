@@ -103,7 +103,9 @@ describe("assetApi Core routing", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "uiset",
-          assets: [expect.objectContaining({ id: "demo-ui-set" })],
+          assets: [
+            expect.objectContaining({ id: "demo-ui-set", isReadOnly: true }),
+          ],
         }),
       ]),
     );
@@ -120,7 +122,7 @@ describe("assetApi Core routing", () => {
     expect(group?.assets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "9" }),
-        expect.objectContaining({ id: "demo-ui-set" }),
+        expect.objectContaining({ id: "demo-ui-set", isReadOnly: true }),
       ]),
     );
   });
