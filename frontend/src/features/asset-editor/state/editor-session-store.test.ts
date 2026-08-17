@@ -175,11 +175,13 @@ describe("editor session store", () => {
     dispatchEditorCommand(store, {
       type: "uiset.component.label.set",
       componentId: generatedComponent.id,
-      label: "Play now",
+      label: "Play now ",
     });
     expect(store.getState().record).toMatchObject({
       mode: "uiset",
-      uiset: { components: [{ id: "primary-action", label: "Play now" }] },
+      uiset: {
+        components: [{ id: "primary-action", label: "Play now " }],
+      },
     });
 
     dispatchEditorCommand(store, {
@@ -198,7 +200,9 @@ describe("editor session store", () => {
     dispatchEditorCommand(store, { type: "history.undo" });
     expect(store.getState().record).toMatchObject({
       mode: "uiset",
-      uiset: { components: [{ id: "primary-action", label: "Play now" }] },
+      uiset: {
+        components: [{ id: "primary-action", label: "Play now " }],
+      },
     });
   });
 
@@ -212,7 +216,7 @@ describe("editor session store", () => {
     dispatchEditorCommand(store, {
       type: "uiset.component.label.set",
       componentId: component.id,
-      label: "   ",
+      label: "Start",
     });
     dispatchEditorCommand(store, {
       type: "uiset.component.label.set",

@@ -121,16 +121,11 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
           }),
         setUISetComponentLabel: (componentId, label) =>
           set((state) => {
-            const normalizedLabel = label.trim();
             const components = getUISetComponents(state.record);
             const target = components.find(
               (component) => component.id === componentId,
             );
-            if (
-              !normalizedLabel ||
-              !target ||
-              target.label === normalizedLabel
-            ) {
+            if (!target || target.label === label) {
               return state;
             }
 
@@ -139,7 +134,7 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
                 ...current,
                 components: current.components.map((component) =>
                   component.id === componentId
-                    ? { ...component, label: normalizedLabel }
+                    ? { ...component, label }
                     : component,
                 ),
               })),
