@@ -102,6 +102,10 @@ describe("UISetEditorMode", () => {
     });
     await user.click(canvasComponent);
     expect(canvasComponent.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByLabelText("Component name")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Restore generated version" }),
+    ).toBeNull();
 
     await user.click(
       screen.getByRole("button", { name: "Clear selected component" }),
@@ -113,31 +117,6 @@ describe("UISetEditorMode", () => {
     expect(sessionMocks.dispatch).toHaveBeenLastCalledWith({
       type: "prompt.set",
       value: "Updated inventory menu",
-    });
-  });
-
-  it("edits and restores the selected component through the session", async () => {
-    const user = userEvent.setup();
-    render(withI18n(<UISetEditorMode data={workspaceData} onBack={vi.fn()} />));
-
-    await user.click(
-      screen.getAllByRole("button", { name: "Select Panel" }).at(-1)!,
-    );
-    fireEvent.change(screen.getByLabelText("Component name"), {
-      target: { value: "Inventory panel" },
-    });
-    expect(sessionMocks.dispatch).toHaveBeenLastCalledWith({
-      type: "uiset.component.label.set",
-      componentId: "panel",
-      label: "Inventory panel",
-    });
-
-    await user.click(
-      screen.getByRole("button", { name: "Restore generated version" }),
-    );
-    expect(sessionMocks.dispatch).toHaveBeenLastCalledWith({
-      type: "uiset.component.restore",
-      component: workspaceData.record.uiset.components[0],
     });
   });
 
