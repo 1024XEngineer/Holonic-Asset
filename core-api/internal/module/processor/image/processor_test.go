@@ -401,6 +401,45 @@ func TestProcessorResizeCoverCanvasCropsTallSource(t *testing.T) {
 	}
 }
 
+func TestHasUsableTransparentSubjectRejectsMissingImages(t *testing.T) {
+	t.Parallel()
+
+	if hasUsableTransparentSubject(nil) {
+		t.Fatal("nil image was accepted as a transparent subject")
+	}
+	if hasUsableTransparentSubject(image.NewRGBA(image.Rectangle{})) {
+		t.Fatal("empty image was accepted as a transparent subject")
+	}
+}
+
+func TestOpaqueBackgroundGateReportsStructuralFailures(t *testing.T) {
+	t.Parallel()
+
+	passed, failures := evaluateTransparencyGate(TransparencyGateInput{
+		Profile:                ProfileOpaqueBackground,
+		IsPNG:                  true,
+		AlphaMin:               MinOpaqueAlpha,
+		CheckerboardDetected:   true,
+		TransparentRGBScrubbed: false,
+	})
+	if passed {
+		t.Fatal("invalid opaque background passed verification")
+	}
+	for _, reason := range []string{"checkerboard_detected", "empty_subject", "transparent_rgb_not_scrubbed"} {
+		if !slices.Contains(failures, reason) {
+			t.Fatalf("missing failure %q in %v", reason, failures)
+		}
+	}
+}
+
+func TestComputeOpaqueAlphaHealthScorePenalizesMissingContent(t *testing.T) {
+	t.Parallel()
+
+	if score := computeOpaqueAlphaHealthScore(false, 0, MinOpaqueAlpha); score != 0.25 {
+		t.Fatalf("opaque alpha health score = %v, want 0.25", score)
+	}
+}
+
 func TestProcessorRejectsInvalidBase64(t *testing.T) {
 	t.Parallel()
 
