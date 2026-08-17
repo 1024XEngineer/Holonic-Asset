@@ -123,13 +123,24 @@ type SceneryLayerInput struct {
 	LayerName          string
 	LayerCreativeBrief string
 	HasReference       bool
+	IsBackmost         bool
 }
 
 func SceneryLayer(input SceneryLayerInput, backgroundConstraint string) string {
+	backgroundContract := strings.TrimSpace(backgroundConstraint)
+	if input.IsBackmost {
+		backgroundContract = `- This is the backmost scenery layer. It may cover the complete canvas edge to edge and may be fully opaque.
+- Do not add a chroma-key matte, transparency checkerboard, alpha holes, border, frame, or empty margin to this backmost layer.`
+	} else {
+		backgroundContract += `
+- This is an overlay layer. Every pixel outside the requested artwork must remain the exact solid matte colour.
+- Leave a continuous matte-only border around the canvas edge. Do not let artwork, glow, shadow, or antialiasing touch the canvas edge.
+- Do not return the matte-only input unchanged; the requested layer must contain clearly non-matte opaque subject pixels.`
+	}
 	return fmt.Sprintf(
 		sceneryLayerTemplate,
 		sceneryVisualConstraints,
-		strings.TrimSpace(backgroundConstraint),
+		backgroundContract,
 		strings.TrimSpace(input.AssetName),
 		strings.TrimSpace(input.CreativeBrief),
 		input.LayerID,
@@ -154,6 +165,7 @@ const sceneryLayoutAnalysisTemplate = `Inspect every attached processed image an
 Layout rules:
 - Return exactly one layout for every supplied layer ID. Do not invent, omit, or duplicate IDs.
 - Every attached image is already registered to the complete final canvas at the requested dimensions. Transparent pixels are intentional padding, and visible pixels already express the planned global placement.
+- The first attached image is the authoritative opaque full-canvas backdrop. Keep it at position (0, 0), scale (1, 1), rotation 0, opacity 1, and give it the unique lowest zIndex so it can never cover another layer.
 - Default to position (0, 0), scale (1, 1), and rotation 0. Change these only when inspection of the actual attached pixels proves a correction is necessary; never transform already-correct content out of its intended canvas region.
 - Use canvas pixels with the canvas top-left as (0, 0), positive X to the right, and positive Y downward.
 - Position is the top-left of the scaled layer before rotation. Rotation is clockwise in degrees around the scaled layer center.
