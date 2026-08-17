@@ -267,6 +267,73 @@ describe("editor session store", () => {
     expect(snapshot.dirty).toBe(true);
   });
 
+  it("synchronizes refreshed UI Set components and prompt", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    const incoming = createUISetRecord();
+    incoming.prompt = "Updated inventory menu";
+    incoming.uiset.components = [
+      {
+        id: "inventory-panel",
+        label: "Inventory panel",
+        kind: "panel",
+        bounds: { x: 10, y: 10, width: 80, height: 70 },
+      },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toEqual({
+      record: incoming,
+      dirty: false,
+      canUndo: false,
+      canRedo: false,
+      saveState: idleSaveState,
+    });
+  });
+
+  it("preserves locally edited UI Set components during a server refresh", () => {
+    const store = createEditorSessionStore(createUISetRecord());
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: "primary-action",
+      label: "Play now",
+    });
+    dispatchEditorCommand(store, {
+      type: "prompt.set",
+      value: "Locally edited inventory menu",
+    });
+    const incoming = createUISetRecord();
+    incoming.prompt = "Server inventory menu";
+    incoming.uiset.components = [
+      {
+        ...incoming.uiset.components[0],
+        label: "Server start",
+      },
+      {
+        id: "inventory-panel",
+        label: "Inventory panel",
+        kind: "panel",
+        bounds: { x: 10, y: 10, width: 80, height: 70 },
+      },
+    ];
+
+    syncEditorSessionExternalRecord(store, incoming);
+
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: {
+        mode: "uiset",
+        prompt: "Locally edited inventory menu",
+        uiset: {
+          components: [
+            { id: "primary-action", label: "Play now" },
+            { id: "inventory-panel", label: "Inventory panel" },
+          ],
+        },
+      },
+      dirty: true,
+    });
+  });
+
   it("keeps external synchronization out of undo history", () => {
     const initialRecord = createCharacterRecord();
     const store = createEditorSessionStore(initialRecord);

@@ -199,7 +199,13 @@ export function syncEditorSessionExternalRecord(
   incomingRecord: AssetRecord,
 ) {
   const state = store.getState();
-  if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) return;
+  if (isUISetRecord(state.record) && isUISetRecord(incomingRecord)) {
+    syncEditorSessionExternalUISetRecord(store, state, incomingRecord);
+    return;
+  }
+  if (!isSpriteRecord(state.record) || !isSpriteRecord(incomingRecord)) {
+    return;
+  }
   if (state.record.mode !== incomingRecord.mode) return;
 
   const incomingSprite = getSpriteRecordData(incomingRecord);
@@ -246,6 +252,51 @@ export function syncEditorSessionExternalRecord(
   }
 }
 
+function syncEditorSessionExternalUISetRecord(
+  store: EditorSessionStore,
+  state: EditorSessionState,
+  incomingRecord: Extract<AssetRecord, { mode: "uiset" }>,
+) {
+  const record = syncExternalUISetRecord(
+    state.record,
+    state.savedRecord,
+    incomingRecord,
+  );
+  const savedRecord = structuredClone(incomingRecord);
+  if (
+    recordsMatch(record, state.record) &&
+    recordsMatch(savedRecord, state.savedRecord)
+  ) {
+    return;
+  }
+
+  const temporalState = store.temporal.getState();
+  const rebaseHistory = (history: typeof temporalState.pastStates) =>
+    history.map((snapshot) =>
+      snapshot.record
+        ? {
+            ...snapshot,
+            record: syncExternalUISetRecord(
+              snapshot.record,
+              state.savedRecord,
+              incomingRecord,
+            ),
+          }
+        : snapshot,
+    );
+  const wasTracking = temporalState.isTracking;
+  if (wasTracking) temporalState.pause();
+  try {
+    store.setState({ record, savedRecord });
+    store.temporal.setState({
+      pastStates: rebaseHistory(temporalState.pastStates),
+      futureStates: rebaseHistory(temporalState.futureStates),
+    });
+  } finally {
+    if (wasTracking) store.temporal.getState().resume();
+  }
+}
+
 function syncExternalAnimations(
   record: AssetRecord,
   savedRecord: AssetRecord,
@@ -271,6 +322,36 @@ function syncExternalAnimations(
       incomingSprite.animations ?? [],
     ),
   }));
+}
+
+function syncExternalUISetRecord(
+  record: AssetRecord,
+  savedRecord: AssetRecord,
+  incomingRecord: Extract<AssetRecord, { mode: "uiset" }>,
+) {
+  if (
+    !isUISetRecord(record) ||
+    !isUISetRecord(savedRecord) ||
+    record.mode !== savedRecord.mode
+  ) {
+    return record;
+  }
+
+  return {
+    ...structuredClone(incomingRecord),
+    prompt:
+      record.prompt === savedRecord.prompt
+        ? incomingRecord.prompt
+        : record.prompt,
+    uiset: {
+      ...structuredClone(incomingRecord.uiset),
+      components: mergeExternalUISetComponents(
+        record.uiset.components,
+        savedRecord.uiset.components,
+        incomingRecord.uiset.components,
+      ),
+    },
+  };
 }
 
 export function dispatchEditorCommand(
@@ -368,6 +449,12 @@ function isSpriteRecord(record: AssetRecord) {
   return record.mode === "character" || record.mode === "object";
 }
 
+function isUISetRecord(
+  record: AssetRecord,
+): record is Extract<AssetRecord, { mode: "uiset" }> {
+  return record.mode === "uiset";
+}
+
 function mergeExternalAnimations(
   current: SpriteAssetRecordData["animations"],
   saved: SpriteAssetRecordData["animations"],
@@ -398,6 +485,41 @@ function mergeExternalAnimations(
     const savedAnimation = savedById.get(animation.id);
     if (!savedAnimation || !deepEqual(animation, savedAnimation)) {
       merged.push(animation);
+    }
+  }
+  return merged;
+}
+
+function mergeExternalUISetComponents(
+  current: UISetComponent[],
+  saved: UISetComponent[],
+  incoming: UISetComponent[],
+) {
+  const savedById = new Map(
+    saved.map((component) => [component.id, component]),
+  );
+  const currentById = new Map(
+    current.map((component) => [component.id, component]),
+  );
+  const incomingIds = new Set(incoming.map((component) => component.id));
+  const merged = incoming.flatMap((component) => {
+    const currentComponent = currentById.get(component.id);
+    const savedComponent = savedById.get(component.id);
+    if (savedComponent && !currentComponent) return [];
+    return [
+      currentComponent &&
+      savedComponent &&
+      !deepEqual(currentComponent, savedComponent)
+        ? structuredClone(currentComponent)
+        : structuredClone(component),
+    ];
+  });
+
+  for (const component of current) {
+    if (incomingIds.has(component.id)) continue;
+    const savedComponent = savedById.get(component.id);
+    if (!savedComponent || !deepEqual(component, savedComponent)) {
+      merged.push(structuredClone(component));
     }
   }
   return merged;
