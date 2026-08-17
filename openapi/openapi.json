@@ -201,7 +201,9 @@
               "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
-              "edit_tiles"
+              "edit_tiles",
+              "generate_uiset",
+              "edit_uiset_components"
             ],
             "type": "string"
           },
@@ -544,7 +546,9 @@
               "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
-              "edit_tiles"
+              "edit_tiles",
+              "generate_uiset",
+              "edit_uiset_components"
             ],
             "type": "string"
           },
@@ -631,7 +635,9 @@
               "generate_scenery",
               "generate_tileset",
               "edit_tileset_item",
-              "edit_tiles"
+              "edit_tiles",
+              "generate_uiset",
+              "edit_uiset_components"
             ],
             "type": "string"
           },

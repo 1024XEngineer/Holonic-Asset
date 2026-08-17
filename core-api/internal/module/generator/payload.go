@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -252,6 +253,56 @@ type EditTilesPayload struct {
 	Reference     string              `json:"reference,omitempty"`
 }
 
+// UISetComponentDefinition describes one complete UI image requested by the
+// caller. Its pixel size is assigned independently by the planner.
+type UISetComponentDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type UISetProjectContext struct {
+	Name           string `json:"name,omitempty"`
+	GameType       string `json:"game_type,omitempty"`
+	TargetPlatform string `json:"target_platform,omitempty"`
+	Description    string `json:"description,omitempty"`
+}
+
+// CreateUISetPayload is the self-contained input consumed by UI Set planning
+// and later component generation phases.
+type CreateUISetPayload struct {
+	AssetName      string                     `json:"asset_name"`
+	ProjectID      uint                       `json:"project_id"`
+	CreativeBrief  string                     `json:"creative_brief"`
+	Style          string                     `json:"style"`
+	Dimensions     assetdomain.Size           `json:"dimensions"`
+	Components     []UISetComponentDefinition `json:"components"`
+	ProjectContext UISetProjectContext        `json:"project_context"`
+	Reference      string                     `json:"reference,omitempty"`
+}
+
+// EditUISetComponentsPayload preserves the requested component paths so the
+// editing phase can resolve them against the Asset version loaded at execution.
+type EditUISetComponentsPayload struct {
+	AssetID          uint     `json:"asset_id"`
+	ProjectID        uint     `json:"project_id"`
+	CreativeBrief    string   `json:"creative_brief"`
+	TargetAssetPaths []string `json:"target_asset_paths"`
+	Reference        string   `json:"reference,omitempty"`
+}
+
+// UISetComponentPlan is the validated planner output joined back to its
+// request definition. Entries are always returned in request order.
+type UISetComponentPlan struct {
+	Index       uint             `json:"index"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Size        assetdomain.Size `json:"size"`
+}
+
+const uiSetComponentPlanSchemaName = "uiset_component_plan"
+
+var uiSetComponentPlanJSONSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["components"],"properties":{"components":{"type":"array","minItems":1,"maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["index","size"],"properties":{"index":{"type":"integer","minimum":0},"size":{"type":"object","additionalProperties":false,"required":["width","height"],"properties":{"width":{"type":"integer","minimum":1,"maximum":4096},"height":{"type":"integer","minimum":1,"maximum":4096}}}}}}}}`)
+
 const (
 	maxTileSetItems           = 64
 	maxTilesPerItem           = 256
@@ -264,6 +315,10 @@ const (
 	maxItemNameLength         = 200
 	maxItemDescriptionLength  = 2000
 	maxReferenceLength        = 8 << 20
+	maxUISetComponents        = 64
+	maxUISetCanvasEdge        = 4096
+	maxUISetComponentEdge     = 4096
+	maxUISetStyleLength       = 4000
 )
 
 // TileSetEditTarget identifies an occupied global Tileset cell. Execution
@@ -427,6 +482,160 @@ func validateTileSetEditTarget(field string, target *TileSetEditTarget) error {
 		return invalidTaskPayload("%s.position must contain nonnegative coordinates", field)
 	}
 	return nil
+}
+
+func validateCreateUISetPayload(payload *CreateUISetPayload) error {
+	if payload == nil {
+		return invalidTaskPayload("UI Set payload is required")
+	}
+	if payload.ProjectID == 0 {
+		return invalidTaskPayload("project_id must be positive")
+	}
+	if err := validateRequiredText("asset_name", payload.AssetName, maxAssetNameLength); err != nil {
+		return err
+	}
+	if err := validateRequiredText("creative_brief", payload.CreativeBrief, maxCreativeBriefLength); err != nil {
+		return err
+	}
+	if err := validateRequiredText("style", payload.Style, maxUISetStyleLength); err != nil {
+		return err
+	}
+	if payload.Dimensions.Width == 0 || payload.Dimensions.Height == 0 {
+		return invalidTaskPayload("dimensions must contain positive width and height")
+	}
+	if payload.Dimensions.Width > maxUISetCanvasEdge || payload.Dimensions.Height > maxUISetCanvasEdge {
+		return invalidTaskPayload("dimensions must not exceed %d pixels per edge", maxUISetCanvasEdge)
+	}
+	if err := validateOptionalReference(payload.Reference); err != nil {
+		return err
+	}
+	if len(payload.Components) == 0 || len(payload.Components) > maxUISetComponents {
+		return invalidTaskPayload("components must contain between 1 and %d definitions", maxUISetComponents)
+	}
+	for index := range payload.Components {
+		component := &payload.Components[index]
+		prefix := fmt.Sprintf("components[%d]", index)
+		if err := validateRequiredText(prefix+".name", component.Name, maxItemNameLength); err != nil {
+			return err
+		}
+		if err := validateRequiredText(prefix+".description", component.Description, maxItemDescriptionLength); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateEditUISetComponentsPayload(payload *EditUISetComponentsPayload) error {
+	if payload == nil {
+		return invalidTaskPayload("UI Set component edit payload is required")
+	}
+	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
+		return err
+	}
+	if err := validateOptionalReference(payload.Reference); err != nil {
+		return err
+	}
+	_, err := parseUISetComponentPaths(payload.TargetAssetPaths)
+	return err
+}
+
+func parseUISetComponentPaths(paths []string) ([]uint, error) {
+	if len(paths) == 0 || len(paths) > maxUISetComponents {
+		return nil, invalidTaskPayload("edit_uiset_components requires between 1 and %d targetAssetPaths", maxUISetComponents)
+	}
+	indexes := make([]uint, len(paths))
+	seen := make(map[uint]struct{}, len(paths))
+	for pathIndex, path := range paths {
+		prefix, indexText, found := strings.Cut(path, ".")
+		if !found || prefix != "components" || indexText == "" || strings.Contains(indexText, ".") {
+			return nil, invalidTaskPayload("targetAssetPaths[%d] must match components.<index>", pathIndex)
+		}
+		index, err := strconv.ParseUint(indexText, 10, strconv.IntSize)
+		if err != nil {
+			return nil, invalidTaskPayload("targetAssetPaths[%d] must contain a nonnegative integer index", pathIndex)
+		}
+		normalized := uint(index)
+		if _, duplicate := seen[normalized]; duplicate {
+			return nil, invalidTaskPayload("edit_uiset_components contains duplicate component index %d", normalized)
+		}
+		seen[normalized] = struct{}{}
+		indexes[pathIndex] = normalized
+	}
+	return indexes, nil
+}
+
+type uiSetComponentPlanResponse struct {
+	Components *[]uiSetComponentPlanCandidate `json:"components"`
+}
+
+type uiSetComponentPlanCandidate struct {
+	Index *int                    `json:"index"`
+	Size  *uiSetPlanSizeCandidate `json:"size"`
+}
+
+type uiSetPlanSizeCandidate struct {
+	Width  *uint `json:"width"`
+	Height *uint `json:"height"`
+}
+
+func decodeUISetComponentPlan(
+	raw []byte,
+	definitions []UISetComponentDefinition,
+	canvas assetdomain.Size,
+) ([]UISetComponentPlan, error) {
+	invalid := func(reason string) error { return fmt.Errorf("%w: %s", ErrInvalidUISetPlan, reason) }
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var response uiSetComponentPlanResponse
+	if err := decoder.Decode(&response); err != nil {
+		return nil, invalid(err.Error())
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return nil, invalid("trailing data")
+		}
+		return nil, invalid(err.Error())
+	}
+	if response.Components == nil {
+		return nil, invalid("components is required")
+	}
+	if len(*response.Components) != len(definitions) {
+		return nil, invalid(fmt.Sprintf("expected %d component plans, got %d", len(definitions), len(*response.Components)))
+	}
+
+	plans := make([]UISetComponentPlan, len(definitions))
+	seen := make(map[int]struct{}, len(definitions))
+	for planIndex, candidate := range *response.Components {
+		if candidate.Index == nil {
+			return nil, invalid(fmt.Sprintf("component plan %d index is required", planIndex))
+		}
+		index := *candidate.Index
+		if index < 0 || index >= len(definitions) {
+			return nil, invalid(fmt.Sprintf("component plan %d has unknown index %d", planIndex, index))
+		}
+		if _, duplicate := seen[index]; duplicate {
+			return nil, invalid(fmt.Sprintf("component index %d is duplicated", index))
+		}
+		seen[index] = struct{}{}
+		if candidate.Size == nil || candidate.Size.Width == nil || candidate.Size.Height == nil {
+			return nil, invalid(fmt.Sprintf("component plan %d size must contain width and height", planIndex))
+		}
+		width, height := *candidate.Size.Width, *candidate.Size.Height
+		if width == 0 || height == 0 {
+			return nil, invalid(fmt.Sprintf("component plan %d size must be positive", planIndex))
+		}
+		if width > maxUISetComponentEdge || height > maxUISetComponentEdge ||
+			width > canvas.Width || height > canvas.Height {
+			return nil, invalid(fmt.Sprintf("component plan %d size must fit within the UI Set canvas", planIndex))
+		}
+		definition := definitions[index]
+		plans[index] = UISetComponentPlan{
+			Index: uint(index), Name: definition.Name, Description: definition.Description,
+			Size: assetdomain.Size{Width: width, Height: height},
+		}
+	}
+	return plans, nil
 }
 
 func validateEditPayloadBase(projectID, assetID uint, creativeBrief string) error {

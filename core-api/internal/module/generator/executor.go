@@ -202,6 +202,27 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.editTileSetItem(ctx, request)
+	case GenerateUISet:
+		if e.llm == nil {
+			return nil, ErrLLMServiceRequired
+		}
+		request := CreateUISetPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		if err := validateCreateUISetPayload(&request); err != nil {
+			return nil, err
+		}
+		return e.generateUISet(ctx, request)
+	case EditUISetComponents:
+		request := EditUISetComponentsPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		if err := validateEditUISetComponentsPayload(&request); err != nil {
+			return nil, err
+		}
+		return nil, nil // Component regeneration is implemented in UI Set phase 6.
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, taskType)
 	}
