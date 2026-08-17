@@ -54,12 +54,46 @@ func (a *AssetDaoImpl) DBHandle() *gorm.DB {
 }
 
 func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]Asset, error) {
-	assets := make([]Asset, 0)
+	type assetListRow struct {
+		ID          uint
+		Name        string
+		ProjectID   uint
+		Type        string
+		Description string
+		Tags        []string `gorm:"serializer:json"`
+		Perspective string
+		Dimensions  datatypes.JSON
+		Content     datatypes.JSON
+		Version     uint
+	}
+
+	rows := make([]assetListRow, 0)
 	err := a.DB.WithContext(ctx).
-		Where("project_id = ?", projectID).
-		Select("id, name, project_id, type, description, tags, perspective, dimensions, version").
-		Order("id ASC").
-		Find(&assets).Error
+		Table("assets AS a").
+		Select("a.id, a.name, a.project_id, a.type, a.description, a.tags, a.perspective, a.dimensions, c.content, a.version").
+		Joins("LEFT JOIN asset_contents AS c ON c.id = a.content_id").
+		Where("a.project_id = ?", projectID).
+		Order("a.id ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	assets := make([]Asset, len(rows))
+	for index, row := range rows {
+		assets[index] = Asset{
+			ID:          row.ID,
+			Name:        row.Name,
+			ProjectID:   row.ProjectID,
+			Type:        row.Type,
+			Description: row.Description,
+			Tags:        row.Tags,
+			Perspective: row.Perspective,
+			Dimensions:  row.Dimensions,
+			Content:     row.Content,
+			Version:     row.Version,
+		}
+	}
 	return assets, err
 }
 

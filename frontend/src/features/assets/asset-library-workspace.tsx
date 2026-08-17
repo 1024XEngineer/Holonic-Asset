@@ -12,13 +12,26 @@ import { AssetLibraryToolbar } from "./asset-library-toolbar";
 import type { AssetLibraryController } from "./state/use-asset-library-controller";
 
 export function AssetLibraryWorkspace({
+  isProjectLoading = false,
   library,
 }: {
+  isProjectLoading?: boolean;
   library: AssetLibraryController;
 }) {
   const { t } = useTranslation("assets");
   const project = library.project;
   const navigate = useNavigate();
+
+  if (isProjectLoading) {
+    return (
+      <ScrollArea className="h-full">
+        <div className="mx-auto w-full max-w-[92rem] px-5 py-6 sm:px-7 lg:px-9 lg:py-8">
+          <div className="mb-6 h-8 w-48 animate-pulse rounded bg-muted" />
+          <AssetLibrarySkeleton />
+        </div>
+      </ScrollArea>
+    );
+  }
 
   if (!project) {
     return (

@@ -359,6 +359,7 @@ export interface components {
             perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
+            prototypeUrls?: string[] | null;
             tags: string[] | null;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
@@ -1446,6 +1447,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1504,6 +1506,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1668,6 +1671,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {

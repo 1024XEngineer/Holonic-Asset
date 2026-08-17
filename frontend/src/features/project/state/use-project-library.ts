@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import {
   reconcileProjectSelection,
+  readLastProjectId,
   removeProjectSelection,
   useDeleteProjectMutation,
   useProjectDetailQuery,
@@ -14,6 +15,7 @@ import type { ProjectSummary } from "@/model/project";
 
 export type ProjectLibraryProjectModel = {
   current?: ProjectSummary;
+  isLoading: boolean;
   items: ProjectSummary[];
   selectedId?: string;
   create: () => Promise<unknown>;
@@ -37,12 +39,26 @@ export function useProjectLibrary(
   const navigate = useNavigate();
   const { data: projectData, isSuccess: projectsLoaded } =
     useProjectListQuery();
-  const { data: projectDetail } = useProjectDetailQuery(selectedProjectId);
+  const rememberedProjectId = useMemo(
+    () => (selectedProjectId ? undefined : readLastProjectId()),
+    [selectedProjectId],
+  );
+  const requestedProjectId = selectedProjectId ?? rememberedProjectId;
+  const { data: projectDetail, isPending: projectDetailPending } =
+    useProjectDetailQuery(requestedProjectId);
   const projects = projectData ?? EMPTY_PROJECTS;
   const { mutateAsync: deleteProject } = useDeleteProjectMutation();
   const { mutate: updateProject } = useUpdateProjectMutation();
+  const rememberedProjectExists = projects.some(
+    (item) => item.id === rememberedProjectId,
+  );
+  const effectiveProjectId =
+    selectedProjectId ??
+    (!projectsLoaded || projectDetail || rememberedProjectExists
+      ? rememberedProjectId
+      : undefined);
   const project =
-    projectDetail ?? projects.find((item) => item.id === selectedProjectId);
+    projectDetail ?? projects.find((item) => item.id === effectiveProjectId);
 
   const selectProject = useCallback(
     (projectId: string | undefined, replace = false) => {
@@ -59,12 +75,29 @@ export function useProjectLibrary(
   );
 
   useEffect(() => {
+    if (!selectedProjectId && rememberedProjectId) {
+      if (projectDetail || (projectsLoaded && rememberedProjectExists)) {
+        void selectProject(rememberedProjectId, true);
+      } else if (projectsLoaded) {
+        reconcileProjectSelection(projects, undefined);
+      }
+      return;
+    }
     if (!projectsLoaded) return;
     const selection = reconcileProjectSelection(projects, selectedProjectId);
     if (selection.redirectProjectId)
       void selectProject(selection.redirectProjectId, true);
     else if (selectedProjectId && !project) void selectProject(undefined, true);
-  }, [project, projects, projectsLoaded, selectedProjectId, selectProject]);
+  }, [
+    project,
+    projectDetail,
+    projects,
+    projectsLoaded,
+    rememberedProjectExists,
+    rememberedProjectId,
+    selectedProjectId,
+    selectProject,
+  ]);
 
   const createProject = useCallback(
     () =>
@@ -96,8 +129,12 @@ export function useProjectLibrary(
   const projectModel = useMemo(
     () => ({
       current: project,
+      isLoading:
+        !project &&
+        (!projectsLoaded ||
+          Boolean(effectiveProjectId && projectDetailPending)),
       items: projects,
-      selectedId: selectedProjectId,
+      selectedId: effectiveProjectId,
       create: createProject,
       remove: removeProject,
       select: selectProject,
@@ -105,8 +142,10 @@ export function useProjectLibrary(
     }),
     [
       project,
+      projectDetailPending,
       projects,
-      selectedProjectId,
+      projectsLoaded,
+      effectiveProjectId,
       createProject,
       removeProject,
       selectProject,

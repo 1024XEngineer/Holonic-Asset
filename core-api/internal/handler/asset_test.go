@@ -117,9 +117,10 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 		Perspective: domain.PerspectiveTopDown,
 		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 		Tags:        []string{"player"},
+		Content:     json.RawMessage(`{"prototype":[{"id":1,"url":"uploads/hero.png"}]}`),
 		Version:     3,
 	}}}
-	h := handler.NewHandler(managerStub)
+	h := handler.NewHandler(managerStub, &assetReferenceStoreStub{})
 
 	response, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{ProjectID: 42})
 	if err != nil {
@@ -140,7 +141,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal response: %v", err)
 	}
-	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"version":3}]}}` {
+	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"prototypeUrls":["signed:uploads/hero.png"],"version":3}]}}` {
 		t.Fatalf("unexpected JSON response: %s", payload)
 	}
 }
@@ -160,6 +161,26 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	}
 	if managerStub.filter.Query != "hero" || len(managerStub.filter.Tags) != 1 || len(managerStub.filter.Types) != 1 {
 		t.Fatalf("unexpected asset filter: %+v", managerStub.filter)
+	}
+}
+
+func TestAssetHandlerKeepsListAvailableWhenOptionalPreviewIsInvalid(t *testing.T) {
+	managerStub := &assetManagerStub{assets: []domain.Asset{{
+		ID:        7,
+		ProjectID: 42,
+		Type:      domain.AssetTypeCharacter,
+		Content:   json.RawMessage(`{"prototype":`),
+	}}}
+
+	response, err := handler.NewHandler(managerStub).GetAssets(
+		context.Background(),
+		dto.GetAssetsRequest{ProjectID: 42},
+	)
+	if err != nil {
+		t.Fatalf("get assets with invalid optional preview: %v", err)
+	}
+	if len(response.Data.Assets) != 1 || len(response.Data.Assets[0].PrototypeURLs) != 0 {
+		t.Fatalf("unexpected list response: %+v", response.Data.Assets)
 	}
 }
 

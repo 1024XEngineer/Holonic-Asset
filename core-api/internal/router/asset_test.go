@@ -100,6 +100,9 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 		if assetStub.projectID != 42 {
 			t.Fatalf("expected project ID 42, got %d", assetStub.projectID)
 		}
+		if timing := recorder.Header().Get("Server-Timing"); !strings.HasPrefix(timing, "app;dur=") {
+			t.Fatalf("expected server timing header, got %q", timing)
+		}
 		if recorder.Body.String() != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"","projectId":42,"type":"","description":"","perspective":"","dimensions":null,"tags":null,"version":0}]}}`+"\n" {
 			t.Fatalf("unexpected response: %s", recorder.Body.String())
 		}

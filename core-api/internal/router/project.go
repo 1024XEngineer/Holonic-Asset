@@ -3,10 +3,12 @@ package router
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
 
 type ProjectRouter interface {
@@ -55,13 +57,15 @@ type generateProjectReferenceOutput struct {
 type listProjectsInput dto.ListProjectsRequest
 
 type listProjectsOutput struct {
-	Body dto.SuccessResponse[dto.ListProjectsResponse]
+	ServerTiming string `header:"Server-Timing"`
+	Body         dto.SuccessResponse[dto.ListProjectsResponse]
 }
 
 type projectDetailInput dto.ProjectDetailRequest
 
 type projectDetailOutput struct {
-	Body dto.SuccessResponse[dto.ProjectDetailResponse]
+	ServerTiming string `header:"Server-Timing"`
+	Body         dto.SuccessResponse[dto.ProjectDetailResponse]
 }
 
 type updateProjectInput struct {
@@ -114,8 +118,13 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 		Tags:        []string{"Projects"},
 		Errors:      []int{http.StatusBadRequest},
 	}, func(ctx context.Context, input *listProjectsInput) (*listProjectsOutput, error) {
+		started := time.Now()
+		ctx, timing := telemetry.WithRequestTiming(ctx)
 		response, err := r.ListByUID(ctx, dto.ListProjectsRequest(*input))
-		return &listProjectsOutput{Body: response}, openAPIError(err)
+		return &listProjectsOutput{
+			ServerTiming: serverTimingSince(started, timing),
+			Body:         response,
+		}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -126,8 +135,13 @@ func RegisterProjectRoutes(api huma.API, r ProjectRouter) {
 		Tags:        []string{"Projects"},
 		Errors:      []int{http.StatusBadRequest, http.StatusNotFound},
 	}, func(ctx context.Context, input *projectDetailInput) (*projectDetailOutput, error) {
+		started := time.Now()
+		ctx, timing := telemetry.WithRequestTiming(ctx)
 		response, err := r.GetDetail(ctx, dto.ProjectDetailRequest(*input))
-		return &projectDetailOutput{Body: response}, openAPIError(err)
+		return &projectDetailOutput{
+			ServerTiming: serverTimingSince(started, timing),
+			Body:         response,
+		}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{

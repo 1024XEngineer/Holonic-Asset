@@ -31,6 +31,7 @@ const remoteAssets = {
       type: "object",
       version: 1,
       tags: ["prop"],
+      prototypeUrls: ["https://storage.example/signed/barrel.png?token=abc"],
     },
   ],
 };
@@ -38,25 +39,6 @@ const remoteAssets = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.coreList.mockResolvedValue(remoteAssets);
-  mocks.coreDetail.mockResolvedValue({
-    assetId: 8,
-    projectId: 42,
-    name: "Barrel",
-    description: "Wooden prop",
-    dimensions: { width: 32, height: 32 },
-    perspective: "Top-Down",
-    type: "object",
-    version: 1,
-    tags: ["prop"],
-    content: {
-      prototype: [
-        {
-          id: 1,
-          url: "https://storage.example/signed/barrel.png?token=abc",
-        },
-      ],
-    },
-  });
   mocks.coreCopy.mockResolvedValue({ newAssetId: 9 });
   mocks.coreDelete.mockResolvedValue({ assetId: 8 });
   mocks.coreUpdate.mockResolvedValue({});
@@ -77,18 +59,20 @@ describe("assetApi Core routing", () => {
       }),
     ]);
     expect(mocks.coreList).toHaveBeenCalledWith(42);
-    expect(mocks.coreDetail).toHaveBeenCalledWith(8);
+    expect(mocks.coreDetail).not.toHaveBeenCalled();
   });
 
-  it("keeps the library usable when an optional thumbnail detail fails", async () => {
-    mocks.coreDetail.mockRejectedValueOnce(new Error("detail unavailable"));
+  it("uses one blocking request regardless of the number of assets", async () => {
+    mocks.coreList.mockResolvedValue({
+      assets: Array.from({ length: 5 }, (_, index) => ({
+        ...remoteAssets.assets[0],
+        assetId: index + 1,
+      })),
+    });
 
-    await expect(assetApi.listGroups("42")).resolves.toEqual([
-      expect.objectContaining({
-        kind: "object",
-        assets: [expect.objectContaining({ id: "8" })],
-      }),
-    ]);
+    await expect(assetApi.listGroups("42")).resolves.toHaveLength(1);
+    expect(mocks.coreList).toHaveBeenCalledOnce();
+    expect(mocks.coreDetail).not.toHaveBeenCalled();
   });
 
   it("uses Core API copy and refreshes the remote library", async () => {

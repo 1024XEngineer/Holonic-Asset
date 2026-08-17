@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
 
 type referencePersister interface {
@@ -44,31 +46,60 @@ func (h *Handler) GetAssets(
 		return dto.SuccessResponse[dto.GetAssetsResponse]{}, echo.ErrBadRequest
 	}
 
+	storeStarted := time.Now()
 	assets, err := h.AssetManager.GetAssets(x, projectID, domain.AssetListFilter{
 		Query: request.Query,
 		Tags:  request.Tags,
 		Types: request.Types,
 	})
+	telemetry.RecordRequestTiming(x, "store", time.Since(storeStarted))
 	if err != nil {
 		return dto.SuccessResponse[dto.GetAssetsResponse]{}, err
 	}
 
+	previewStarted := time.Now()
 	items := make([]dto.AssetListItemResponse, len(assets))
 	for index, asset := range assets {
+		prototypeURLs, _ := h.resolvePrototypeURLs(x, asset)
 		items[index] = dto.AssetListItemResponse{
-			AssetID:     asset.ID,
-			Name:        asset.Name,
-			ProjectID:   asset.ProjectID,
-			Type:        asset.Type,
-			Description: asset.Description,
-			Perspective: asset.Perspective,
-			Dimensions:  append([]byte(nil), asset.Dimensions...),
-			Tags:        asset.Tags,
-			Version:     asset.Version,
+			AssetID:       asset.ID,
+			Name:          asset.Name,
+			ProjectID:     asset.ProjectID,
+			Type:          asset.Type,
+			Description:   asset.Description,
+			Perspective:   asset.Perspective,
+			Dimensions:    append([]byte(nil), asset.Dimensions...),
+			Tags:          asset.Tags,
+			PrototypeURLs: prototypeURLs,
+			Version:       asset.Version,
 		}
 	}
+	telemetry.RecordRequestTiming(x, "preview", time.Since(previewStarted))
 
 	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
+}
+
+func (h *Handler) resolvePrototypeURLs(ctx context.Context, asset domain.Asset) ([]string, error) {
+	content, err := asset.DecodeContent()
+	if err != nil || content.Prototype == nil {
+		return nil, err
+	}
+
+	urls := make([]string, 0, len(*content.Prototype))
+	for _, resource := range *content.Prototype {
+		if resource.URL == nil || strings.TrimSpace(*resource.URL) == "" {
+			continue
+		}
+		resolved := *resource.URL
+		if h.references != nil {
+			resolved, err = h.references.ResolveReference(ctx, resolved)
+			if err != nil {
+				return nil, err
+			}
+		}
+		urls = append(urls, resolved)
+	}
+	return urls, nil
 }
 
 func (h *Handler) Detail(

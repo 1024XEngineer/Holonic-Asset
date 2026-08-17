@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
+	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
 
 type ProjectHandler struct {
@@ -74,11 +76,14 @@ func (h *ProjectHandler) ListByUID(
 	c context.Context,
 	request dto.ListProjectsRequest,
 ) (dto.SuccessResponse[dto.ListProjectsResponse], error) {
+	storeStarted := time.Now()
 	projects, err := h.manager.ListByUID(c, request.UserID)
+	telemetry.RecordRequestTiming(c, "store", time.Since(storeStarted))
 	if err != nil {
 		return dto.SuccessResponse[dto.ListProjectsResponse]{}, projectHandlerError(err)
 	}
 
+	referencesStarted := time.Now()
 	response := make([]*dto.ProjectResponse, len(projects))
 	for i, project := range projects {
 		response[i], err = h.projectResponse(c, project)
@@ -86,6 +91,7 @@ func (h *ProjectHandler) ListByUID(
 			return dto.SuccessResponse[dto.ListProjectsResponse]{}, err
 		}
 	}
+	telemetry.RecordRequestTiming(c, "references", time.Since(referencesStarted))
 	return dto.NewTypedSuccessResponse(dto.ListProjectsResponse{Projects: response}), nil
 }
 
@@ -93,11 +99,15 @@ func (h *ProjectHandler) GetDetail(
 	c context.Context,
 	request dto.ProjectDetailRequest,
 ) (dto.SuccessResponse[dto.ProjectDetailResponse], error) {
+	storeStarted := time.Now()
 	project, err := h.manager.GetDetail(c, request.ProjectID)
+	telemetry.RecordRequestTiming(c, "store", time.Since(storeStarted))
 	if err != nil {
 		return dto.SuccessResponse[dto.ProjectDetailResponse]{}, projectHandlerError(err)
 	}
+	referencesStarted := time.Now()
 	response, err := h.projectResponse(c, project)
+	telemetry.RecordRequestTiming(c, "references", time.Since(referencesStarted))
 	if err != nil {
 		return dto.SuccessResponse[dto.ProjectDetailResponse]{}, err
 	}

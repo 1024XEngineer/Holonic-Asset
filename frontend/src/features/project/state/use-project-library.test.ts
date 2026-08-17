@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => ({
   },
   projectDetailQuery: {
     data: undefined as ProjectSummary | undefined,
+    isPending: false,
   },
+  rememberedProjectId: undefined as string | undefined,
   reconcile: vi.fn(),
   removeSelection: vi.fn(),
   updateProject: vi.fn(),
@@ -33,6 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/model", () => ({
   reconcileProjectSelection: mocks.reconcile,
+  readLastProjectId: () => mocks.rememberedProjectId,
   removeProjectSelection: mocks.removeSelection,
   useDeleteProjectMutation: () => ({ mutateAsync: mocks.deleteProject }),
   useProjectDetailQuery: () => mocks.projectDetailQuery,
@@ -49,6 +52,8 @@ beforeEach(() => {
   mocks.projectQuery.data = projects;
   mocks.projectQuery.isSuccess = true;
   mocks.projectDetailQuery.data = undefined;
+  mocks.projectDetailQuery.isPending = false;
+  mocks.rememberedProjectId = undefined;
   mocks.reconcile.mockReturnValue({});
   mocks.removeSelection.mockReturnValue("second");
   mocks.deleteProject.mockResolvedValue(undefined);
@@ -71,6 +76,46 @@ describe("useProjectLibrary", () => {
       to: "/projects",
       replace: true,
     });
+  });
+
+  it("loads a remembered project before the project list completes", () => {
+    mocks.projectQuery.data = undefined;
+    mocks.projectQuery.isSuccess = false;
+    mocks.projectDetailQuery.data = projects[1];
+    mocks.rememberedProjectId = "second";
+
+    const controller = useProjectLibrary(undefined);
+
+    expect(controller.project.current).toEqual(projects[1]);
+    expect(controller.project.selectedId).toBe("second");
+    expect(controller.project.isLoading).toBe(false);
+    expect(mocks.navigate).toHaveBeenCalledWith({
+      to: "/projects/$projectId",
+      params: { projectId: "second" },
+      replace: true,
+    });
+  });
+
+  it("reports project bootstrap loading instead of an unselected state", () => {
+    mocks.projectQuery.data = undefined;
+    mocks.projectQuery.isSuccess = false;
+    mocks.projectDetailQuery.isPending = true;
+
+    const controller = useProjectLibrary(undefined);
+
+    expect(controller.project.current).toBeUndefined();
+    expect(controller.project.isLoading).toBe(true);
+  });
+
+  it("shows the unselected state after an empty project list loads", () => {
+    mocks.projectQuery.data = [];
+    mocks.projectQuery.isSuccess = true;
+    mocks.projectDetailQuery.isPending = true;
+
+    const controller = useProjectLibrary(undefined);
+
+    expect(controller.project.current).toBeUndefined();
+    expect(controller.project.isLoading).toBe(false);
   });
 
   it("exposes project navigation, update, and removal actions", async () => {

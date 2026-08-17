@@ -16,7 +16,10 @@ export function ProjectLibraryWorkspace({
       <ProjectWorkspaceLayout
         sidebar={<ProjectSidebar library={library.project} />}
       >
-        <AssetLibrary project={library.project.current} />
+        <AssetLibrary
+          isProjectLoading={library.project.isLoading}
+          project={library.project.current}
+        />
       </ProjectWorkspaceLayout>
     </div>
   );

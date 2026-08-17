@@ -3,10 +3,12 @@ package router
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
 
 type AssetRouter interface {
@@ -47,7 +49,8 @@ type AssetRouter interface {
 type listAssetsInput dto.GetAssetsRequest
 
 type listAssetsOutput struct {
-	Body dto.SuccessResponse[dto.GetAssetsResponse]
+	ServerTiming string `header:"Server-Timing"`
+	Body         dto.SuccessResponse[dto.GetAssetsResponse]
 }
 
 type getAssetInput dto.AssetDetailRequest
@@ -112,8 +115,13 @@ func RegisterAssetRoutes(api huma.API, r AssetRouter) {
 		Tags:        []string{"Assets"},
 		Errors:      []int{http.StatusBadRequest},
 	}, func(ctx context.Context, input *listAssetsInput) (*listAssetsOutput, error) {
+		started := time.Now()
+		ctx, timing := telemetry.WithRequestTiming(ctx)
 		response, err := r.GetAssets(ctx, dto.GetAssetsRequest(*input))
-		return &listAssetsOutput{Body: response}, openAPIError(err)
+		return &listAssetsOutput{
+			ServerTiming: serverTimingSince(started, timing),
+			Body:         response,
+		}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{
