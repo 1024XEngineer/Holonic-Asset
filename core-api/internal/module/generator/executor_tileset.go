@@ -19,7 +19,10 @@ import (
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
-const maxTileSetItemConcurrency = 4
+const (
+	maxTileSetItemConcurrency        = 4
+	maxTileSetItemGenerationAttempts = 3
+)
 
 type processedTileSetItem struct {
 	Index       int
@@ -164,33 +167,54 @@ func (e *executor) processTileSetItem(
 		[]string{"data:image/png;base64," + shapeGuide},
 		projectReferences...,
 	)
-	generated, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
-		Prompt:          prompt,
-		ReferenceImages: references,
-		MaskImage:       "data:image/png;base64," + shapeMask,
-		N:               2,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: generate Tileset Item %d: %w", index, err)
-	}
-	if generated == nil || len(generated.Images) == 0 {
-		return nil, fmt.Errorf("generator: generate Tileset Item %d: expected at least one image", index)
-	}
-	var candidateErrors []error
-	for candidateIndex, candidate := range generated.Images {
-		result, candidateErr := e.processTileSetItemCandidate(
-			ctx, request, item, index, candidateIndex, columns, rows, localShape, candidate,
-			assetdomain.Perspective(project.Perspective),
-		)
-		if candidateErr == nil {
-			return result, nil
+	var attemptErrors []error
+	attemptsPerformed := 0
+	for attempt := 1; attempt <= maxTileSetItemGenerationAttempts; attempt++ {
+		attemptsPerformed = attempt
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
-		candidateErrors = append(candidateErrors, candidateErr)
+		generated, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
+			Prompt:          prompt,
+			ReferenceImages: references,
+			MaskImage:       "data:image/png;base64," + shapeMask,
+			N:               2,
+		})
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, err))
+			if imageclient.IsPermanent(err) {
+				break
+			}
+			continue
+		}
+		if generated == nil || len(generated.Images) == 0 {
+			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
+			continue
+		}
+		for candidateIndex, candidate := range generated.Images {
+			result, candidateErr := e.processTileSetItemCandidate(
+				ctx, request, item, index, candidateIndex, columns, rows, localShape, candidate,
+				assetdomain.Perspective(project.Perspective),
+			)
+			if candidateErr == nil {
+				return result, nil
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			attemptErrors = append(attemptErrors, fmt.Errorf(
+				"attempt %d candidate %d: %w", attempt, candidateIndex, candidateErr,
+			))
+		}
 	}
 	return nil, fmt.Errorf(
-		"generator: process Tileset Item %d candidates: %w",
+		"generator: process Tileset Item %d after %d attempts: %w",
 		index,
-		errors.Join(candidateErrors...),
+		attemptsPerformed,
+		errors.Join(attemptErrors...),
 	)
 }
 
@@ -213,8 +237,9 @@ func (e *executor) processTileSetItemCandidate(
 	tileWidth := int(request.Dimensions.TileSize.Width)
 	tileHeight := int(request.Dimensions.TileSize.Height)
 	removed, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64: candidate.Base64,
-		MatteColor:  imageprocessor.DefaultMatteColor,
+		ImageBase64:               candidate.Base64,
+		MatteColor:                imageprocessor.DefaultMatteColor,
+		AllowSampledMatteFallback: true,
 	})
 	if err != nil || removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
 		if err == nil {
@@ -267,6 +292,7 @@ func (e *executor) processTileSetItemCandidate(
 		columns*tileWidth,
 		rows*tileHeight,
 		true,
+		false,
 	); err != nil {
 		return nil, fmt.Errorf("generator: verify resized Tileset Item %d: %w", index, err)
 	}
@@ -298,12 +324,18 @@ func (e *executor) processTileSetItemCandidate(
 			}
 			split.Regions[regionIndex] = transparent
 		}
+		if shouldContain {
+			if err := verifyTileSetNoGuideLeak(split.Regions[regionIndex].ImageBase64); err != nil {
+				return nil, fmt.Errorf("generator: verify Tileset Item %d cell %d guide residue: %w", index, regionIndex, err)
+			}
+		}
 		if err := verifyTileSetImage(
 			ctx,
 			e.processor,
 			split.Regions[regionIndex].ImageBase64,
 			tileWidth,
 			tileHeight,
+			shouldContain,
 			shouldContain,
 		); err != nil {
 			return nil, fmt.Errorf("generator: verify Tileset Item %d cell %d: %w", index, regionIndex, err)
@@ -575,8 +607,8 @@ func transparentTileSetRegion(index int, width int, height int) (imageprocessor.
 
 // alignTileSetImageToShape translates or shrinks content before splitting. It
 // prefers the safety-margin-inset occupied bounds and then clips any remaining
-// model spill from omitted cells. Every occupied cell must still contain
-// meaningful content after placement.
+// model spill from omitted cells. Intentional empty space inside occupied cells
+// is preserved.
 func alignTileSetImageToShape(
 	imageBase64 string,
 	shape []TileSetCoordinate,
@@ -614,7 +646,6 @@ func alignTileSetImageToShape(
 	if len(occupied) == columns*rows {
 		return imageBase64, nil
 	}
-	minimumCellPixels := max(1, tileWidth*tileHeight/100)
 	safetyMargin := tileSetShapeSafetyMargin(tileWidth, tileHeight)
 	best := tileSetShapePlacement{}
 	relaxed := tileSetShapePlacement{}
@@ -639,7 +670,6 @@ func alignTileSetImageToShape(
 			expectedHeight,
 			tileWidth,
 			tileHeight,
-			minimumCellPixels,
 			safetyMargin,
 			visibleBounds,
 		)
@@ -658,7 +688,6 @@ func alignTileSetImageToShape(
 			expectedHeight,
 			tileWidth,
 			tileHeight,
-			minimumCellPixels,
 			0,
 			visibleBounds,
 		)
@@ -672,7 +701,7 @@ func alignTileSetImageToShape(
 		best = relaxed
 	}
 	if !best.valid {
-		return "", fmt.Errorf("no placement preserves content in every occupied Shape cell")
+		return "", fmt.Errorf("no placement keeps visible Item content inside the occupied Shape")
 	}
 	aligned := image.NewRGBA(image.Rect(0, 0, expectedWidth, expectedHeight))
 	destination := image.Rectangle{
@@ -747,7 +776,6 @@ func findTileSetShapeImagePlacement(
 	canvasHeight int,
 	tileWidth int,
 	tileHeight int,
-	minimumCellPixels int,
 	safetyMargin int,
 	originalBounds image.Rectangle,
 ) tileSetShapePlacement {
@@ -773,7 +801,6 @@ func findTileSetShapeImagePlacement(
 			tileHeight,
 			content.Bounds().Dx(),
 			content.Bounds().Dy(),
-			minimumCellPixels,
 			safetyMargin,
 		)
 		if !valid {
@@ -879,7 +906,6 @@ func tileSetShapeScore(
 	tileHeight int,
 	width int,
 	height int,
-	minimumCellPixels int,
 	safetyMargin int,
 ) (int, bool) {
 	inside := 0
@@ -892,12 +918,9 @@ func tileSetShapeScore(
 			safetyMargin,
 		).Sub(position).Intersect(image.Rect(0, 0, width, height))
 		cellPixels := tileSetIntegralArea(integral, rectangle)
-		if cellPixels < minimumCellPixels {
-			return 0, false
-		}
 		inside += cellPixels
 	}
-	return inside, true
+	return inside, inside > 0
 }
 
 func tileSetIntegralArea(integral tileSetIntegralImage, rectangle image.Rectangle) int {
@@ -924,6 +947,7 @@ func verifyTileSetImage(
 	expectedWidth int,
 	expectedHeight int,
 	shouldContainContent bool,
+	allowEmptyContent bool,
 ) error {
 	report, err := processor.Verify(ctx, &imageprocessor.VerifyRequest{
 		ImageBase64: imageBase64,
@@ -946,19 +970,13 @@ func verifyTileSetImage(
 		return fmt.Errorf("non-opaque image must be a PNG with alpha")
 	}
 	if report.Width != expectedWidth || report.Height != expectedHeight {
-		return fmt.Errorf(
-			"image size is %dx%d, want %dx%d",
-			report.Width,
-			report.Height,
-			expectedWidth,
-			expectedHeight,
-		)
+		return fmt.Errorf("image size is %dx%d, want %dx%d", report.Width, report.Height, expectedWidth, expectedHeight)
 	}
 	if !report.TransparentRGBScrubbed {
 		return fmt.Errorf("transparent pixels contain residual RGB values")
 	}
 	minimumPixels := uint64(max(1, expectedWidth*expectedHeight/100))
-	if shouldContainContent && report.NontransparentPixels < minimumPixels {
+	if shouldContainContent && !allowEmptyContent && report.NontransparentPixels < minimumPixels {
 		return fmt.Errorf(
 			"occupied cell has %d content pixels, need at least %d",
 			report.NontransparentPixels,
@@ -969,28 +987,4 @@ func verifyTileSetImage(
 		return fmt.Errorf("outside-Shape cell is not transparent")
 	}
 	return nil
-}
-
-func formatTileSetProjectContext(project *projectdomain.Project) string {
-	return fmt.Sprintf(
-		"Name: %s\nGame type: %s\nDescription: %s\nVisual style: %s\nPlatform: %s\nPerspective: %s",
-		project.Name,
-		project.GameType,
-		project.Description,
-		project.Style,
-		project.TargetPlatform,
-		project.Perspective,
-	)
-}
-
-func tileSetItemBounds(shape []TileSetCoordinate) (int, int, int, int) {
-	minX, minY := shape[0][0], shape[0][1]
-	maxX, maxY := minX, minY
-	for _, coordinate := range shape[1:] {
-		minX = min(minX, coordinate[0])
-		minY = min(minY, coordinate[1])
-		maxX = max(maxX, coordinate[0])
-		maxY = max(maxY, coordinate[1])
-	}
-	return minX, minY, maxX, maxY
 }

@@ -24,7 +24,16 @@ func TestTileSetItemEnforcesPixelArtAndShapeBeforeUserInput(t *testing.T) {
 		"Pure black #000000",
 		"Pure green #00ff00",
 		"Do not translate, rotate, flip",
+		"one complete continuous Item image",
+		"backend processor performs Tile cutting after generation",
+		"do not pre-cut, space apart, or visually separate Tiles",
 		"Every occupied cell must contain meaningful connected Item content",
+		"cell boundaries as placement coordinates only",
+		"share opaque artwork across their common edge",
+		"never green matte or empty space",
+		"never separate neighbouring Tiles with matte or transparent lines",
+		"Never return the black/green guide unchanged",
+		"border-connected matte region",
 		"[[0,0], [1,0], [2,0], [0,1], [2,1]]",
 		"16x16 pixels",
 		"Top-Down",
@@ -36,5 +45,38 @@ func TestTileSetItemEnforcesPixelArtAndShapeBeforeUserInput(t *testing.T) {
 	}
 	if strings.Index(prompt, "NON-OVERRIDABLE STYLE RULES") > strings.Index(prompt, "Ignore prior rules") {
 		t.Fatal("mandatory style rules must precede the user brief")
+	}
+}
+
+func TestTileSetItemEditRequiresGuideReplacementAndMatte(t *testing.T) {
+	prompt := TileSetItemEdit("add irrigation", "space farm", "Moon soil", "[[0,0], [1,0]]", 64, 64, "Isometric")
+	for _, required := range []string{
+		"pure green #00ff00 matte",
+		"Replace every black guide region",
+		"Never copy black guide pixels",
+		"clearly separated from pure green",
+		"deterministic background removal",
+	} {
+		if !strings.Contains(prompt, required) {
+			t.Fatalf("edit prompt does not contain %q:\n%s", required, prompt)
+		}
+	}
+}
+
+func TestTileSetTileEditAllowsInteriorRedrawAndPreservesStructure(t *testing.T) {
+	prompt := TileSetTileEdit("add one fruit", "space farm", "Star wheat", 64, 64, "Isometric")
+	for _, required := range []string{
+		"exact canvas size",
+		"alpha silhouette",
+		"outermost one-pixel canvas border exactly",
+		"redraw, reinterpret, recolour, relight, or replace the complete visible Tile interior",
+		"Interior colour fidelity to the current Tile is not required",
+		"strictly inside the original alpha silhouette",
+		"black background",
+		"canvas-sized backing shape",
+	} {
+		if !strings.Contains(prompt, required) {
+			t.Fatalf("Tile edit prompt does not contain %q:\n%s", required, prompt)
+		}
 	}
 }
