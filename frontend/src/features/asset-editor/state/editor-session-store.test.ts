@@ -308,6 +308,8 @@ describe("editor session store", () => {
       {
         ...incoming.uiset.components[0],
         label: "Server start",
+        kind: "input",
+        bounds: { x: 36, y: 48, width: 64, height: 24 },
       },
       {
         id: "inventory-panel",
@@ -325,7 +327,12 @@ describe("editor session store", () => {
         prompt: "Locally edited inventory menu",
         uiset: {
           components: [
-            { id: "primary-action", label: "Play now" },
+            {
+              id: "primary-action",
+              label: "Play now",
+              kind: "input",
+              bounds: { x: 36, y: 48, width: 64, height: 24 },
+            },
             { id: "inventory-panel", label: "Inventory panel" },
           ],
         },

@@ -510,7 +510,11 @@ function mergeExternalUISetComponents(
       currentComponent &&
       savedComponent &&
       !deepEqual(currentComponent, savedComponent)
-        ? structuredClone(currentComponent)
+        ? mergeExternalUISetComponent(
+            currentComponent,
+            savedComponent,
+            component,
+          )
         : structuredClone(component),
     ];
   });
@@ -523,4 +527,19 @@ function mergeExternalUISetComponents(
     }
   }
   return merged;
+}
+
+function mergeExternalUISetComponent(
+  current: UISetComponent,
+  saved: UISetComponent,
+  incoming: UISetComponent,
+) {
+  const merged = structuredClone(incoming) as Record<string, unknown>;
+  const savedFields = saved as Record<string, unknown>;
+  for (const [key, value] of Object.entries(current)) {
+    if (!deepEqual(value, savedFields[key])) {
+      merged[key] = structuredClone(value);
+    }
+  }
+  return merged as UISetComponent;
 }
