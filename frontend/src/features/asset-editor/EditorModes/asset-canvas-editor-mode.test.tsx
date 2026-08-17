@@ -26,15 +26,6 @@ describe("AssetCanvasEditorMode", () => {
       },
       "Tileset canvas",
     ],
-    [
-      "uiset",
-      {
-        mode: "uiset",
-        prompt: "Inventory menu",
-        uiset: { components: [] },
-      },
-      "UI Set canvas",
-    ],
   ] satisfies Array<[AssetKind, AssetRecord, string]>)(
     "renders the %s record in its editor canvas",
     (kind, record, canvasLabel) => {

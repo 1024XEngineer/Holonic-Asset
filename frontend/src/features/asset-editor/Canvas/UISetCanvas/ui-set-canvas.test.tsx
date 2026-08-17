@@ -37,7 +37,7 @@ describe("UISetCanvas", () => {
     const html = renderToStaticMarkup(
       withI18n(
         <UISetCanvas
-          model={{ components, selectedComponentIds: ["panel", "button"] }}
+          model={{ components, selectedComponentId: "panel" }}
           onEvent={vi.fn()}
         />,
       ),
@@ -45,7 +45,7 @@ describe("UISetCanvas", () => {
 
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-pressed="false"');
-    expect(html).toContain("Panel, Button selected");
+    expect(html).toContain("Panel selected");
     expect(html).toContain("items-start");
     expect(html).toContain("bg-transparent");
     expect(html).toContain("justify-center");

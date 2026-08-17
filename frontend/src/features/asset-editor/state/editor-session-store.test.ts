@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssetRecord, CharacterAssetRecord } from "@/model";
+import type {
+  AssetRecord,
+  CharacterAssetRecord,
+  UISetAssetRecord,
+} from "@/model";
 
 import {
   createEditorSessionStore,
@@ -28,6 +32,23 @@ function createCharacterRecord(): CharacterAssetRecord {
       },
       animations: [{ kind: "clip", id: "idle", label: "Idle", frameCount: 4 }],
       nodePositions: { idle: { x: 10, y: 20 } },
+    },
+  };
+}
+
+function createUISetRecord(): UISetAssetRecord {
+  return {
+    mode: "uiset",
+    prompt: "Inventory menu",
+    uiset: {
+      components: [
+        {
+          id: "primary-action",
+          label: "Start",
+          kind: "button",
+          bounds: { x: 20, y: 60, width: 50, height: 16 },
+        },
+      ],
     },
   };
 }
@@ -143,6 +164,42 @@ describe("editor session store", () => {
     if (record.mode !== "character") return;
     expect(record.character.animations).toHaveLength(0);
     expect(record.character.nodePositions.idle).toBeUndefined();
+  });
+
+  it("updates and restores UI Set components through editor history", () => {
+    const generatedRecord = createUISetRecord();
+    const store = createEditorSessionStore(generatedRecord);
+    const generatedComponent = generatedRecord.uiset.components[0];
+    if (!generatedComponent) throw new Error("Expected a generated component.");
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.label.set",
+      componentId: generatedComponent.id,
+      label: "Play now",
+    });
+    expect(store.getState().record).toMatchObject({
+      mode: "uiset",
+      uiset: { components: [{ id: "primary-action", label: "Play now" }] },
+    });
+
+    dispatchEditorCommand(store, {
+      type: "uiset.component.restore",
+      component: generatedComponent,
+    });
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: {
+        mode: "uiset",
+        uiset: { components: [{ id: "primary-action", label: "Start" }] },
+      },
+      dirty: false,
+      canUndo: true,
+    });
+
+    dispatchEditorCommand(store, { type: "history.undo" });
+    expect(store.getState().record).toMatchObject({
+      mode: "uiset",
+      uiset: { components: [{ id: "primary-action", label: "Play now" }] },
+    });
   });
 
   it("merges generated server animations without overwriting local edits", () => {
