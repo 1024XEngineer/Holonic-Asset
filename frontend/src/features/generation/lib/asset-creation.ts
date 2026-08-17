@@ -5,6 +5,11 @@ import { getDefaultAssetCanvasSize } from "@/model";
 import { perspectiveOptions, perspectiveSchema } from "@/model/project";
 import { z } from "zod";
 
+import {
+  defaultUISetCanvasDimensions,
+  isUISetCanvasHeight,
+  isUISetCanvasWidth,
+} from "../create-asset/ui-set-canvas";
 import type { AssetCreationDraft } from "../types";
 
 const commonAssetCreationDraftShape = {
@@ -14,6 +19,20 @@ const commonAssetCreationDraftShape = {
 };
 
 const itemTileSchema = z.tuple([z.number(), z.number()]);
+
+export function createUISetComponent() {
+  return { id: crypto.randomUUID(), name: "", description: "" };
+}
+
+function formatCanvasSize({
+  width,
+  height,
+}: {
+  width: number;
+  height: number;
+}) {
+  return `${width} x ${height} px`;
+}
 
 export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -44,15 +63,30 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
     kind: z.literal("uiset"),
-    style: z.string(),
+    dimensions: z.object({
+      width: z
+        .number()
+        .int()
+        .refine(isUISetCanvasWidth, "Select a supported canvas width."),
+      height: z
+        .number()
+        .int()
+        .refine(isUISetCanvasHeight, "Select a supported canvas height."),
+    }),
+    style: z.string().trim().min(1, "UI Set style is required."),
     reference: z.unknown().optional(),
-    components: z.array(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        isCustom: z.boolean(),
-      }),
-    ),
+    components: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string().trim().min(1, "Every component needs a name."),
+          description: z
+            .string()
+            .trim()
+            .min(1, "Every component needs a description."),
+        }),
+      )
+      .min(1, "Add at least one UI Set component."),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -91,12 +125,15 @@ export function createAssetCreationDraft<Reference = unknown>(
         tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
       };
     case "uiset":
+      const dimensions = { ...defaultUISetCanvasDimensions };
       return {
         ...common,
         kind,
+        canvasSize: formatCanvasSize(dimensions),
+        dimensions,
         style: "",
         reference: undefined,
-        components: [{ name: "", description: "", isCustom: false }],
+        components: [createUISetComponent()],
       };
     default:
       return {
@@ -133,9 +170,13 @@ export function toCreationRequest<Reference>(
     case "uiset":
       return {
         ...common,
+        canvasSize: formatCanvasSize(draft.dimensions),
+        dimensions: draft.dimensions,
         style: draft.style,
         reference: draft.reference,
-        components: draft.components,
+        components: draft.components.map(
+          ({ id: _, ...component }) => component,
+        ),
       };
     default:
       return draft.kind === "character" || draft.kind === "object"

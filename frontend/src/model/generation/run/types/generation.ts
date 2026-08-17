@@ -7,6 +7,7 @@ export type CreationRequest<Reference = unknown> = {
   name: string;
   prompt: string;
   canvasSize: string;
+  dimensions?: { width: number; height: number };
   perspective?: Perspective;
   reference?: Reference;
   style?: string;
@@ -17,7 +18,7 @@ export type CreationRequest<Reference = unknown> = {
     reference?: Reference;
     shape: ItemTile[];
   }[];
-  components?: { name: string; description: string; isCustom: boolean }[];
+  components?: { name: string; description: string }[];
 };
 
 export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
