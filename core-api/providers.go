@@ -12,6 +12,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
@@ -52,11 +53,12 @@ func InitAuthService(cfg config.AuthConfig, store auth.Store) (*auth.Service, er
 }
 
 // InitImageService creates the external image provider and its application service.
-func InitImageService(cfg config.ImageClientConfig) imageclient.ImageGenerationService {
+func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) imageclient.ImageGenerationService {
 	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
 		BaseURL:      cfg.BaseURL,
 		APIKey:       cfg.APIKey,
 		DefaultModel: cfg.DefaultModel,
+		Logger:       appLogger,
 	})
 	return imageclient.NewImageGenerationService(provider)
 }

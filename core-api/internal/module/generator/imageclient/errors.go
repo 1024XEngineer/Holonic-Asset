@@ -56,3 +56,11 @@ func IsTransient(err error) bool {
 	var providerErr *ProviderError
 	return errors.As(err, &providerErr) && providerErr.Transient
 }
+
+// IsPermanent reports whether a classified provider failure cannot succeed
+// when retried with the same request. Unclassified errors remain retryable so
+// callers preserve recovery for custom service implementations.
+func IsPermanent(err error) bool {
+	var providerErr *ProviderError
+	return errors.As(err, &providerErr) && !providerErr.Transient
+}
