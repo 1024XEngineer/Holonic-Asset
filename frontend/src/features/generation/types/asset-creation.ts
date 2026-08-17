@@ -36,9 +36,10 @@ export type TilesetAssetCreationDraft<Reference = unknown> =
 
 export type UISetAssetCreationDraft<Reference = unknown> =
   CommonAssetCreationDraft<"uiset"> & {
+    dimensions: { width: number; height: number };
     style: string;
     reference: Reference | undefined;
-    components: { name: string; description: string; isCustom: boolean }[];
+    components: { id: string; name: string; description: string }[];
   };
 
 export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
