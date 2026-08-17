@@ -35,8 +35,10 @@ export function CreateAssetForm({
 }) {
   const { t } = useTranslation(["generation", "common"]);
   const [validationError, setValidationError] = useState<string>();
+  const [localSubmissionReady, setLocalSubmissionReady] = useState(false);
+  const [initialDraft] = useState(() => createAssetCreationDraft<File>(kind));
   const form = useForm({
-    defaultValues: { draft: createAssetCreationDraft<File>(kind) },
+    defaultValues: { draft: initialDraft },
     onSubmit: async ({ value }) => {
       const result = assetCreationDraftSchema.safeParse(value.draft);
       if (!result.success) {
@@ -54,12 +56,18 @@ export function CreateAssetForm({
       }
 
       setValidationError(undefined);
-      await onCreate(toCreationRequest(value.draft));
+      const validatedDraft = result.data as AssetCreationDraft<File>;
+      if (validatedDraft.kind === "uiset") {
+        setLocalSubmissionReady(true);
+        return;
+      }
+      await onCreate(toCreationRequest(validatedDraft));
     },
   });
   const draft = useStore(form.store, (state) => state.values.draft);
   const setDraft = (nextDraft: AssetCreationDraft<File>) => {
     setValidationError(undefined);
+    setLocalSubmissionReady(false);
     form.setFieldValue("draft", nextDraft);
   };
 
@@ -122,6 +130,12 @@ export function CreateAssetForm({
       {validationError ? (
         <p className="text-sm text-destructive" role="alert">
           {validationError}
+        </p>
+      ) : null}
+
+      {localSubmissionReady ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          {t("uiSetLocalSubmissionReady")}
         </p>
       ) : null}
 
