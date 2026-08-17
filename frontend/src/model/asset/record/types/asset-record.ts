@@ -20,7 +20,16 @@ export type TilesetItem = {
 export type UISetComponent = {
   id: string;
   label: string;
-  kind: "panel" | "label" | "button";
+  kind:
+    | "panel"
+    | "label"
+    | "button"
+    | "input"
+    | "badge"
+    | "progress"
+    | "toggle"
+    | "icon"
+    | "slider";
   bounds: { x: number; y: number; width: number; height: number };
 };
 

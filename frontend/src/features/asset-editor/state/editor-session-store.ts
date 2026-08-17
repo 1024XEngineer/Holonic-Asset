@@ -6,6 +6,7 @@ import type {
   AssetCanvasPosition,
   AssetRecord,
   SpriteAssetRecordData,
+  UISetComponent,
 } from "@/model";
 
 import type {
@@ -24,6 +25,8 @@ type EditorSessionState = {
   ) => void;
   renameSpriteAnimation: (animationId: string, label: string) => void;
   deleteSpriteAnimation: (animationId: string) => void;
+  setUISetComponentLabel: (componentId: string, label: string) => void;
+  restoreUISetComponent: (component: UISetComponent) => void;
 };
 
 const SPRITE_RECORD_REQUIRED_MESSAGE =
@@ -113,6 +116,50 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
                   (animation) => animation.id !== animationId,
                 ),
                 nodePositions,
+              })),
+            };
+          }),
+        setUISetComponentLabel: (componentId, label) =>
+          set((state) => {
+            const normalizedLabel = label.trim();
+            const components = getUISetComponents(state.record);
+            const target = components.find(
+              (component) => component.id === componentId,
+            );
+            if (
+              !normalizedLabel ||
+              !target ||
+              target.label === normalizedLabel
+            ) {
+              return state;
+            }
+
+            return {
+              record: updateUISetRecord(state.record, (current) => ({
+                ...current,
+                components: current.components.map((component) =>
+                  component.id === componentId
+                    ? { ...component, label: normalizedLabel }
+                    : component,
+                ),
+              })),
+            };
+          }),
+        restoreUISetComponent: (component) =>
+          set((state) => {
+            const current = getUISetComponents(state.record).find(
+              (candidate) => candidate.id === component.id,
+            );
+            if (!current || deepEqual(current, component)) return state;
+
+            return {
+              record: updateUISetRecord(state.record, (currentRecord) => ({
+                ...currentRecord,
+                components: currentRecord.components.map((candidate) =>
+                  candidate.id === component.id
+                    ? structuredClone(component)
+                    : candidate,
+                ),
               })),
             };
           }),
@@ -245,6 +292,14 @@ export function dispatchEditorCommand(
     case "sprite.animation.delete":
       store.getState().deleteSpriteAnimation(command.animationId);
       return;
+    case "uiset.component.label.set":
+      store
+        .getState()
+        .setUISetComponentLabel(command.componentId, command.label);
+      return;
+    case "uiset.component.restore":
+      store.getState().restoreUISetComponent(command.component);
+      return;
     case "history.undo":
       store.temporal.getState().undo();
       return;
@@ -270,6 +325,23 @@ function updateSpriteRecord(
     return { ...record, object: update(record.object) };
   }
   throw new Error(SPRITE_RECORD_REQUIRED_MESSAGE);
+}
+
+function getUISetComponents(record: AssetRecord): UISetComponent[] {
+  if (record.mode === "uiset") return record.uiset.components;
+  throw new Error("UI Set editing requires a UI Set record.");
+}
+
+function updateUISetRecord(
+  record: AssetRecord,
+  update: (
+    data: Extract<AssetRecord, { mode: "uiset" }>["uiset"],
+  ) => Extract<AssetRecord, { mode: "uiset" }>["uiset"],
+): AssetRecord {
+  if (record.mode !== "uiset") {
+    throw new Error("UI Set editing requires a UI Set record.");
+  }
+  return { ...record, uiset: update(record.uiset) };
 }
 
 export function getEditorSessionSnapshot(

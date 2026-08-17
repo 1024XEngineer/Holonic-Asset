@@ -72,5 +72,16 @@
   "animationGenerated": "{{name}} 已生成",
   "animationGenerationFailed": "动画生成失败",
   "promptSent": "提示词已发送",
-  "promptSubmissionFailed": "提示词发送失败"
+  "promptSubmissionFailed": "提示词发送失败",
+  "uiSetComponents": "组件",
+  "uiSetComponentsDescription": "面板、标签和按钮",
+  "uiSetInspector": "组件编辑",
+  "uiSetComponentType": "类型：{{value}}",
+  "uiSetComponentLabel": "组件名称",
+  "clearSelectedComponent": "清除已选组件",
+  "selectUISetComponent": "选择一个组件以进行编辑。",
+  "generatedVersion": "生成版本",
+  "generatedVersionDescription": "将该组件恢复为本次编辑会话加载时的版本。",
+  "restoreGeneratedVersion": "恢复生成版本",
+  "noComponentVersions": "该组件没有可用的生成版本。"
 }

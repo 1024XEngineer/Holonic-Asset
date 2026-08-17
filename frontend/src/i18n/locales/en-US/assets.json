@@ -1,5 +1,6 @@
 {
   "openEditor": "Open asset editor",
+  "openUISetEditor": "Open UI Set editor",
   "copy": "Copy asset",
   "editDetails": "Edit asset details",
   "deleteConfirm": "Delete {{name}}?",

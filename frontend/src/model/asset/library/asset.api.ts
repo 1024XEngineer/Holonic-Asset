@@ -22,7 +22,10 @@ export const assetApi = {
   listGroups: async (projectId: string) => {
     const response = await coreAssetApi.list(coreProjectId(projectId));
     const details = await readAssetDetails(response.assets);
-    return toAssetGroups(response.assets, new Map(details));
+    const groups = toAssetGroups(response.assets, new Map(details));
+    return (import.meta.env as { MODE?: string }).MODE === "development"
+      ? withDemoUISet(groups)
+      : groups;
   },
   copy: async (projectId: string, assetId: string) => {
     await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
@@ -73,6 +76,32 @@ async function readAssetDetails(assets: AssetListItemResponse[]) {
     }
   }
   return details;
+}
+
+function withDemoUISet(groups: ReturnType<typeof toAssetGroups>) {
+  const demoAsset: ProjectAsset = {
+    id: "demo-ui-set",
+    name: "Demo UI Set",
+    description: "A frontend-only UI Set fixture for testing the editor.",
+    version: "v1",
+    canvasSize: "1280 × 720 px",
+    perspective: "Top-Down",
+    tags: ["demo", "ui"],
+    thumbnailUrl: "/assets/uiset/uiset.png",
+    history: [],
+    animations: [],
+  };
+  const uiSetGroup = groups.find((group) => group.kind === "uiset");
+
+  if (uiSetGroup) {
+    return groups.map((group) =>
+      group === uiSetGroup
+        ? { ...group, assets: [...group.assets, demoAsset] }
+        : group,
+    );
+  }
+
+  return [...groups, { kind: "uiset" as const, assets: [demoAsset] }];
 }
 
 function parseAssetDimensions(canvasSize: string) {
