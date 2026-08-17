@@ -5,6 +5,7 @@ import type { CreatableAssetKind } from "@/model/asset";
 import {
   assetCreationDraftSchema,
   createAssetCreationDraft,
+  getAssetCreationValidationMessageKey,
   toCreationRequest,
 } from "./asset-creation";
 
@@ -89,4 +90,23 @@ describe("asset creation", () => {
       expect(result.success).toBe(false);
     },
   );
+
+  it.each([
+    ["UI Set style is required.", "validation.uiSetStyleRequired"],
+    ["Every component needs a name.", "validation.uiSetComponentNameRequired"],
+    [
+      "Every component needs a description.",
+      "validation.uiSetComponentDescriptionRequired",
+    ],
+    [
+      "Select a supported canvas width.",
+      "validation.uiSetCanvasWidthUnsupported",
+    ],
+    [
+      "Select a supported canvas height.",
+      "validation.uiSetCanvasHeightUnsupported",
+    ],
+  ])("maps UI Set validation message %s to %s", (message, key) => {
+    expect(getAssetCreationValidationMessageKey(message)).toBe(key);
+  });
 });

@@ -11,6 +11,7 @@ import type { CreationRequest } from "@/model/generation";
 import {
   assetCreationDraftSchema,
   createAssetCreationDraft,
+  getAssetCreationValidationMessageKey,
   toCreationRequest,
 } from "./lib";
 import type { AssetCreationDraft } from "./types";
@@ -40,9 +41,14 @@ export function CreateAssetForm({
       const result = assetCreationDraftSchema.safeParse(value.draft);
       if (!result.success) {
         setValidationError(
-          [...new Set(result.error.issues.map((issue) => issue.message))].join(
-            " ",
-          ),
+          [
+            ...new Set(
+              result.error.issues.map((issue) => {
+                const key = getAssetCreationValidationMessageKey(issue.message);
+                return key ? t(key) : issue.message;
+              }),
+            ),
+          ].join(" "),
         );
         return;
       }
