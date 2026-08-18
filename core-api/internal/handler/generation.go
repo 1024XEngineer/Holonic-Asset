@@ -112,7 +112,6 @@ func (h *GenerationHandler) Get(
 				result.Content,
 				"resolve generation result",
 				transform,
-				false,
 			)
 			if err != nil {
 				return dto.SuccessResponse[dto.GetGenerationResponse]{}, err
@@ -150,5 +149,5 @@ func (h *GenerationHandler) ResolveApplication(
 	if err != nil {
 		return dto.SuccessResponse[dto.ResolveGenerationApplicationResponse]{}, err
 	}
-	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{Completed: true}), nil
+	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{}), nil
 }

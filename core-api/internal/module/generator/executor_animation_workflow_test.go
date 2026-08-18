@@ -76,15 +76,12 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	if !reflect.DeepEqual(animations.request, wantRequest) {
 		t.Fatalf("unexpected edit animation request: got %+v want %+v", animations.request, wantRequest)
 	}
-	if assets.animationAssetID != 0 || assets.animationID != 0 {
-		t.Fatalf("edit animation must not create a new animation: %+v", assets)
-	}
 	application, content := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
 	if content.Prototype != nil {
 		t.Fatalf("animation edit result must not include the asset prototype: %+v", content.Prototype)
 	}
-	if assets.updatedAnimationID != 0 || len(content.Animations) != 1 || len(content.Animations[0].Frames) != 2 {
-		t.Fatalf("generation must return, not persist, edited frames: result=%+v assets=%+v", application, assets)
+	if len(content.Animations) != 1 || len(content.Animations[0].Frames) != 2 {
+		t.Fatalf("generation must return the edited frames: result=%+v content=%+v", application, content)
 	}
 	frames := content.Animations[0].Frames
 	if frames[0].ID != 1 || frames[0].URL == nil ||
@@ -173,8 +170,8 @@ func TestExecutorEditAnimationKeepsExistingFramesWhenRegenerationFails(t *testin
 	if err == nil || !strings.Contains(err.Error(), "regenerate animation frames") {
 		t.Fatalf("expected regeneration error, got %v", err)
 	}
-	if len(assets.updatedFrames) != 0 || len(events) != 2 {
-		t.Fatalf("existing frames should not be updated on generation failure: events=%v assets=%+v", events, assets)
+	if len(events) != 2 {
+		t.Fatalf("unexpected workflow after generation failure: %v", events)
 	}
 }
 
@@ -229,8 +226,8 @@ func TestExecutorEditAnimationDoesNotReplaceFramesWhenPersistenceFails(t *testin
 	if err == nil || !strings.Contains(err.Error(), "persist animation frame 1") {
 		t.Fatalf("expected persistence error, got %v", err)
 	}
-	if assets.updatedAnimationID != 0 || !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
-		t.Fatalf("existing frames should not be updated on persistence failure: events=%v assets=%+v", events, assets)
+	if !reflect.DeepEqual(events, []string{"get_asset", "generate_animation"}) {
+		t.Fatalf("unexpected workflow after persistence failure: %v", events)
 	}
 }
 
@@ -328,8 +325,8 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	if content.Prototype != nil {
 		t.Fatalf("animation generation result must not include the asset prototype: %+v", content.Prototype)
 	}
-	if assets.animationAssetID != 0 || len(content.Animations) != 1 {
-		t.Fatalf("generation must return only the generated animation: result=%+v assets=%+v", application, assets)
+	if len(content.Animations) != 1 {
+		t.Fatalf("generation must return only the generated animation: result=%+v content=%+v", application, content)
 	}
 	generatedAnimation := content.Animations[0]
 	if generatedAnimation.ID != 0 {

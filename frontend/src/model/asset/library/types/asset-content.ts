@@ -1,4 +1,5 @@
 import type { Perspective } from "@/model/project";
+import type { AnimationGenerationConfig } from "../../types/asset";
 import type { DirectionCountForPerspective } from "../../types/perspective-direction";
 
 export type AssetContentMetadata = Record<string, unknown>;
@@ -31,6 +32,7 @@ export type AssetAnimationResponse = {
   id: number;
   name: string;
   frames: AssetAnimationFrameResponse[];
+  generation?: AnimationGenerationConfig;
 };
 
 export type CoreSpriteAssetContent = AssetContentBase & {

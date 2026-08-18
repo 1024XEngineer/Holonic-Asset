@@ -70,6 +70,7 @@ export {
   assetKindSchema,
   assetKinds,
   creatableAssetKinds,
+  type AnimationGenerationConfig,
   type AssetAnimation,
   type AssetDirection,
   type AssetMetadataUpdate,

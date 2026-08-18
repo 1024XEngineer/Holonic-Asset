@@ -202,6 +202,9 @@ function toAnimationsFromContent(
       id: String(animation.id),
       label: animation.name,
       frameCount: frameUrls.length,
+      ...(animation.generation
+        ? { generation: structuredClone(animation.generation) }
+        : {}),
       ...(frameUrls.length > 0
         ? {
             spriteSheet: {
@@ -248,6 +251,9 @@ function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
           url,
         }),
       ),
+      ...(animation.generation
+        ? { generation: structuredClone(animation.generation) }
+        : {}),
     })),
     metadata: { nodePositions: structuredClone(sprite.nodePositions) },
   };

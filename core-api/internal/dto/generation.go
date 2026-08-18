@@ -76,6 +76,4 @@ type ResolveGenerationApplicationRequest struct {
 	Applied         bool            `json:"applied"`
 }
 
-type ResolveGenerationApplicationResponse struct {
-	Completed bool `json:"completed"`
-}
+type ResolveGenerationApplicationResponse struct{}

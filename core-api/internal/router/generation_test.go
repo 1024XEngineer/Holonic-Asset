@@ -53,7 +53,7 @@ func (*generationRouterStub) ResolveApplication(
 	context.Context,
 	dto.ResolveGenerationApplicationRequest,
 ) (dto.SuccessResponse[dto.ResolveGenerationApplicationResponse], error) {
-	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{Completed: true}), nil
+	return dto.NewTypedSuccessResponse(dto.ResolveGenerationApplicationResponse{}), nil
 }
 
 func TestGenerationRoutesAreRegistered(t *testing.T) {

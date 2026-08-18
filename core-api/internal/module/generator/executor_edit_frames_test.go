@@ -90,9 +90,6 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		t.Fatalf("unexpected edit prompt or original action: %+v", animations.request)
 	}
 	application, candidate := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
-	if assets.updateCalls != 0 {
-		t.Fatalf("edit frames must return a candidate without mutating the asset: updates=%d", assets.updateCalls)
-	}
 	if candidate.Prototype != nil || len(candidate.Animations) != 1 || candidate.Animations[0].ID != 42 {
 		t.Fatalf("edit frames result must contain only the target animation: %+v", candidate)
 	}
@@ -225,9 +222,6 @@ func TestExecutorEditFramesRejectsMissingRawOutput(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "edited raw frame result contains 0 frames") {
 		t.Fatalf("expected missing raw frame error, got %v", err)
 	}
-	if assets.updateCalls != 0 {
-		t.Fatalf("asset updated without raw frames: %d", assets.updateCalls)
-	}
 }
 
 func TestExecutorEditFramesSupportsSingleFrameAndValidatesSelection(t *testing.T) {
@@ -254,8 +248,8 @@ func TestExecutorEditFramesSupportsSingleFrameAndValidatesSelection(t *testing.T
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
-			if animations.request != nil || assets.updateCalls != 0 {
-				t.Fatalf("invalid selection started generation or update: request=%+v updates=%d", animations.request, assets.updateCalls)
+			if animations.request != nil {
+				t.Fatalf("invalid selection started generation: request=%+v", animations.request)
 			}
 		})
 	}
@@ -323,8 +317,8 @@ func TestExecutorEditFramesRequiresGenerationConfiguration(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "has no generation configuration for frame editing") {
 		t.Fatalf("expected missing generation configuration error, got %v", err)
 	}
-	if animations.request != nil || assets.updateCalls != 0 {
-		t.Fatalf("missing generation configuration started edit: request=%+v updates=%d", animations.request, assets.updateCalls)
+	if animations.request != nil {
+		t.Fatalf("missing generation configuration started edit: request=%+v", animations.request)
 	}
 }
 
@@ -364,9 +358,6 @@ func TestExecutorEditFramesValidatesContextAndAssetErrors(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
-			if assetStub.updateCalls != 0 {
-				t.Fatalf("invalid edit updated animation: %d", assetStub.updateCalls)
-			}
 		})
 	}
 }
@@ -404,9 +395,6 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
-			if assets.updateCalls != 0 {
-				t.Fatalf("failed edit updated animation: %d", assets.updateCalls)
-			}
 			if test.name == "continuity gate error" && (len(store.persisted) != 0 || len(store.uploads) != 0) {
 				t.Fatalf("continuity-rejected edit persisted frames: processed=%d raw=%d", len(store.persisted), len(store.uploads))
 			}
@@ -430,9 +418,6 @@ func TestExecutorEditFramesPreservesOriginalDurationWhenGeneratedDurationIsZero(
 	if len(candidate.Animations) != 1 || len(candidate.Animations[0].Frames) != 1 ||
 		candidate.Animations[0].Frames[0].Duration != 10 {
 		t.Fatalf("generated zero duration did not preserve original duration: %+v", candidate.Animations)
-	}
-	if assets.updateCalls != 0 {
-		t.Fatalf("duration-preserving edit mutated persisted asset: %d", assets.updateCalls)
 	}
 }
 

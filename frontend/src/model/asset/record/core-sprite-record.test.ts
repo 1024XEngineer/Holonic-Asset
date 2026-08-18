@@ -37,6 +37,20 @@ beforeEach(() => {
   mocks.assetRecords.mockResolvedValue({ records: [] });
 });
 
+const walkGeneration = {
+  direction: "front",
+  style: "pixel art",
+  action: "walk",
+  frameCount: 2,
+  columns: 2,
+  frameWidth: 32,
+  frameHeight: 32,
+  fps: 12,
+  resolution: "720p",
+  duration: 5,
+  aspectRatio: "1:1",
+};
+
 describe("saveCoreSpriteAssetRevision", () => {
   it("persists a Core sprite revision with its loaded base version", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 4 });
@@ -106,6 +120,7 @@ describe("saveCoreSpriteAssetRevision", () => {
               columns: 1,
               rows: 1,
             },
+            generation: walkGeneration,
           },
         ],
         nodePositions: {},
@@ -129,6 +144,7 @@ describe("saveCoreSpriteAssetRevision", () => {
             id: 1,
             name: "Open",
             frames: [{ id: 1, url: "/open.png" }],
+            generation: walkGeneration,
           },
         ],
         metadata: { nodePositions: {} },
@@ -253,6 +269,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
               id: "7",
               label: "Walk",
               frameCount: 2,
+              generation: walkGeneration,
               spriteSheet: {
                 imageUrl: "/walk-1.png",
                 frameUrls: ["/walk-1.png", "/walk-2.png"],
@@ -371,6 +388,7 @@ describe("toCoreSpriteCandidateRecord", () => {
           id: 8,
           name: "Run",
           frames: [{ id: 1, url: "/run.png" }],
+          generation: { ...walkGeneration, action: "run" },
         },
       ],
     });
@@ -381,7 +399,12 @@ describe("toCoreSpriteCandidateRecord", () => {
         prototype: { imageUrl: "/new-front.png" },
         animations: [
           { id: "7", label: "Walk" },
-          { id: "8", label: "Run", frameCount: 1 },
+          {
+            id: "8",
+            label: "Run",
+            frameCount: 1,
+            generation: { ...walkGeneration, action: "run" },
+          },
         ],
       },
     });
@@ -411,6 +434,7 @@ function characterDetail(): AssetDetailResponse {
         {
           id: 7,
           name: "Walk",
+          generation: walkGeneration,
           frames: [
             { id: 1, url: "/walk-1.png", duration: 83 },
             { id: 2, url: "/walk-2.png", duration: 83 },

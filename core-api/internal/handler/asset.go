@@ -125,10 +125,6 @@ func (h *Handler) Record(
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}
-	persistedContent, err = h.preserveAnimationGeneration(x, asset.AssetID, persistedContent)
-	if err != nil {
-		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
-	}
 	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{
 		AssetID: asset.AssetID,
 		Content: persistedContent,
@@ -196,14 +192,14 @@ func (h *Handler) resolveAssetContent(
 	if h.references != nil {
 		transform = h.references.ResolveReference
 	}
-	return transformAssetContentReferences(ctx, raw, "resolve", transform, true)
+	return transformAssetContentReferences(ctx, raw, "resolve", transform)
 }
 
 func (h *Handler) persistAssetContent(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
-	return transformAssetContentReferences(ctx, raw, "persist", h.persistAssetReference, false)
+	return transformAssetContentReferences(ctx, raw, "persist", h.persistAssetReference)
 }
 
 func transformAssetContentReferences(
@@ -211,7 +207,6 @@ func transformAssetContentReferences(
 	raw json.RawMessage,
 	operation string,
 	transform referenceTransform,
-	stripGeneration bool,
 ) (json.RawMessage, error) {
 	var content map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &content); err != nil {
@@ -219,16 +214,6 @@ func transformAssetContentReferences(
 	}
 	if content == nil {
 		return raw, nil
-	}
-
-	if stripGeneration {
-		if value, ok := content["animations"]; ok {
-			sanitized, err := stripAnimationGeneration(value)
-			if err != nil {
-				return nil, err
-			}
-			content["animations"] = sanitized
-		}
 	}
 
 	if transform != nil {
@@ -281,106 +266,6 @@ func transformAssetContentReferences(
 		return nil, fmt.Errorf("handler: encode asset content: %w", err)
 	}
 	return json.RawMessage(encoded), nil
-}
-
-func (h *Handler) preserveAnimationGeneration(
-	ctx context.Context,
-	assetID uint,
-	raw json.RawMessage,
-) (json.RawMessage, error) {
-	asset, err := h.AssetManager.GetDetail(ctx, assetID)
-	if err != nil {
-		return nil, fmt.Errorf("handler: load asset %d generation metadata: %w", assetID, err)
-	}
-	var currentContent map[string]json.RawMessage
-	if len(bytes.TrimSpace(asset.Content)) == 0 {
-		currentContent = map[string]json.RawMessage{}
-	} else if err := json.Unmarshal(asset.Content, &currentContent); err != nil {
-		return nil, fmt.Errorf("handler: decode asset %d generation metadata: %w", assetID, err)
-	}
-	var nextContent map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &nextContent); err != nil {
-		return nil, fmt.Errorf("handler: decode asset %d submitted content: %w", assetID, err)
-	}
-	currentAnimations, err := decodeJSONArrayObjects(currentContent["animations"])
-	if err != nil {
-		return nil, fmt.Errorf("handler: decode asset %d generation metadata animations: %w", assetID, err)
-	}
-	nextRaw, ok := nextContent["animations"]
-	if !ok {
-		return raw, nil
-	}
-	nextAnimations, err := decodeJSONArrayObjects(nextRaw)
-	if err != nil {
-		return nil, fmt.Errorf("handler: decode asset %d submitted animations: %w", assetID, err)
-	}
-
-	generationByID := make(map[string]json.RawMessage, len(currentAnimations))
-	for _, animation := range currentAnimations {
-		id, hasID := animation["id"]
-		generation, hasGeneration := animation["generation"]
-		if hasID && hasGeneration {
-			generationByID[string(bytes.TrimSpace(id))] = append(json.RawMessage(nil), generation...)
-		}
-	}
-	for _, animation := range nextAnimations {
-		if _, hasGeneration := animation["generation"]; hasGeneration {
-			continue
-		}
-		id, hasID := animation["id"]
-		if !hasID {
-			continue
-		}
-		if generation, found := generationByID[string(bytes.TrimSpace(id))]; found {
-			animation["generation"] = generation
-		}
-	}
-	nextContent["animations"], err = json.Marshal(nextAnimations)
-	if err != nil {
-		return nil, fmt.Errorf("handler: encode asset %d submitted animations: %w", assetID, err)
-	}
-	encoded, err := json.Marshal(nextContent)
-	if err != nil {
-		return nil, fmt.Errorf("handler: encode asset %d submitted content: %w", assetID, err)
-	}
-	return json.RawMessage(encoded), nil
-}
-
-func decodeJSONArrayObjects(raw json.RawMessage) ([]map[string]json.RawMessage, error) {
-	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return nil, nil
-	}
-	var values []map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &values); err != nil {
-		return nil, err
-	}
-	return values, nil
-}
-
-func stripAnimationGeneration(raw json.RawMessage) (json.RawMessage, error) {
-	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return raw, nil
-	}
-	var animations []json.RawMessage
-	if err := json.Unmarshal(raw, &animations); err != nil {
-		return nil, fmt.Errorf("handler: decode asset content animations: %w", err)
-	}
-	for index, value := range animations {
-		animation, err := decodeJSONObject(value)
-		if err != nil {
-			return nil, fmt.Errorf("handler: decode asset content animations[%d]: %w", index, err)
-		}
-		delete(animation, "generation")
-		animations[index], err = json.Marshal(animation)
-		if err != nil {
-			return nil, fmt.Errorf("handler: encode asset content animations[%d]: %w", index, err)
-		}
-	}
-	encoded, err := json.Marshal(animations)
-	if err != nil {
-		return nil, fmt.Errorf("handler: encode asset content animations: %w", err)
-	}
-	return encoded, nil
 }
 
 func transformReferenceArray(

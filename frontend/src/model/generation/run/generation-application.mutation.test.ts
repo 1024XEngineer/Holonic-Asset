@@ -14,7 +14,7 @@ import { resolveGenerationApplication } from "./generation-application.mutation"
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.resolve.mockResolvedValue({ completed: true });
+  mocks.resolve.mockResolvedValue({});
 });
 
 describe("resolveGenerationApplication", () => {

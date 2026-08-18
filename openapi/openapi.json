@@ -930,14 +930,6 @@
       },
       "ResolveGenerationApplicationResponse": {
         "additionalProperties": false,
-        "properties": {
-          "completed": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "completed"
-        ],
         "type": "object"
       },
       "RollBackAssetRequest": {

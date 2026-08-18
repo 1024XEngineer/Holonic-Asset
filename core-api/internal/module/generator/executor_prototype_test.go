@@ -38,8 +38,7 @@ func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testin
 	}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 3,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          7,
 			Name:        "hero",
@@ -93,9 +92,6 @@ func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testin
 			t.Fatalf("edit prompt missing %q: %s", expected, images.request.Prompt)
 		}
 	}
-	if assets.createdRecord != nil {
-		t.Fatalf("generation must not create an asset record: %+v", assets.createdRecord)
-	}
 	application, updated := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
 	if updated.DirectionCount != 4 || updated.Prototype == nil || len(*updated.Prototype) != 4 {
 		t.Fatalf("unexpected edited prototype content: %+v", updated)
@@ -108,9 +104,6 @@ func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testin
 		if resource.URL == nil || *resource.URL != want {
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
-	}
-	if events[len(events)-1] == "create_record" {
-		t.Fatalf("generation must stop before asset persistence: %v", events)
 	}
 	if application.AssetID != 7 || application.Version != 2 || len(application.GeneratedResources) != 8 {
 		t.Fatalf("unexpected application candidate: %+v", application)
@@ -534,8 +527,7 @@ func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T
 
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 6,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          8,
 			Name:        "chest",
@@ -559,9 +551,6 @@ func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T
 	if err != nil {
 		t.Fatalf("edit object prototype: %v", err)
 	}
-	if assets.expectedVersion != 0 || assets.createdRecord != nil {
-		t.Fatalf("generation must not persist an asset record: %+v", assets)
-	}
 	if !reflect.DeepEqual(references.resolved, originalURLs) {
 		t.Fatalf("unexpected resolved references: got %v want %v", references.resolved, originalURLs)
 	}
@@ -582,9 +571,6 @@ func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T
 		if resource.URL == nil || *resource.URL != want {
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
-	}
-	if events[len(events)-1] == "create_record" {
-		t.Fatalf("generation must stop before asset persistence: %v", events)
 	}
 	if application.AssetID != 8 || application.Version != 5 || len(application.GeneratedResources) != 16 {
 		t.Fatalf("unexpected application candidate: %+v", application)

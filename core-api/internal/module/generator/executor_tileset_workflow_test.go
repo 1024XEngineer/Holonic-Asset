@@ -100,13 +100,10 @@ func TestTileSetWorkflowGeneratesEditsTileAndEditsCompleteItem(t *testing.T) {
 			t.Fatalf("complete Item edit changed non-target Item URL %q", path)
 		}
 	}
-	if len(assets.records) != 0 {
-		t.Fatalf("generation must not create revision history: %+v", assets.records)
-	}
 }
 
 func TestTileSetEditReturnsCandidateWithoutMutatingPersistedState(t *testing.T) {
-	assets := &tileSetWorkflowAssets{reviseErr: fmt.Errorf("revision unavailable")}
+	assets := &tileSetWorkflowAssets{}
 	existing := "uploads/existing.png"
 	content := assetdomain.AssetContent{Items: []assetdomain.TileSetItem{{
 		Name:  "Pot",
@@ -320,10 +317,8 @@ func (s *tileSetWorkflowReferences) DeleteObjects(_ context.Context, keys []stri
 }
 
 type tileSetWorkflowAssets struct {
-	asset     assetdomain.Asset
-	content   assetdomain.AssetContent
-	records   []assetdomain.AssetRecord
-	reviseErr error
+	asset   assetdomain.Asset
+	content assetdomain.AssetContent
 }
 
 func (s *tileSetWorkflowAssets) GetDetail(_ context.Context, id uint) (assetdomain.Asset, error) {
@@ -355,37 +350,6 @@ func (s *tileSetWorkflowAssets) CreateTileSetAsset(_ context.Context, value *ass
 	}
 	s.content = content
 	return s.asset.ID, nil
-}
-
-func (*tileSetWorkflowAssets) CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error) {
-	return 0, fmt.Errorf("unexpected animation creation")
-}
-
-func (*tileSetWorkflowAssets) UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error {
-	return fmt.Errorf("unexpected animation update")
-}
-
-func (s *tileSetWorkflowAssets) CreateRecord(
-	_ context.Context,
-	record *assetdomain.AssetRecord,
-	expectedVersion uint,
-) (*assetdomain.AssetRecord, error) {
-	if s.reviseErr != nil {
-		return nil, s.reviseErr
-	}
-	if expectedVersion != s.asset.Version {
-		return nil, fmt.Errorf("version conflict: expected %d current %d", expectedVersion, s.asset.Version)
-	}
-	content, err := (assetdomain.Asset{Type: assetdomain.AssetTypeTileSet, Content: record.Content}).DecodeContent()
-	if err != nil {
-		return nil, err
-	}
-	s.content = content
-	s.asset.Content = append(json.RawMessage(nil), record.Content...)
-	s.asset.Version++
-	created := assetdomain.AssetRecord{AssetID: s.asset.ID, Version: s.asset.Version, Content: append(json.RawMessage(nil), record.Content...)}
-	s.records = append(s.records, created)
-	return &created, nil
 }
 
 func assertTileSetWorkflowResult(t *testing.T, raw json.RawMessage, assetID uint, version uint) {

@@ -23,6 +23,7 @@ export {
 } from "./asset";
 export type {
   AddAudioTrackInput,
+  AnimationGenerationConfig,
   AssetAnimation,
   AssetPreviewCrop,
   AssetPreviewFrame,

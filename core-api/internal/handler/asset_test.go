@@ -348,15 +348,14 @@ func TestAssetHandlerRecordPersistsImageReferencesAsObjectKeys(t *testing.T) {
 	}
 }
 
-func TestAssetHandlerRecordPreservesAnimationGenerationMetadata(t *testing.T) {
+func TestAssetHandlerRecordDoesNotRestoreAnimationGenerationMetadata(t *testing.T) {
 	managerStub := &assetManagerStub{
 		asset: domain.Asset{
 			ID:   7,
 			Type: domain.AssetTypeCharacter,
 			Content: json.RawMessage(`{
 				"animations":[
-					{"id":2,"name":"idle","frames":[{"id":1,"url":"uploads/idle.png"}],"generation":{"direction":"front","frameCount":8}},
-					{"id":3,"name":"deleted","frames":[],"generation":{"direction":"back","frameCount":4}}
+					{"id":2,"name":"idle","frames":[{"id":1,"url":"uploads/idle.png"}],"generation":{"direction":"front","frameCount":8}}
 				]
 			}`),
 		},
@@ -384,9 +383,8 @@ func TestAssetHandlerRecordPreservesAnimationGenerationMetadata(t *testing.T) {
 		t.Fatalf("decode recorded content: %+v", managerStub.recordRequest)
 	}
 	if len(content.Animations) != 1 || content.Animations[0].ID != 2 ||
-		content.Animations[0].Name != "idle renamed" ||
-		string(content.Animations[0].Generation) != `{"direction":"front","frameCount":8}` {
-		t.Fatalf("generation metadata was not preserved: %s", managerStub.recordRequest.Content)
+		content.Animations[0].Name != "idle renamed" || len(content.Animations[0].Generation) != 0 {
+		t.Fatalf("recorded content differs from submitted content: %s", managerStub.recordRequest.Content)
 	}
 }
 
@@ -541,7 +539,7 @@ func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
 	}
 }
 
-func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing.T) {
+func TestAssetHandlerExposesAnimationGenerationWithoutReferenceResolver(t *testing.T) {
 	raw := json.RawMessage(`{
 		"animations":[{
 			"id":3,
@@ -571,8 +569,8 @@ func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing
 	if len(animations) != 1 {
 		t.Fatalf("unexpected response animations: %s", content["animations"])
 	}
-	if _, ok := animations[0]["generation"]; ok {
-		t.Fatalf("animation generation metadata leaked in response: %s", response.Data.Content)
+	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16,"columns":4,"frameWidth":256,"frameHeight":256,"fps":10,"resolution":"720p","duration":5,"aspectRatio":"1:1"}` {
+		t.Fatalf("animation generation metadata missing from response: %s", response.Data.Content)
 	}
 	if string(animations[0]["customAnimation"]) != `{"keep":true}` ||
 		string(animations[0]["futureValue"]) != "12345678901234567890" ||
@@ -602,7 +600,7 @@ func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing
 	}
 }
 
-func TestAssetHandlerRecordsHideAnimationGeneration(t *testing.T) {
+func TestAssetHandlerRecordsExposeAnimationGeneration(t *testing.T) {
 	raw := json.RawMessage(`{"animations":[{"id":3,"name":"walk","frames":[],"generation":{"direction":"front","frameCount":16}}]}`)
 	managerStub := &assetManagerStub{records: []domain.AssetRecord{{
 		ID: 15, AssetID: 7, Version: 1, ContentID: 21, Content: raw,
@@ -621,8 +619,8 @@ func TestAssetHandlerRecordsHideAnimationGeneration(t *testing.T) {
 	if err := json.Unmarshal(content["animations"], &animations); err != nil {
 		t.Fatalf("decode record response animations: %v", err)
 	}
-	if _, ok := animations[0]["generation"]; ok {
-		t.Fatalf("animation generation metadata leaked in record response: %s", response.Data.Records[0].Content)
+	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16}` {
+		t.Fatalf("animation generation metadata missing from record response: %s", response.Data.Records[0].Content)
 	}
 	if string(managerStub.records[0].Content) != string(raw) {
 		t.Fatalf("handler mutated persisted record content: %s", managerStub.records[0].Content)

@@ -616,9 +616,7 @@ export interface components {
         ResolveGenerationApplicationRequest: {
             applied: boolean;
         };
-        ResolveGenerationApplicationResponse: {
-            completed: boolean;
-        };
+        ResolveGenerationApplicationResponse: Record<string, never>;
         RollBackAssetRequest: {
             /** Format: int64 */
             assetId: number;

@@ -253,7 +253,7 @@ func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
 	)
-	if err != nil || !response.Data.Completed || stub.resolveID != 7 || !stub.resolved {
+	if err != nil || response.Code != dto.SuccessCode || stub.resolveID != 7 || !stub.resolved {
 		t.Fatalf("unexpected application response: %+v, stub=%+v, err=%v", response, stub, err)
 	}
 }

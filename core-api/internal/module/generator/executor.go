@@ -50,13 +50,6 @@ type AssetWriter interface {
 	CreateTileSetAsset(context.Context, *assetdomain.Asset) (uint, error)
 }
 
-// AnimationFrameUpdater is an optional asset capability used by edit_frames.
-// It is kept separate from AssetWriter so existing generation integrations do
-// not need to implement animation editing.
-type AnimationFrameUpdater interface {
-	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
-}
-
 type executor struct {
 	images     imageclient.ImageGenerationService
 	llm        llmclient.LLMService
