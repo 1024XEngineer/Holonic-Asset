@@ -34,5 +34,3 @@ export type CancelGenerationResponse =
   operations["cancelGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
 export type ResolveGenerationApplicationRequest =
   operations["resolveGenerationApplication"]["requestBody"]["content"]["application/json"];
-export type ResolveGenerationApplicationResponse =
-  operations["resolveGenerationApplication"]["responses"][200]["content"]["application/json"]["data"];

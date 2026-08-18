@@ -616,7 +616,6 @@ export interface components {
         ResolveGenerationApplicationRequest: {
             applied: boolean;
         };
-        ResolveGenerationApplicationResponse: Record<string, never>;
         RollBackAssetRequest: {
             /** Format: int64 */
             assetId: number;
@@ -788,16 +787,6 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["RecordAssetResponse"];
-            /** @constant */
-            message: "success";
-        };
-        SuccessResponseResolveGenerationApplicationResponse: {
-            /**
-             * Format: int64
-             * @enum {integer}
-             */
-            code: 200;
-            data: components["schemas"]["ResolveGenerationApplicationResponse"];
             /** @constant */
             message: "success";
         };
@@ -1348,14 +1337,12 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description No Content */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["SuccessResponseResolveGenerationApplicationResponse"];
-                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {

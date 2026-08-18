@@ -16,7 +16,7 @@ type GenerationRouter interface {
 	List(context.Context, dto.ListGenerationRunsRequest) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error)
 	Get(context.Context, dto.GetGenerationRequest) (dto.SuccessResponse[dto.GetGenerationResponse], error)
 	Cancel(context.Context, dto.CancelGenerationRequest) (dto.SuccessResponse[dto.CancelGenerationResponse], error)
-	ResolveApplication(context.Context, dto.ResolveGenerationApplicationRequest) (dto.SuccessResponse[dto.ResolveGenerationApplicationResponse], error)
+	ResolveApplication(context.Context, dto.ResolveGenerationApplicationRequest) error
 }
 
 type createGenerationInput struct {
@@ -74,10 +74,6 @@ type cancelGenerationOutput struct {
 type resolveGenerationApplicationInput struct {
 	RunID generator.RunID `path:"run_id" minimum:"1"`
 	Body  dto.ResolveGenerationApplicationRequest
-}
-
-type resolveGenerationApplicationOutput struct {
-	Body dto.SuccessResponse[dto.ResolveGenerationApplicationResponse]
 }
 
 // RegisterGenerationRoutes exposes task-backed generation use cases. AI Service
@@ -147,10 +143,9 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 		Summary:     "Apply or discard a generation result",
 		Tags:        []string{"Generation"},
 		Errors:      []int{http.StatusBadRequest, http.StatusConflict},
-	}, func(ctx context.Context, input *resolveGenerationApplicationInput) (*resolveGenerationApplicationOutput, error) {
+	}, func(ctx context.Context, input *resolveGenerationApplicationInput) (*struct{}, error) {
 		request := input.Body
 		request.GenerationRunID = input.RunID
-		response, err := r.ResolveApplication(ctx, request)
-		return &resolveGenerationApplicationOutput{Body: response}, openAPIError(err)
+		return nil, openAPIError(r.ResolveApplication(ctx, request))
 	})
 }

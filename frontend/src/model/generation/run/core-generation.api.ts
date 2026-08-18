@@ -5,9 +5,12 @@ import type {
   GenerationRunResponse,
   ListGenerationRunsQuery,
   ListGenerationRunsResponse,
-  ResolveGenerationApplicationResponse,
 } from "./generation.contract";
-import { coreApiClient, unwrapApiResponse } from "@/model/fetchers";
+import {
+  coreApiClient,
+  ensureApiResponseSuccess,
+  unwrapApiResponse,
+} from "@/model/fetchers";
 
 export const coreGenerationApi = {
   create: async (projectID: number, request: CreateGenerationRequest) =>
@@ -36,7 +39,7 @@ export const coreGenerationApi = {
       }),
     ),
   resolveApplication: async (runID: number, applied: boolean) =>
-    unwrapApiResponse<ResolveGenerationApplicationResponse>(
+    ensureApiResponseSuccess(
       await coreApiClient.POST("/generation-runs/{run_id}/application", {
         params: { path: { run_id: runID } },
         body: { applied },

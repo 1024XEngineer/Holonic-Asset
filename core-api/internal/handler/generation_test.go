@@ -249,19 +249,19 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 
 func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 	stub := &runManagerStub{}
-	response, err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
 	)
-	if err != nil || response.Code != dto.SuccessCode || stub.resolveID != 7 || !stub.resolved {
-		t.Fatalf("unexpected application response: %+v, stub=%+v, err=%v", response, stub, err)
+	if err != nil || stub.resolveID != 7 || !stub.resolved {
+		t.Fatalf("unexpected application result: stub=%+v, err=%v", stub, err)
 	}
 }
 
 func TestResolveApplicationReturnsManagerError(t *testing.T) {
 	wantErr := errors.New("transition failed")
 	stub := &runManagerStub{resolveErr: wantErr}
-	_, err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7},
 	)

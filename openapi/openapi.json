@@ -928,10 +928,6 @@
         ],
         "type": "object"
       },
-      "ResolveGenerationApplicationResponse": {
-        "additionalProperties": false,
-        "type": "object"
-      },
       "RollBackAssetRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1365,31 +1361,6 @@
           },
           "data": {
             "$ref": "#/components/schemas/RecordAssetResponse"
-          },
-          "message": {
-            "const": "success",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "data"
-        ],
-        "type": "object"
-      },
-      "SuccessResponseResolveGenerationApplicationResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "enum": [
-              200
-            ],
-            "format": "int64",
-            "type": "integer"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ResolveGenerationApplicationResponse"
           },
           "message": {
             "const": "success",
@@ -2304,15 +2275,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponseResolveGenerationApplicationResponse"
-                }
-              }
-            },
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           },
           "400": {
             "content": {

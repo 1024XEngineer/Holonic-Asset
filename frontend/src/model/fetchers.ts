@@ -87,7 +87,7 @@ function createCoreApiClient(config: CoreApiConfig, middleware?: Middleware) {
   return client;
 }
 
-export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
+export function ensureApiResponseSuccess({ error, response }: ApiResult) {
   if (!response.ok) {
     throw new DataApiError(
       dataApiErrorCodeForStatus(response.status),
@@ -95,6 +95,11 @@ export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
       error,
     );
   }
+}
+
+export function unwrapApiResponse<T>(result: ApiResult): T {
+  ensureApiResponseSuccess(result);
+  const { data } = result;
 
   if (!isApiResponse(data)) {
     throw new DataApiError("UNKNOWN", "Invalid API response.", data);

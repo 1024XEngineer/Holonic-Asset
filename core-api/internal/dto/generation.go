@@ -75,5 +75,3 @@ type ResolveGenerationApplicationRequest struct {
 	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
 	Applied         bool            `json:"applied"`
 }
-
-type ResolveGenerationApplicationResponse struct{}
