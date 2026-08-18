@@ -2,10 +2,13 @@ package dao
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func TestAssetListLoadsStoredThumbnailWithoutJoiningContent(t *testing.T) {
@@ -79,4 +82,121 @@ func TestAssetDaoUpdateCurrentContentReportsMissingAsset(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet database expectations: %v", err)
 	}
+}
+
+func TestAssetDaoUpdateAssetEncodesTagsAsJSON(t *testing.T) {
+	tests := []struct {
+		name       string
+		tags       []string
+		storedTags string
+	}{
+		{
+			name:       "one tag",
+			tags:       []string{"pixel-art"},
+			storedTags: `["pixel-art"]`,
+		},
+		{
+			name:       "multiple tags",
+			tags:       []string{"object", "pixel-art"},
+			storedTags: `["object","pixel-art"]`,
+		},
+		{
+			name:       "legacy scalar is readable",
+			tags:       []string{"pixel-art"},
+			storedTags: `pixel-art`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock := newMockAssetDatabase(t)
+			mock.ExpectBegin()
+			mock.ExpectExec(regexp.QuoteMeta(`UPDATE "assets" SET "tags"=$1 WHERE id = $2`)).
+				WithArgs(encodeTestTags(t, tt.tags), uint(32)).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+			mock.ExpectQuery(
+				regexp.QuoteMeta(`SELECT `)+`.+`+
+					regexp.QuoteMeta(` FROM "assets" WHERE "assets"."id" = $1 ORDER BY "assets"."id" LIMIT $2`),
+			).
+				WithArgs(uint(32), 1).
+				WillReturnRows(sqlmock.NewRows([]string{
+					"id", "name", "project_id", "type", "description", "tags",
+					"perspective", "dimensions", "content_id", "version",
+				}).AddRow(
+					32, "槟榔树苗", 1, "object", "槟榔，棕榈科的常绿乔木", tt.storedTags,
+					"Top-Down", `{"width":48,"height":48}`, nil, 1,
+				))
+
+			got, err := (&AssetDaoImpl{DB: db}).UpdateAsset(context.Background(), 32, &AssetUpdate{Tags: &tt.tags})
+			if err != nil {
+				t.Fatalf("update asset: %v", err)
+			}
+			if len(got.Tags) != len(tt.tags) {
+				t.Fatalf("unexpected tags: %#v, want %#v", got.Tags, tt.tags)
+			}
+			for index := range tt.tags {
+				if got.Tags[index] != tt.tags[index] {
+					t.Fatalf("unexpected tags: %#v, want %#v", got.Tags, tt.tags)
+				}
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}
+
+func TestDecodeAssetTagsAcceptsJSONArraysAndLegacyScalars(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  []string
+	}{
+		{name: "array", input: `["object","pixel-art"]`, want: []string{"object", "pixel-art"}},
+		{name: "json scalar", input: `"pixel-art"`, want: []string{"pixel-art"}},
+		{name: "plain text", input: "pixel-art", want: []string{"pixel-art"}},
+		{name: "null", input: "null", want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decodeAssetTags(tt.input)
+			if err != nil {
+				t.Fatalf("decode tags: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("unexpected tags: %#v, want %#v", got, tt.want)
+			}
+			for index := range got {
+				if got[index] != tt.want[index] {
+					t.Fatalf("unexpected tags: %#v, want %#v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func encodeTestTags(t *testing.T, tags []string) string {
+	t.Helper()
+	encoded, err := json.Marshal(tags)
+	if err != nil {
+		t.Fatalf("encode tags: %v", err)
+	}
+	return string(encoded)
+}
+
+func newMockAssetDatabase(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
+	t.Helper()
+
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create SQL mock: %v", err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open GORM database: %v", err)
+	}
+	return db, mock
 }
