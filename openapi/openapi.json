@@ -2454,14 +2454,7 @@
                 }
               }
             },
-            "description": "OK",
-            "headers": {
-              "Server-Timing": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
+            "description": "OK"
           },
           "400": {
             "content": {
@@ -2540,14 +2533,7 @@
                 }
               }
             },
-            "description": "OK",
-            "headers": {
-              "Server-Timing": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
+            "description": "OK"
           },
           "400": {
             "content": {
@@ -2801,14 +2787,7 @@
                 }
               }
             },
-            "description": "OK",
-            "headers": {
-              "Server-Timing": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
+            "description": "OK"
           },
           "400": {
             "content": {

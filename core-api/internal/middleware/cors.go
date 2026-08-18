@@ -11,8 +11,7 @@ func CORS(allowedOrigins ...string) echo.MiddlewareFunc {
 		allowedOrigins = []string{"*"}
 	}
 	return echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins:  allowedOrigins,
-		AllowHeaders:  []string{echo.HeaderContentType, echo.HeaderAuthorization},
-		ExposeHeaders: []string{"Server-Timing"},
+		AllowOrigins: allowedOrigins,
+		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAuthorization},
 	})
 }

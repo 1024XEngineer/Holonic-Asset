@@ -8,13 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
-	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
 
 type referencePersister interface {
@@ -46,18 +44,15 @@ func (h *Handler) GetAssets(
 		return dto.SuccessResponse[dto.GetAssetsResponse]{}, echo.ErrBadRequest
 	}
 
-	storeStarted := time.Now()
 	assets, err := h.AssetManager.GetAssets(x, projectID, domain.AssetListFilter{
 		Query: request.Query,
 		Tags:  request.Tags,
 		Types: request.Types,
 	})
-	telemetry.RecordRequestTiming(x, "store", time.Since(storeStarted))
 	if err != nil {
 		return dto.SuccessResponse[dto.GetAssetsResponse]{}, err
 	}
 
-	previewStarted := time.Now()
 	items := make([]dto.AssetListItemResponse, len(assets))
 	for index, asset := range assets {
 		prototypeURLs, _ := h.resolvePrototypeURLs(x, asset)
@@ -74,8 +69,6 @@ func (h *Handler) GetAssets(
 			Version:       asset.Version,
 		}
 	}
-	telemetry.RecordRequestTiming(x, "preview", time.Since(previewStarted))
-
 	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
 }
 

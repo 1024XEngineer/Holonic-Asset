@@ -1447,7 +1447,6 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
-                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1506,7 +1505,6 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
-                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1671,7 +1669,6 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
-                    "Server-Timing"?: string;
                     [name: string]: unknown;
                 };
                 content: {

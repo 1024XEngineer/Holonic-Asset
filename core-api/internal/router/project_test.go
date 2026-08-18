@@ -41,24 +41,6 @@ func (s *projectRouterStub) GetDetail(
 	return dto.NewTypedSuccessResponse(dto.ProjectDetailResponse{}), nil
 }
 
-func TestProjectBootstrapRoutesExposeServerTiming(t *testing.T) {
-	e := router.Register(nil, &projectRouterStub{}, nil, nil)
-	for _, path := range []string{
-		"/api/v1/project/list?userID=7",
-		"/api/v1/project/detail?projectID=7",
-	} {
-		recorder := httptest.NewRecorder()
-		e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
-
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("expected status %d for %s, got %d", http.StatusOK, path, recorder.Code)
-		}
-		if timing := recorder.Header().Get("Server-Timing"); !strings.HasPrefix(timing, "app;dur=") {
-			t.Fatalf("expected server timing for %s, got %q", path, timing)
-		}
-	}
-}
-
 func (s *projectRouterStub) Create(
 	_ context.Context,
 	request dto.CreateProjectRequest,

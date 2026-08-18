@@ -1,27 +1,10 @@
 package router
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/middleware"
-	"github.com/1024XEngineer/Holonic-Asset/internal/telemetry"
 )
-
-func serverTimingSince(start time.Time, timing *telemetry.RequestTiming) string {
-	metrics := []string{formatServerTiming("app", time.Since(start))}
-	for _, metric := range timing.Metrics() {
-		metrics = append(metrics, formatServerTiming(metric.Name, metric.Duration))
-	}
-	return strings.Join(metrics, ", ")
-}
-
-func formatServerTiming(name string, duration time.Duration) string {
-	return fmt.Sprintf("%s;dur=%.2f", name, float64(duration.Microseconds())/1000)
-}
 
 type Authentication struct {
 	Router         AuthRouter
