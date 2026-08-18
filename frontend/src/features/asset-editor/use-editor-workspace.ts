@@ -11,8 +11,10 @@ import {
   useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
   type GenerateAnimationRequest,
+  type GenerationTaskType,
 } from "@/model";
 
+import type { AnimatedSpriteCanvasReview } from "./Canvas/AnimatedSpriteCanvas";
 import type { SpriteEditorModeProps } from "./EditorModes/sprite-editor-mode.types";
 import type { EditorGenerationTask } from "./Header/editor-header";
 import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
@@ -153,8 +155,19 @@ export function useEditorWorkspace({
     return null;
   }
 
-  const displayRecord = candidateRecord ?? snapshot.record;
+  const reviewKind = candidateQuery.data?.kind;
+  const displayRecord =
+    reviewKind === "generate_animation" && candidateRecord
+      ? candidateRecord
+      : snapshot.record;
   const sprite = getSpriteRecordData(displayRecord);
+  const generationReview = buildGenerationReview({
+    taskKind: reviewKind,
+    currentRecord: snapshot.record,
+    candidateRecord,
+    animationId: candidateQuery.data?.result?.animation_id,
+    isResolving: applicationMutation.isPending,
+  });
   const assetKind = snapshot.record.mode;
 
   const generateAnimation = async (request: GenerateAnimationRequest) => {
@@ -241,17 +254,10 @@ export function useEditorWorkspace({
       onRedo: () => session.dispatch({ type: "history.redo" }),
       onSave: () => void save(),
     },
-    ...(reviewRun
+    ...(reviewRun && generationReview
       ? {
           generationReview: {
-            name: reviewRun.name,
-            prompt: reviewRun.prompt,
-            pendingCount: awaitingRuns.length,
-            isLoading: candidateQuery.isPending,
-            isUnavailable:
-              candidateQuery.isError ||
-              (!candidateQuery.isPending && candidateRecord === null),
-            isResolving: applicationMutation.isPending,
+            ...generationReview,
             onApply: () => void resolveApplication(reviewRun.id, true),
             onDeny: () => void resolveApplication(reviewRun.id, false),
           },
@@ -298,4 +304,87 @@ function getSpriteRecordData(record: AssetWorkspaceData["record"]) {
   if (record.mode === "character") return record.character;
   if (record.mode === "object") return record.object;
   throw new Error("Sprite editor requires a Character or Object asset.");
+}
+
+function buildGenerationReview({
+  taskKind,
+  currentRecord,
+  candidateRecord,
+  animationId,
+  isResolving,
+}: {
+  taskKind: GenerationTaskType | undefined;
+  currentRecord: AssetWorkspaceData["record"];
+  candidateRecord: AssetWorkspaceData["record"] | null;
+  animationId?: number;
+  isResolving: boolean;
+}): AnimatedSpriteCanvasReview | undefined {
+  if (!taskKind || !candidateRecord) return undefined;
+  const current = getSpriteRecordData(currentRecord);
+  const candidate = getSpriteRecordData(candidateRecord);
+
+  if (taskKind === "generate_animation") {
+    const animation = findCandidateAnimation(
+      current.animations ?? [],
+      candidate.animations ?? [],
+      animationId,
+    );
+    return animation
+      ? {
+          kind: "new-animation",
+          nodeId: animation.id,
+          isResolving,
+        }
+      : undefined;
+  }
+
+  if (
+    taskKind === "edit_character_prototype" ||
+    taskKind === "edit_object_prototype"
+  ) {
+    return {
+      kind: "comparison",
+      nodeId: "prototype",
+      candidatePrototype: candidate.prototype,
+      isResolving,
+    };
+  }
+
+  if (
+    taskKind === "edit_animation" ||
+    taskKind === "edit_character_frames" ||
+    taskKind === "edit_object_frames"
+  ) {
+    const animation = findCandidateAnimation(
+      current.animations ?? [],
+      candidate.animations ?? [],
+      animationId,
+    );
+    return animation
+      ? {
+          kind: "comparison",
+          nodeId: animation.id,
+          candidateAnimation: animation,
+          isResolving,
+        }
+      : undefined;
+  }
+  return undefined;
+}
+
+function findCandidateAnimation(
+  current: ReturnType<typeof getSpriteRecordData>["animations"],
+  candidate: ReturnType<typeof getSpriteRecordData>["animations"],
+  animationId?: number,
+) {
+  const targetId = animationId === undefined ? undefined : String(animationId);
+  return (
+    candidate?.find((animation) => animation.id === targetId) ??
+    candidate?.find(
+      (animation) =>
+        !current?.some(
+          (currentAnimation) => currentAnimation.id === animation.id,
+        ),
+    )
+  );
 }

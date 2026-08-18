@@ -65,6 +65,10 @@ export class AnimatedSpriteStageInteraction {
     const hit = this.hitTest(point);
     if (hit?.kind === "play") return this.togglePlaying(hit.node);
     if (hit?.kind === "expand") return this.toggleExpanded(hit.node);
+    if (hit?.kind === "review-apply")
+      return this.context.actions.onReviewResolve(true);
+    if (hit?.kind === "review-deny")
+      return this.context.actions.onReviewResolve(false);
     if (hit?.kind === "frame")
       return this.context.actions.onSelectFrame(hit.node, hit.index);
     this.capture(event);
@@ -134,6 +138,7 @@ export class AnimatedSpriteStageInteraction {
       point,
       this.context.getPrototype(),
       this.context.getAnimations(),
+      this.context.getReview(),
     );
   }
 
@@ -172,6 +177,7 @@ export class AnimatedSpriteStageInteraction {
             scene.expanded.has(node),
             this.context.getPrototype(),
             this.context.getAnimations(),
+            this.context.getReview(),
           ),
         ),
     );

@@ -32,6 +32,14 @@ vi.mock("pixi.js", () => {
       return this;
     }
 
+    moveTo() {
+      return this;
+    }
+
+    lineTo() {
+      return this;
+    }
+
     fill() {
       return this;
     }
@@ -146,6 +154,41 @@ describe("prototype frame rendering", () => {
         frame: 0,
         spriteSheet: animation.spriteSheet,
       }),
+    );
+  });
+
+  it("renders both prototype versions inside a comparison node", () => {
+    const candidate = {
+      ...prototype,
+      imageUrl: "candidate-front.png",
+      frameUrls: ["candidate-front.png", "candidate-back.png"],
+    };
+
+    vi.mocked(drawSpriteSheetFrame).mockClear();
+    drawAnimatedSpriteNode({
+      node: "prototype",
+      frameTextures: {} as never,
+      position: { x: 0, y: 0 },
+      selected: false,
+      selectedFrames: [],
+      expanded: false,
+      playing: false,
+      previewFrame: 0,
+      animations: [],
+      prototype,
+      review: {
+        kind: "comparison",
+        nodeId: "prototype",
+        candidatePrototype: candidate,
+        isResolving: false,
+      },
+    });
+
+    expect(drawSpriteSheetFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ spriteSheet: prototype }),
+    );
+    expect(drawSpriteSheetFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ spriteSheet: candidate }),
     );
   });
 });

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AssetRecord, AssetWorkspaceData } from "@/model";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  GenerationTaskType,
+} from "@/model";
 
 import type { EditorGenerationTask } from "./Header/editor-header";
 
@@ -17,7 +21,8 @@ const mocks = vi.hoisted(() => ({
   candidateQuery: {
     data: undefined as
       | {
-          result?: { content?: unknown };
+          kind: GenerationTaskType;
+          result?: { animation_id?: number; content?: unknown };
           status: string;
         }
       | undefined,
@@ -278,6 +283,7 @@ describe("useEditorWorkspace", () => {
       },
     ];
     mocks.candidateQuery.data = {
+      kind: "edit_character_prototype",
       status: "awaiting_application",
       result: {
         content: {
@@ -297,7 +303,12 @@ describe("useEditorWorkspace", () => {
     });
 
     expect(editor?.header.generationTasks).toEqual([]);
-    expect(editor?.sprite.prototype.imageUrl).toBe("/candidate-front.png");
+    expect(editor?.sprite.prototype.imageUrl).toBe("/sprite.png");
+    expect(editor?.generationReview).toMatchObject({
+      kind: "comparison",
+      nodeId: "prototype",
+      candidatePrototype: { imageUrl: "/candidate-front.png" },
+    });
     editor?.generationReview?.onApply();
     editor?.generationReview?.onDeny();
     await flushPromises();
@@ -316,6 +327,47 @@ describe("useEditorWorkspace", () => {
     });
   });
 
+  it("shows a new animation as a reviewable canvas node", () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Walk",
+        prompt: "A relaxed walk",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "generate_animation",
+      status: "awaiting_application",
+      result: {
+        animation_id: 7,
+        content: {
+          animations: [
+            {
+              id: 7,
+              name: "Walk",
+              frames: [{ id: 1, url: "/walk-1.png" }],
+            },
+          ],
+        },
+      },
+    };
+    mocks.stateValues.push(null, null, null);
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.sprite.animations).toEqual([
+      expect.objectContaining({ id: "7", label: "Walk" }),
+    ]);
+    expect(editor?.generationReview).toMatchObject({
+      kind: "new-animation",
+      nodeId: "7",
+    });
+  });
+
   it("handles a generation application failure", async () => {
     mocks.generationRuns = [
       {
@@ -328,6 +380,15 @@ describe("useEditorWorkspace", () => {
     mocks.applicationMutation.mutateAsync.mockRejectedValue(
       new Error("application failed"),
     );
+    mocks.candidateQuery.data = {
+      kind: "edit_character_prototype",
+      status: "awaiting_application",
+      result: {
+        content: {
+          prototype: [{ id: 1, url: "/candidate-front.png" }],
+        },
+      },
+    };
     mocks.stateValues.push(null, null, null);
     const editor = useEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),

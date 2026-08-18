@@ -8,7 +8,6 @@ import {
   type AnimatedSpriteNodeId,
 } from "../Canvas/AnimatedSpriteCanvas";
 import { EditorHeader } from "../Header/editor-header";
-import { GenerationReviewBar } from "../GenerationReview/generation-review-bar";
 import { Inspector } from "../Inspector/inspector";
 import type { SpriteEditorModeProps } from "./sprite-editor-mode.types";
 
@@ -53,7 +52,12 @@ export function SpriteEditorMode({
   };
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
     if (event.type === "selection.changed") setSelection(event.selection);
-    else sprite.onPositionChange(event.nodeId, event.position);
+    else if (event.type === "node-position.committed")
+      sprite.onPositionChange(event.nodeId, event.position);
+    else if (event.type === "generation-review.resolved") {
+      if (event.applied) generationReview?.onApply();
+      else generationReview?.onDeny();
+    }
   };
   const clearInspectorSelection = () => {
     setSelection({ nodeIds: [], frames: [] });
@@ -75,20 +79,16 @@ export function SpriteEditorMode({
           onDeleteAnimation={tree.onAnimationDelete}
           isGeneratingAnimation={tree.isGeneratingAnimation}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <AnimatedSpriteCanvas
-            model={{
-              prototype: sprite.prototype,
-              animations,
-              nodePositions: sprite.nodePositions,
-              selection,
-            }}
-            onEvent={handleCanvasEvent}
-          />
-          {generationReview ? (
-            <GenerationReviewBar review={generationReview} />
-          ) : null}
-        </div>
+        <AnimatedSpriteCanvas
+          model={{
+            prototype: sprite.prototype,
+            animations,
+            nodePositions: sprite.nodePositions,
+            selection,
+            ...(generationReview ? { review: generationReview } : {}),
+          }}
+          onEvent={handleCanvasEvent}
+        />
         <Inspector
           {...inspector}
           selectedNodes={selection.nodeIds}
