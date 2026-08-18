@@ -32,7 +32,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "lcov"],
-      include: ["src/lib/**/*.ts", "src/model/**/*.ts", "src/features/**/*.ts"],
+      include: [
+        "src/config/**/*.ts",
+        "src/lib/**/*.ts",
+        "src/model/**/*.ts",
+        "src/features/**/*.ts",
+      ],
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/**/index.ts",
