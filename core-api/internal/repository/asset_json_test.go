@@ -220,6 +220,7 @@ func TestAssetRepositoryUpdatesAnimationFrames(t *testing.T) {
 	generation := &domain.AnimationGenerationConfig{
 		Direction:   "back_right",
 		Style:       "painted pixel art",
+		Action:      "raise the hat in greeting",
 		FrameCount:  8,
 		Columns:     4,
 		FrameWidth:  128,
@@ -328,6 +329,7 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	generation := &domain.AnimationGenerationConfig{
 		Direction:   "front",
 		Style:       "painted pixel art",
+		Action:      "walking cycle",
 		FrameCount:  8,
 		Columns:     4,
 		FrameWidth:  128,

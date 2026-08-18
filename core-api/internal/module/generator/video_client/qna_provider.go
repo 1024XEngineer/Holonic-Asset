@@ -131,7 +131,7 @@ func (p *QNAProvider) Generate(
 		return nil, p.error(ErrorKindAuthentication, 0, false, "API key is empty", nil)
 	}
 	prompt := limitCharacters(request.Prompt, maxQNAPromptCharacters)
-	if prompt == "" || strings.TrimSpace(request.ReferenceImageURL) == "" {
+	if prompt == "" || strings.TrimSpace(request.StartImageURL) == "" {
 		return nil, p.error(
 			ErrorKindInvalidRequest,
 			0,
@@ -145,14 +145,16 @@ func (p *QNAProvider) Generate(
 		return nil, err
 	}
 
-	payload, err := json.Marshal(qnaVideoRequest{
+	payloadRequest := qnaVideoRequest{
 		Prompt:        prompt,
-		ImageURL:      request.ReferenceImageURL,
+		ImageURL:      strings.TrimSpace(request.StartImageURL),
+		EndImageURL:   strings.TrimSpace(request.EndImageURL),
 		Resolution:    firstNonEmpty(request.Resolution, p.resolution),
 		Duration:      fmt.Sprintf("%d", validDuration(request.Duration, p.duration)),
 		AspectRatio:   firstNonEmpty(request.AspectRatio, p.aspectRatio),
 		GenerateAudio: request.GenerateAudio,
-	})
+	}
+	payload, err := json.Marshal(payloadRequest)
 	if err != nil {
 		return nil, p.error(ErrorKindInvalidRequest, 0, false, "encode video request", err)
 	}
@@ -586,6 +588,7 @@ func sleepWithContext(ctx context.Context, duration time.Duration) error {
 type qnaVideoRequest struct {
 	Prompt        string `json:"prompt"`
 	ImageURL      string `json:"image_url"`
+	EndImageURL   string `json:"end_image_url,omitempty"`
 	Resolution    string `json:"resolution,omitempty"`
 	Duration      string `json:"duration,omitempty"`
 	AspectRatio   string `json:"aspect_ratio,omitempty"`

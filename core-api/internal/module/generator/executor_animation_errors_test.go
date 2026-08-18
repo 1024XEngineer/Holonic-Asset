@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -89,6 +90,35 @@ func TestNormalizeAnimationGenerationRequestRejectsInvalidOptions(t *testing.T) 
 	}
 }
 
+func TestNormalizeAnimationGenerationRequestValidatesTargetFrameIndices(t *testing.T) {
+	base := AnimationGenerationRequest{
+		ReferenceImage: "reference", ReferenceImageContext: true, FrameCount: 4,
+		Columns: 2, FrameWidth: 64, FrameHeight: 64, FPS: 10, Duration: 5,
+	}
+	tests := []struct {
+		name    string
+		targets []int
+		context bool
+		want    string
+	}{
+		{name: "outside context", targets: []int{4}, context: true, want: "outside the 4-frame context"},
+		{name: "unordered", targets: []int{2, 1}, context: true, want: "unique and ordered"},
+		{name: "duplicate", targets: []int{1, 1}, context: true, want: "unique and ordered"},
+		{name: "without context", targets: []int{1}, context: false, want: "require an animation context reference"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := base
+			request.ReferenceImageContext = test.context
+			request.TargetFrameIndices = test.targets
+			_, err := normalizeAnimationGenerationRequest(&request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
 func TestLoadAnimationReferenceRejectsResolverFailures(t *testing.T) {
 	wantErr := errors.New("resolve failed")
 	service := &animationGenerationService{referenceResolver: &animationReferenceResolverStub{err: wantErr}}
@@ -146,6 +176,70 @@ func TestProcessAnimationVideoRejectsInvalidProcessorResults(t *testing.T) {
 	}
 }
 
+func TestSelectEditFrameContextIndicesSamplesOrderedFullSegment(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: make([]videoprocessor.FrameObservation, 10),
+	}
+	for index := range analysis.Frames {
+		analysis.Frames[index].Safe = true
+	}
+	indices, err := selectEditFrameContextIndices(analysis, 4)
+	if err != nil {
+		t.Fatalf("select context indices: %v", err)
+	}
+	want := []int{0, 3, 6, 9}
+	if !reflect.DeepEqual(indices, want) {
+		t.Fatalf("indices = %v, want %v", indices, want)
+	}
+}
+
+func TestSelectEditFrameContextIndicesSkipsUnsafeBoundaryFrames(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{
+			{Safe: false}, {Safe: true}, {Safe: true}, {Safe: true}, {Safe: true},
+		},
+	}
+	indices, err := selectEditFrameContextIndices(analysis, 3)
+	if err != nil {
+		t.Fatalf("select context indices: %v", err)
+	}
+	want := []int{1, 3, 4}
+	if !reflect.DeepEqual(indices, want) {
+		t.Fatalf("indices = %v, want %v", indices, want)
+	}
+}
+
+func TestSelectEditFrameContextIndicesRejectsUnsafeFrame(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{{Safe: true}, {Safe: false}, {Safe: true}},
+	}
+	_, err := selectEditFrameContextIndices(analysis, 3)
+	var qualityError *videoprocessor.QualityError
+	if !errors.As(err, &qualityError) || qualityError.Kind != "framing" {
+		t.Fatalf("expected framing quality error, got %v", err)
+	}
+}
+
+func TestSelectEditFrameContextIndicesRejectsSplitSafeRuns(t *testing.T) {
+	analysis := videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{
+			{Safe: true}, {Safe: true}, {Safe: true},
+			{Safe: false},
+			{Safe: true}, {Safe: true}, {Safe: true},
+		},
+	}
+	_, err := selectEditFrameContextIndices(analysis, 4)
+	var qualityError *videoprocessor.QualityError
+	if !errors.As(err, &qualityError) || qualityError.Kind != "framing" ||
+		!strings.Contains(err.Error(), "continuous safe interval") {
+		t.Fatalf("expected split safe runs to be rejected, got %v", err)
+	}
+}
+
 func TestPackAnimationVideoFramesValidatesGridInputs(t *testing.T) {
 	frame := image.NewNRGBA(image.Rect(0, 0, 8, 8))
 	if _, err := packAnimationVideoFrames([]image.Image{frame}, 0); err == nil {
@@ -153,5 +247,83 @@ func TestPackAnimationVideoFramesValidatesGridInputs(t *testing.T) {
 	}
 	if _, err := packAnimationVideoFrames([]image.Image{image.NewNRGBA(image.Rectangle{})}, 1); err == nil {
 		t.Fatal("expected empty frame dimensions to be rejected")
+	}
+}
+
+func TestProcessAnimationVideoUsesOrderedContextSelection(t *testing.T) {
+	frames := animationTestVideoFrames(5)
+	processor := &animationProcessorStub{splitResult: &imageprocessor.SplitImageResult{
+		ImageBase64: "sheet", MIMEType: "image/png",
+		Regions: []imageprocessor.ImageRegion{
+			{Index: 0, ImageBase64: "frame-1"},
+			{Index: 1, ImageBase64: "frame-2"},
+			{Index: 2, ImageBase64: "frame-3"},
+		},
+	}}
+	videoProcessor := &animationVideoProcessorStub{}
+	videoProcessor.results = []*videoprocessor.Result{{Frames: frames[1:4]}}
+	service := &animationGenerationService{processor: processor, videoProcessor: videoProcessor}
+
+	// The real processor invokes Select before returning the selected images. The
+	// stub records the callback, so invoke it with a sequence containing unsafe
+	// boundary samples to exercise the edit-context selector and loop metadata.
+	videoProcessor.results = nil
+	videoProcessor.errors = []error{errors.New("capture options")}
+	_, _ = service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
+		ReferenceImageContext: true, FrameCount: 3, Columns: 3, FrameWidth: 32, FrameHeight: 32,
+	})
+	if len(videoProcessor.options) != 1 || videoProcessor.options[0].Select == nil {
+		t.Fatalf("context selection callback was not configured: %+v", videoProcessor.options)
+	}
+	indices, err := videoProcessor.options[0].Select(videoprocessor.FrameSequenceAnalysis{
+		FPS: 12, ForegroundRatio: .25,
+		Frames: []videoprocessor.FrameObservation{{Safe: false}, {Safe: true}, {Safe: true}, {Safe: true}, {Safe: false}},
+	})
+	if err != nil {
+		t.Fatalf("select ordered context: %v", err)
+	}
+	if !reflect.DeepEqual(indices, []int{1, 2, 3}) {
+		t.Fatalf("context indices = %v, want [1 2 3]", indices)
+	}
+}
+
+func TestSelectEditFrameContextIndicesValidatesSequence(t *testing.T) {
+	tests := []struct {
+		name       string
+		analysis   videoprocessor.FrameSequenceAnalysis
+		frameCount int
+		want       string
+		kind       string
+	}{
+		{name: "non-positive count", frameCount: 0, want: "must be positive"},
+		{name: "foreground", frameCount: 1, analysis: videoprocessor.FrameSequenceAnalysis{ForegroundRatio: 0.001, Frames: []videoprocessor.FrameObservation{{Safe: true}}}, want: "chroma-key separation failed", kind: "foreground"},
+		{name: "too few candidates", frameCount: 2, analysis: videoprocessor.FrameSequenceAnalysis{ForegroundRatio: .25, Frames: []videoprocessor.FrameObservation{{Safe: true}}}, want: "need at least 2"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := selectEditFrameContextIndices(test.analysis, test.frameCount)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+			if test.kind != "" {
+				var qualityError *videoprocessor.QualityError
+				if !errors.As(err, &qualityError) || qualityError.Kind != test.kind {
+					t.Fatalf("expected %s quality error, got %v", test.kind, err)
+				}
+			}
+		})
+	}
+}
+
+func TestSelectEditFrameContextIndicesUsesMiddleSafeFrameForSingleTarget(t *testing.T) {
+	indices, err := selectEditFrameContextIndices(videoprocessor.FrameSequenceAnalysis{
+		ForegroundRatio: .25,
+		Frames:          []videoprocessor.FrameObservation{{Safe: false}, {Safe: true}, {Safe: true}, {Safe: true}, {Safe: false}},
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(indices, []int{2}) {
+		t.Fatalf("single target indices = %v, want [2]", indices)
 	}
 }

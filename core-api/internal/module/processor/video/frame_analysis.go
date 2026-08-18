@@ -1,6 +1,7 @@
 package video
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -25,6 +26,14 @@ type FrameSequenceAnalysis struct {
 	ForegroundRatio float64
 }
 
+// FramePairDifference measures how much a candidate frame differs from the
+// corresponding original frame while ignoring the configured chroma-key
+// background.
+type FramePairDifference struct {
+	AppearanceMSE            float64
+	ForegroundMaskDifference float64
+}
+
 type frameDescriptor struct {
 	mask       [analysisSize * analysisSize]bool
 	gray       [analysisSize * analysisSize]float64
@@ -38,6 +47,74 @@ type frameDescriptor struct {
 type frameAnalysis struct {
 	descriptor frameDescriptor
 	safe       bool
+}
+
+// AnalyzeFrameSequence measures already-decoded video frames with the same
+// foreground model used by extraction and interval selection. This lets
+// callers validate a recomposed sequence without encoding it back into a
+// temporary video first.
+func AnalyzeFrameSequence(frames []image.Image, fps int, chromaKey ChromaKey) (FrameSequenceAnalysis, error) {
+	if len(frames) == 0 {
+		return FrameSequenceAnalysis{}, fmt.Errorf("video: frame sequence is required")
+	}
+	if fps < 0 {
+		return FrameSequenceAnalysis{}, fmt.Errorf("video: frame sequence FPS must not be negative")
+	}
+	if !chromaKey.valid() {
+		return FrameSequenceAnalysis{}, fmt.Errorf("video: valid chroma key settings are required")
+	}
+	analyses := make([]frameAnalysis, len(frames))
+	for index, frame := range frames {
+		if frame == nil || frame.Bounds().Empty() {
+			return FrameSequenceAnalysis{}, fmt.Errorf("video: frame sequence image %d is empty", index)
+		}
+		analyses[index] = frameAnalysis{
+			descriptor: describeFrame(frame, chromaKey),
+			safe:       frameInsideSafetyBand(frame, chromaKey),
+		}
+	}
+	return buildFrameSequenceAnalysis(analyses, fps), nil
+}
+
+// AnalyzeFramePairs compares corresponding original and candidate frames with
+// the same foreground descriptor used by sequence analysis.
+func AnalyzeFramePairs(
+	original, candidate []image.Image,
+	chromaKey ChromaKey,
+) ([]FramePairDifference, error) {
+	if len(original) == 0 {
+		return nil, fmt.Errorf("video: original frame sequence is required")
+	}
+	if len(original) != len(candidate) {
+		return nil, fmt.Errorf("video: frame pair sequences contain %d and %d frames", len(original), len(candidate))
+	}
+	if !chromaKey.valid() {
+		return nil, fmt.Errorf("video: valid chroma key settings are required")
+	}
+	differences := make([]FramePairDifference, len(original))
+	for index := range original {
+		if original[index] == nil || original[index].Bounds().Empty() {
+			return nil, fmt.Errorf("video: original frame sequence image %d is empty", index)
+		}
+		if candidate[index] == nil || candidate[index].Bounds().Empty() {
+			return nil, fmt.Errorf("video: candidate frame sequence image %d is empty", index)
+		}
+		left := describeFrame(original[index], chromaKey)
+		right := describeFrame(candidate[index], chromaKey)
+		var union [analysisSize * analysisSize]bool
+		unionArea := 0
+		for pixel := range union {
+			union[pixel] = left.mask[pixel] || right.mask[pixel]
+			if union[pixel] {
+				unionArea++
+			}
+		}
+		differences[index] = FramePairDifference{
+			AppearanceMSE:            foregroundMSE(left, right, &union, unionArea),
+			ForegroundMaskDifference: foregroundMaskDifference(left, right, unionArea),
+		}
+	}
+	return differences, nil
 }
 
 func buildFrameSequenceAnalysis(analyses []frameAnalysis, fps int) FrameSequenceAnalysis {
@@ -108,6 +185,19 @@ func describeFrame(source image.Image, chromaKey ChromaKey) frameDescriptor {
 		descriptor.cx, descriptor.cy = math.NaN(), math.NaN()
 	}
 	return descriptor
+}
+
+func foregroundMaskDifference(a, b frameDescriptor, unionArea int) float64 {
+	if unionArea == 0 {
+		return 0
+	}
+	different := 0
+	for index := range a.mask {
+		if a.mask[index] != b.mask[index] {
+			different++
+		}
+	}
+	return float64(different) / float64(unionArea)
 }
 
 func foregroundMSE(a, b frameDescriptor, union *[analysisSize * analysisSize]bool, unionArea int) float64 {

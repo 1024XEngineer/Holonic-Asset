@@ -5,11 +5,10 @@ type TaskType string
 const (
 	GenerateCharacterProtoType TaskType = "generate_character_prototype"
 	EditCharacterProtoType     TaskType = "edit_character_prototype"
-	EditCharacterFrames        TaskType = "edit_character_frames"
+	EditFrames                 TaskType = "edit_frames"
 
 	GenerateObjectProtoType TaskType = "generate_object_prototype"
 	EditObjectProtoType     TaskType = "edit_object_prototype"
-	EditObjectFrames        TaskType = "edit_object_frames"
 
 	GenerateAnimation TaskType = "generate_animation"
 	EditAnimation     TaskType = "edit_animation"
@@ -32,10 +31,9 @@ func TaskTypes() []TaskType {
 	return []TaskType{
 		GenerateCharacterProtoType,
 		EditCharacterProtoType,
-		EditCharacterFrames,
+		EditFrames,
 		GenerateObjectProtoType,
 		EditObjectProtoType,
-		EditObjectFrames,
 		GenerateAnimation,
 		EditAnimation,
 		GenerateScenery,

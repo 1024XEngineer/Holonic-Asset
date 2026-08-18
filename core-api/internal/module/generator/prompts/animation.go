@@ -9,17 +9,20 @@ import (
 const (
 	DefaultAnimationStyle         = "finely drawn production-quality 2D game asset art"
 	MaxAnimationVideoCharacters   = 2450
-	maxAnimationBaseCharacters    = 2000
+	maxAnimationBaseCharacters    = 1700
 	maxAnimationDescriptionLength = 240
 	maxAnimationStyleLength       = 180
 	maxAnimationActionLength      = 320
 )
 
 type AnimationOptions struct {
-	Description string
-	Style       string
-	Action      string
-	FrameCount  int
+	Description        string
+	Style              string
+	Action             string
+	OriginalAction     string
+	FrameCount         int
+	LocalFrameEdit     bool
+	TargetFrameIndices []int
 }
 
 // BuildAnimationVideo converts the user's semantic action specification into
@@ -30,15 +33,46 @@ func BuildAnimationVideo(options AnimationOptions) string {
 	description := limit(options.Description, maxAnimationDescriptionLength)
 	style := limit(options.Style, maxAnimationStyleLength)
 	action := limit(options.Action, maxAnimationActionLength)
+	originalAction := limit(options.OriginalAction, maxAnimationActionLength)
 	if style == "" {
 		style = DefaultAnimationStyle
 	}
-	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image.
+	referenceInstructions := `REFERENCE IMAGE:
+- the input is exactly ONE isolated canonical subject view from the high-resolution prototype or direction sheet
+- use that subject for identity, scale, and orientation; never turn, mirror, switch views, or invent another direction
+- preserve identity, proportions, details, materials, palette, and art style`
+	actionInstructions := `ACTION:
+- interpret the requested action by its actual meaning; do not map it to a generic motion preset
+- show one complete cycle from the initial pose back to the same pose
+- include preparation, every semantically required intermediate stage, the main extreme, complete follow-through and recovery
+- strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
+- do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose`
+	if options.LocalFrameEdit {
+		targetFrames := formatAnimationTargetFrames(options.TargetFrameIndices, options.FrameCount)
+		originalActionInstruction := "- the stored original action is unavailable; preserve every pre-existing motion implied by the user's edit wording and the boundary poses"
+		if originalAction != "" {
+			originalActionInstruction = fmt.Sprintf("- ORIGINAL ACTION — MUST BE PRESERVED: %s", originalAction)
+		}
+		referenceInstructions = `BOUNDARY FRAME REFERENCES:
+- start/end inputs are the original unprocessed frames immediately outside the selected interval, clamped at the animation start or end when necessary
+- generate one normal full-frame video that matches the start frame exactly and arrives at the end frame exactly
+- inputs are separate full-frame anchors, never a contact sheet, collage, grid, storyboard, multi-frame canvas, or spritesheet
+- preserve identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
+		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
+%s
+- one continuous chronological take; no restart, montage, unrelated motion, or phase reordering; boundary images may omit an internal action extreme
+- ADDITIVE EDIT: keep the pre-existing action recognizable while performing the requested change; never replace it
+- PRIMARY REQUIREMENT: the requested change must be unmistakably visible; copying original target pixels or making only a token change is invalid
+- retain the original action's identity and principal phase/extreme, but allow local pose, path, and timing adjustments needed to show the change clearly
+- begin the change by the first target, keep it readable across most target samples, and complete it by the last
+- non-target samples are seam context only: match entry/exit smoothly, but do not force target poses to resemble the originals`, targetFrames, options.FrameCount, originalActionInstruction)
+	}
+	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image inputs.
 
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
 - every frame contains exactly ONE complete subject and its attached or held props
-- normal full-frame video, never a contact sheet, collage, grid, storyboard, or spritesheet
-- never show multiple directions, multiple poses, copies, cells, borders, labels, or the reference layout
+- normal full-frame video; never a contact sheet, collage, grid, storyboard, spritesheet, multiple views, poses, or copies
+- fixed camera and root; keep the whole subject inside the inner 70%% on a uniform pure-green #00FF00 background
 
 USER SPECIFICATION — AUTHORITATIVE:
 - subject: %s
@@ -46,17 +80,9 @@ USER SPECIFICATION — AUTHORITATIVE:
 - requested action: %s
 - the system will extract %d ordered frames later; do not render those frames as a sheet
 
-REFERENCE IMAGE:
-- the input is exactly ONE isolated canonical subject view from the high-resolution prototype or direction sheet
-- use that subject for identity, scale, and orientation; never turn, mirror, switch views, or invent another direction
-- preserve identity, proportions, details, materials, palette, and art style
+%s
 
-ACTION:
-- interpret the requested action by its actual meaning; do not map it to a generic motion preset
-- show one complete cycle from the initial pose back to the same pose
-- include preparation, every semantically required intermediate stage, the main extreme, complete follow-through and recovery
-- strict temporal order: begin from the supplied initial pose, perform preparation before the main action, follow through before recovery, and end only after returning to that same pose
-- do not start in the middle, reverse the action, jump between phases, repeat the main action before recovery, omit late stages, or freeze at the main pose
+%s
 
 CONTINUITY:
 - preserve silhouette, proportions, details, materials, equipment, and attached-part geometry
@@ -67,8 +93,19 @@ FRAMING AND BACKGROUND:
 - keep the whole subject and props inside the inner 70%%; maintain at least 15%% uninterrupted empty space on every side
 - keep long parts, weapons, or tool tips inside the central area; reduce amplitude rather than reaching toward an edge
 - background is perfectly uniform pure chroma green #00FF00: no floor, shadow, gradient, scenery, lighting change, particles, text, audio, trails, or motion graphics`,
-		description, style, action, options.FrameCount))
+		description, style, action, options.FrameCount, referenceInstructions, actionInstructions))
 	return limit(prompt, MaxAnimationVideoCharacters)
+}
+
+func formatAnimationTargetFrames(indices []int, frameCount int) string {
+	if len(indices) == 0 {
+		return fmt.Sprintf("all %d", frameCount)
+	}
+	values := make([]string, len(indices))
+	for index, frameIndex := range indices {
+		values[index] = fmt.Sprintf("%d", frameIndex+1)
+	}
+	return strings.Join(values, ", ")
 }
 
 func BuildAnimationVideoRetry(base, issueKind string) string {
@@ -85,6 +122,35 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 - preserve the exact subject, attached parts, and opaque silhouette in every frame
 - keep the background uniformly #00FF00 with strong colour separation
 - do not fade, dissolve, blur away, or merge any body or object part into the background`
+	}
+	if issueKind == "continuity" {
+		correction = `Generate a fresh take; the previous local edit created an abrupt motion discontinuity.
+- match the supplied start and end boundary poses at the two seams; target samples do not need to copy their original pixels or exact poses
+- keep the pre-existing action recognizable, including its principal phase or extreme, while giving the requested change enough pose freedom to be obvious
+- smooth only the entry and exit of the requested change; never shrink, hide, or remove that change merely to resemble the original target frames
+- allow no sudden root displacement, scale jump, silhouette pop, or isolated one-frame spike at the edit boundaries
+- the requested change remains the primary requirement throughout the target interval`
+	}
+	if issueKind == "motion_preservation" {
+		correction = `Generate a fresh take; the previous local edit erased or weakened motion that already existed in the selected interval.
+- restore enough of the pre-existing action to keep its identity and principal phase or extreme recognizable
+- treat the requested change as an additive simultaneous layer, never as a replacement for the original action
+- local pose, path, and timing adjustments are allowed when needed to make the requested change clearly visible
+- do not solve preservation by copying the original target frames or weakening the requested change`
+	}
+	if issueKind == "temporal_coherence" {
+		correction = `Generate exactly one continuous chronological action interval; the previous local edit mixed or reordered motion phases.
+- no repeated take, restart, alternate pose sequence, pose montage, unrelated motion, or phase reversal
+- keep the pre-existing action recognizable and retain its chronological phase order
+- layer the requested change simultaneously onto that action instead of starting a second action
+- allow the requested change to depart visibly from the original target poses while progressing smoothly once from the supplied start boundary to the end boundary`
+	}
+	if issueKind == "edit_application" {
+		correction = `Generate a fresh take; the previous local edit reproduced the original animation but failed to visibly perform the requested addition.
+- the requested change is mandatory, not optional; make it unmistakably readable across most target samples
+- keep the pre-existing action recognizable instead of replacing it, but do not prioritize pixel similarity over the requested change
+- visibly transform the exact subject part, object, pose, or effect named by the user specification
+- use a clear pose difference, not a token movement; do not return the unedited original motion, a barely changed pose, or a change hidden outside the target interval`
 	}
 	return limit(strings.TrimSpace(base+"\n\nQUALITY RETRY OVERRIDE — FOLLOW THESE MORE STRICTLY:\n"+correction), MaxAnimationVideoCharacters)
 }

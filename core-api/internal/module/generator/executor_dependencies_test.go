@@ -157,3 +157,55 @@ func TestExecutorRejectsMalformedAndUnsupportedTasks(t *testing.T) {
 		t.Fatalf("expected unsupported task error, got %v", err)
 	}
 }
+
+func TestExecutorEditFramesRequiresDependenciesAndValidPayload(t *testing.T) {
+	payload := json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`)
+	events := []string{}
+	tests := []struct {
+		name     string
+		executor generator.Executor
+		payload  json.RawMessage
+		want     error
+		wantText string
+	}{
+		{
+			name: "asset writer",
+			executor: generator.NewExecutorWithDependencies(nil, nil, nil, generator.ExecutorDependencies{
+				Animations: &animationGenerationServiceStub{events: &events}, References: &executorReferenceStoreStub{},
+			}),
+			payload: payload, want: generator.ErrAssetWriterRequired,
+		},
+		{
+			name: "animation service",
+			executor: generator.NewExecutorWithDependencies(nil, nil, &generationAssetWriterStub{events: &events}, generator.ExecutorDependencies{
+				References: &executorReferenceStoreStub{},
+			}),
+			payload: payload, want: generator.ErrAnimationServiceRequired,
+		},
+		{
+			name: "reference store",
+			executor: generator.NewExecutorWithDependencies(nil, nil, &generationAssetWriterStub{events: &events}, generator.ExecutorDependencies{
+				Animations: &animationGenerationServiceStub{events: &events},
+			}),
+			payload: payload, want: generator.ErrAnimationReferenceStoreRequired,
+		},
+		{
+			name: "malformed payload",
+			executor: generator.NewExecutorWithDependencies(nil, nil, &generationAssetWriterStub{events: &events}, generator.ExecutorDependencies{
+				Animations: &animationGenerationServiceStub{events: &events}, References: &executorReferenceStoreStub{},
+			}),
+			payload: json.RawMessage(`{`), wantText: "decode edit_frames execution payload",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.executor.Generate(context.Background(), generator.EditFrames, test.payload)
+			if test.want != nil && !errors.Is(err, test.want) {
+				t.Fatalf("expected %v, got %v", test.want, err)
+			}
+			if test.wantText != "" && (err == nil || !strings.Contains(err.Error(), test.wantText)) {
+				t.Fatalf("expected %q, got %v", test.wantText, err)
+			}
+		})
+	}
+}

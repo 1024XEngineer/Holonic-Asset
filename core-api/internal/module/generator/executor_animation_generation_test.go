@@ -29,6 +29,10 @@ func (s *animationVideoServiceStub) Generate(
 	request *videoclient.GenerateRequest,
 ) (*videoclient.GenerateResult, error) {
 	copy := *request
+	if request.EndImage != nil {
+		endImage := *request.EndImage
+		copy.EndImage = &endImage
+	}
 	s.requests = append(s.requests, &copy)
 	if s.err != nil {
 		return nil, s.err
@@ -294,7 +298,7 @@ func TestAnimationGenerationKeepsPreparedGreenReference(t *testing.T) {
 	if len(videos.requests) != 1 {
 		t.Fatalf("video requests = %d, want 1", len(videos.requests))
 	}
-	got, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].ReferenceImageBase64)
+	got, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode provider reference: %v", decodeErr)
 	}
@@ -372,7 +376,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.resizeRequests[0].Options.Margin != imageprocessor.AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
-	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].ReferenceImageBase64)
+	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode video reference: %v", decodeErr)
 	}
@@ -388,8 +392,79 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
 		!processor.splitRequest.PreserveVerticalMotion ||
-		!processor.splitRequest.PreserveSourceCellScale {
+		!processor.splitRequest.PreserveSourceCellScale ||
+		processor.splitRequest.Background == nil ||
+		processor.splitRequest.Background.MatteColor != "auto" {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
+	}
+}
+
+func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testing.T) {
+	startReference := animationTestOpaquePrototypeColor(t, color.NRGBA{R: 255, A: 255})
+	endReference := animationTestOpaquePrototypeColor(t, color.NRGBA{G: 120, B: 255, A: 255})
+	foreground := animationTestForeground(t)
+	videos := &animationVideoServiceStub{}
+	processor := &animationProcessorStub{
+		foregroundBase64: foreground,
+		splitResult: &imageprocessor.SplitImageResult{
+			Mode:        imageprocessor.ImageSplitModeAnimation,
+			ImageBase64: "spritesheet",
+			MIMEType:    "image/png",
+			Regions: []imageprocessor.ImageRegion{
+				{Index: 0, ImageBase64: "frame-1", MIMEType: "image/png"},
+				{Index: 1, ImageBase64: "frame-2", MIMEType: "image/png"},
+				{Index: 2, ImageBase64: "frame-3", MIMEType: "image/png"},
+			},
+		},
+	}
+	editedFrames := animationTestVideoFrames(3)
+	editedMiddle := editedFrames[1].(*image.NRGBA)
+	draw.Draw(editedMiddle, image.Rect(67, 44, 77, 54), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+		Frames: editedFrames,
+	}}}
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
+	contextFrames := animationTestVideoFrames(3)
+	contextReferences := make([]string, len(contextFrames))
+	for index, frame := range contextFrames {
+		contextReferences[index] = animationTestImageDataURL(t, frame)
+	}
+
+	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
+		Description:            "knight",
+		Action:                 "raise the sword",
+		ReferenceImage:         startReference,
+		EndReferenceImage:      endReference,
+		ReferenceImageContext:  true,
+		TargetFrameIndices:     []int{1},
+		ContextReferenceImages: contextReferences,
+		FrameCount:             3,
+		Columns:                3,
+		FrameWidth:             64,
+		FrameHeight:            64,
+		FPS:                    10,
+	})
+	if err != nil {
+		t.Fatalf("generate edited frame segment: %v", err)
+	}
+	if len(processor.removeRequests) != 2 || len(processor.resizeRequests) != 2 {
+		t.Fatalf("boundary references were not independently prepared: removes=%d resizes=%d", len(processor.removeRequests), len(processor.resizeRequests))
+	}
+	if processor.removeRequests[0].ImageBase64 != startReference ||
+		processor.removeRequests[1].ImageBase64 != endReference {
+		t.Fatalf("boundary reference preparation order changed: %+v", processor.removeRequests)
+	}
+	if len(videos.requests) != 1 || videos.requests[0].EndImage == nil {
+		t.Fatalf("video request did not receive start and end references: %+v", videos.requests)
+	}
+	if videos.requests[0].StartImage.Base64 == "" || videos.requests[0].EndImage.Base64 == "" {
+		t.Fatalf("video request contains an empty boundary reference: %+v", videos.requests[0])
+	}
+	if !strings.Contains(videos.requests[0].Prompt, "BOUNDARY FRAME REFERENCES") ||
+		!strings.Contains(videos.requests[0].Prompt, "start/end inputs") ||
+		strings.Contains(videos.requests[0].Prompt, "ordered image array") ||
+		strings.Contains(videos.requests[0].Prompt, "@Image") {
+		t.Fatalf("unexpected boundary-frame edit prompt: %s", videos.requests[0].Prompt)
 	}
 }
 
@@ -465,6 +540,29 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 	}
 }
 
+func TestProcessAnimationVideoAutoDetectsNonGreenMatte(t *testing.T) {
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+		Frames: animationTestVideoFramesWithMatte(4, color.NRGBA{R: 235, G: 235, B: 235, A: 255}),
+	}}}
+	service := &animationGenerationService{
+		processor:      imageprocessor.NewProcessor(),
+		videoProcessor: videoProcessor,
+	}
+
+	result, err := service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
+		Action: "idle breathing", FrameCount: 4, Columns: 2, FrameWidth: 64, FrameHeight: 64,
+	})
+	if err != nil {
+		t.Fatalf("process video with non-green matte: %v", err)
+	}
+	if result.Normalization == nil || result.Normalization.BackgroundRemovalReport == nil {
+		t.Fatal("expected automatic background removal report")
+	}
+	if result.Normalization.BackgroundRemovalReport.MatteColorSource != "auto-sampled" {
+		t.Fatalf("matte source = %q, want auto-sampled", result.Normalization.BackgroundRemovalReport.MatteColorSource)
+	}
+}
+
 func animationTestForeground(t *testing.T) string {
 	t.Helper()
 	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
@@ -490,8 +588,13 @@ func animationTestPreparedGreenReference(t *testing.T) string {
 
 func animationTestOpaquePrototype(t *testing.T) string {
 	t.Helper()
+	return animationTestOpaquePrototypeColor(t, color.NRGBA{R: 255, B: 255, A: 255})
+}
+
+func animationTestOpaquePrototypeColor(t *testing.T, background color.NRGBA) string {
+	t.Helper()
 	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
-	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{R: 255, B: 255, A: 255}}, image.Point{}, draw.Src)
+	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: background}, image.Point{}, draw.Src)
 	draw.Draw(frame, image.Rect(30, 16, 66, 88), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
 	encoded, err := imageprocessor.EncodePNGBase64(frame)
 	if err != nil {
@@ -500,11 +603,24 @@ func animationTestOpaquePrototype(t *testing.T) string {
 	return "data:image/png;base64," + encoded
 }
 
+func animationTestImageDataURL(t *testing.T, frame image.Image) string {
+	t.Helper()
+	encoded, err := imageprocessor.EncodePNGBase64(frame)
+	if err != nil {
+		t.Fatalf("encode animation test frame: %v", err)
+	}
+	return "data:image/png;base64," + encoded
+}
+
 func animationTestVideoFrames(count int) []image.Image {
+	return animationTestVideoFramesWithMatte(count, color.NRGBA{G: 255, A: 255})
+}
+
+func animationTestVideoFramesWithMatte(count int, matte color.NRGBA) []image.Image {
 	frames := make([]image.Image, count)
 	for index := range frames {
 		frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
-		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: matte}, image.Point{}, draw.Src)
 		offset := index % 3
 		draw.Draw(frame, image.Rect(30+offset, 18, 66+offset, 88), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
 		frames[index] = frame

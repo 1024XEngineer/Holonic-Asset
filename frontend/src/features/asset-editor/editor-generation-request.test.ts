@@ -22,7 +22,7 @@ describe("buildInspectorGenerationRequest", () => {
       }),
     ).toEqual({
       assetId: 12,
-      kind: "edit_character_frames",
+      kind: "edit_frames",
       creative_brief: "Make the stride longer",
       targetAssetPaths: [
         "animations.walk.frames.0",
