@@ -15,25 +15,13 @@ export function HomeHero() {
       <div className="relative mx-auto grid min-h-[calc(100vh-3.5rem)] max-w-[100rem] grid-rows-[1fr_auto] px-5 sm:px-8 lg:px-10">
         <div className="grid items-center gap-10 py-14 lg:grid-cols-[minmax(0,.92fr)_minmax(30rem,.98fr)] lg:py-20">
           <div className="home-reveal">
-            <h1 className="mt-0 max-w-none text-[clamp(2.4rem,3.2vw,4rem)] leading-[0.92] font-semibold tracking-[-0.045em] lg:whitespace-nowrap">
+            <h1 className="mt-0 max-w-none text-[clamp(2.25rem,2.8vw,3.5rem)] leading-[0.92] font-semibold tracking-[-0.06em]">
               {t("heroTitle")}
             </h1>
             <div className="mt-9 max-w-3xl">
               <p className="max-w-xl text-base leading-7 text-neutral-600 sm:text-lg sm:leading-8">
                 {t("heroDescription")}
               </p>
-            </div>
-            <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] font-semibold tracking-[0.13em] text-neutral-600">
-              <span className="border border-neutral-950/20 px-3 py-2">
-                {t("projectBased")}
-              </span>
-              <span className="border border-neutral-950/20 px-3 py-2">
-                {t("engineReady")}
-              </span>
-              <span className="flex items-center gap-2 px-2">
-                <i className="size-2 rounded-full bg-lime-400" />
-                {t("systemOnline")}
-              </span>
             </div>
           </div>
 
