@@ -170,8 +170,8 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 	if images.request.Size != "auto" {
 		t.Fatalf("expected automatic image orientation, got %q", images.request.Size)
 	}
-	if images.request.Params["quality"] != "high" {
-		t.Fatalf("expected high quality generation, got %+v", images.request.Params)
+	if images.request.Params["quality"] != "medium" {
+		t.Fatalf("expected medium quality generation, got %+v", images.request.Params)
 	}
 	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
 		t.Fatalf("expected resolved project reference to be forwarded, got %+v", images.request.ReferenceImages)
