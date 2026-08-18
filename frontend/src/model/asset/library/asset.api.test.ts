@@ -115,6 +115,18 @@ describe("toAssetGroups", () => {
     });
   });
 
+  it("does not invent a thumbnail when the list item has none", () => {
+    const [group] = toAssetGroups([
+      {
+        ...assetItemBase,
+        type: "object",
+        dimensions: { width: 32, height: 32 },
+      },
+    ] satisfies AssetListItemResponse[]);
+
+    expect(group.assets[0]).not.toHaveProperty("thumbnailUrl");
+  });
+
   it("does not report a visual canvas size for audio assets", () => {
     const [group] = toAssetGroups([
       {

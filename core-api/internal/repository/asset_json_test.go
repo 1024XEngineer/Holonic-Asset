@@ -427,7 +427,7 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	}
 
 	err = repo.UpdatePrototypeImages(context.Background(), 7, []domain.ImageResource{
-		{ID: 2101, URL: new("https://cdn.example/prototype-01.png")},
+		{ID: 2101, URL: new("  ")},
 		{ID: 2102, URL: new("https://cdn.example/prototype-02.png")},
 		{ID: 2103, URL: new("https://cdn.example/prototype-03.png")},
 		{ID: 2104, URL: new("https://cdn.example/prototype-04.png")},
@@ -451,8 +451,8 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	if daoStub.updatedVersion != 3 {
 		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
 	}
-	if daoStub.updatedThumbnail != "https://cdn.example/prototype-01.png" {
-		t.Fatalf("asset thumbnail = %q, want first prototype URL", daoStub.updatedThumbnail)
+	if daoStub.updatedThumbnail != "https://cdn.example/prototype-02.png" {
+		t.Fatalf("asset thumbnail = %q, want first non-blank prototype URL", daoStub.updatedThumbnail)
 	}
 	record, ok := recordDao.records[21]
 	if !ok || record.Version != 3 || record.ContentID != daoStub.updatedContent {

@@ -24,10 +24,7 @@ func InitTables(db *gorm.DB) error {
 	if db.Name() != "postgres" {
 		return nil
 	}
-	if err := migrateAssetAttributes(db); err != nil {
-		return err
-	}
-	return migrateAssetThumbnails(db)
+	return migrateAssetAttributes(db)
 }
 
 func migrateAssetAttributes(db *gorm.DB) error {
@@ -66,14 +63,4 @@ func migrateAssetAttributes(db *gorm.DB) error {
 		return db.Migrator().DropColumn(&Asset{}, "attributes")
 	}
 	return nil
-}
-
-func migrateAssetThumbnails(db *gorm.DB) error {
-	return db.Exec(`UPDATE assets AS a
-		SET thumbnail_url = c.content->'prototype'->0->>'url'
-		FROM asset_contents AS c
-		WHERE a.content_id = c.id
-		  AND COALESCE(a.thumbnail_url, '') = ''
-		  AND jsonb_typeof(c.content->'prototype') = 'array'
-		  AND COALESCE(c.content->'prototype'->0->>'url', '') <> ''`).Error
 }
