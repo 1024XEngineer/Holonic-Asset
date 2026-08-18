@@ -1,4 +1,4 @@
-import { ImageOff } from "lucide-react";
+import { ImageOff, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { AssetKindIcon, getAssetKindConfig } from "@/components/asset-kind";
@@ -146,7 +146,10 @@ function TilesetPreview({
   const recordQuery = useRecordQuery(projectId, assetId);
   const record = recordQuery.data?.record;
 
-  if (record?.mode !== "tileset") return <TilesetPreviewPlaceholder />;
+  if (recordQuery.isPending) {
+    return <TilesetPreviewStatus loading />;
+  }
+  if (record?.mode !== "tileset") return <TilesetPreviewStatus />;
 
   const { gridSize, items } = record.tileset;
 
@@ -160,7 +163,29 @@ function TilesetPreview({
       }}
     >
       {items.map((item) => {
-        if (!item.imageUrl || item.tiles.length === 0) return null;
+        if (item.tiles.length === 0) return null;
+
+        if (item.tileUrls) {
+          return item.tiles.flatMap((tile, tileIndex) => {
+            const url = item.tileUrls?.[tileIndex];
+            if (!url) return [];
+
+            return [
+              <img
+                key={`${item.id}:${tileIndex}`}
+                alt=""
+                className="z-10 size-full object-fill [image-rendering:pixelated]"
+                src={url}
+                style={{
+                  gridColumn: tile[0] + 1,
+                  gridRow: tile[1] + 1,
+                }}
+              />,
+            ];
+          });
+        }
+
+        if (!item.imageUrl) return null;
 
         const bounds = getGridBounds(item.tiles);
 
@@ -192,18 +217,19 @@ function TilesetPreview({
   );
 }
 
-function TilesetPreviewPlaceholder() {
+function TilesetPreviewStatus({ loading = false }: { loading?: boolean }) {
+  const { t } = useTranslation("assets");
+
   return (
-    <div className="grid size-full grid-cols-8 grid-rows-8 bg-[#eeece7] p-3">
-      {Array.from({ length: 64 }, (_, index) => (
-        <span
-          key={index}
-          className={cn(
-            "border border-[#5dabb0]/65",
-            index % 5 === 0 ? "bg-emerald-500/20" : "bg-white/50",
-          )}
-        />
-      ))}
+    <div className="grid size-full place-items-center bg-[#eeece7] text-[#47656a]">
+      {loading ? (
+        <LoaderCircle className="size-6 animate-spin" aria-hidden="true" />
+      ) : (
+        <div className="grid place-items-center gap-2">
+          <ImageOff className="size-6" aria-hidden="true" />
+          <span className="text-xs font-medium">{t("previewUnavailable")}</span>
+        </div>
+      )}
     </div>
   );
 }

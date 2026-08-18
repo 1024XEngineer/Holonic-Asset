@@ -21,6 +21,7 @@
   "empty": "为此项目创建的资产会显示在这里。",
   "reset": "重置筛选",
   "tilesetPreview": "图块集预览",
+  "previewUnavailable": "预览不可用",
   "edit": {
     "title": "编辑资产",
     "description": "更新此项目中使用的资产信息。",

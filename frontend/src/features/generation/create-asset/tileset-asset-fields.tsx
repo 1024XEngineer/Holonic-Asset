@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,22 +10,23 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { TilesetAssetCreationDraft } from "../types";
 import { ItemShapePicker } from "./item-shape-picker";
 
 const itemCounts = [1, 2, 3, 4, 5, 6, 8];
 
-function createEmptyItem(): TilesetAssetCreationDraft<File>["tiles"][number] {
-  return { description: "", reference: undefined, shape: [[0, 0]] };
+function createEmptyItem(): TilesetAssetCreationDraft["tiles"][number] {
+  return { name: "", description: "", shape: [[0, 0]] };
 }
 
 export function TilesetAssetFields({
   draft,
   onChange,
 }: {
-  draft: TilesetAssetCreationDraft<File>;
-  onChange: (draft: TilesetAssetCreationDraft<File>) => void;
+  draft: TilesetAssetCreationDraft;
+  onChange: (draft: TilesetAssetCreationDraft) => void;
 }) {
   const { t } = useTranslation("generation");
   const [expandedItems, setExpandedItems] = useState(
@@ -102,6 +102,17 @@ export function TilesetAssetFields({
               {expanded ? (
                 <>
                   <label className="grid gap-2 text-sm font-medium">
+                    {t("itemName", { number: index + 1 })}
+                    <Input
+                      required
+                      placeholder={t("itemNamePlaceholder")}
+                      value={item.name}
+                      onChange={(event) =>
+                        updateItem(index, { name: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium">
                     {t("itemDescription", { number: index + 1 })}
                     <Textarea
                       required
@@ -117,16 +128,6 @@ export function TilesetAssetFields({
                       shape={item.shape}
                       onChange={(shape) => updateItem(index, { shape })}
                     />
-                    <div className="grid gap-2 text-sm font-medium">
-                      <span>{t("referenceImage")}</span>
-                      <ImageDropzone
-                        className="min-h-40"
-                        value={item.reference}
-                        onChange={(reference) =>
-                          updateItem(index, { reference })
-                        }
-                      />
-                    </div>
                   </div>
                 </>
               ) : null}

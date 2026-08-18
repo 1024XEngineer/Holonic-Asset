@@ -64,6 +64,56 @@ describe("generationApi", () => {
     },
   );
 
+  it("maps a tileset form request to the Core API", async () => {
+    const request = creationRequest({
+      kind: "tileset",
+      canvasSize: "16 × 16 px",
+      perspective: undefined,
+      tiles: [
+        {
+          name: "  Grass edge  ",
+          description: "  A seamless grass edge  ",
+          shape: [
+            [0, 0],
+            [1, 0],
+          ],
+        },
+        {
+          name: "Dirt",
+          description: "A dirt tile",
+          shape: [[0, 0]],
+        },
+      ],
+    });
+
+    await expect(toCreateGenerationRequest(request)).resolves.toEqual({
+      kind: "generate_tileset",
+      creative_brief: "A moonlit orchard keeper",
+      parameters: {
+        asset_name: "Orchard Keeper",
+        dimensions: {
+          tileSize: { width: 16, height: 16 },
+          tileAmount: { columns: 16, rows: 16 },
+        },
+        items: [
+          {
+            name: "Grass edge",
+            description: "A seamless grass edge",
+            shape: [
+              [0, 0],
+              [1, 0],
+            ],
+          },
+          {
+            name: "Dirt",
+            description: "A dirt tile",
+            shape: [[0, 0]],
+          },
+        ],
+      },
+    });
+  });
+
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 
@@ -247,7 +297,20 @@ describe("generationApi", () => {
   it("rejects asset kinds that are outside the connected form scope", async () => {
     await expect(
       toCreateGenerationRequest(creationRequest({ kind: "audio" })),
-    ).rejects.toThrow("supports Character and Object assets only");
+    ).rejects.toThrow("supports Character, Object, and Tileset assets only");
+  });
+
+  it("rejects a tileset without items", async () => {
+    await expect(
+      toCreateGenerationRequest(
+        creationRequest({
+          kind: "tileset",
+          canvasSize: "16 × 16 px",
+          perspective: undefined,
+          tiles: [],
+        }),
+      ),
+    ).rejects.toThrow("At least one tileset item is required");
   });
 
   it("rejects malformed canvas dimensions before enqueueing", async () => {

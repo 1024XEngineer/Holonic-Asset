@@ -25,14 +25,13 @@ export type SceneryAssetCreationDraft<Reference = unknown> =
     reference: Reference | undefined;
   };
 
-export type TilesetAssetCreationDraft<Reference = unknown> =
-  CommonAssetCreationDraft<"tileset"> & {
-    tiles: {
-      description: string;
-      reference: Reference | undefined;
-      shape: ItemTile[];
-    }[];
-  };
+export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
+  tiles: {
+    name: string;
+    description: string;
+    shape: ItemTile[];
+  }[];
+};
 
 export type UISetAssetCreationDraft<Reference = unknown> =
   CommonAssetCreationDraft<"uiset"> & {
@@ -47,6 +46,6 @@ export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
 export type AssetCreationDraft<Reference = unknown> =
   | VisualAssetCreationDraft<Reference>
   | SceneryAssetCreationDraft<Reference>
-  | TilesetAssetCreationDraft<Reference>
+  | TilesetAssetCreationDraft
   | UISetAssetCreationDraft<Reference>
   | AudioAssetCreationDraft;

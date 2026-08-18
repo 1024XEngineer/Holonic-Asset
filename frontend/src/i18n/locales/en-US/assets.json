@@ -21,6 +21,7 @@
   "empty": "Assets created for this project will appear here.",
   "reset": "Reset filters",
   "tilesetPreview": "Tileset preview",
+  "previewUnavailable": "Preview unavailable",
   "edit": {
     "title": "Edit asset",
     "description": "Update the asset information used throughout this project.",

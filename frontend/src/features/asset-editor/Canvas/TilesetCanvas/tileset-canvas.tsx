@@ -49,6 +49,27 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
             beforeCells={
               <>
                 {model.items.flatMap((item) => {
+                  if (item.tileUrls) {
+                    return item.tiles.flatMap((tile, tileIndex) => {
+                      const url = item.tileUrls?.[tileIndex];
+                      if (!url) return [];
+
+                      return [
+                        <img
+                          key={`${item.id}:${tileIndex}`}
+                          src={url}
+                          alt=""
+                          draggable={false}
+                          className="pointer-events-none z-10 size-full object-fill [image-rendering:pixelated]"
+                          style={{
+                            gridColumn: tile[0] + 1,
+                            gridRow: tile[1] + 1,
+                          }}
+                        />,
+                      ];
+                    });
+                  }
+
                   const bounds = getRenderableItemBounds(item, gridSize);
                   if (!item.imageUrl || !bounds) return [];
 

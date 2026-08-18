@@ -13,6 +13,8 @@ export type TilesetItem = {
   label: string;
   /** Complete generated item image; tiles define its grid placement and selection footprint. */
   imageUrl?: string;
+  /** Individual generated tile images, aligned with the tiles array. */
+  tileUrls?: Array<string | undefined>;
   /** Every tileset tile occupied by this complete item, as [column, row]. */
   tiles: ItemTile[];
 };

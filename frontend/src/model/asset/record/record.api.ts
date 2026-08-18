@@ -1,10 +1,10 @@
 import { getMockAssetRecord, saveMockAssetRecordRevision } from "./mock";
-import { loadCoreSpriteAssetWorkspace } from "./core-sprite-record";
+import { loadCoreAssetWorkspace } from "./core-asset-record";
 import type { AssetRecordApi } from "./types";
 
 export const recordApi: AssetRecordApi = {
   get: async (input) =>
-    (await loadCoreSpriteAssetWorkspace(input)) ?? getMockAssetRecord(input),
+    (await loadCoreAssetWorkspace(input)) ?? getMockAssetRecord(input),
   saveRevision: saveMockAssetRecordRevision,
 };
 

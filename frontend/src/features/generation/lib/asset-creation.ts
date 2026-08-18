@@ -52,8 +52,11 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
     kind: z.literal("tileset"),
     tiles: z.array(
       z.object({
-        description: z.string(),
-        reference: z.unknown().optional(),
+        name: z.string().trim().min(1, "Each tileset item needs a name."),
+        description: z
+          .string()
+          .trim()
+          .min(1, "Each tileset item needs a description."),
         shape: z
           .array(itemTileSchema)
           .min(1, "Each tileset item must have at least one occupied tile."),
@@ -122,7 +125,7 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
-        tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
+        tiles: [{ name: "", description: "", shape: [[0, 0]] }],
       };
     case "uiset":
       const dimensions = { ...defaultUISetCanvasDimensions };
@@ -166,7 +169,14 @@ export function toCreationRequest<Reference>(
         layers: draft.layers,
       };
     case "tileset":
-      return { ...common, tiles: draft.tiles };
+      return {
+        ...common,
+        tiles: draft.tiles.map((tile) => ({
+          ...tile,
+          name: tile.name.trim(),
+          description: tile.description.trim(),
+        })),
+      };
     case "uiset":
       return {
         ...common,

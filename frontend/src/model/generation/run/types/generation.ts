@@ -14,8 +14,8 @@ export type CreationRequest<Reference = unknown> = {
   aspectRatio?: string;
   layers?: { description: string }[];
   tiles?: {
+    name: string;
     description: string;
-    reference?: Reference;
     shape: ItemTile[];
   }[];
   components?: { name: string; description: string }[];

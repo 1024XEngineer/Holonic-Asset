@@ -24,6 +24,15 @@ const items: TilesetItem[] = [
     imageUrl: "/outside.png",
     tiles: [[4, 0]],
   },
+  {
+    id: "generated",
+    label: "Generated",
+    tileUrls: ["/generated-1.png", "/generated-2.png"],
+    tiles: [
+      [2, 0],
+      [3, 0],
+    ],
+  },
 ];
 
 describe("TilesetCanvas", () => {
@@ -42,6 +51,8 @@ describe("TilesetCanvas", () => {
     );
 
     expect(html).toContain('src="/sofa.png"');
+    expect(html).toContain('src="/generated-1.png"');
+    expect(html).toContain('src="/generated-2.png"');
     expect(html).not.toContain('src="/empty.png"');
     expect(html).not.toContain('src="/outside.png"');
     expect(html).toContain("2 tiles selected");
