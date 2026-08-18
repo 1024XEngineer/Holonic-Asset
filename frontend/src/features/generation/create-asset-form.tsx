@@ -83,7 +83,9 @@ export function CreateAssetForm({
                 ? t("audioNamePlaceholder")
                 : draft.kind === "character"
                   ? t("characterNamePlaceholder")
-                  : t("objectNamePlaceholder")
+                  : draft.kind === "tileset"
+                    ? t("tilesetNamePlaceholder")
+                    : t("objectNamePlaceholder")
             }
             value={draft.name}
             onChange={(event) =>

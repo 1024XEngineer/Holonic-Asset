@@ -3,6 +3,7 @@ import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import {
   assetCanvasSizeDimensionsSchema,
   defaultAssetCanvasSize,
+  getDefaultAssetCanvasSize,
 } from "../../asset/library/asset-canvas-size";
 import type { CreatableAssetKind } from "../../asset";
 import { coreAssetApi } from "../../asset/library/core-asset.api";
@@ -89,9 +90,32 @@ const generationRequestsStorageKey = "holonic-generation-requests";
 export async function toCreateGenerationRequest(
   request: CreationRequest,
 ): Promise<CreateGenerationRequest> {
+  if (request.kind === "tileset") {
+    if (!request.tiles || request.tiles.length === 0) {
+      throw new Error("At least one tileset item is required.");
+    }
+
+    return {
+      kind: "generate_tileset",
+      creative_brief: request.prompt,
+      parameters: {
+        asset_name: request.name,
+        dimensions: {
+          tileSize: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
+          tileAmount: { columns: 16, rows: 16 },
+        },
+        items: request.tiles.map((item) => ({
+          name: item.name.trim(),
+          description: item.description.trim(),
+          shape: item.shape,
+        })),
+      },
+    };
+  }
+
   if (request.kind !== "character" && request.kind !== "object") {
     throw new Error(
-      "Core API creation currently supports Character and Object assets only.",
+      "Core API creation currently supports Character, Object, and Tileset assets only.",
     );
   }
   if (!request.perspective) {
@@ -129,7 +153,7 @@ function toGenerationRun(
     kind,
     name: request?.name ?? `New ${kind}`,
     prompt: request?.prompt ?? "",
-    canvasSize: request?.canvasSize ?? defaultAssetCanvasSize,
+    canvasSize: request?.canvasSize ?? getDefaultAssetCanvasSize(kind),
     perspective: request?.perspective,
     id: String(item.id),
     projectId: String(item.projectId),

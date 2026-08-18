@@ -62,7 +62,7 @@ describe("asset creation", () => {
       }),
       expect.objectContaining({
         kind: "tileset",
-        tiles: [{ description: "", reference: undefined, shape: [[0, 0]] }],
+        tiles: [{ name: "", description: "", shape: [[0, 0]] }],
       }),
       expect.objectContaining({
         kind: "uiset",
@@ -104,4 +104,24 @@ describe("asset creation", () => {
       expect(result.success).toBe(false);
     },
   );
+
+  it("trims tileset item metadata", () => {
+    const draft = createAssetCreationDraft("tileset");
+    if (draft.kind !== "tileset") throw new Error("expected tileset draft");
+    draft.tiles = [
+      {
+        name: "  Grass edge  ",
+        description: "  A seamless grass edge  ",
+        shape: [[0, 0]],
+      },
+    ];
+
+    expect(toCreationRequest(draft).tiles).toEqual([
+      {
+        name: "Grass edge",
+        description: "A seamless grass edge",
+        shape: [[0, 0]],
+      },
+    ]);
+  });
 });
