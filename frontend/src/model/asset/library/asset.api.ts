@@ -67,8 +67,6 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   for (const item of items) {
     const kind = item.type === "tileSet" ? "tileset" : item.type;
     const assets = groups.get(kind) ?? [];
-    const prototypeUrls = item.prototypeUrls?.filter(Boolean);
-    const thumbnailUrl = prototypeUrls?.[0];
     assets.push({
       id: String(item.assetId),
       name: item.name,
@@ -77,8 +75,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
       tags: item.tags ?? [],
-      ...(thumbnailUrl ? { thumbnailUrl } : {}),
-      ...(prototypeUrls?.length ? { prototypeUrls } : {}),
+      ...(item.thumbnailUrl ? { thumbnailUrl: item.thumbnailUrl } : {}),
       history: [],
       animations: [],
     });

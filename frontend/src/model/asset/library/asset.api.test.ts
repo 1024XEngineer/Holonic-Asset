@@ -100,19 +100,18 @@ describe("toAssetGroups", () => {
     ]);
   });
 
-  it("keeps every prototype direction URL for the editor", () => {
+  it("maps the stored thumbnail URL", () => {
     const [group] = toAssetGroups([
       {
         ...assetItemBase,
         type: "character",
         dimensions: { width: 48, height: 64 },
-        prototypeUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
+        thumbnailUrl: "/front.png",
       },
     ] satisfies AssetListItemResponse[]);
 
     expect(group.assets[0]).toMatchObject({
       thumbnailUrl: "/front.png",
-      prototypeUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
     });
   });
 

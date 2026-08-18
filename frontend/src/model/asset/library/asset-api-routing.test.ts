@@ -31,7 +31,7 @@ const remoteAssets = {
       type: "object",
       version: 1,
       tags: ["prop"],
-      prototypeUrls: ["https://storage.example/signed/barrel.png?token=abc"],
+      thumbnailUrl: "https://storage.example/signed/barrel.png?token=abc",
     },
   ],
 };
