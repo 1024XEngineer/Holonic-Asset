@@ -189,6 +189,9 @@ func TestCreateBuildsUnifiedEditFramesPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create edit frames: %v", err)
 	}
+	if tasks.createdTask == nil || tasks.createdTask.CompletionStatus != taskdomain.StatusAwaitingApplication {
+		t.Fatalf("edit frames task must await application: %+v", tasks.createdTask)
+	}
 	var payload generator.EditFramesPayload
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode edit frames payload: %v", err)
@@ -1068,12 +1071,6 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			Payload: payload,
 		}
 		_, err := tasks.dispatch(context.Background(), message)
-		if taskType == generator.EditCharacterFrames || taskType == generator.EditObjectFrames {
-			if !errors.Is(err, generator.ErrUnsupportedTaskType) {
-				t.Fatalf("unimplemented task type %q returned %v", taskType, err)
-			}
-			continue
-		}
 		if err != nil {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}

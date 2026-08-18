@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AssetRecord,
   AssetWorkspaceData,
+  CharacterAnimation,
   GenerationTaskType,
 } from "@/model";
 
@@ -340,6 +341,83 @@ describe("useEditorWorkspace", () => {
     expect(mocks.session.save).not.toHaveBeenCalled();
   });
 
+  it("previews and applies an awaiting frame edit without saving", async () => {
+    mocks.session.snapshot = snapshot(spriteRecordWithAnimations("object"));
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Open",
+        prompt: "Open more dramatically",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "edit_frames",
+      status: "awaiting_application",
+      result: {
+        animation_id: 42,
+        content: {
+          animations: [
+            {
+              id: 42,
+              name: "Open",
+              frames: [
+                { id: 1, url: "/open-edited-1.png" },
+                { id: 2, url: "/open-edited-2.png" },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mocks.stateValues.push(null, null, null);
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.generationReview).toMatchObject({
+      kind: "comparison",
+      nodeId: "42",
+      candidateAnimation: {
+        id: "42",
+        label: "Open",
+        spriteSheet: {
+          frameUrls: ["/open-edited-1.png", "/open-edited-2.png"],
+        },
+      },
+    });
+
+    editor?.generationReview?.onApply();
+    await flushPromises();
+
+    expect(mocks.applicationMutation.mutateAsync).toHaveBeenCalledWith({
+      projectId: "7",
+      assetId: "8",
+      runId: "ready",
+      applied: true,
+    });
+    expect(mocks.session.dispatch).toHaveBeenCalledWith({
+      type: "record.candidate.apply",
+      record: expect.objectContaining({
+        mode: "object",
+        object: expect.objectContaining({
+          animations: [
+            expect.objectContaining({
+              id: "42",
+              spriteSheet: expect.objectContaining({
+                frameUrls: ["/open-edited-1.png", "/open-edited-2.png"],
+              }),
+            }),
+            expect.objectContaining({ id: "77", label: "Idle" }),
+          ],
+        }),
+      }),
+    });
+    expect(mocks.session.save).not.toHaveBeenCalled();
+  });
+
   it("shows a new animation as a reviewable canvas node", () => {
     mocks.generationRuns = [
       {
@@ -494,6 +572,45 @@ function spriteRecord(mode: "character" | "object"): AssetRecord {
   return mode === "character"
     ? { mode, prompt: "Hero", character: data }
     : { mode, prompt: "Chest", object: data };
+}
+
+function spriteRecordWithAnimations(mode: "character" | "object"): AssetRecord {
+  const record = spriteRecord(mode);
+  const animations: CharacterAnimation[] = [
+    {
+      kind: "clip",
+      id: "42",
+      label: "Open",
+      frameCount: 2,
+      spriteSheet: {
+        format: "png-sprite-sheet",
+        imageUrl: "/open-1.png",
+        frameUrls: ["/open-1.png", "/open-2.png"],
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 2,
+        rows: 1,
+      },
+    },
+    {
+      kind: "clip",
+      id: "77",
+      label: "Idle",
+      frameCount: 1,
+      spriteSheet: {
+        format: "png-sprite-sheet",
+        imageUrl: "/idle.png",
+        frameUrls: ["/idle.png"],
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 1,
+        rows: 1,
+      },
+    },
+  ];
+  if (record.mode === "character") record.character.animations = animations;
+  if (record.mode === "object") record.object.animations = animations;
+  return record;
 }
 
 function snapshot(record: AssetRecord) {

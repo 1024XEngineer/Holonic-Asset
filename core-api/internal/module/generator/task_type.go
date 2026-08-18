@@ -31,6 +31,7 @@ func (t TaskType) AwaitsApplication() bool {
 	switch t {
 	case EditCharacterProtoType,
 		EditObjectProtoType,
+		EditFrames,
 		GenerateAnimation,
 		EditAnimation,
 		EditTilesetItem,

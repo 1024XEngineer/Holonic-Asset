@@ -358,11 +358,7 @@ function buildGenerationReview({
     };
   }
 
-  if (
-    taskKind === "edit_animation" ||
-    taskKind === "edit_character_frames" ||
-    taskKind === "edit_object_frames"
-  ) {
+  if (taskKind === "edit_animation" || taskKind === "edit_frames") {
     const animation = findCandidateAnimation(
       current.animations ?? [],
       candidate.animations ?? [],

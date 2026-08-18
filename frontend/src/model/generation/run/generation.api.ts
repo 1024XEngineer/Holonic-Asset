@@ -57,7 +57,7 @@ export const generationApi: GenerationApi = {
         return toGenerationRun(
           item,
           request,
-          await resolveAnimationAssetKind(item, request?.kind),
+          await resolveSpriteAssetKind(item, request?.kind),
         );
       }),
     );
@@ -169,15 +169,13 @@ function generationKindToAssetKind(
 ) {
   if (
     kind === "generate_character_prototype" ||
-    kind === "edit_character_prototype" ||
-    kind === "edit_character_frames"
+    kind === "edit_character_prototype"
   ) {
     return "character" as const;
   }
   if (
     kind === "generate_object_prototype" ||
-    kind === "edit_object_prototype" ||
-    kind === "edit_object_frames"
+    kind === "edit_object_prototype"
   ) {
     return "object" as const;
   }
@@ -194,13 +192,17 @@ function generationKindToAssetKind(
   ) {
     return requestedKind;
   }
-  if (kind === "generate_animation" || kind === "edit_animation") {
+  if (
+    kind === "generate_animation" ||
+    kind === "edit_animation" ||
+    kind === "edit_frames"
+  ) {
     return resolvedAnimationKind ?? ("character" as const);
   }
   return undefined;
 }
 
-async function resolveAnimationAssetKind(
+async function resolveSpriteAssetKind(
   item: GenerationRunListItemResponse,
   requestedKind: CreatableAssetKind | undefined,
 ): Promise<"character" | "object" | undefined> {
@@ -208,7 +210,9 @@ async function resolveAnimationAssetKind(
     return requestedKind;
   }
   if (
-    (item.kind !== "generate_animation" && item.kind !== "edit_animation") ||
+    (item.kind !== "generate_animation" &&
+      item.kind !== "edit_animation" &&
+      item.kind !== "edit_frames") ||
     item.assetId === undefined
   ) {
     return undefined;

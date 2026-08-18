@@ -138,6 +138,30 @@ describe("generationApi", () => {
     expect(mocks.assetDetail).toHaveBeenCalledWith(18);
   });
 
+  it("resolves an awaiting frame edit to the owning asset kind", async () => {
+    mocks.assetDetail.mockResolvedValue({ type: "object" });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 27,
+          projectId: 42,
+          assetId: 19,
+          kind: "edit_frames",
+          status: "awaiting_application",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42", "19")).resolves.toEqual([
+      expect.objectContaining({
+        id: "27",
+        kind: "object",
+        status: "awaiting_application",
+      }),
+    ]);
+    expect(mocks.assetDetail).toHaveBeenCalledWith(19);
+  });
+
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 
