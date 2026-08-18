@@ -18,7 +18,7 @@ export function HomeClosingCta() {
         </p>
         <h2
           id="closing-cta-heading"
-          className="mx-auto mt-6 max-w-5xl text-5xl leading-[0.92] font-semibold tracking-[-0.065em] text-balance sm:text-7xl lg:text-8xl"
+          className="mx-auto mt-6 max-w-5xl whitespace-pre-line text-5xl leading-[1.04] font-semibold tracking-[-0.065em] text-balance sm:text-7xl lg:text-8xl"
         >
           {t("closingTitle")}
         </h2>

@@ -1,32 +1,32 @@
 {
-  "heroTitle": "创造世界，保持独特。",
-  "heroDescription": "Holonic Asset 帮助你生成角色、物体、环境、瓦片集和 UI 资源，并将所有资产以一致的视觉风格整理在项目库中。",
+  "heroTitle": "为你的游戏，建立一套统一资产。",
+  "heroDescription": "在同一个项目中持续生成、迭代和管理游戏美术资产，让每一次扩展都延续同一套视觉语言。",
   "projectBased": "项目驱动",
   "engineReady": "引擎就绪",
   "systemOnline": "创作系统在线",
   "previewAlt": "完整游戏资产项目预览",
   "completeSystem": "完整游戏资产系统",
   "syncTitle": "一个项目，所有资产保持同步。",
-  "syncDescription": "以一致的风格生成角色、物体、场景、瓦片集和 UI 资源，并统一管理完整资产集。",
+  "syncDescription": "以一致的风格生成 Character、Object、Scenery、Tileset 和 UI Set，并统一管理完整资产集。",
   "disciplines": {
     "characters": {
-      "label": "角色",
-      "detail": "精灵图 + 动作"
+      "label": "Character",
+      "detail": "Sprite + 动画"
     },
     "objects": {
-      "label": "物体",
+      "label": "Object",
       "detail": "道具 + 状态"
     },
     "scenery": {
-      "label": "场景",
+      "label": "Scenery",
       "detail": "场景 + 图层"
     },
     "tilesets": {
-      "label": "瓦片集",
-      "detail": "瓦片 + 地图"
+      "label": "Tileset",
+      "detail": "tile + 地图"
     },
     "uiSet": {
-      "label": "UI 资源",
+      "label": "UI Set",
       "detail": "HUD + 菜单"
     }
   },
@@ -34,39 +34,39 @@
   "explore": "浏览资产",
   "capabilities": {
     "characters": {
-      "title": "角色",
+      "title": "Character",
       "description": "生成角色原型（2/4/8 方向视图）、4-16 帧动画（待机、行走、攻击）以及配套动作音效。",
-      "detail": "原型、精灵图与音效",
+      "detail": "原型、Sprite Sheet 与音效",
       "alt": "篮球运动员向南奔跑的动画",
       "headline": "让你的角色动起来"
     },
     "objects": {
-      "title": "物体",
+      "title": "Object",
       "description": "生成风格统一、轮廓清晰并具备完整视觉状态的独特游戏物体。",
       "detail": "游戏物体与视觉状态",
       "alt": "动态蓝色物体"
     },
     "scenery": {
-      "title": "场景",
+      "title": "Scenery",
       "description": "生成带有视差天空、风和前景细节的多层背景，用于关卡设计。",
       "detail": "视差场景图层",
       "alt": "像素风场景天空",
       "treesAlt": "像素风场景树木"
     },
     "tilesets": {
-      "title": "瓦片集",
-      "description": "构建可复用的像素风瓦片集，用于街道、室内、地形和无缝游戏世界。",
-      "detail": "模块化瓦片与地图构建",
-      "alt": "像素风室内瓦片集预览"
+      "title": "Tileset",
+      "description": "构建可复用的像素风 Tileset，用于街道、室内、地形和无缝游戏世界。",
+      "detail": "模块化 tile 与地图构建",
+      "alt": "像素风室内 Tileset 预览"
     },
     "uiSet": {
-      "title": "UI 资源",
+      "title": "UI Set",
       "description": "设计统一的血条、背包面板、技能图标框、系统菜单和 UI 交互音效。",
       "detail": "HUD、控件与系统菜单",
       "alt": "像素风 UI 资源预览"
     },
     "audio": {
-      "title": "游戏音频与 BGM",
+      "title": "Audio & BGM",
       "description": "生成与动画匹配的动作音效，以及沉浸式循环背景音乐。",
       "detail": "动画音效与循环 BGM",
       "alt": "游戏音频波形"
@@ -89,21 +89,21 @@
     },
     "export": {
       "title": "引擎就绪导出",
-      "description": "导出可直接用于 Unity 或 Godot 的精灵图、视差场景图层、瓦片地图、UI 组件和音频文件。"
+      "description": "导出可直接用于 Unity 或 Godot 的 Sprite Sheet、视差场景图层、瓦片地图、UI 组件和音频文件。"
     }
   },
-  "closingEyebrow": "你的下一个世界，从这里开始",
-  "closingTitle": "先制作第一个资产，再围绕它构建一切。",
-  "startProject": "开始一个项目",
-  "tryGeneration": "试用图像生成",
-  "footerDescription": "为角色、环境和 UI 资源提供 AI 游戏资产创作，并构建一致的项目资产库。",
+  "closingEyebrow": "你的下一款游戏，从这里开始。",
+  "closingTitle": "从首个游戏资产出发，\n构建完整的游戏世界。",
+  "startProject": "创建项目",
+  "tryGeneration": "体验图像生成",
+  "footerDescription": "为 Character、Scenery 和 UI Set 提供 AI 游戏资产创作，并构建一致的项目资产库。",
   "footerNavigation": "页脚导航",
   "projectStory": {
     "organizedByProject": "按项目整理",
     "sceneLayers": "场景图层",
     "consistencyFeature": "一致性就是功能",
     "title": "不是一堆输出，而是完整的游戏资产库。",
-    "description": "每个项目都会集中保存游戏类型、平台和视觉风格，让新资产始终保持一致。资产按类型分组，从角色、物体到场景、瓦片集和 UI 资源都清晰可见。",
+    "description": "每个项目都会集中保存游戏类型、平台和视觉风格，让新资产始终保持一致。资产按类型分组，从 Character、Object 到 Scenery、Tileset 和 UI Set 都清晰可见。",
     "details": "为每个资产保留有用信息：画布尺寸、视角、标签、场景图层和修订历史。随着游戏成长，你的资产库依然清晰易懂。",
     "openWorkspace": "查看项目工作区",
     "imageAlt": "多图层游戏场景项目",

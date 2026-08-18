@@ -20,7 +20,7 @@
   "trySearch": "尝试其他搜索词或显示更多资产类型。",
   "empty": "为此项目创建的资产会显示在这里。",
   "reset": "重置筛选",
-  "tilesetPreview": "图块集预览",
+  "tilesetPreview": "Tileset 预览",
   "previewUnavailable": "预览不可用",
   "edit": {
     "title": "编辑资产",
