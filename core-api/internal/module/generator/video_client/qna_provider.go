@@ -36,9 +36,14 @@ const (
 	maxQNAResponseBytes    int64 = 128 << 20
 	maxQNAVideoBytes       int64 = 512 << 20
 	defaultQNAHTTPTimeout        = 10 * time.Minute
-	defaultQNAPollInterval       = 4 * time.Second
-	defaultQNAPollTimeout        = 45 * time.Second
-	defaultQNAMaxRetries         = 3
+	// QNA may return a video URL backed by a different CDN path than the API.
+	// Keep the handshake budget independent from the default 10-second Go value
+	// because transient server-side routing/packet loss otherwise fails before
+	// the CDN has a chance to complete TLS negotiation.
+	defaultQNATLSHandshakeTimeout = 45 * time.Second
+	defaultQNAPollInterval        = 4 * time.Second
+	defaultQNAPollTimeout         = 45 * time.Second
+	defaultQNAMaxRetries          = 3
 )
 
 // QNAConfig configures the QNA video provider.
@@ -82,6 +87,8 @@ type qnaRequestTrace struct {
 	Attempt     int
 	MaxAttempts int
 	RetryErrors bool
+	Network     *qnaNetworkTrace
+	Protocol    string
 }
 
 // NewQNAProvider creates a QNA video provider with production defaults.
@@ -148,6 +155,7 @@ func NewQNAProvider(config QNAConfig) *QNAProvider {
 
 func newDefaultQNAHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = defaultQNATLSHandshakeTimeout
 	return &http.Client{
 		Transport: transport,
 		Timeout:   defaultQNAHTTPTimeout,
@@ -375,8 +383,14 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 			Attempt:     attempt,
 			MaxAttempts: attempts,
 			RetryErrors: true,
+			Network:     newQNARequestTrace(),
 		}
-		request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+		request, requestErr := http.NewRequestWithContext(
+			withQNAHTTPTrace(ctx, trace.Network),
+			http.MethodGet,
+			parsed.String(),
+			nil,
+		)
 		if requestErr != nil {
 			return nil, p.error(ErrorKindInvalidRequest, 0, false, "create video download request", requestErr)
 		}
@@ -391,6 +405,7 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 				startedAt,
 				"",
 				"",
+				"",
 				retryableRequestError(ctx, trace, requestErr),
 				requestErr,
 			)
@@ -403,6 +418,7 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 			continue
 		}
 
+		trace.Protocol = response.Proto
 		data, readErr := readLimited(response.Body, maxQNAVideoBytes)
 		closeErr := response.Body.Close()
 		if readErr == nil {
@@ -418,6 +434,7 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 				startedAt,
 				response.Header.Get("Server"),
 				response.Header.Get("CF-Ray"),
+				qnaUpstreamRequestID(response.Header),
 				len(data),
 				nil,
 			)
@@ -439,6 +456,7 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 				startedAt,
 				response.Header.Get("Server"),
 				response.Header.Get("CF-Ray"),
+				qnaUpstreamRequestID(response.Header),
 				retryableRequestError(ctx, trace, readErr),
 				readErr,
 			)
@@ -464,6 +482,7 @@ func (p *QNAProvider) Download(ctx context.Context, rawURL string) ([]byte, erro
 			startedAt,
 			response.Header.Get("Server"),
 			response.Header.Get("CF-Ray"),
+			qnaUpstreamRequestID(response.Header),
 			len(data),
 			nil,
 		)
@@ -487,6 +506,9 @@ func (p *QNAProvider) doJSON(
 	target any,
 ) (int, []byte, error) {
 	startedAt := time.Now()
+	if trace.Network == nil {
+		trace.Network = newQNARequestTrace()
+	}
 	requestContext := ctx
 	cancel := func() {}
 	if trace.Stage == "poll" {
@@ -498,7 +520,12 @@ func (p *QNAProvider) doJSON(
 	if payload != nil {
 		body = bytes.NewReader(payload)
 	}
-	request, err := http.NewRequestWithContext(requestContext, method, endpoint, body)
+	request, err := http.NewRequestWithContext(
+		withQNAHTTPTrace(requestContext, trace.Network),
+		method,
+		endpoint,
+		body,
+	)
 	if err != nil {
 		return 0, nil, p.error(ErrorKindInvalidRequest, 0, false, "create video API request", err)
 	}
@@ -519,11 +546,13 @@ func (p *QNAProvider) doJSON(
 			startedAt,
 			"",
 			"",
+			"",
 			retryableRequestError(ctx, trace, err),
 			err,
 		)
 		return 0, nil, p.contextError(ctx, err)
 	}
+	trace.Protocol = response.Proto
 	defer func() {
 		_ = response.Body.Close()
 	}()
@@ -538,6 +567,7 @@ func (p *QNAProvider) doJSON(
 			startedAt,
 			response.Header.Get("Server"),
 			response.Header.Get("CF-Ray"),
+			qnaUpstreamRequestID(response.Header),
 			retryableRequestError(ctx, trace, err),
 			err,
 		)
@@ -561,6 +591,7 @@ func (p *QNAProvider) doJSON(
 				startedAt,
 				response.Header.Get("Server"),
 				response.Header.Get("CF-Ray"),
+				qnaUpstreamRequestID(response.Header),
 				retryableRequestError(ctx, trace, err),
 				err,
 			)
@@ -581,124 +612,11 @@ func (p *QNAProvider) doJSON(
 		startedAt,
 		response.Header.Get("Server"),
 		response.Header.Get("CF-Ray"),
+		qnaUpstreamRequestID(response.Header),
 		len(data),
 		qnaResponseTarget(target),
 	)
 	return response.StatusCode, data, nil
-}
-
-func (p *QNAProvider) logRequestResult(
-	trace qnaRequestTrace,
-	method string,
-	endpoint string,
-	statusCode int,
-	startedAt time.Time,
-	server string,
-	cfRay string,
-	responseBytes int,
-	responseState *qnaVideoResponse,
-) {
-	if p.logger == nil {
-		return
-	}
-	inProgress := trace.Stage == "poll" && statusCode == http.StatusBadRequest &&
-		responseState != nil && taskInProgress(*responseState)
-	success := statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
-	var kind ErrorKind
-	var transient bool
-	if !success && !inProgress {
-		kind, transient = classifyQNAStatus(statusCode)
-	}
-	fields := p.requestLogFields(
-		trace,
-		method,
-		endpoint,
-		statusCode,
-		startedAt,
-		server,
-		cfRay,
-		trace.Attempt < trace.MaxAttempts && transient,
-	)
-	fields = append(fields, logger.Int("response_bytes", responseBytes))
-	if inProgress {
-		fields = append(fields,
-			logger.String("task_status", strings.TrimSpace(responseState.Status)),
-			logger.String("detail_type", strings.TrimSpace(responseState.Detail.Type)),
-			logger.Any("will_poll_again", true),
-		)
-		p.logger.Debug("qna video task still in progress", fields...)
-		return
-	}
-
-	if success {
-		p.logger.Debug("qna video API request completed", fields...)
-		return
-	}
-	fields = append(fields,
-		logger.String("error_kind", string(kind)),
-		logger.Any("transient", transient),
-	)
-	p.logger.Warn("qna video API request failed", fields...)
-}
-
-func (p *QNAProvider) logRequestFailure(
-	message string,
-	trace qnaRequestTrace,
-	method string,
-	endpoint string,
-	statusCode int,
-	startedAt time.Time,
-	server string,
-	cfRay string,
-	willRetry bool,
-	err error,
-) {
-	if p.logger == nil {
-		return
-	}
-	fields := p.requestLogFields(
-		trace,
-		method,
-		endpoint,
-		statusCode,
-		startedAt,
-		server,
-		cfRay,
-		willRetry,
-	)
-	kind, transient := classifyQNARequestFailure(statusCode, err)
-	fields = append(fields,
-		logger.String("error_kind", string(kind)),
-		logger.Any("transient", transient),
-		logger.Error(err),
-	)
-	p.logger.Warn(message, fields...)
-}
-
-func (p *QNAProvider) requestLogFields(
-	trace qnaRequestTrace,
-	method string,
-	endpoint string,
-	statusCode int,
-	startedAt time.Time,
-	server string,
-	cfRay string,
-	willRetry bool,
-) []logger.Field {
-	return []logger.Field{
-		logger.String("provider", qnaProviderName),
-		logger.String("stage", trace.Stage),
-		logger.String("method", method),
-		logger.String("endpoint", endpointLogValue(endpoint)),
-		logger.String("request_id", trace.RequestID),
-		logger.Int("attempt", trace.Attempt),
-		logger.Int("max_attempts", trace.MaxAttempts),
-		logger.Int("status_code", statusCode),
-		logger.Int64("duration_ms", time.Since(startedAt).Milliseconds()),
-		logger.String("upstream_server", strings.TrimSpace(server)),
-		logger.String("cf_ray", strings.TrimSpace(cfRay)),
-		logger.Any("will_retry", willRetry),
-	}
 }
 
 func (p *QNAProvider) logInfo(message string, fields ...logger.Field) {
@@ -740,6 +658,15 @@ func classifyQNARequestFailure(statusCode int, err error) (ErrorKind, bool) {
 		return ErrorKindInvalidResponse, true
 	}
 	return ErrorKindTransport, true
+}
+
+func qnaUpstreamRequestID(header http.Header) string {
+	for _, name := range []string{"Request-Id", "X-Request-Id", "X-Reqid"} {
+		if value := strings.TrimSpace(header.Get(name)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func endpointLogValue(raw string) string {

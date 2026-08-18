@@ -158,7 +158,14 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	})
 	videos := videoclient.NewVideoGenerationService(videoProvider)
 	imageProcessor := InitImageProcessor()
-	animations := generator.NewAnimationGenerationService(videos, imageProcessor, references)
+	animations := generator.NewAnimationGenerationServiceWithDependencies(
+		videos,
+		imageProcessor,
+		generator.AnimationGenerationDependencies{
+			ReferenceResolver: references,
+			Logger:            appLogger,
+		},
+	)
 	generatorExecutor := generator.NewExecutorWithDependencies(
 		imageService,
 		imageProcessor,

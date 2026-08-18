@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -286,6 +287,7 @@ func TestQNAProviderUsesDefaultRetriesAndLogsRequestStage(t *testing.T) {
 		if creates.Add(1) < 3 {
 			writer.Header().Set("Server", "test-edge")
 			writer.Header().Set("CF-Ray", "test-ray")
+			writer.Header().Set("Request-Id", "gateway-request-123")
 			writer.WriteHeader(522)
 			return
 		}
@@ -322,18 +324,19 @@ func TestQNAProviderUsesDefaultRetriesAndLogsRequestStage(t *testing.T) {
 		t.Fatal("expected staged QNA failure log")
 	}
 	for key, want := range map[string]any{
-		"provider":        "qna",
-		"stage":           "create",
-		"method":          http.MethodPost,
-		"endpoint":        videoclient.DefaultQNACreatePath,
-		"attempt":         1,
-		"max_attempts":    4,
-		"status_code":     522,
-		"upstream_server": "test-edge",
-		"cf_ray":          "test-ray",
-		"will_retry":      true,
-		"error_kind":      string(videoclient.ErrorKindUnavailable),
-		"transient":       true,
+		"provider":            "qna",
+		"stage":               "create",
+		"method":              http.MethodPost,
+		"endpoint":            videoclient.DefaultQNACreatePath,
+		"attempt":             1,
+		"max_attempts":        4,
+		"status_code":         522,
+		"upstream_server":     "test-edge",
+		"upstream_request_id": "gateway-request-123",
+		"cf_ray":              "test-ray",
+		"will_retry":          true,
+		"error_kind":          string(videoclient.ErrorKindUnavailable),
+		"transient":           true,
 	} {
 		if got := entry.fields[key]; got != want {
 			t.Errorf("log field %q = %#v, want %#v", key, got, want)
@@ -447,6 +450,89 @@ func TestQNAProviderReturnsStableTaskFailure(t *testing.T) {
 			t.Errorf("log field %q = %#v, want %#v", key, got, want)
 		}
 	}
+}
+
+func TestQNAProviderRedactsSignedURLFromTransportFailureLog(t *testing.T) {
+	logs := &recordingLogger{}
+	client := &http.Client{Transport: qnaRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return nil, fmt.Errorf("dial failed for %s", request.URL.String())
+	})}
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		HTTPClient: client,
+		MaxRetries: -1,
+		Logger:     logs,
+	})
+	_, err := provider.Download(
+		context.Background(),
+		"https://cdn.example.test/video.mp4?token=super-secret&e=1787624733",
+	)
+	if err == nil {
+		t.Fatal("expected transport failure")
+	}
+
+	entry, ok := logs.find("qna video download transport failure")
+	if !ok {
+		t.Fatal("expected transport failure log")
+	}
+	loggedErr, ok := entry.fields["errorx"].(error)
+	if !ok {
+		t.Fatalf("errorx type = %T, want error", entry.fields["errorx"])
+	}
+	if strings.Contains(loggedErr.Error(), "super-secret") || strings.Contains(loggedErr.Error(), "1787624733") {
+		t.Fatalf("signed URL query leaked into log error: %q", loggedErr)
+	}
+	if !strings.Contains(loggedErr.Error(), "https://cdn.example.test/video.mp4") {
+		t.Fatalf("sanitized error lost endpoint context: %q", loggedErr)
+	}
+}
+
+func TestQNAProviderLogsTLSDownloadNetworkStages(t *testing.T) {
+	logs := &recordingLogger{}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte("mp4"))
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		HTTPClient: server.Client(),
+		MaxRetries: -1,
+		Logger:     logs,
+	})
+	video, err := provider.Download(context.Background(), server.URL+"/video.mp4?token=secret")
+	if err != nil {
+		t.Fatalf("download video: %v", err)
+	}
+	if string(video) != "mp4" {
+		t.Fatalf("video = %q, want mp4", video)
+	}
+
+	entry, ok := logs.find("qna video download completed")
+	if !ok {
+		t.Fatal("expected successful download log")
+	}
+	for key, want := range map[string]any{
+		"stage":             "download",
+		"endpoint":          "/video.mp4",
+		"status_code":       http.StatusOK,
+		"http_protocol":     "HTTP/1.1",
+		"connection_reused": false,
+	} {
+		if got := entry.fields[key]; got != want {
+			t.Errorf("network log field %q = %#v, want %#v", key, got, want)
+		}
+	}
+	if remote, _ := entry.fields["remote_addr"].(string); strings.TrimSpace(remote) == "" {
+		t.Errorf("remote_addr = %#v, want a resolved peer", entry.fields["remote_addr"])
+	}
+	if version, _ := entry.fields["tls_version"].(string); strings.TrimSpace(version) == "" {
+		t.Errorf("tls_version = %#v, want TLS version", entry.fields["tls_version"])
+	}
+}
+
+type qnaRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function qnaRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
 }
 
 type recordedLogEntry struct {
