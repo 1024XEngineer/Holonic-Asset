@@ -155,12 +155,7 @@ export function HomeCapabilities() {
               <p className="font-mono text-xs tracking-[0.18em] text-cyan-700/70">
                 {t(`capabilities.${key}.detail`)}
               </p>
-              <h2 className="mt-5 text-3xl leading-tight font-semibold tracking-[-0.035em] sm:text-4xl">
-                {index === 0
-                  ? t("capabilities.characters.headline")
-                  : t(`capabilities.${key}.title`)}
-              </h2>
-              <p className="mt-6 text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
+              <p className="mt-5 text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
                 {t(`capabilities.${key}.description`)}
               </p>
               <Link
