@@ -11,7 +11,7 @@ import (
 
 const (
 	referenceSize               = "auto"
-	referenceQuality            = "high"
+	referenceQuality            = "medium"
 	referenceRegenerationPrompt = `REFERENCE REGENERATION
 The supplied reference image is the user's current result and they are dissatisfied with it. Generate a clearly new alternative instead of reproducing the same composition. Keep only useful high-level cues such as visual language, palette relationships, sprite scale, and material treatment. Change the composition, layout, staging, silhouettes, and scene details while following the current project brief.`
 )
