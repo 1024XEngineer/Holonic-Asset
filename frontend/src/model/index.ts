@@ -9,6 +9,7 @@ export {
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
   recordQueryOptions,
+  toCoreSpriteCandidateRecord,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -114,10 +115,12 @@ export type {
 } from "./asset/library/asset.contract";
 export {
   generationKeys,
+  rememberGenerationRunMetadata,
   useDeleteQuickAssetMutation,
   useEnqueueGenerationMutation,
   useGenerateAnimationMutation,
   useGenerateQuickAssetMutation,
+  useGenerationCandidateQuery,
   useGenerationRunsQuery,
   useResolveGenerationApplicationMutation,
   useQuickAssetsQuery,

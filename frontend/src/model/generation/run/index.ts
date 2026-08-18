@@ -1,5 +1,7 @@
 export { useEnqueueGenerationMutation } from "./generation-run.mutation";
 export { useGenerationRunsQuery } from "./generation-runs.query";
+export { useGenerationCandidateQuery } from "./generation-candidate.query";
+export { rememberGenerationRunMetadata } from "./generation.api";
 export {
   resolveGenerationApplication,
   useResolveGenerationApplicationMutation,

@@ -1,7 +1,6 @@
 package generator
 
 import (
-<<<<<<< HEAD
 	"context"
 	"fmt"
 	"image"
@@ -118,50 +117,4 @@ func (s *animationGenerationService) loadAnimationContextFrames(
 		frames[index] = frame
 	}
 	return frames, nil
-=======
-	"fmt"
-	"net/url"
-	"strings"
-
-	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
-)
-
-func animationReference(asset assetdomain.Asset, direction string) (string, bool, error) {
-	if asset.Type != assetdomain.AssetTypeCharacter && asset.Type != assetdomain.AssetTypeObject {
-		return "", false, fmt.Errorf("generator: asset type %q does not support animation generation", asset.Type)
-	}
-	// Select the requested direction and resolve its -unprocessed image-hosting
-	// reference.
-	content, err := asset.DecodeContent()
-	if err != nil {
-		return "", false, fmt.Errorf("generator: decode animation asset %d content: %w", asset.ID, err)
-	}
-	prototypeIndex, err := animationDirectionIndex(direction, content.DirectionCount)
-	if err != nil {
-		return "", false, err
-	}
-
-	if content.Prototype == nil || prototypeIndex >= len(*content.Prototype) {
-		return "", false, fmt.Errorf("generator: animation asset %d has no prototype for direction %q", asset.ID, direction)
-	}
-	prototype := (*content.Prototype)[prototypeIndex]
-	if prototype.URL == nil || strings.TrimSpace(*prototype.URL) == "" {
-		return "", false, fmt.Errorf("generator: animation asset %d prototype direction %q has no image URL", asset.ID, direction)
-	}
-	unprocessedURL := animationUnprocessedImageURL(strings.TrimSpace(*prototype.URL))
-	return unprocessedURL, false, nil
-}
-
-func animationUnprocessedImageURL(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || strings.HasPrefix(value, "data:") {
-		return value
-	}
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return addObjectKeySuffix(value, "-unprocessed")
-	}
-	parsed.Path = addObjectKeySuffix(parsed.Path, "-unprocessed")
-	return parsed.String()
->>>>>>> 45e65c3 (fix(generator):change task result to patch and return url)
 }

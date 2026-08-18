@@ -369,7 +369,6 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected persisted animation frame inputs: %v", references.persisted)
 	}
-<<<<<<< HEAD
 	if !reflect.DeepEqual(references.uploads, []referenceUpload{
 		{key: "uploads/generated-1-unprocessed.png", reference: "data:image/png;base64,raw-first"},
 		{key: "uploads/generated-2-unprocessed.png", reference: "data:image/png;base64,raw-second"},
@@ -377,9 +376,6 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		t.Fatalf("unexpected persisted raw animation frames: %+v", references.uploads)
 	}
 	if application.AssetID != 7 || application.AnimationID != 1 || len(application.GeneratedResources) != 2 {
-=======
-	if application.AssetID != 7 || application.AnimationID != 4 || len(application.GeneratedResources) != 2 {
->>>>>>> 45e65c3 (fix(generator):change task result to patch and return url)
 		t.Fatalf("unexpected animation application candidate: %+v", application)
 	}
 }

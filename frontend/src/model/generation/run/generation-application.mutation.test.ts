@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  assetDetail: vi.fn(),
   detail: vi.fn(),
   record: vi.fn(),
   resolve: vi.fn(),
@@ -13,7 +14,7 @@ vi.mock("./core-generation.api", () => ({
   },
 }));
 vi.mock("../../asset/library/core-asset.api", () => ({
-  coreAssetApi: { record: mocks.record },
+  coreAssetApi: { detail: mocks.assetDetail, record: mocks.record },
 }));
 
 import { resolveGenerationApplication } from "./generation-application.mutation";
@@ -21,6 +22,13 @@ import { resolveGenerationApplication } from "./generation-application.mutation"
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.record.mockResolvedValue({ version: 5 });
+  mocks.assetDetail.mockResolvedValue({
+    content: {
+      directionCount: 4,
+      prototype: [{ id: 1, url: "hero.png" }],
+      animations: [{ id: 2, name: "Idle", frames: [] }],
+    },
+  });
   mocks.resolve.mockResolvedValue({ completed: true });
 });
 
@@ -28,7 +36,15 @@ describe("resolveGenerationApplication", () => {
   it("saves an applicable candidate before completing its task", async () => {
     mocks.detail.mockResolvedValue({
       status: "awaiting_application",
-      result: { asset_id: 9, version: 4, content: { animations: [] } },
+      result: {
+        asset_id: 9,
+        version: 4,
+        content: {
+          animations: [
+            { id: 3, name: "Walk", frames: [{ id: 1, url: "walk.png" }] },
+          ],
+        },
+      },
     });
 
     await resolveGenerationApplication({
@@ -41,7 +57,18 @@ describe("resolveGenerationApplication", () => {
     expect(mocks.record).toHaveBeenCalledWith({
       assetId: 9,
       expectedVersion: 4,
-      content: { animations: [] },
+      content: {
+        directionCount: 4,
+        prototype: [{ id: 1, url: "hero.png" }],
+        animations: [
+          { id: 2, name: "Idle", frames: [] },
+          {
+            id: 3,
+            name: "Walk",
+            frames: [{ id: 1, url: "walk.png" }],
+          },
+        ],
+      },
     });
     expect(mocks.resolve).toHaveBeenCalledWith(12, true);
     expect(mocks.record.mock.invocationCallOrder[0]).toBeLessThan(
@@ -58,6 +85,7 @@ describe("resolveGenerationApplication", () => {
     });
 
     expect(mocks.detail).not.toHaveBeenCalled();
+    expect(mocks.assetDetail).not.toHaveBeenCalled();
     expect(mocks.record).not.toHaveBeenCalled();
     expect(mocks.resolve).toHaveBeenCalledWith(12, false);
   });

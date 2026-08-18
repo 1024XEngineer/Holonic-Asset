@@ -27,6 +27,7 @@ vi.mock("../../project", async (importOriginal) => ({
 import {
   loadCoreSpriteAssetWorkspace,
   saveCoreSpriteAssetRevision,
+  toCoreSpriteCandidateRecord,
   toCoreSpriteAssetWorkspace,
 } from "./core-sprite-record";
 
@@ -345,6 +346,44 @@ describe("toCoreSpriteAssetWorkspace", () => {
     expect(withoutPositions.record).toMatchObject({
       mode: "character",
       character: { nodePositions: {} },
+    });
+  });
+});
+
+describe("toCoreSpriteCandidateRecord", () => {
+  it("overlays a generated patch while preserving unchanged sprite content", () => {
+    const current = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: characterDetail(),
+      records: [],
+    }).record;
+
+    const candidate = toCoreSpriteCandidateRecord(current, "Top-Down", {
+      prototype: [
+        { id: 1, url: "/new-front.png" },
+        { id: 2, url: "/new-right.png" },
+        { id: 3, url: "/new-back.png" },
+        { id: 4, url: "/new-left.png" },
+      ],
+      animations: [
+        {
+          id: 8,
+          name: "Run",
+          frames: [{ id: 1, url: "/run.png" }],
+        },
+      ],
+    });
+
+    expect(candidate).toMatchObject({
+      mode: "character",
+      character: {
+        prototype: { imageUrl: "/new-front.png" },
+        animations: [
+          { id: "7", label: "Walk" },
+          { id: "8", label: "Run", frameCount: 1 },
+        ],
+      },
     });
   });
 });

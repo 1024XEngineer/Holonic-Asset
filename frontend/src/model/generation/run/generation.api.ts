@@ -167,16 +167,34 @@ function generationKindToAssetKind(
   requestedKind?: CreatableAssetKind,
   resolvedAnimationKind?: "character" | "object",
 ) {
-  if (kind === "generate_character_prototype") return "character" as const;
-  if (kind === "generate_object_prototype") return "object" as const;
-  if (kind === "generate_tileset") return "tileset" as const;
   if (
-    kind === "generate_animation" &&
+    kind === "generate_character_prototype" ||
+    kind === "edit_character_prototype" ||
+    kind === "edit_character_frames"
+  ) {
+    return "character" as const;
+  }
+  if (
+    kind === "generate_object_prototype" ||
+    kind === "edit_object_prototype" ||
+    kind === "edit_object_frames"
+  ) {
+    return "object" as const;
+  }
+  if (
+    kind === "generate_tileset" ||
+    kind === "edit_tileset_item" ||
+    kind === "edit_tiles"
+  ) {
+    return "tileset" as const;
+  }
+  if (
+    (kind === "generate_animation" || kind === "edit_animation") &&
     (requestedKind === "character" || requestedKind === "object")
   ) {
     return requestedKind;
   }
-  if (kind === "generate_animation") {
+  if (kind === "generate_animation" || kind === "edit_animation") {
     return resolvedAnimationKind ?? ("character" as const);
   }
   return undefined;
@@ -189,7 +207,10 @@ async function resolveAnimationAssetKind(
   if (requestedKind === "character" || requestedKind === "object") {
     return requestedKind;
   }
-  if (item.kind !== "generate_animation" || item.assetId === undefined) {
+  if (
+    (item.kind !== "generate_animation" && item.kind !== "edit_animation") ||
+    item.assetId === undefined
+  ) {
     return undefined;
   }
   const cachedKind = animationAssetKinds.get(item.assetId);

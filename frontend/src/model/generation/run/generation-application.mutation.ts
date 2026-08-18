@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { readAuthenticatedUserId } from "@/model/auth";
 import { refreshAssetLibraryCache } from "../../asset/library/asset-library-cache";
 import { coreAssetApi } from "../../asset/library/core-asset.api";
+import { mergeAssetContentPatch } from "../../asset/library/merge-asset-content";
 import { recordQueryOptions } from "../../asset/record/record.query";
 import { coreGenerationApi } from "./core-generation.api";
 import { generationKeys } from "./keys";
@@ -20,14 +21,17 @@ export async function resolveGenerationApplication(
   const runId = positiveCoreId(input.runId, "generation run");
   if (input.applied) {
     const assetId = positiveCoreId(input.assetId, "asset");
-    const detail = await coreGenerationApi.detail(runId);
-    if (detail.status !== "awaiting_application") {
+    const [run, asset] = await Promise.all([
+      coreGenerationApi.detail(runId),
+      coreAssetApi.detail(assetId),
+    ]);
+    if (run.status !== "awaiting_application") {
       throw new Error("Generation result is no longer awaiting application.");
     }
     if (
-      detail.result?.asset_id !== assetId ||
-      detail.result.version === undefined ||
-      detail.result.content === undefined
+      run.result?.asset_id !== assetId ||
+      run.result.version === undefined ||
+      run.result.content === undefined
     ) {
       throw new Error(
         "Generation result does not contain an applicable asset revision.",
@@ -35,8 +39,8 @@ export async function resolveGenerationApplication(
     }
     await coreAssetApi.record({
       assetId,
-      expectedVersion: detail.result.version,
-      content: detail.result.content,
+      expectedVersion: run.result.version,
+      content: mergeAssetContentPatch(asset.content ?? {}, run.result.content),
     });
   }
 

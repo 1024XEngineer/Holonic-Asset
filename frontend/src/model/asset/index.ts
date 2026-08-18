@@ -17,7 +17,11 @@ export type {
   AssetLibraryCollection,
   AssetLibraryItem,
 } from "./library";
-export { useRecordQuery, useSaveAssetRevisionMutation } from "./record";
+export {
+  toCoreSpriteCandidateRecord,
+  useRecordQuery,
+  useSaveAssetRevisionMutation,
+} from "./record";
 export type {
   AssetCanvasPosition,
   AssetRecord,

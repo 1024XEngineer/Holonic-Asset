@@ -1,7 +1,9 @@
 export {
   generationKeys,
   isGenerationRunActive,
+  rememberGenerationRunMetadata,
   useEnqueueGenerationMutation,
+  useGenerationCandidateQuery,
   useGenerationRunsQuery,
   useResolveGenerationApplicationMutation,
 } from "./run";

@@ -3,6 +3,8 @@ import type {
   AssetRecordResponse,
 } from "../library/asset.contract";
 import { coreAssetApi } from "../library/core-asset.api";
+import { mergeAssetContentPatch } from "../library/merge-asset-content";
+import type { CharacterAssetContent } from "../library/asset.contract";
 import type {
   AssetKind,
   AssetRevision,
@@ -109,17 +111,66 @@ export function toCoreSpriteAssetWorkspace({
   } as AssetWorkspaceData;
 }
 
+export function toCoreSpriteCandidateRecord(
+  record: AssetRecord,
+  perspective: AssetWorkspaceData["asset"]["perspective"],
+  patch: unknown,
+): AssetRecord {
+  if (record.mode !== "character" && record.mode !== "object") {
+    throw new Error(
+      "Core sprite candidates require a Character or Object asset.",
+    );
+  }
+  const currentSprite =
+    record.mode === "character" ? record.character : record.object;
+  const content = mergeAssetContentPatch(
+    toCoreSpriteAssetContent(record),
+    patch,
+  ) as CharacterAssetContent;
+  const sprite = {
+    prototype: toPrototypeFromContent(
+      content.prototype,
+      perspective,
+      currentSprite.prototype.frameWidth,
+      currentSprite.prototype.frameHeight,
+    ),
+    animations: toAnimationsFromContent(
+      content.animations,
+      currentSprite.prototype.frameWidth,
+      currentSprite.prototype.frameHeight,
+    ),
+    nodePositions: readNodePositions(content.metadata),
+  };
+  return record.mode === "character"
+    ? { ...record, character: sprite }
+    : { ...record, object: sprite };
+}
+
 function toPrototype(
   detail: Extract<AssetDetailResponse, { type: CoreSpriteAssetKind }>,
 ): CharacterSpriteSheet {
-  const frameUrls = readURLs(detail.content?.prototype);
-  const layout = getPerspectiveDirectionLayout(detail.perspective);
+  return toPrototypeFromContent(
+    detail.content?.prototype,
+    detail.perspective,
+    detail.dimensions.width,
+    detail.dimensions.height,
+  );
+}
+
+function toPrototypeFromContent(
+  prototype: CharacterAssetContent["prototype"] | undefined,
+  perspective: AssetWorkspaceData["asset"]["perspective"],
+  frameWidth: number,
+  frameHeight: number,
+): CharacterSpriteSheet {
+  const frameUrls = readURLs(prototype);
+  const layout = getPerspectiveDirectionLayout(perspective);
   return {
     format: "png-sprite-sheet",
     imageUrl: frameUrls[0] ?? "",
     ...(frameUrls.length > 1 ? { frameUrls } : {}),
-    frameWidth: detail.dimensions.width,
-    frameHeight: detail.dimensions.height,
+    frameWidth,
+    frameHeight,
     columns: layout.columns,
     rows: layout.rows,
   };
@@ -128,7 +179,19 @@ function toPrototype(
 function toAnimations(
   detail: Extract<AssetDetailResponse, { type: CoreSpriteAssetKind }>,
 ): CharacterAnimation[] {
-  return (detail.content?.animations ?? []).map((animation) => {
+  return toAnimationsFromContent(
+    detail.content?.animations,
+    detail.dimensions.width,
+    detail.dimensions.height,
+  );
+}
+
+function toAnimationsFromContent(
+  animations: CharacterAssetContent["animations"] | undefined,
+  frameWidth: number,
+  frameHeight: number,
+): CharacterAnimation[] {
+  return (animations ?? []).map((animation) => {
     const frameUrls = readURLs(animation.frames);
     return {
       kind: "clip",
@@ -141,8 +204,8 @@ function toAnimations(
               format: "png-sprite-sheet",
               imageUrl: frameUrls[0]!,
               frameUrls,
-              frameWidth: detail.dimensions.width,
-              frameHeight: detail.dimensions.height,
+              frameWidth,
+              frameHeight,
               columns: frameUrls.length,
               rows: 1,
             },
