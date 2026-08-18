@@ -17,14 +17,79 @@ export function mergeAssetContentPatch(
 
   for (const [field, identityKey] of Object.entries(collectionIdentityKeys)) {
     if (!(field in patchContent)) continue;
-    merged[field] = mergeCollection(
-      currentContent[field],
-      patchContent[field],
-      identityKey,
-    );
+    merged[field] =
+      field === "animations"
+        ? mergeAnimationCollection(currentContent[field], patchContent[field])
+        : mergeCollection(
+            currentContent[field],
+            patchContent[field],
+            identityKey,
+          );
   }
 
   return merged;
+}
+
+function mergeAnimationCollection(current: unknown, patch: unknown) {
+  if (!Array.isArray(patch)) return patch;
+
+  const currentItems = Array.isArray(current) ? current : [];
+  const merged = currentItems.map((value) => cloneValue(value));
+  const usedIds = new Set(
+    [...currentItems, ...patch].flatMap((value) => {
+      const item = asOptionalJsonObject(value);
+      return item && isPositiveInteger(item.id) ? [String(item.id)] : [];
+    }),
+  );
+  let nextId =
+    Math.max(
+      0,
+      ...currentItems.flatMap((value) => {
+        const item = asOptionalJsonObject(value);
+        return item && isPositiveInteger(item.id) ? [Number(item.id)] : [];
+      }),
+    ) + 1;
+
+  for (const patchValue of patch) {
+    const patchItem = asOptionalJsonObject(patchValue);
+    if (!patchItem) {
+      merged.push(cloneValue(patchValue));
+      continue;
+    }
+
+    let normalizedPatch = patchItem;
+    if (!isPositiveInteger(patchItem.id)) {
+      while (usedIds.has(String(nextId))) nextId += 1;
+      normalizedPatch = { ...patchItem, id: nextId };
+      usedIds.add(String(nextId));
+      nextId += 1;
+    }
+
+    const identity = normalizedPatch.id;
+    const existingIndex = merged.findIndex((value) => {
+      const currentItem = asOptionalJsonObject(value);
+      return (
+        currentItem?.id !== undefined &&
+        String(currentItem.id) === String(identity)
+      );
+    });
+
+    if (existingIndex === -1) {
+      merged.push(cloneValue(normalizedPatch));
+      continue;
+    }
+    const currentItem = asOptionalJsonObject(merged[existingIndex]);
+    merged[existingIndex] = currentItem
+      ? { ...currentItem, ...normalizedPatch }
+      : cloneValue(normalizedPatch);
+  }
+  return merged;
+}
+
+function isPositiveInteger(value: unknown): value is number | string {
+  if (typeof value !== "number" && typeof value !== "string") return false;
+  const numeric = Number(value);
+  return Number.isSafeInteger(numeric) && numeric > 0;
 }
 
 function mergeCollection(

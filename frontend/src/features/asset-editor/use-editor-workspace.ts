@@ -76,7 +76,11 @@ export function useEditorWorkspace({
     setNotice(message);
     scheduleNoticeReset(() => setNotice(null), 2400);
   };
-  const resolveApplication = async (runId: string, applied: boolean) => {
+  const resolveApplication = async (
+    runId: string,
+    applied: boolean,
+    candidate?: AssetWorkspaceData["record"] | null,
+  ) => {
     try {
       await applicationMutation.mutateAsync({
         projectId: asset.projectId,
@@ -84,6 +88,9 @@ export function useEditorWorkspace({
         runId,
         applied,
       });
+      if (applied && candidate) {
+        session.dispatch({ type: "record.candidate.apply", record: candidate });
+      }
       reportAction(applied ? "Generation applied" : "Generation denied");
     } catch {
       reportAction("Unable to consume generation result");
@@ -258,7 +265,8 @@ export function useEditorWorkspace({
       ? {
           generationReview: {
             ...generationReview,
-            onApply: () => void resolveApplication(reviewRun.id, true),
+            onApply: () =>
+              void resolveApplication(reviewRun.id, true, candidateRecord),
             onDeny: () => void resolveApplication(reviewRun.id, false),
           },
         }

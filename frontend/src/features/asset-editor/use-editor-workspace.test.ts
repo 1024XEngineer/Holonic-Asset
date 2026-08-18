@@ -325,6 +325,19 @@ describe("useEditorWorkspace", () => {
       runId: "ready",
       applied: false,
     });
+    expect(mocks.session.dispatch).toHaveBeenCalledTimes(1);
+    expect(mocks.session.dispatch).toHaveBeenCalledWith({
+      type: "record.candidate.apply",
+      record: expect.objectContaining({
+        mode: "character",
+        character: expect.objectContaining({
+          prototype: expect.objectContaining({
+            imageUrl: "/candidate-front.png",
+          }),
+        }),
+      }),
+    });
+    expect(mocks.session.save).not.toHaveBeenCalled();
   });
 
   it("shows a new animation as a reviewable canvas node", () => {
@@ -340,11 +353,9 @@ describe("useEditorWorkspace", () => {
       kind: "generate_animation",
       status: "awaiting_application",
       result: {
-        animation_id: 7,
         content: {
           animations: [
             {
-              id: 7,
               name: "Walk",
               frames: [{ id: 1, url: "/walk-1.png" }],
             },
@@ -360,11 +371,11 @@ describe("useEditorWorkspace", () => {
     });
 
     expect(editor?.sprite.animations).toEqual([
-      expect.objectContaining({ id: "7", label: "Walk" }),
+      expect.objectContaining({ id: "1", label: "Walk" }),
     ]);
     expect(editor?.generationReview).toMatchObject({
       kind: "new-animation",
-      nodeId: "7",
+      nodeId: "1",
     });
   });
 
@@ -395,15 +406,16 @@ describe("useEditorWorkspace", () => {
       onBack: vi.fn(),
     });
 
-    editor?.generationReview?.onDeny();
+    editor?.generationReview?.onApply();
     await flushPromises();
 
     expect(mocks.applicationMutation.mutateAsync).toHaveBeenCalledWith({
       projectId: "7",
       assetId: "8",
       runId: "ready",
-      applied: false,
+      applied: true,
     });
+    expect(mocks.session.dispatch).not.toHaveBeenCalled();
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
   });
 

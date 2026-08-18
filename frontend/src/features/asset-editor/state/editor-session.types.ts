@@ -19,6 +19,7 @@ export type EditorCommand =
       label: string;
     }
   | { type: "sprite.animation.delete"; animationId: string }
+  | { type: "record.candidate.apply"; record: AssetRecord }
   | { type: "history.undo" }
   | { type: "history.redo" };
 
