@@ -7,8 +7,6 @@
 <p align="center"><strong>AI-assisted asset production for coherent game worlds.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/1024XEngineer/Holonic-Asset/actions/workflows/frontend-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/1024XEngineer/Holonic-Asset/frontend-ci.yml?branch=main&label=frontend%20CI" alt="Frontend CI status"></a>
-  <a href="https://github.com/1024XEngineer/Holonic-Asset/actions/workflows/backend-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/1024XEngineer/Holonic-Asset/backend-ci.yml?branch=main&label=backend%20CI" alt="Backend CI status"></a>
   <a href="https://codecov.io/gh/1024XEngineer/Holonic-Asset"><img src="https://codecov.io/gh/1024XEngineer/Holonic-Asset/branch/main/graph/badge.svg?flag=backend" alt="Backend test coverage"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
@@ -21,25 +19,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=white" alt="Go 1.26.5">
-  <img src="https://img.shields.io/badge/React-19.2.7-149eca?logo=react&logoColor=white" alt="React 19.2.7">
-  <img src="https://img.shields.io/badge/TypeScript-6.0.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript 6.0.x">
-  <img src="https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white" alt="Vite 8.x">
-  <img src="https://img.shields.io/badge/pnpm-11.5.0-F69220?logo=pnpm&logoColor=white" alt="pnpm 11.5.0">
+  <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=00ADD8" alt="Go 1.26.5">
+  <img src="https://img.shields.io/badge/React-19.2.7-149eca?logo=react&logoColor=61DAFB" alt="React 19.2.7">
+  <img src="https://img.shields.io/badge/TypeScript-6.0.x-3178C6?logo=typescript&logoColor=3178C6" alt="TypeScript 6.0.x">
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-4.3.3-06B6D4?logo=tailwindcss&logoColor=06B6D4" alt="Tailwind CSS 4.3.3">
+  <img src="https://img.shields.io/badge/TanStack-1.170.18-FF4154?logo=tanstack&logoColor=FF4154" alt="TanStack Router 1.170.18">
+  <a href="https://pixijs.com/"><img src="https://github.com/pixijs.png?size=32" alt="PixiJS logo" height="20"><img src="https://img.shields.io/badge/PixiJS-8.19.0-E72264" alt="PixiJS 8.19.0"></a>
+  <img src="https://img.shields.io/badge/OpenAPI%20TypeScript-7.13.0-6BA539?logo=openapiinitiative&logoColor=6BA539" alt="OpenAPI TypeScript 7.13.0">
 </p>
 
 Holonic Asset brings AI generation into real-world game development workflows. Within a shared project context, creators can generate, iterate on, connect, manage, and export characters, objects, scenes, tilesets, and UI Set assets instead of ending up with isolated images.
-
-## Tech Stack
-
-| Area | Technology | Version / source |
-| --- | --- | --- |
-| Frontend | React + TypeScript | React 19.2.7 · TypeScript 6.0.x |
-| Frontend tooling | Vite + Vitest | Vite 8.x · Vitest 4.1.10 |
-| Frontend package manager | pnpm | 11.5.0 (`packageManager`) |
-| Backend | Go + Echo + GORM | Go 1.26.5 · Echo 4.15.4 · GORM 1.31.2 |
-| API contract | OpenAPI + Huma | Generated from `openapi/openapi.json` |
-| Quality | GitHub Actions + Codecov | Frontend and backend CI/coverage workflows |
 
 ## Who It Is For
 
