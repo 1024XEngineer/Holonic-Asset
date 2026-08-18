@@ -19,10 +19,11 @@ type GenerateRequest struct {
 	// protected.
 	MaskImage string
 	// N requests multiple independent candidates from providers that support it.
-	N      int
-	Model  string
-	Size   string
-	Params Params
+	N           int
+	Model       string
+	Size        string
+	Params      Params
+	MaxAttempts int
 }
 
 // GeneratedImage is one normalized image returned by a model provider.

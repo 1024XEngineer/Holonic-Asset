@@ -274,7 +274,7 @@ func TestGenerateTileSetTileEditRetriesProviderBatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("retry Tile edit: %v", err)
 	}
-	if region.ImageBase64 == "" || images.calls != 2 || len(images.requests) != 2 || images.requests[1].N != 2 {
+	if region.ImageBase64 == "" || images.calls != 2 || len(images.requests) != 2 || images.requests[1].N != 2 || images.requests[1].MaxAttempts != 2 {
 		t.Fatalf("unexpected retry result: region=%+v images=%+v", region, images)
 	}
 }
@@ -296,9 +296,9 @@ func TestGenerateTileSetTileEditRejectsEmptyOriginalBeforeProvider(t *testing.T)
 	}
 }
 
-func TestGenerateTileSetTileEditStopsOnPermanentProviderError(t *testing.T) {
+func TestGenerateTileSetTileEditDoesNotUseQualityRetriesForProviderErrors(t *testing.T) {
 	original := tileSetEditTransparentTestImage(t, 16, 16)
-	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
 	images := &tileSetEditImageStub{errors: []error{providerErr}}
 	url := "tile"
 	executor := &executor{
@@ -309,8 +309,8 @@ func TestGenerateTileSetTileEditStopsOnPermanentProviderError(t *testing.T) {
 		assetdomain.Tile{URL: &url},
 		assetdomain.TileSetDimensions{TileSize: assetdomain.Size{Width: 16, Height: 16}}, nil,
 	)
-	if err == nil || !errors.Is(err, providerErr) || !strings.Contains(err.Error(), "after 1 attempts") || images.calls != 1 {
-		t.Fatalf("expected one permanent provider attempt: calls=%d err=%v", images.calls, err)
+	if err == nil || !errors.Is(err, providerErr) || images.calls != 1 {
+		t.Fatalf("provider failure consumed quality retries: calls=%d err=%v", images.calls, err)
 	}
 }
 

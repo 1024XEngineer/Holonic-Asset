@@ -199,3 +199,83 @@ func TestQNAProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 		t.Fatalf("unexpected unrelated-error fallback: requests=%d err=%v", requests, err)
 	}
 }
+
+func TestQNAProviderClassifiesStatusCodes(t *testing.T) {
+	tests := []struct {
+		statusCode int
+		body       string
+		wantKind   imageclient.ErrorKind
+		transient  bool
+	}{
+		{http.StatusUnauthorized, `{"message":"unauthorized"}`, imageclient.ErrorKindAuthentication, false},
+		{http.StatusForbidden, `{"message":"forbidden"}`, imageclient.ErrorKindAuthentication, false},
+		{http.StatusRequestTimeout, `{"message":"timed out"}`, imageclient.ErrorKindTimeout, true},
+		{http.StatusTooManyRequests, `{"error":{"message":"rate limited"}}`, imageclient.ErrorKindRateLimited, true},
+		{http.StatusBadRequest, `{"error":"bad request"}`, imageclient.ErrorKindInvalidRequest, false},
+		{http.StatusUnprocessableEntity, `raw error string`, imageclient.ErrorKindInvalidRequest, false},
+		{http.StatusInternalServerError, `{"message":"server error"}`, imageclient.ErrorKindUnavailable, true},
+		{525, `SSL Handshake Failed`, imageclient.ErrorKindUnavailable, true},
+	}
+
+	for _, tt := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.WriteHeader(tt.statusCode)
+			_, _ = writer.Write([]byte(tt.body))
+		}))
+		provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "key"})
+		_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+		server.Close()
+
+		if err == nil {
+			t.Fatalf("expected error for status %d, got nil", tt.statusCode)
+		}
+		if imageclient.IsTransient(err) != tt.transient {
+			t.Fatalf("status %d: got transient=%v, want %v", tt.statusCode, imageclient.IsTransient(err), tt.transient)
+		}
+		if imageclient.IsPermanent(err) == tt.transient {
+			t.Fatalf("status %d: got permanent=%v, want %v", tt.statusCode, imageclient.IsPermanent(err), !tt.transient)
+		}
+	}
+}
+
+func TestQNAProviderHandlesInvalidResponsePayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"invalid json", `invalid json`},
+		{"empty data list", `{"created":123,"data":[]}`},
+		{"empty b64 field", `{"created":123,"data":[{"b64_json":""}]}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				writer.Header().Set("Content-Type", "application/json")
+				_, _ = writer.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "key"})
+			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+			if err == nil {
+				t.Fatalf("expected error for %s, got nil", tt.name)
+			}
+			if !imageclient.IsTransient(err) {
+				t.Fatalf("expected invalid response to be transient, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestQNAProviderErrorMethods(t *testing.T) {
+	var nilErr *imageclient.ProviderError
+	if nilErr.Error() != "" || nilErr.Unwrap() != nil {
+		t.Fatalf("expected empty for nil error")
+	}
+
+	errWithKindOnly := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable}
+	if errWithKindOnly.Error() != "image provider: unavailable" {
+		t.Fatalf("unexpected error string: %s", errWithKindOnly.Error())
+	}
+}

@@ -80,7 +80,7 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 	for index, reference := range originalURLs {
 		wantImageReferences[index] = "signed:" + reference
 	}
-	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, wantImageReferences) {
+	if images.request == nil || images.request.MaxAttempts != 3 || !reflect.DeepEqual(images.request.ReferenceImages, wantImageReferences) {
 		t.Fatalf("unexpected edit image references: %+v", images.request)
 	}
 	for _, expected := range []string{
@@ -285,7 +285,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
-	if images.request == nil || !strings.Contains(images.request.Prompt, "pixel knight") ||
+	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
@@ -459,6 +459,9 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
+	}
+	if images.request == nil || images.request.MaxAttempts != 3 {
+		t.Fatalf("expected MaxAttempts 3, got %+v", images.request)
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
 		assets.objectAsset.ProjectID != 12 || assets.objectAsset.Type != assetdomain.AssetTypeObject {

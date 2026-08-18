@@ -2,8 +2,16 @@ package imageclient
 
 import (
 	"context"
+	"errors"
 	"maps"
+	"slices"
 	"strings"
+	"time"
+)
+
+var (
+	defaultMaxAttempts = 1
+	baseRetryBackoff   = time.Second
 )
 
 // ImageGenerationService completes one provider-independent image generation
@@ -35,36 +43,37 @@ func (s *imageGenerationService) Generate(
 		Params:          copyParams(request.Params),
 	}
 
+	maxAttempts := request.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = defaultMaxAttempts
+	}
+
 	var (
 		providerResult *ProviderResult
 		err            error
 	)
-	if len(providerRequest.ReferenceImages) == 0 {
-		providerResult, err = s.provider.Generate(ctx, providerRequest)
-	} else {
-		providerResult, err = s.provider.Edit(ctx, providerRequest)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if providerResult == nil || len(providerResult.Images) == 0 {
-		return nil, &ProviderError{
-			Kind:      ErrorKindInvalidResponse,
-			Transient: true,
-			Message:   "provider returned no images",
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if len(providerRequest.ReferenceImages) == 0 {
+			providerResult, err = s.provider.Generate(ctx, providerRequest)
+		} else {
+			providerResult, err = s.provider.Edit(ctx, providerRequest)
+		}
+		if err == nil {
+			err = validateProviderResult(providerResult)
+		}
+		if err == nil {
+			break
+		}
+		if !IsTransient(err) || errors.Is(ctx.Err(), context.Canceled) || attempt >= maxAttempts {
+			return nil, err
+		}
+		if waitErr := backoffSleep(ctx, attempt); waitErr != nil {
+			return nil, waitErr
 		}
 	}
-
 	mediaType := mediaTypeForFormat(providerResult.OutputFormat)
 	images := make([]GeneratedImage, 0, len(providerResult.Images))
 	for _, imageBase64 := range providerResult.Images {
-		if imageBase64 == "" {
-			return nil, &ProviderError{
-				Kind:      ErrorKindInvalidResponse,
-				Transient: true,
-				Message:   "provider returned an empty image",
-			}
-		}
 		images = append(images, GeneratedImage{
 			Base64:    imageBase64,
 			MediaType: mediaType,
@@ -78,6 +87,24 @@ func (s *imageGenerationService) Generate(
 		CreatedAt: providerResult.CreatedAt,
 		Usage:     providerResult.Usage,
 	}, nil
+}
+
+func validateProviderResult(result *ProviderResult) error {
+	if result == nil || len(result.Images) == 0 {
+		return &ProviderError{
+			Kind:      ErrorKindInvalidResponse,
+			Transient: true,
+			Message:   "provider returned no images",
+		}
+	}
+	if slices.Contains(result.Images, "") {
+		return &ProviderError{
+			Kind:      ErrorKindInvalidResponse,
+			Transient: true,
+			Message:   "provider returned an empty image",
+		}
+	}
+	return nil
 }
 
 func copyParams(params Params) Params {
@@ -99,5 +126,17 @@ func mediaTypeForFormat(format string) string {
 		return "image/webp"
 	default:
 		return "image/" + strings.ToLower(format)
+	}
+}
+
+func backoffSleep(ctx context.Context, attempt int) error {
+	delay := time.Duration(attempt) * baseRetryBackoff
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }

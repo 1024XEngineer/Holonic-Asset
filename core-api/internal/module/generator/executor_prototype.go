@@ -201,6 +201,7 @@ func (e *executor) generatePrototypeResources(
 	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
 		Prompt:          prompt,
 		ReferenceImages: resolvedReferences,
+		MaxAttempts:     3,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)

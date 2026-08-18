@@ -126,17 +126,15 @@ func (e *executor) generateSceneryLayer(
 		}
 		generated, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
 			Prompt: prompt, ReferenceImages: append([]string(nil), references...),
-			Size: fmt.Sprintf("%dx%d", payload.Dimensions.Width, payload.Dimensions.Height),
+			Size:        fmt.Sprintf("%dx%d", payload.Dimensions.Width, payload.Dimensions.Height),
+			MaxAttempts: 2,
 		})
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return nil, ctxErr
 			}
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, err))
-			if imageclient.IsPermanent(err) {
-				break
-			}
-			continue
+			break
 		}
 		if generated == nil || len(generated.Images) == 0 {
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))

@@ -127,6 +127,7 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		Params: imageclient.Params{
 			"quality": referenceQuality,
 		},
+		MaxAttempts: 2,
 	}
 	if reference != "" {
 		// Refresh private URLs before sending them to the image provider so an

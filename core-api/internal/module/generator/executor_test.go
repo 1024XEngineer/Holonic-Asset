@@ -177,6 +177,7 @@ func (s *imageGenerationServiceStub) Generate(
 		Model:           request.Model,
 		Size:            request.Size,
 		Params:          request.Params,
+		MaxAttempts:     request.MaxAttempts,
 	}
 	return s.result, s.err
 }
