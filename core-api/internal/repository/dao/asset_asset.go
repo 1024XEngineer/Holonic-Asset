@@ -10,17 +10,18 @@ import (
 )
 
 type Asset struct {
-	ID          uint `gorm:"primaryKey"`
-	Name        string
-	ProjectID   uint `gorm:"index"`
-	Type        string
-	Description string
-	Tags        []string `json:"tags" gorm:"serializer:json"`
-	Perspective string
-	Dimensions  datatypes.JSON `gorm:"type:jsonb"`
-	ContentID   *uint          `gorm:"index"`
-	Content     datatypes.JSON `json:"content" gorm:"-"`
-	Version     uint
+	ID           uint `gorm:"primaryKey"`
+	Name         string
+	ProjectID    uint `gorm:"index"`
+	Type         string
+	Description  string
+	Tags         []string `json:"tags" gorm:"serializer:json"`
+	Perspective  string
+	Dimensions   datatypes.JSON `gorm:"type:jsonb"`
+	ThumbnailURL string
+	ContentID    *uint          `gorm:"index"`
+	Content      datatypes.JSON `json:"content" gorm:"-"`
+	Version      uint
 }
 
 type AssetUpdate struct {
@@ -38,7 +39,7 @@ type AssetDao interface {
 	GetAssetForUpdate(ctx context.Context, id uint) (Asset, error)
 	UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (Asset, error)
 	DeleteAsset(ctx context.Context, id uint) error
-	UpdateAssetCurrentContent(ctx context.Context, id uint, version uint, contentID uint) error
+	UpdateAssetCurrentContent(ctx context.Context, id uint, version uint, contentID uint, thumbnailURL string) error
 }
 
 type AssetDaoImpl struct {
@@ -54,46 +55,12 @@ func (a *AssetDaoImpl) DBHandle() *gorm.DB {
 }
 
 func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint) ([]Asset, error) {
-	type assetListRow struct {
-		ID          uint
-		Name        string
-		ProjectID   uint
-		Type        string
-		Description string
-		Tags        []string `gorm:"serializer:json"`
-		Perspective string
-		Dimensions  datatypes.JSON
-		Content     datatypes.JSON
-		Version     uint
-	}
-
-	rows := make([]assetListRow, 0)
+	assets := make([]Asset, 0)
 	err := a.DB.WithContext(ctx).
-		Table("assets AS a").
-		Select("a.id, a.name, a.project_id, a.type, a.description, a.tags, a.perspective, a.dimensions, c.content, a.version").
-		Joins("LEFT JOIN asset_contents AS c ON c.id = a.content_id").
-		Where("a.project_id = ?", projectID).
-		Order("a.id ASC").
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-
-	assets := make([]Asset, len(rows))
-	for index, row := range rows {
-		assets[index] = Asset{
-			ID:          row.ID,
-			Name:        row.Name,
-			ProjectID:   row.ProjectID,
-			Type:        row.Type,
-			Description: row.Description,
-			Tags:        row.Tags,
-			Perspective: row.Perspective,
-			Dimensions:  row.Dimensions,
-			Content:     row.Content,
-			Version:     row.Version,
-		}
-	}
+		Where("project_id = ?", projectID).
+		Select("id, name, project_id, type, description, tags, perspective, dimensions, thumbnail_url, version").
+		Order("id ASC").
+		Find(&assets).Error
 	return assets, err
 }
 
@@ -175,13 +142,15 @@ func (a *AssetDaoImpl) UpdateAssetCurrentContent(
 	id uint,
 	version uint,
 	contentID uint,
+	thumbnailURL string,
 ) error {
 	result := a.DB.WithContext(ctx).
 		Model(&Asset{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
-			"version":    version,
-			"content_id": contentID,
+			"version":       version,
+			"content_id":    contentID,
+			"thumbnail_url": thumbnailURL,
 		})
 	if result.Error != nil {
 		return fmt.Errorf("dao: update current content for asset %d: %w", id, result.Error)

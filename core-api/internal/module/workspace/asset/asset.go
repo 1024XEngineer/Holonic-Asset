@@ -3,16 +3,17 @@ package asset
 import "encoding/json"
 
 type Asset struct {
-	ID          uint
-	Name        string
-	ProjectID   uint
-	Type        AssetType
-	Description string
-	Tags        []string        `json:"tags"`
-	Perspective Perspective     `json:"perspective"`
-	Dimensions  json.RawMessage `json:"dimensions"`
-	Content     json.RawMessage `json:"content,omitempty"`
-	Version     uint
+	ID           uint
+	Name         string
+	ProjectID    uint
+	Type         AssetType
+	Description  string
+	Tags         []string        `json:"tags"`
+	Perspective  Perspective     `json:"perspective"`
+	Dimensions   json.RawMessage `json:"dimensions"`
+	ThumbnailURL string
+	Content      json.RawMessage `json:"content,omitempty"`
+	Version      uint
 }
 
 type AssetListFilter struct {
