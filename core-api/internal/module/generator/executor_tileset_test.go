@@ -114,8 +114,8 @@ func TestProcessTileSetItemsBuildsGuideMaskAndOccupiedTiles(t *testing.T) {
 		t.Fatalf("expected one generation per Item, got %d", len(requests))
 	}
 	for _, imageRequest := range requests {
-		if imageRequest.N != 2 {
-			t.Fatalf("expected two candidates per Item, got %d", imageRequest.N)
+		if imageRequest.N != 2 || imageRequest.MaxAttempts != 2 {
+			t.Fatalf("expected two candidates and MaxAttempts 2 per Item, got N=%d MaxAttempts=%d", imageRequest.N, imageRequest.MaxAttempts)
 		}
 		if len(imageRequest.ReferenceImages) != 2 ||
 			!strings.HasPrefix(imageRequest.ReferenceImages[0], "data:image/png;base64,") ||

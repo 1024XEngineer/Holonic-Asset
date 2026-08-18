@@ -266,17 +266,14 @@ func (e *executor) generateTileSetTileEdit(
 			return imageprocessor.ImageRegion{}, err
 		}
 		result, generateErr := e.images.Generate(ctx, &imageclient.GenerateRequest{
-			Prompt: prompt, ReferenceImages: references, N: 2,
+			Prompt: prompt, ReferenceImages: references, N: 2, MaxAttempts: 2,
 		})
 		if generateErr != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return imageprocessor.ImageRegion{}, ctxErr
 			}
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, generateErr))
-			if imageclient.IsPermanent(generateErr) {
-				break
-			}
-			continue
+			break
 		}
 		if result == nil || len(result.Images) == 0 {
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
@@ -490,16 +487,14 @@ func (e *executor) generateTileSetItemEdit(
 		result, generateErr := e.images.Generate(ctx, &imageclient.GenerateRequest{
 			Prompt: prompt, ReferenceImages: references,
 			MaskImage: "data:image/png;base64," + mask, N: 2,
+			MaxAttempts: 2,
 		})
 		if generateErr != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return nil, ctxErr
 			}
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider: %w", attempt, generateErr))
-			if imageclient.IsPermanent(generateErr) {
-				break
-			}
-			continue
+			break
 		}
 		if result == nil || len(result.Images) == 0 {
 			attemptErrors = append(attemptErrors, fmt.Errorf("attempt %d provider returned no images", attempt))
