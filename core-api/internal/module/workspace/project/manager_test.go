@@ -173,6 +173,9 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 	if images.request.Params["quality"] != "medium" {
 		t.Fatalf("expected medium quality generation, got %+v", images.request.Params)
 	}
+	if images.request.MaxAttempts != 2 {
+		t.Fatalf("expected MaxAttempts 2, got %d", images.request.MaxAttempts)
+	}
 	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
 		t.Fatalf("expected resolved project reference to be forwarded, got %+v", images.request.ReferenceImages)
 	}
