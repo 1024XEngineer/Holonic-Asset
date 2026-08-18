@@ -84,6 +84,7 @@ const capabilities = [
       "Generate action sound effects (SFX) matched with animations, plus immersive looping background music (BGM).",
     detail: "Animation SFX & Loopable BGM",
     to: "/projects",
+    docsHref: undefined,
     icon: Music,
     preview: undefined,
   },
