@@ -109,16 +109,16 @@ func (s *assetReferenceStoreStub) PersistReference(_ context.Context, reference 
 
 func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	managerStub := &assetManagerStub{assets: []domain.Asset{{
-		ID:          7,
-		Name:        "hero",
-		ProjectID:   42,
-		Type:        domain.AssetTypeCharacter,
-		Description: "main character",
-		Perspective: domain.PerspectiveTopDown,
-		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
-		Tags:        []string{"player"},
-		Content:     json.RawMessage(`{"prototype":[{"id":1,"url":"uploads/hero.png"}]}`),
-		Version:     3,
+		ID:           7,
+		Name:         "hero",
+		ProjectID:    42,
+		Type:         domain.AssetTypeCharacter,
+		Description:  "main character",
+		Perspective:  domain.PerspectiveTopDown,
+		Dimensions:   json.RawMessage(`{"width":64,"height":64}`),
+		Tags:         []string{"player"},
+		ThumbnailURL: "uploads/hero.png",
+		Version:      3,
 	}}}
 	h := handler.NewHandler(managerStub, &assetReferenceStoreStub{})
 
@@ -141,7 +141,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal response: %v", err)
 	}
-	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"prototypeUrls":["signed:uploads/hero.png"],"version":3}]}}` {
+	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"thumbnailUrl":"signed:uploads/hero.png","version":3}]}}` {
 		t.Fatalf("unexpected JSON response: %s", payload)
 	}
 }
@@ -164,22 +164,23 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	}
 }
 
-func TestAssetHandlerKeepsListAvailableWhenOptionalPreviewIsInvalid(t *testing.T) {
+func TestAssetHandlerKeepsListAvailableWhenOptionalThumbnailCannotResolve(t *testing.T) {
 	managerStub := &assetManagerStub{assets: []domain.Asset{{
-		ID:        7,
-		ProjectID: 42,
-		Type:      domain.AssetTypeCharacter,
-		Content:   json.RawMessage(`{"prototype":`),
+		ID:           7,
+		ProjectID:    42,
+		Type:         domain.AssetTypeCharacter,
+		ThumbnailURL: "uploads/hero.png",
 	}}}
+	references := &assetReferenceStoreStub{resolveErr: errors.New("storage unavailable")}
 
-	response, err := handler.NewHandler(managerStub).GetAssets(
+	response, err := handler.NewHandler(managerStub, references).GetAssets(
 		context.Background(),
 		dto.GetAssetsRequest{ProjectID: 42},
 	)
 	if err != nil {
 		t.Fatalf("get assets with invalid optional preview: %v", err)
 	}
-	if len(response.Data.Assets) != 1 || len(response.Data.Assets[0].PrototypeURLs) != 0 {
+	if len(response.Data.Assets) != 1 || response.Data.Assets[0].ThumbnailURL != "" {
 		t.Fatalf("unexpected list response: %+v", response.Data.Assets)
 	}
 }

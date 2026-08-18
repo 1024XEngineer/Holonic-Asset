@@ -8,16 +8,16 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func TestAssetListLoadsCurrentContentInOneQuery(t *testing.T) {
+func TestAssetListLoadsStoredThumbnailWithoutJoiningContent(t *testing.T) {
 	db, mock := newMockUserDatabase(t)
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT a.id, a.name, a.project_id, a.type, a.description, a.tags, a.perspective, a.dimensions, c.content, a.version FROM assets AS a LEFT JOIN asset_contents AS c ON c.id = a.content_id WHERE a.project_id = $1 ORDER BY a.id ASC`,
+		`SELECT id, name, project_id, type, description, tags, perspective, dimensions, thumbnail_url, version FROM "assets" WHERE project_id = $1 ORDER BY id ASC`,
 	)).WithArgs(42).WillReturnRows(sqlmock.NewRows([]string{
-		"id", "name", "project_id", "type", "description", "tags", "perspective", "dimensions", "content", "version",
+		"id", "name", "project_id", "type", "description", "tags", "perspective", "dimensions", "thumbnail_url", "version",
 	}).AddRow(
 		7, "hero", 42, "character", "main character", `["player"]`, "Top-Down",
 		`{"width":64,"height":64}`,
-		`{"prototype":[{"id":1,"url":"uploads/hero.png"}]}`,
+		"uploads/hero.png",
 		3,
 	))
 
@@ -25,8 +25,8 @@ func TestAssetListLoadsCurrentContentInOneQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list assets: %v", err)
 	}
-	if len(assets) != 1 || string(assets[0].Content) != `{"prototype":[{"id":1,"url":"uploads/hero.png"}]}` {
-		t.Fatalf("expected current content in list result, got %+v", assets)
+	if len(assets) != 1 || assets[0].ThumbnailURL != "uploads/hero.png" || len(assets[0].Content) != 0 {
+		t.Fatalf("expected stored thumbnail without content in list result, got %+v", assets)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet database expectations: %v", err)
