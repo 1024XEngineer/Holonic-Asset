@@ -327,9 +327,32 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		return payload, nil
-	case EditCharacterFrames,
-		EditObjectFrames:
-		return struct{}{}, nil
+	case EditFrames:
+		if request.AssetID == nil || *request.AssetID == 0 {
+			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
+		}
+		parameters := EditFramesParameters{}
+		if err := decodeParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		prompt := strings.TrimSpace(request.CreativeBrief)
+		payload := EditFramesPayload{
+			AssetID:     *request.AssetID,
+			ProjectID:   request.ProjectID,
+			AnimationID: parameters.AnimationID,
+			FrameIDs:    append([]uint(nil), parameters.FrameIDs...),
+			Prompt:      prompt,
+		}
+		if len(payload.FrameIDs) == 0 {
+			return nil, fmt.Errorf("generator: frame ids are required for %s", request.Kind)
+		}
+		if payload.AnimationID == 0 {
+			return nil, fmt.Errorf("generator: animation id is required for %s", request.Kind)
+		}
+		if strings.TrimSpace(payload.Prompt) == "" {
+			return nil, fmt.Errorf("generator: creative brief is required for %s", request.Kind)
+		}
+		return payload, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, request.Kind)
 	}

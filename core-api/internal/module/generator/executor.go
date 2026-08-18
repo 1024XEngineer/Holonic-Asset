@@ -51,6 +51,13 @@ type AssetWriter interface {
 	CreateRecord(context.Context, *assetdomain.AssetRecord, uint) (*assetdomain.AssetRecord, error)
 }
 
+// AnimationFrameUpdater is an optional asset capability used by edit_frames.
+// It is kept separate from AssetWriter so existing generation integrations do
+// not need to implement animation editing.
+type AnimationFrameUpdater interface {
+	UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error
+}
+
 type executor struct {
 	images     imageclient.ImageGenerationService
 	llm        llmclient.LLMService
@@ -133,6 +140,21 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateObjectPrototype(ctx, request)
+	case EditFrames:
+		if e.assets == nil {
+			return nil, ErrAssetWriterRequired
+		}
+		if e.animations == nil {
+			return nil, ErrAnimationServiceRequired
+		}
+		if e.references == nil {
+			return nil, ErrAnimationReferenceStoreRequired
+		}
+		request := EditFramesPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.editFrames(ctx, request)
 	case GenerateAnimation:
 		if e.assets == nil {
 			return nil, ErrAssetWriterRequired

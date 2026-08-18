@@ -32,7 +32,7 @@ func (s *videoProviderStub) Download(_ context.Context, videoURL string) ([]byte
 	return append([]byte(nil), s.downloadData...), s.downloadErr
 }
 
-func TestVideoGenerationServiceBuildsReferenceDataURL(t *testing.T) {
+func TestVideoGenerationServiceBuildsStartAndEndReferenceDataURLs(t *testing.T) {
 	provider := &videoProviderStub{result: &videoclient.ProviderResult{
 		RequestID: "request-1",
 		VideoURL:  "https://cdn.example.test/video.mp4",
@@ -40,25 +40,26 @@ func TestVideoGenerationServiceBuildsReferenceDataURL(t *testing.T) {
 	service := videoclient.NewVideoGenerationService(provider)
 
 	result, err := service.Generate(context.Background(), &videoclient.GenerateRequest{
-		Prompt:                  "  fixed camera walk cycle  ",
-		ReferenceImageBase64:    "cG5n",
-		ReferenceImageMediaType: "image/webp",
-		Resolution:              "1080p",
-		Duration:                8,
-		AspectRatio:             "16:9",
-		GenerateAudio:           true,
+		Prompt:        "  fixed camera walk cycle  ",
+		StartImage:    videoclient.ReferenceImage{Base64: "cG5n", MediaType: "image/webp"},
+		EndImage:      &videoclient.ReferenceImage{Base64: "cG5nMg=="},
+		Resolution:    "1080p",
+		Duration:      8,
+		AspectRatio:   "16:9",
+		GenerateAudio: true,
 	})
 	if err != nil {
 		t.Fatalf("generate video: %v", err)
 	}
 
 	wantRequest := &videoclient.ProviderRequest{
-		Prompt:            "fixed camera walk cycle",
-		ReferenceImageURL: "data:image/webp;base64,cG5n",
-		Resolution:        "1080p",
-		Duration:          8,
-		AspectRatio:       "16:9",
-		GenerateAudio:     true,
+		Prompt:        "fixed camera walk cycle",
+		StartImageURL: "data:image/webp;base64,cG5n",
+		EndImageURL:   "data:image/png;base64,cG5nMg==",
+		Resolution:    "1080p",
+		Duration:      8,
+		AspectRatio:   "16:9",
+		GenerateAudio: true,
 	}
 	if !reflect.DeepEqual(provider.request, wantRequest) {
 		t.Fatalf("unexpected provider request:\nwant: %+v\n got: %+v", wantRequest, provider.request)
@@ -76,14 +77,14 @@ func TestVideoGenerationServiceUsesPNGMediaTypeAndDownloads(t *testing.T) {
 	service := videoclient.NewVideoGenerationService(provider)
 
 	_, err := service.Generate(context.Background(), &videoclient.GenerateRequest{
-		Prompt:               "idle animation",
-		ReferenceImageBase64: "cG5n",
+		Prompt:     "idle animation",
+		StartImage: videoclient.ReferenceImage{Base64: "cG5n"},
 	})
 	if err != nil {
 		t.Fatalf("generate video: %v", err)
 	}
-	if provider.request.ReferenceImageURL != "data:image/png;base64,cG5n" {
-		t.Fatalf("unexpected reference image URL: %q", provider.request.ReferenceImageURL)
+	if provider.request.StartImageURL != "data:image/png;base64,cG5n" || provider.request.EndImageURL != "" {
+		t.Fatalf("unexpected reference image URLs: %+v", provider.request)
 	}
 
 	video, err := service.Download(context.Background(), "https://cdn.example.test/video.mp4")
@@ -100,8 +101,9 @@ func TestVideoGenerationServiceRejectsInvalidRequestsAndResponses(t *testing.T) 
 
 	for name, request := range map[string]*videoclient.GenerateRequest{
 		"nil request":       nil,
-		"missing prompt":    {ReferenceImageBase64: "cG5n"},
+		"missing prompt":    {StartImage: videoclient.ReferenceImage{Base64: "cG5n"}},
 		"missing reference": {Prompt: "idle"},
+		"empty end image":   {Prompt: "idle", StartImage: videoclient.ReferenceImage{Base64: "cG5n"}, EndImage: &videoclient.ReferenceImage{}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := service.Generate(context.Background(), request)
@@ -112,7 +114,7 @@ func TestVideoGenerationServiceRejectsInvalidRequestsAndResponses(t *testing.T) 
 	provider := &videoProviderStub{result: &videoclient.ProviderResult{}}
 	_, err := videoclient.NewVideoGenerationService(provider).Generate(
 		context.Background(),
-		&videoclient.GenerateRequest{Prompt: "idle", ReferenceImageBase64: "cG5n"},
+		&videoclient.GenerateRequest{Prompt: "idle", StartImage: videoclient.ReferenceImage{Base64: "cG5n"}},
 	)
 	assertProviderErrorKind(t, err, videoclient.ErrorKindInvalidResponse)
 }

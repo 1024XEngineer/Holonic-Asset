@@ -20,10 +20,12 @@ type imageGenerationServiceStub struct {
 }
 
 type animationGenerationServiceStub struct {
-	events  *[]string
-	request *generator.AnimationGenerationRequest
-	result  *generator.AnimationGenerationResult
-	err     error
+	events   *[]string
+	request  *generator.AnimationGenerationRequest
+	requests []*generator.AnimationGenerationRequest
+	result   *generator.AnimationGenerationResult
+	results  []*generator.AnimationGenerationResult
+	err      error
 }
 
 func (s *animationGenerationServiceStub) Generate(
@@ -32,7 +34,14 @@ func (s *animationGenerationServiceStub) Generate(
 ) (*generator.AnimationGenerationResult, error) {
 	*s.events = append(*s.events, "generate_animation")
 	copy := *request
+	copy.TargetFrameIndices = append([]int(nil), request.TargetFrameIndices...)
+	copy.ContextReferenceImages = append([]string(nil), request.ContextReferenceImages...)
 	s.request = &copy
+	s.requests = append(s.requests, &copy)
+	call := len(s.requests) - 1
+	if call < len(s.results) {
+		return s.results[call], s.err
+	}
 	return s.result, s.err
 }
 
@@ -48,19 +57,23 @@ type referenceUpload struct {
 }
 
 type executorReferenceStoreStub struct {
-	resolved     []string
-	persisted    []string
-	persistValue string
-	uploads      []referenceUpload
-	events       *[]string
-	resolveErr   error
-	persistErr   error
+	resolved      []string
+	resolveValues map[string]string
+	persisted     []string
+	persistValue  string
+	uploads       []referenceUpload
+	events        *[]string
+	resolveErr    error
+	persistErr    error
 }
 
 func (s *executorReferenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	s.resolved = append(s.resolved, reference)
 	if s.resolveErr != nil {
 		return "", s.resolveErr
+	}
+	if value, ok := s.resolveValues[reference]; ok {
+		return value, nil
 	}
 	return "signed:" + reference, nil
 }
@@ -187,6 +200,7 @@ type generationAssetWriterStub struct {
 	updatedAnimationID      uint
 	updatedFrames           []assetdomain.Frame
 	updateAnimationErr      error
+	updateCalls             int
 	err                     error
 	detailErr               error
 	recordErr               error
@@ -213,6 +227,9 @@ func (s *generationAssetWriterStub) GetDetail(
 		return assetdomain.Asset{}, s.err
 	}
 	if s.parentAsset.ID == assetID {
+		if s.updateCalls > 0 && s.detailResult != nil {
+			return *s.detailResult, nil
+		}
 		return s.parentAsset, nil
 	}
 	if s.detailResult != nil {
@@ -303,7 +320,12 @@ func (s *generationAssetWriterStub) UpdateAnimationFrames(
 	s.updatedAnimationAssetID = assetID
 	s.updatedAnimationID = animationID
 	s.updatedFrames = append([]assetdomain.Frame(nil), frames...)
-	return s.updateAnimationErr
+	s.frames = append([]assetdomain.Frame(nil), frames...)
+	s.updateCalls++
+	if s.updateAnimationErr != nil {
+		return s.updateAnimationErr
+	}
+	return s.err
 }
 
 func (s *generationAssetWriterStub) CreateRecord(

@@ -132,7 +132,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 	stub := &runManagerStub{listPage: &generator.RunListPage{
 		Runs: []generator.Run{
 			{ID: 7, ProjectID: 2, AssetID: &assetID, Kind: generator.GenerateAnimation, Status: taskdomain.StatusProcessing},
-			{ID: 8, ProjectID: 2, AssetID: &assetID, Kind: generator.EditCharacterFrames, Status: taskdomain.StatusPending},
+			{ID: 8, ProjectID: 2, AssetID: &assetID, Kind: generator.EditFrames, Status: taskdomain.StatusPending},
 		},
 		NextCursor: "next",
 	}}

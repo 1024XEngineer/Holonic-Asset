@@ -127,15 +127,15 @@ func (e *Engine) handleEditTiles(
 	return e.execute(ctx, EditTiles, message.Payload)
 }
 
-func (e *Engine) handleEmptyTask(
-	_ context.Context,
+func (e *Engine) handleEditFrames(
+	ctx context.Context,
 	message *taskdomain.Task,
 ) (any, error) {
-	payload := struct{}{}
+	payload := EditFramesPayload{}
 	if err := decodeTaskPayload(message, &payload); err != nil {
 		return nil, err
 	}
-	return nil, nil //nolint:nilnil // The handler has no business result until its workflow is implemented.
+	return e.execute(ctx, EditFrames, message.Payload)
 }
 
 func decodeTaskPayload(message *taskdomain.Task, payload any) error {
@@ -181,12 +181,6 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
 	manager.Register(string(EditTilesetItem), taskdomain.HandlerFunc(e.handleEditTilesetItem))
 	manager.Register(string(EditTiles), taskdomain.HandlerFunc(e.handleEditTiles))
+	manager.Register(string(EditFrames), taskdomain.HandlerFunc(e.handleEditFrames))
 
-	emptyHandler := taskdomain.HandlerFunc(e.handleEmptyTask)
-	for _, taskType := range []TaskType{
-		EditCharacterFrames,
-		EditObjectFrames,
-	} {
-		manager.Register(string(taskType), emptyHandler)
-	}
 }

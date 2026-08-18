@@ -73,8 +73,8 @@ func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 	})
 	longPrompt := strings.Repeat("角色和道具必须保持完整。", 400)
 	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
-		Prompt:            longPrompt,
-		ReferenceImageURL: "data:image/png;base64,cG5n",
+		Prompt:        longPrompt,
+		StartImageURL: "data:image/png;base64,cG5n",
 	})
 	if err != nil {
 		t.Fatalf("generate video: %v", err)
@@ -99,6 +99,53 @@ func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 	}
 	if string(video) != "mp4" {
 		t.Fatalf("video = %q, want mp4", video)
+	}
+}
+
+func TestQNAProviderSendsStartAndEndImages(t *testing.T) {
+	var received struct {
+		Prompt      string `json:"prompt"`
+		ImageURL    string `json:"image_url"`
+		EndImageURL string `json:"end_image_url"`
+		Resolution  string `json:"resolution"`
+		Duration    string `json:"duration"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != videoclient.DefaultQNACreatePath {
+			http.NotFound(writer, request)
+			return
+		}
+		if err := json.NewDecoder(request.Body).Decode(&received); err != nil {
+			t.Errorf("decode create request: %v", err)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"request_id": "request-boundaries",
+			"video":      map[string]string{"url": "https://cdn.example.test/boundaries.mp4"},
+		})
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL:    server.URL,
+		APIKey:     "test-key",
+		HTTPClient: server.Client(),
+	})
+	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "interpolate from the start boundary to the end boundary",
+		StartImageURL: "data:image/png;base64,c3RhcnQ=",
+		EndImageURL:   "data:image/png;base64,ZW5k",
+		Resolution:    "720p",
+		Duration:      5,
+	})
+	if err != nil {
+		t.Fatalf("generate boundary video: %v", err)
+	}
+	if result.RequestID != "request-boundaries" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if received.ImageURL != "data:image/png;base64,c3RhcnQ=" ||
+		received.EndImageURL != "data:image/png;base64,ZW5k" {
+		t.Fatalf("unexpected boundary images: %+v", received)
 	}
 }
 
@@ -128,8 +175,8 @@ func TestQNAProviderRetriesTransientCreateStatus(t *testing.T) {
 		HTTPClient: server.Client(),
 	})
 	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
-		Prompt:            "fixed camera",
-		ReferenceImageURL: "data:image/png;base64,cG5n",
+		Prompt:        "fixed camera",
+		StartImageURL: "data:image/png;base64,cG5n",
 	})
 	if err != nil {
 		t.Fatalf("generate video: %v", err)
@@ -182,8 +229,8 @@ func TestQNAProviderRetriesTransientPollAndDownloadStatus(t *testing.T) {
 		HTTPClient:   server.Client(),
 	})
 	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
-		Prompt:            "fixed camera",
-		ReferenceImageURL: "data:image/png;base64,cG5n",
+		Prompt:        "fixed camera",
+		StartImageURL: "data:image/png;base64,cG5n",
 	})
 	if err != nil {
 		t.Fatalf("generate video: %v", err)
@@ -218,8 +265,8 @@ func TestQNAProviderReturnsStableTaskFailure(t *testing.T) {
 		HTTPClient:   server.Client(),
 	})
 	_, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
-		Prompt:            "fixed camera",
-		ReferenceImageURL: "data:image/png;base64,cG5n",
+		Prompt:        "fixed camera",
+		StartImageURL: "data:image/png;base64,cG5n",
 	})
 	var providerErr *videoclient.ProviderError
 	if !errors.As(err, &providerErr) {

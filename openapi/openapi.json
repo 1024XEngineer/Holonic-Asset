@@ -192,10 +192,9 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
-              "edit_character_frames",
+              "edit_frames",
               "generate_object_prototype",
               "edit_object_prototype",
-              "edit_object_frames",
               "generate_animation",
               "edit_animation",
               "generate_scenery",
@@ -217,8 +216,7 @@
           }
         },
         "required": [
-          "kind",
-          "creative_brief"
+          "kind"
         ],
         "type": "object"
       },
@@ -535,10 +533,9 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
-              "edit_character_frames",
+              "edit_frames",
               "generate_object_prototype",
               "edit_object_prototype",
-              "edit_object_frames",
               "generate_animation",
               "edit_animation",
               "generate_scenery",
@@ -622,10 +619,9 @@
             "enum": [
               "generate_character_prototype",
               "edit_character_prototype",
-              "edit_character_frames",
+              "edit_frames",
               "generate_object_prototype",
               "edit_object_prototype",
-              "edit_object_frames",
               "generate_animation",
               "edit_animation",
               "generate_scenery",

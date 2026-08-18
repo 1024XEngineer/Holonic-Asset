@@ -1,17 +1,22 @@
 package videoclient
 
-// GenerateRequest describes one image-to-video generation call.
-//
-// ReferenceImageBase64 accepts raw base64 image data. ReferenceImageMediaType
-// defaults to image/png when omitted.
+// ReferenceImage is one image input for a video generation call.
+// Base64 accepts raw base64 image data. MediaType defaults to image/png.
+type ReferenceImage struct {
+	Base64    string
+	MediaType string
+}
+
+// GenerateRequest describes one image-to-video call. EndImage optionally pins
+// the final frame for first/last-frame video generation.
 type GenerateRequest struct {
-	Prompt                  string
-	ReferenceImageBase64    string
-	ReferenceImageMediaType string
-	Resolution              string
-	Duration                int
-	AspectRatio             string
-	GenerateAudio           bool
+	Prompt        string
+	StartImage    ReferenceImage
+	EndImage      *ReferenceImage
+	Resolution    string
+	Duration      int
+	AspectRatio   string
+	GenerateAudio bool
 }
 
 // GenerateResult is the provider-independent result of one video generation

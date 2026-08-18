@@ -478,3 +478,21 @@ func validateRequiredText(field, value string, maximum int) error {
 func invalidTaskPayload(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidTaskPayload, fmt.Sprintf(format, args...))
 }
+
+// EditFramesParameters contains the edit_frames-specific options carried by
+// the generic generation request parameters object.
+type EditFramesParameters struct {
+	AnimationID uint   `json:"animationId"`
+	FrameIDs    []uint `json:"frameIds"`
+}
+
+// EditFramesPayload is the self-contained input consumed by the unified
+// character/object animation frame edit task. FrameIDs are persisted frame
+// identifiers, not zero-based array offsets.
+type EditFramesPayload struct {
+	AssetID     uint   `json:"asset_id"`
+	ProjectID   uint   `json:"project_id"`
+	AnimationID uint   `json:"animation_id"`
+	FrameIDs    []uint `json:"frame_ids"`
+	Prompt      string `json:"prompt"`
+}

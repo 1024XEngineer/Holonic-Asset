@@ -37,6 +37,7 @@ type Animation struct {
 type AnimationGenerationConfig struct {
 	Direction string `json:"direction"`
 	Style     string `json:"style,omitempty"`
+	Action    string `json:"action,omitempty"`
 
 	FrameCount  int `json:"frameCount"`
 	Columns     int `json:"columns"`

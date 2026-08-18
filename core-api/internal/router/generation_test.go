@@ -137,24 +137,24 @@ func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
 	}
 }
 
-func TestGenerationCreateRejectsLegacyPromptField(t *testing.T) {
+func TestGenerationCreateAcceptsEditFramesParameters(t *testing.T) {
 	stub := &generationRouterStub{}
 	e := router.Register(nil, nil, stub, nil)
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/projects/42/generation-runs",
-		strings.NewReader(`{"kind":"generate_character_prototype","prompt":"hero"}`),
+		strings.NewReader(`{"kind":"edit_frames","creative_brief":"make the stride longer","assetId":7,"parameters":{"animationId":3,"frameIds":[1]}}`),
 	)
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	recorder := httptest.NewRecorder()
 
 	e.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if stub.createCalls != 0 {
-		t.Fatalf("expected legacy prompt request not to reach the handler, got %d calls", stub.createCalls)
+	if stub.createCalls != 1 {
+		t.Fatalf("expected edit frames request to reach the handler, got %d calls", stub.createCalls)
 	}
 }
 

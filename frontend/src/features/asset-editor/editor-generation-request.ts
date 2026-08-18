@@ -10,9 +10,7 @@ export function buildInspectorGenerationRequest(
   const selectedNode = request.target.nodeIds[0];
   const hasSelectedFrames = request.target.frames.length > 0;
   const kind = hasSelectedFrames
-    ? assetKind === "character"
-      ? "edit_character_frames"
-      : "edit_object_frames"
+    ? "edit_frames"
     : selectedNode && selectedNode !== "prototype"
       ? "edit_animation"
       : assetKind === "character"

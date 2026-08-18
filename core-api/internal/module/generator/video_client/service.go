@@ -32,22 +32,25 @@ func (s *videoGenerationService) Generate(
 	if prompt == "" {
 		return nil, invalidRequestError("video prompt is required")
 	}
-	imageBase64 := strings.TrimSpace(request.ReferenceImageBase64)
-	if imageBase64 == "" {
-		return nil, invalidRequestError("reference image is required")
+	startImageURL, err := referenceDataURL(request.StartImage)
+	if err != nil {
+		return nil, err
 	}
-
-	mediaType := strings.TrimSpace(request.ReferenceImageMediaType)
-	if mediaType == "" {
-		mediaType = "image/png"
+	endImageURL := ""
+	if request.EndImage != nil {
+		endImageURL, err = referenceDataURL(*request.EndImage)
+		if err != nil {
+			return nil, err
+		}
 	}
 	providerResult, err := s.provider.Generate(ctx, &ProviderRequest{
-		Prompt:            prompt,
-		ReferenceImageURL: "data:" + mediaType + ";base64," + imageBase64,
-		Resolution:        request.Resolution,
-		Duration:          request.Duration,
-		AspectRatio:       request.AspectRatio,
-		GenerateAudio:     request.GenerateAudio,
+		Prompt:        prompt,
+		StartImageURL: startImageURL,
+		EndImageURL:   endImageURL,
+		Resolution:    request.Resolution,
+		Duration:      request.Duration,
+		AspectRatio:   request.AspectRatio,
+		GenerateAudio: request.GenerateAudio,
 	})
 	if err != nil {
 		return nil, err
@@ -64,6 +67,18 @@ func (s *videoGenerationService) Generate(
 		RequestID: providerResult.RequestID,
 		VideoURL:  providerResult.VideoURL,
 	}, nil
+}
+
+func referenceDataURL(image ReferenceImage) (string, error) {
+	imageBase64 := strings.TrimSpace(image.Base64)
+	if imageBase64 == "" {
+		return "", invalidRequestError("reference image is required")
+	}
+	mediaType := strings.TrimSpace(image.MediaType)
+	if mediaType == "" {
+		mediaType = "image/png"
+	}
+	return "data:" + mediaType + ";base64," + imageBase64, nil
 }
 
 func (s *videoGenerationService) Download(ctx context.Context, videoURL string) ([]byte, error) {
