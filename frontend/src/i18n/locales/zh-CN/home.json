@@ -32,6 +32,7 @@
   },
   "capabilitiesLabel": "资产创作能力",
   "explore": "浏览资产",
+  "viewDocs": "查看文档",
   "capabilities": {
     "characters": {
       "title": "Character",

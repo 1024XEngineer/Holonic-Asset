@@ -32,6 +32,7 @@
   },
   "capabilitiesLabel": "Asset creation capabilities",
   "explore": "Explore assets",
+  "viewDocs": "View docs",
   "capabilities": {
     "characters": {
       "title": "Characters",

@@ -40,6 +40,19 @@ describe("home image loading", () => {
     });
   });
 
+  it("links each documented asset capability to its document section", () => {
+    const { container } = render(<HomeCapabilities />);
+    const links = [...container.querySelectorAll('a[href^="/docs/"]')];
+
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/docs/asset-concepts#character",
+      "/docs/asset-concepts#object",
+      "/docs/asset-concepts#scenery",
+      "/docs/asset-concepts#tileset",
+      "/docs/asset-concepts#ui-set",
+    ]);
+  });
+
   it("defers the interactive project scene layers", () => {
     const { container } = render(<HomeProjectStory />);
 
