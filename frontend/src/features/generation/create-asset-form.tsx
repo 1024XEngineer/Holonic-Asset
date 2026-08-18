@@ -19,6 +19,15 @@ import { VisualAssetFields } from "./create-asset/visual-asset-fields";
 import { SceneryAssetFields } from "./create-asset/scenery-asset-fields";
 import { UISetAssetFields } from "./create-asset/uiset-asset-fields";
 
+const assetNamePlaceholderKeys = {
+  audio: "audioNamePlaceholder",
+  character: "characterNamePlaceholder",
+  object: "objectNamePlaceholder",
+  scenery: "sceneryNamePlaceholder",
+  tileset: "tilesetNamePlaceholder",
+  uiset: "objectNamePlaceholder",
+} as const satisfies Record<CreatableAssetKind, string>;
+
 export function CreateAssetForm({
   kind,
   onCancel,
@@ -78,15 +87,7 @@ export function CreateAssetForm({
           {t("assetName")}
           <Input
             required
-            placeholder={
-              draft.kind === "audio"
-                ? t("audioNamePlaceholder")
-                : draft.kind === "character"
-                  ? t("characterNamePlaceholder")
-                  : draft.kind === "tileset"
-                    ? t("tilesetNamePlaceholder")
-                    : t("objectNamePlaceholder")
-            }
+            placeholder={t(assetNamePlaceholderKeys[draft.kind])}
             value={draft.name}
             onChange={(event) =>
               setDraft({ ...draft, name: event.target.value })

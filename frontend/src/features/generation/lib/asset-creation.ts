@@ -167,6 +167,7 @@ export function toCreationRequest<Reference>(
         style: draft.style,
         aspectRatio: draft.aspectRatio,
         layers: draft.layers,
+        reference: draft.reference,
       };
     case "tileset":
       return {

@@ -114,6 +114,32 @@ describe("generationApi", () => {
     });
   });
 
+  it("maps a scenery form request to the Core API", async () => {
+    const reference = new File(["image"], "reference.png", {
+      type: "image/png",
+    });
+    const request = creationRequest({
+      kind: "scenery",
+      canvasSize: "1920 × 1080 px",
+      style: "Painterly pixel art",
+      aspectRatio: "16:9",
+      layers: [{ description: "Distant mountains" }],
+      reference,
+    });
+
+    await expect(toCreateGenerationRequest(request)).resolves.toEqual({
+      kind: "generate_scenery",
+      creative_brief: "A moonlit orchard keeper",
+      parameters: {
+        asset_name: "Orchard Keeper",
+        style: "Painterly pixel art",
+        dimensions: { width: 1920, height: 1080 },
+        reference: "data:image/png;base64,reference",
+      },
+    });
+    expect(mocks.readFileAsDataUrl).toHaveBeenCalledWith(reference);
+  });
+
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 
@@ -157,6 +183,28 @@ describe("generationApi", () => {
         name: "New character",
         prompt: "",
         canvasSize: "32 × 32 px",
+      }),
+    ]);
+  });
+
+  it("lists a scenery generation run without local metadata", async () => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 31,
+          projectId: 42,
+          kind: "generate_scenery",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "31",
+        kind: "scenery",
+        name: "New scenery",
+        status: "processing",
       }),
     ]);
   });
@@ -297,7 +345,9 @@ describe("generationApi", () => {
   it("rejects asset kinds that are outside the connected form scope", async () => {
     await expect(
       toCreateGenerationRequest(creationRequest({ kind: "audio" })),
-    ).rejects.toThrow("supports Character, Object, and Tileset assets only");
+    ).rejects.toThrow(
+      "supports Character, Object, Scenery, and Tileset assets only",
+    );
   });
 
   it("rejects a tileset without items", async () => {

@@ -216,7 +216,8 @@
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "creative_brief"
         ],
         "type": "object"
       },

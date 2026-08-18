@@ -379,9 +379,9 @@ export interface components {
         CreateGenerationRequest: {
             /** Format: int64 */
             assetId?: number;
-            creative_brief?: string;
+            creative_brief: string;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
             targetAssetPaths?: string[] | null;
         };
@@ -486,13 +486,21 @@ export interface components {
         GenerateProjectReferenceResponse: {
             reference: string;
         };
+        GenerationResult: {
+            /** Format: int64 */
+            animation_id?: number;
+            /** Format: int64 */
+            asset_id?: number;
+            /** Format: int64 */
+            version?: number;
+        };
         GenerationRunListItemResponse: {
             /** Format: int64 */
             assetId?: number;
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
@@ -511,10 +519,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
-            result?: unknown;
+            result?: components["schemas"]["GenerationResult"];
             /** @enum {string} */
             status: "pending" | "processing" | "completed" | "failed" | "cancelled";
         };
