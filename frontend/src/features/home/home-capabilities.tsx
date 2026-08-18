@@ -94,9 +94,9 @@ export function HomeCapabilities() {
           className={`mx-auto flex min-h-[calc(100svh-3.5rem)] max-w-[110rem] flex-col border-x border-neutral-950/10 px-5 py-10 text-neutral-950 sm:px-10 sm:py-12 lg:px-16 ${index % 2 === 0 ? "bg-[#fcfbf7]" : "bg-[#edf4ef]"}`}
         >
           <div className="flex items-baseline justify-between border-b border-neutral-950/15 pb-5">
-            <div className="text-4xl leading-none font-semibold tracking-[-0.045em] sm:text-5xl">
+            <h2 className="text-4xl leading-none font-semibold tracking-[-0.045em] sm:text-5xl">
               {t(`capabilities.${key}.title`)}
-            </div>
+            </h2>
             <span className="font-mono text-xs text-neutral-400">
               0{index + 1}
             </span>
