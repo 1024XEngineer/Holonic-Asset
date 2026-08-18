@@ -6,9 +6,13 @@ import { useAssetLibraryController } from "./state/use-asset-library-controller"
 export function AssetLibrary({
   isProjectLoading = false,
   project,
+  projectError,
+  retryProject,
 }: {
   isProjectLoading?: boolean;
   project?: ProjectSummary;
+  projectError?: Error;
+  retryProject: () => void;
 }) {
   const library = useAssetLibraryController({ project });
 
@@ -16,6 +20,8 @@ export function AssetLibrary({
     <AssetLibraryWorkspace
       isProjectLoading={isProjectLoading}
       library={library}
+      projectError={projectError}
+      retryProject={retryProject}
     />
   );
 }

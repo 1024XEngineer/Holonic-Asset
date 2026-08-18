@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   projectQuery: {
     data: undefined as ProjectSummary[] | undefined,
+    error: null as Error | null,
+    isPending: false,
     isSuccess: false,
+    refetch: vi.fn(),
   },
   projectDetailQuery: {
     data: undefined as ProjectSummary | undefined,
@@ -50,7 +53,10 @@ const projects = [project("first"), project("second")];
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.projectQuery.data = projects;
+  mocks.projectQuery.error = null;
+  mocks.projectQuery.isPending = false;
   mocks.projectQuery.isSuccess = true;
+  mocks.projectQuery.refetch.mockResolvedValue(undefined);
   mocks.projectDetailQuery.data = undefined;
   mocks.projectDetailQuery.isPending = false;
   mocks.rememberedProjectId = undefined;
@@ -98,6 +104,7 @@ describe("useProjectLibrary", () => {
 
   it("reports project bootstrap loading instead of an unselected state", () => {
     mocks.projectQuery.data = undefined;
+    mocks.projectQuery.isPending = true;
     mocks.projectQuery.isSuccess = false;
     mocks.projectDetailQuery.isPending = true;
 
@@ -105,6 +112,33 @@ describe("useProjectLibrary", () => {
 
     expect(controller.project.current).toBeUndefined();
     expect(controller.project.isLoading).toBe(true);
+  });
+
+  it("exposes a failed project list query instead of staying loading", () => {
+    const error = new Error("project list failed");
+    mocks.projectQuery.data = undefined;
+    mocks.projectQuery.error = error;
+    mocks.projectQuery.isPending = false;
+    mocks.projectQuery.isSuccess = false;
+
+    const controller = useProjectLibrary(undefined);
+
+    expect(controller.project.isLoading).toBe(false);
+    expect(controller.project.error).toBe(error);
+
+    controller.project.retry();
+    expect(mocks.projectQuery.refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps cached projects usable when a background refresh fails", () => {
+    mocks.projectQuery.error = new Error("project refresh failed");
+    mocks.projectQuery.isSuccess = false;
+
+    const controller = useProjectLibrary(undefined);
+
+    expect(controller.project.items).toEqual(projects);
+    expect(controller.project.error).toBeUndefined();
+    expect(controller.project.isLoading).toBe(false);
   });
 
   it("shows the unselected state after an empty project list loads", () => {

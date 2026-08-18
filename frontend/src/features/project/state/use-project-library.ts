@@ -15,11 +15,13 @@ import type { ProjectSummary } from "@/model/project";
 
 export type ProjectLibraryProjectModel = {
   current?: ProjectSummary;
+  error?: Error;
   isLoading: boolean;
   items: ProjectSummary[];
   selectedId?: string;
   create: () => Promise<unknown>;
   remove: (projectId: string) => Promise<void>;
+  retry: () => void;
   select: (
     projectId: string | undefined,
     replace?: boolean,
@@ -37,8 +39,13 @@ export function useProjectLibrary(
   selectedProjectId?: string,
 ): ProjectLibraryController {
   const navigate = useNavigate();
-  const { data: projectData, isSuccess: projectsLoaded } =
-    useProjectListQuery();
+  const {
+    data: projectData,
+    error: projectListError,
+    isPending: projectListPending,
+    isSuccess: projectsLoaded,
+    refetch: refetchProjects,
+  } = useProjectListQuery();
   const rememberedProjectId = useMemo(
     () => (selectedProjectId ? undefined : readLastProjectId()),
     [selectedProjectId],
@@ -125,29 +132,38 @@ export function useProjectLibrary(
     (updatedProject: ProjectSummary) => updateProject(updatedProject),
     [updateProject],
   );
+  const retryProjectList = useCallback(() => {
+    void refetchProjects();
+  }, [refetchProjects]);
 
   const projectModel = useMemo(
     () => ({
       current: project,
+      error:
+        projectData === undefined ? (projectListError ?? undefined) : undefined,
       isLoading:
         !project &&
-        (!projectsLoaded ||
+        (projectListPending ||
           Boolean(effectiveProjectId && projectDetailPending)),
       items: projects,
       selectedId: effectiveProjectId,
       create: createProject,
       remove: removeProject,
+      retry: retryProjectList,
       select: selectProject,
       update,
     }),
     [
       project,
       projectDetailPending,
+      projectListError,
+      projectListPending,
+      projectData,
       projects,
-      projectsLoaded,
       effectiveProjectId,
       createProject,
       removeProject,
+      retryProjectList,
       selectProject,
       update,
     ],

@@ -14,9 +14,13 @@ import type { AssetLibraryController } from "./state/use-asset-library-controlle
 export function AssetLibraryWorkspace({
   isProjectLoading = false,
   library,
+  projectError,
+  retryProject,
 }: {
   isProjectLoading?: boolean;
   library: AssetLibraryController;
+  projectError?: Error;
+  retryProject: () => void;
 }) {
   const { t } = useTranslation("assets");
   const project = library.project;
@@ -28,6 +32,19 @@ export function AssetLibraryWorkspace({
         <div className="mx-auto w-full max-w-[92rem] px-5 py-6 sm:px-7 lg:px-9 lg:py-8">
           <div className="mb-6 h-8 w-48 animate-pulse rounded bg-muted" />
           <AssetLibrarySkeleton />
+        </div>
+      </ScrollArea>
+    );
+  }
+
+  if (projectError && !project) {
+    return (
+      <ScrollArea className="h-full">
+        <div className="mx-auto w-full max-w-[92rem] px-5 py-6 sm:px-7 lg:px-9 lg:py-8">
+          <AssetLibraryError
+            message={projectError.message}
+            onRetry={retryProject}
+          />
         </div>
       </ScrollArea>
     );

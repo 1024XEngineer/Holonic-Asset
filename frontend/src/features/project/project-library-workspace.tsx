@@ -17,7 +17,9 @@ export function ProjectLibraryWorkspace({
         sidebar={<ProjectSidebar library={library.project} />}
       >
         <AssetLibrary
+          projectError={library.project.error}
           isProjectLoading={library.project.isLoading}
+          retryProject={library.project.retry}
           project={library.project.current}
         />
       </ProjectWorkspaceLayout>
