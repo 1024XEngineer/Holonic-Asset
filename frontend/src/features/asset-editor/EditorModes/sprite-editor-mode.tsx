@@ -8,6 +8,7 @@ import {
   type AnimatedSpriteNodeId,
 } from "../Canvas/AnimatedSpriteCanvas";
 import { EditorHeader } from "../Header/editor-header";
+import { GenerationReviewBar } from "../GenerationReview/generation-review-bar";
 import { Inspector } from "../Inspector/inspector";
 import type { SpriteEditorModeProps } from "./sprite-editor-mode.types";
 
@@ -16,6 +17,7 @@ export function SpriteEditorMode({
   sprite,
   tree,
   inspector,
+  generationReview,
 }: SpriteEditorModeProps) {
   const { animations } = sprite;
   const [selection, setSelection] = useState<AnimatedSpriteCanvasSelection>({
@@ -73,15 +75,20 @@ export function SpriteEditorMode({
           onDeleteAnimation={tree.onAnimationDelete}
           isGeneratingAnimation={tree.isGeneratingAnimation}
         />
-        <AnimatedSpriteCanvas
-          model={{
-            prototype: sprite.prototype,
-            animations,
-            nodePositions: sprite.nodePositions,
-            selection,
-          }}
-          onEvent={handleCanvasEvent}
-        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <AnimatedSpriteCanvas
+            model={{
+              prototype: sprite.prototype,
+              animations,
+              nodePositions: sprite.nodePositions,
+              selection,
+            }}
+            onEvent={handleCanvasEvent}
+          />
+          {generationReview ? (
+            <GenerationReviewBar review={generationReview} />
+          ) : null}
+        </div>
         <Inspector
           {...inspector}
           selectedNodes={selection.nodeIds}

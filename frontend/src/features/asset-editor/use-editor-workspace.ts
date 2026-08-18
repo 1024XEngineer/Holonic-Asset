@@ -3,7 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useTimeout } from "@/hooks/use-timeout";
 import {
   coreGenerationApi,
+  rememberGenerationRunMetadata,
+  toCoreSpriteCandidateRecord,
   useGenerateAnimationMutation,
+  useGenerationCandidateQuery,
   useGenerationRunsQuery,
   useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
@@ -40,6 +43,12 @@ export function useEditorWorkspace({
     asset.projectId,
     asset.id,
   );
+  const awaitingRuns = useMemo(
+    () => generationRuns.filter((run) => run.status === "awaiting_application"),
+    [generationRuns],
+  );
+  const reviewRun = awaitingRuns[0];
+  const candidateQuery = useGenerationCandidateQuery(reviewRun?.id);
   const [animationTask, setAnimationTask] =
     useState<EditorGenerationTask | null>(null);
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
@@ -73,7 +82,7 @@ export function useEditorWorkspace({
         runId,
         applied,
       });
-      reportAction(applied ? "Generation applied" : "Generation discarded");
+      reportAction(applied ? "Generation applied" : "Generation denied");
     } catch {
       reportAction("Unable to consume generation result");
     }
@@ -84,7 +93,6 @@ export function useEditorWorkspace({
       ...generationRuns.flatMap((run) =>
         run.status === "pending" ||
         run.status === "processing" ||
-        run.status === "awaiting_application" ||
         run.status === "failed"
           ? [
               {
@@ -96,15 +104,8 @@ export function useEditorWorkspace({
                     ? "queued"
                     : run.status === "failed"
                       ? "failed"
-                      : run.status,
+                      : "processing",
                 ...(run.error ? { error: run.error } : {}),
-                ...(run.status === "awaiting_application"
-                  ? {
-                      isResolving: applicationMutation.isPending,
-                      onApply: () => void resolveApplication(run.id, true),
-                      onDiscard: () => void resolveApplication(run.id, false),
-                    }
-                  : {}),
               } satisfies EditorGenerationTask,
             ]
           : [],
@@ -112,8 +113,22 @@ export function useEditorWorkspace({
       ...(animationTask ? [animationTask] : []),
       ...(promptTask ? [promptTask] : []),
     ],
-    [animationTask, applicationMutation.isPending, generationRuns, promptTask],
+    [animationTask, generationRuns, promptTask],
   );
+
+  const candidateRecord = useMemo(() => {
+    const content = candidateQuery.data?.result?.content;
+    if (content === undefined) return null;
+    try {
+      return toCoreSpriteCandidateRecord(
+        snapshot.record,
+        asset.perspective,
+        content,
+      );
+    } catch {
+      return null;
+    }
+  }, [asset.perspective, candidateQuery.data, snapshot.record]);
 
   const status = getEditorStatus({
     saveState: snapshot.saveState,
@@ -138,10 +153,8 @@ export function useEditorWorkspace({
     return null;
   }
 
-  const sprite =
-    snapshot.record.mode === "character"
-      ? snapshot.record.character
-      : snapshot.record.object;
+  const displayRecord = candidateRecord ?? snapshot.record;
+  const sprite = getSpriteRecordData(displayRecord);
   const assetKind = snapshot.record.mode;
 
   const generateAnimation = async (request: GenerateAnimationRequest) => {
@@ -184,9 +197,19 @@ export function useEditorWorkspace({
       const projectId = Number(asset.projectId);
       const assetId = Number(asset.id);
       if (Number.isSafeInteger(projectId) && Number.isSafeInteger(assetId)) {
-        await coreGenerationApi.create(
+        const created = await coreGenerationApi.create(
           projectId,
           buildInspectorGenerationRequest(assetKind, assetId, request),
+        );
+        rememberGenerationRunMetadata(
+          asset.projectId,
+          created.generationRunId,
+          {
+            kind: assetKind,
+            name: `Edit ${asset.name}`,
+            prompt,
+            assetId: asset.id,
+          },
         );
       }
 
@@ -218,6 +241,22 @@ export function useEditorWorkspace({
       onRedo: () => session.dispatch({ type: "history.redo" }),
       onSave: () => void save(),
     },
+    ...(reviewRun
+      ? {
+          generationReview: {
+            name: reviewRun.name,
+            prompt: reviewRun.prompt,
+            pendingCount: awaitingRuns.length,
+            isLoading: candidateQuery.isPending,
+            isUnavailable:
+              candidateQuery.isError ||
+              (!candidateQuery.isPending && candidateRecord === null),
+            isResolving: applicationMutation.isPending,
+            onApply: () => void resolveApplication(reviewRun.id, true),
+            onDeny: () => void resolveApplication(reviewRun.id, false),
+          },
+        }
+      : {}),
     sprite: {
       perspective: asset.perspective,
       prototype: sprite.prototype,
@@ -253,4 +292,10 @@ export function useEditorWorkspace({
       onSubmit: submitInspectorPrompt,
     },
   };
+}
+
+function getSpriteRecordData(record: AssetWorkspaceData["record"]) {
+  if (record.mode === "character") return record.character;
+  if (record.mode === "object") return record.object;
+  throw new Error("Sprite editor requires a Character or Object asset.");
 }

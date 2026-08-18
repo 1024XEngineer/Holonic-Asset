@@ -14,6 +14,16 @@ const mocks = vi.hoisted(() => ({
     mutateAsync: vi.fn(),
   },
   coreCreate: vi.fn(),
+  candidateQuery: {
+    data: undefined as
+      | {
+          result?: { content?: unknown };
+          status: string;
+        }
+      | undefined,
+    isError: false,
+    isPending: false,
+  },
   generationRuns: [] as Array<{
     id: string;
     name: string;
@@ -21,6 +31,7 @@ const mocks = vi.hoisted(() => ({
     status: string;
     error?: string;
   }>,
+  rememberGenerationRunMetadata: vi.fn(),
   schedules: [] as Array<{ callback: () => void; delay: number }>,
   session: {
     dispatch: vi.fn(),
@@ -75,8 +86,10 @@ vi.mock("@/model", async (importOriginal) => {
   return {
     ...actual,
     coreGenerationApi: { create: mocks.coreCreate },
+    rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
     useGenerateAnimationMutation: () => mocks.animationMutation,
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
+    useGenerationCandidateQuery: () => mocks.candidateQuery,
     useGenerationRunsQuery: () => ({ data: mocks.generationRuns }),
   };
 });
@@ -94,12 +107,15 @@ beforeEach(() => {
   mocks.generationRuns = [];
   mocks.animationMutation.isPending = false;
   mocks.applicationMutation.isPending = false;
+  mocks.candidateQuery.data = undefined;
+  mocks.candidateQuery.isError = false;
+  mocks.candidateQuery.isPending = false;
   mocks.applicationMutation.mutateAsync.mockResolvedValue(undefined);
   mocks.animationMutation.mutateAsync.mockResolvedValue({
     generationId: "generation-1",
     animation: { kind: "clip", label: "Walk", frameCount: 4 },
   });
-  mocks.coreCreate.mockResolvedValue({});
+  mocks.coreCreate.mockResolvedValue({ generationRunId: 31 });
   mocks.session.save.mockResolvedValue({ status: "saved" });
   mocks.session.snapshot = snapshot(spriteRecord("character"));
 });
@@ -197,6 +213,12 @@ describe("useEditorWorkspace", () => {
       7,
       expect.objectContaining({ assetId: 8, kind: "edit_character_prototype" }),
     );
+    expect(mocks.rememberGenerationRunMetadata).toHaveBeenCalledWith("7", 31, {
+      kind: "character",
+      name: "Edit Asset",
+      prompt: "Refine hero",
+      assetId: "8",
+    });
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(1800);
   });
@@ -246,7 +268,7 @@ describe("useEditorWorkspace", () => {
     expect(mocks.coreCreate).not.toHaveBeenCalled();
   });
 
-  it("lets the editor apply or discard an awaiting generation result", async () => {
+  it("previews an awaiting result in the editor and offers apply or deny", async () => {
     mocks.generationRuns = [
       {
         id: "ready",
@@ -255,14 +277,29 @@ describe("useEditorWorkspace", () => {
         status: "awaiting_application",
       },
     ];
+    mocks.candidateQuery.data = {
+      status: "awaiting_application",
+      result: {
+        content: {
+          prototype: [
+            { id: 1, url: "/candidate-front.png" },
+            { id: 2, url: "/candidate-right.png" },
+            { id: 3, url: "/candidate-back.png" },
+            { id: 4, url: "/candidate-left.png" },
+          ],
+        },
+      },
+    };
     mocks.stateValues.push(null, null, null);
     const editor = useEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),
       onBack: vi.fn(),
     });
 
-    editor?.header.generationTasks[0]?.onApply?.();
-    editor?.header.generationTasks[0]?.onDiscard?.();
+    expect(editor?.header.generationTasks).toEqual([]);
+    expect(editor?.sprite.prototype.imageUrl).toBe("/candidate-front.png");
+    editor?.generationReview?.onApply();
+    editor?.generationReview?.onDeny();
     await flushPromises();
 
     expect(mocks.applicationMutation.mutateAsync).toHaveBeenNthCalledWith(1, {
@@ -297,7 +334,7 @@ describe("useEditorWorkspace", () => {
       onBack: vi.fn(),
     });
 
-    editor?.header.generationTasks[0]?.onDiscard?.();
+    editor?.generationReview?.onDeny();
     await flushPromises();
 
     expect(mocks.applicationMutation.mutateAsync).toHaveBeenCalledWith({

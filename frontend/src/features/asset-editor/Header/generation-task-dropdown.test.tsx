@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { withI18n } from "@/testing/with-i18n";
 
@@ -83,33 +83,5 @@ describe("GenerationTaskDropdown", () => {
     expect(
       screen.getByText("Video provider rejected the request"),
     ).toBeTruthy();
-  });
-
-  it("offers apply and discard for a generated candidate", async () => {
-    const user = userEvent.setup();
-    const onApply = vi.fn();
-    const onDiscard = vi.fn();
-    render(
-      withI18n(
-        <GenerationTaskDropdown
-          tasks={[
-            {
-              id: "run-ready",
-              name: "Walk",
-              prompt: "A relaxed walk",
-              status: "awaiting_application",
-              onApply,
-              onDiscard,
-            },
-          ]}
-        />,
-      ),
-    );
-
-    await user.click(screen.getByRole("button", { name: /generation ready/ }));
-    await user.click(screen.getByRole("button", { name: "Apply" }));
-    expect(onApply).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole("button", { name: "Discard" }));
-    expect(onDiscard).toHaveBeenCalledOnce();
   });
 });

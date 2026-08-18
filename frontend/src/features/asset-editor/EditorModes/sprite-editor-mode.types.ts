@@ -9,9 +9,11 @@ import type {
 
 import type { EditorHeaderProps } from "../Header/editor-header";
 import type { InspectorSubmitRequest } from "../Inspector/inspector.types";
+import type { GenerationReview } from "../GenerationReview/generation-review-bar";
 
 export type SpriteEditorModeProps = {
   header: EditorHeaderProps;
+  generationReview?: GenerationReview;
   sprite: {
     perspective: Perspective;
     prototype: CharacterSpriteSheet;
