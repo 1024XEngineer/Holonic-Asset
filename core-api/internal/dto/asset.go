@@ -8,16 +8,16 @@ import (
 )
 
 type AssetListItemResponse struct {
-	AssetID       uint               `json:"assetId" minimum:"1"`
-	Name          string             `json:"name"`
-	ProjectID     uint               `json:"projectId" minimum:"1"`
-	Type          domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
-	Description   string             `json:"description"`
-	Perspective   domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
-	Dimensions    json.RawMessage    `json:"dimensions"`
-	Tags          []string           `json:"tags"`
-	PrototypeURLs []string           `json:"prototypeUrls,omitempty"`
-	Version       uint               `json:"version"`
+	AssetID      uint               `json:"assetId" minimum:"1"`
+	Name         string             `json:"name"`
+	ProjectID    uint               `json:"projectId" minimum:"1"`
+	Type         domain.AssetType   `json:"type" enum:"character,object,tileSet,audio,uiset,scenery"`
+	Description  string             `json:"description"`
+	Perspective  domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
+	Dimensions   json.RawMessage    `json:"dimensions"`
+	Tags         []string           `json:"tags"`
+	ThumbnailURL string             `json:"thumbnailUrl,omitempty"`
+	Version      uint               `json:"version"`
 }
 
 type GetAssetsResponse struct {

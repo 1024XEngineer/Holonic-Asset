@@ -55,44 +55,29 @@ func (h *Handler) GetAssets(
 
 	items := make([]dto.AssetListItemResponse, len(assets))
 	for index, asset := range assets {
-		prototypeURLs, _ := h.resolvePrototypeURLs(x, asset)
+		thumbnailURL, _ := h.resolveThumbnailURL(x, asset.ThumbnailURL)
 		items[index] = dto.AssetListItemResponse{
-			AssetID:       asset.ID,
-			Name:          asset.Name,
-			ProjectID:     asset.ProjectID,
-			Type:          asset.Type,
-			Description:   asset.Description,
-			Perspective:   asset.Perspective,
-			Dimensions:    append([]byte(nil), asset.Dimensions...),
-			Tags:          asset.Tags,
-			PrototypeURLs: prototypeURLs,
-			Version:       asset.Version,
+			AssetID:      asset.ID,
+			Name:         asset.Name,
+			ProjectID:    asset.ProjectID,
+			Type:         asset.Type,
+			Description:  asset.Description,
+			Perspective:  asset.Perspective,
+			Dimensions:   append([]byte(nil), asset.Dimensions...),
+			Tags:         asset.Tags,
+			ThumbnailURL: thumbnailURL,
+			Version:      asset.Version,
 		}
 	}
 	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
 }
 
-func (h *Handler) resolvePrototypeURLs(ctx context.Context, asset domain.Asset) ([]string, error) {
-	content, err := asset.DecodeContent()
-	if err != nil || content.Prototype == nil {
-		return nil, err
+func (h *Handler) resolveThumbnailURL(ctx context.Context, thumbnailURL string) (string, error) {
+	thumbnailURL = strings.TrimSpace(thumbnailURL)
+	if thumbnailURL == "" || h.references == nil {
+		return thumbnailURL, nil
 	}
-
-	urls := make([]string, 0, len(*content.Prototype))
-	for _, resource := range *content.Prototype {
-		if resource.URL == nil || strings.TrimSpace(*resource.URL) == "" {
-			continue
-		}
-		resolved := *resource.URL
-		if h.references != nil {
-			resolved, err = h.references.ResolveReference(ctx, resolved)
-			if err != nil {
-				return nil, err
-			}
-		}
-		urls = append(urls, resolved)
-	}
-	return urls, nil
+	return h.references.ResolveReference(ctx, thumbnailURL)
 }
 
 func (h *Handler) Detail(
