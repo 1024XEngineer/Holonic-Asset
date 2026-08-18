@@ -332,8 +332,27 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		t.Fatalf("generation must return only the generated animation: result=%+v assets=%+v", application, assets)
 	}
 	generatedAnimation := content.Animations[0]
-	if generatedAnimation.ID != 4 {
-		t.Fatalf("generation result contains the wrong animation: %+v", generatedAnimation)
+	if generatedAnimation.ID != 0 {
+		t.Fatalf("generated animation candidate must not allocate an ID: %+v", generatedAnimation)
+	}
+	var rawResult map[string]json.RawMessage
+	if err := json.Unmarshal(result, &rawResult); err != nil {
+		t.Fatalf("decode raw animation result: %v", err)
+	}
+	if _, exists := rawResult["animation_id"]; exists {
+		t.Fatalf("generated animation result must omit animation_id: %s", result)
+	}
+	var rawContent struct {
+		Animations []map[string]json.RawMessage `json:"animations"`
+	}
+	if err := json.Unmarshal(rawResult["content"], &rawContent); err != nil {
+		t.Fatalf("decode raw animation candidate content: %v", err)
+	}
+	if len(rawContent.Animations) != 1 {
+		t.Fatalf("expected one raw animation candidate, got %+v", rawContent.Animations)
+	}
+	if _, exists := rawContent.Animations[0]["id"]; exists {
+		t.Fatalf("generated animation candidate must omit id: %s", rawResult["content"])
 	}
 	wantGeneration := &assetdomain.AnimationGenerationConfig{
 		Direction:   "back_right",
@@ -375,7 +394,7 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected persisted raw animation frames: %+v", references.uploads)
 	}
-	if application.AssetID != 7 || application.AnimationID != 1 || len(application.GeneratedResources) != 2 {
+	if application.AssetID != 7 || application.AnimationID != 0 || len(application.GeneratedResources) != 2 {
 		t.Fatalf("unexpected animation application candidate: %+v", application)
 	}
 }

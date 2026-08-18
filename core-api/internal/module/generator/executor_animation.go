@@ -748,6 +748,12 @@ func animationFrameDimensions(asset assetdomain.Asset) (assetdomain.Size, error)
 	return dimensions, nil
 }
 
+type generatedAnimationCandidate struct {
+	Name       string                                 `json:"name"`
+	Frames     []assetdomain.Frame                    `json:"frames"`
+	Generation *assetdomain.AnimationGenerationConfig `json:"generation,omitempty"`
+}
+
 func (e *executor) generateAnimation(
 	ctx context.Context,
 	payload CreateAnimationPayload,
@@ -814,13 +820,7 @@ func (e *executor) generateAnimation(
 	if err != nil {
 		return nil, err
 	}
-	content, err := asset.DecodeContent()
-	if err != nil {
-		return nil, fmt.Errorf("generator: decode animation asset %d content: %w", payload.AssetID, err)
-	}
-	animationID := nextGeneratedAnimationID(content.Animations)
-	animation := assetdomain.Animation{
-		ID:     animationID,
+	animation := generatedAnimationCandidate{
 		Name:   animationName,
 		Frames: frames,
 		Generation: &assetdomain.AnimationGenerationConfig{
@@ -837,15 +837,16 @@ func (e *executor) generateAnimation(
 			AspectRatio: generationRequest.AspectRatio,
 		},
 	}
-	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{
-		Animations: []assetdomain.Animation{animation},
+	encoded, err := json.Marshal(struct {
+		Animations []generatedAnimationCandidate `json:"animations"`
+	}{
+		Animations: []generatedAnimationCandidate{animation},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode animation result for asset %d: %w", payload.AssetID, err)
 	}
 	return encodeExecutionResult(ExecutionResult{
 		AssetID:            payload.AssetID,
-		AnimationID:        animationID,
 		Version:            asset.Version,
 		Content:            encoded,
 		GeneratedResources: generatedFrameResourceKeys(frames),

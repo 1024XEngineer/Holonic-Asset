@@ -323,14 +323,4 @@ func generatedFrameResourceKeys(frames []assetdomain.Frame) []string {
 	return keys
 }
 
-func nextGeneratedAnimationID(animations []assetdomain.Animation) uint {
-	var id uint
-	for _, animation := range animations {
-		if animation.ID > id {
-			id = animation.ID
-		}
-	}
-	return id + 1
-}
-
 var _ Executor = (*executor)(nil)

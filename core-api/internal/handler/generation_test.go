@@ -146,9 +146,8 @@ func TestGetResolvesGenerationResultContentReferences(t *testing.T) {
 		Status:    taskdomain.StatusAwaitingApplication,
 		Result: json.RawMessage(`{
 			"asset_id":3,
-			"animation_id":4,
 			"version":2,
-			"content":{"animations":[{"id":4,"name":"walk","frames":[{"id":1,"url":"uploads/frame.png"}],"generation":{"direction":"front","frameCount":1,"columns":1,"frameWidth":32,"frameHeight":32,"fps":10,"resolution":"720p","duration":1,"aspectRatio":"1:1"}}]}
+			"content":{"animations":[{"name":"walk","frames":[{"id":1,"url":"uploads/frame.png"}],"generation":{"direction":"front","frameCount":1,"columns":1,"frameWidth":32,"frameHeight":32,"fps":10,"resolution":"720p","duration":1,"aspectRatio":"1:1"}}]}
 		}`),
 	}}
 	resolver := &referenceResolverStub{}
@@ -162,6 +161,7 @@ func TestGetResolvesGenerationResultContentReferences(t *testing.T) {
 	}
 	var content struct {
 		Animations []struct {
+			ID     *uint `json:"id"`
 			Frames []struct {
 				URL string `json:"url"`
 			} `json:"frames"`
@@ -171,7 +171,8 @@ func TestGetResolvesGenerationResultContentReferences(t *testing.T) {
 	if response.Data.Result == nil || json.Unmarshal(response.Data.Result.Content, &content) != nil {
 		t.Fatalf("decode generation result content: %+v", response.Data.Result)
 	}
-	if len(content.Animations) != 1 || len(content.Animations[0].Frames) != 1 ||
+	if len(content.Animations) != 1 || content.Animations[0].ID != nil ||
+		len(content.Animations[0].Frames) != 1 ||
 		content.Animations[0].Frames[0].URL != "signed:uploads/frame.png" ||
 		len(content.Animations[0].Generation) == 0 {
 		t.Fatalf("unexpected resolved generation content: %+v", content)
