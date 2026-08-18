@@ -360,6 +360,7 @@ export interface components {
             /** Format: int64 */
             projectId: number;
             tags: string[] | null;
+            thumbnailUrl?: string;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */

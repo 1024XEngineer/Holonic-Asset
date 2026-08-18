@@ -16,11 +16,12 @@ import (
 
 type jsonAssetDaoStub struct {
 	dao.AssetDao
-	asset          dao.Asset
-	created        dao.Asset
-	updatedAsset   uint
-	updatedVersion uint
-	updatedContent uint
+	asset            dao.Asset
+	created          dao.Asset
+	updatedAsset     uint
+	updatedVersion   uint
+	updatedContent   uint
+	updatedThumbnail string
 }
 
 type jsonAssetRecordDaoStub struct {
@@ -115,10 +116,11 @@ func (s *jsonAssetDaoStub) CreateAsset(_ context.Context, asset *dao.Asset) (dao
 	return s.created, nil
 }
 
-func (s *jsonAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint) error {
+func (s *jsonAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint, thumbnailURL string) error {
 	s.updatedAsset = assetID
 	s.updatedVersion = version
 	s.updatedContent = contentID
+	s.updatedThumbnail = thumbnailURL
 	return nil
 }
 
@@ -193,12 +195,21 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 	contentDao := &jsonAssetContentDaoStub{contents: map[uint]dao.AssetContent{}, nextID: 10}
 	recordDao := &jsonAssetRecordDaoStub{records: map[uint]dao.AssetRecord{}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub, ContentDao: contentDao, RecordDao: recordDao}
+	prototypeURL := "uploads/hero/prototype.png"
+	content := domain.NewAssetContent(domain.AssetTypeCharacter)
+	prototype := domain.Prototype{{ID: 1, URL: &prototypeURL}}
+	content.Prototype = &prototype
+	encoded, err := domain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode character content: %v", err)
+	}
 
 	created, err := repo.CreateCharacterAsset(context.Background(), &domain.Asset{
 		Name:        "hero",
 		ProjectID:   42,
 		Perspective: domain.PerspectiveTopDown,
 		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
+		Content:     encoded,
 	})
 	if err != nil {
 		t.Fatalf("create character asset: %v", err)
@@ -206,7 +217,10 @@ func TestAssetRepositoryCreatesCharacterWithPrototype(t *testing.T) {
 	if created == nil || created.ID != 23 {
 		t.Fatalf("expected created asset ID 23, got %+v", created)
 	}
-	content, err := (&domain.Asset{Content: []byte(daoStub.created.Content), Type: domain.AssetTypeCharacter}).DecodeContent()
+	if created.ThumbnailURL != prototypeURL || daoStub.created.ThumbnailURL != prototypeURL || daoStub.updatedThumbnail != prototypeURL {
+		t.Fatalf("prototype thumbnail was not stored: created=%+v dao=%+v", created, daoStub)
+	}
+	content, err = (&domain.Asset{Content: []byte(daoStub.created.Content), Type: domain.AssetTypeCharacter}).DecodeContent()
 	if err != nil {
 		t.Fatalf("decode created content: %v", err)
 	}
@@ -375,6 +389,9 @@ func TestAssetRepositoryCreatesAnimationInsideAssetContent(t *testing.T) {
 	if daoStub.updatedVersion != 3 {
 		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
 	}
+	if daoStub.updatedThumbnail != prototypeURL {
+		t.Fatalf("asset thumbnail = %q, want %q", daoStub.updatedThumbnail, prototypeURL)
+	}
 	record, ok := recordDao.records[21]
 	if !ok {
 		t.Fatalf("expected animation content record, got %+v", recordDao.records)
@@ -412,7 +429,7 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	}
 
 	err = repo.UpdatePrototypeImages(context.Background(), 7, []domain.ImageResource{
-		{ID: 2101, URL: new("https://cdn.example/prototype-01.png")},
+		{ID: 2101, URL: new("  ")},
 		{ID: 2102, URL: new("https://cdn.example/prototype-02.png")},
 		{ID: 2103, URL: new("https://cdn.example/prototype-03.png")},
 		{ID: 2104, URL: new("https://cdn.example/prototype-04.png")},
@@ -435,6 +452,9 @@ func TestAssetRepositoryUpdatesPrototypeImages(t *testing.T) {
 	}
 	if daoStub.updatedVersion != 3 {
 		t.Fatalf("asset version = %d, want 3", daoStub.updatedVersion)
+	}
+	if daoStub.updatedThumbnail != "https://cdn.example/prototype-02.png" {
+		t.Fatalf("asset thumbnail = %q, want first non-blank prototype URL", daoStub.updatedThumbnail)
 	}
 	record, ok := recordDao.records[21]
 	if !ok || record.Version != 3 || record.ContentID != daoStub.updatedContent {

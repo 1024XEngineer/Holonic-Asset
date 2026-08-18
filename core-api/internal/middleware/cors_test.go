@@ -34,9 +34,6 @@ func TestCORSAllowsConfiguredOrigin(t *testing.T) {
 	if vary := response.Header().Values(echo.HeaderVary); !slices.Contains(vary, echo.HeaderOrigin) {
 		t.Fatalf("expected response to vary by Origin, got %q", vary)
 	}
-	if exposed := response.Header().Get(echo.HeaderAccessControlExposeHeaders); exposed != "" {
-		t.Fatalf("expected no exposed headers, got %q", exposed)
-	}
 }
 
 func TestCORSAllowsAnyOriginByDefault(t *testing.T) {

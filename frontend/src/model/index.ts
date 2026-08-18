@@ -142,6 +142,7 @@ export type {
 export {
   isPerspective,
   perspectiveOptions,
+  readLastProjectId,
   reconcileProjectSelection,
   removeProjectSelection,
   useCreateProjectMutation,

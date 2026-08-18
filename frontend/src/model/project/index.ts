@@ -4,6 +4,7 @@ export { useDeleteProjectMutation } from "./project-delete.mutation";
 export { useProjectDetailQuery } from "./project-detail.query";
 export { useProjectListQuery } from "./project-list.query";
 export {
+  readLastProjectId,
   reconcileProjectSelection,
   removeProjectSelection,
 } from "./project-selection";

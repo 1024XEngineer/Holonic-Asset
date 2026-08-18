@@ -55,20 +55,29 @@ func (h *Handler) GetAssets(
 
 	items := make([]dto.AssetListItemResponse, len(assets))
 	for index, asset := range assets {
+		thumbnailURL, _ := h.resolveThumbnailURL(x, asset.ThumbnailURL)
 		items[index] = dto.AssetListItemResponse{
-			AssetID:     asset.ID,
-			Name:        asset.Name,
-			ProjectID:   asset.ProjectID,
-			Type:        asset.Type,
-			Description: asset.Description,
-			Perspective: asset.Perspective,
-			Dimensions:  append([]byte(nil), asset.Dimensions...),
-			Tags:        asset.Tags,
-			Version:     asset.Version,
+			AssetID:      asset.ID,
+			Name:         asset.Name,
+			ProjectID:    asset.ProjectID,
+			Type:         asset.Type,
+			Description:  asset.Description,
+			Perspective:  asset.Perspective,
+			Dimensions:   append([]byte(nil), asset.Dimensions...),
+			Tags:         asset.Tags,
+			ThumbnailURL: thumbnailURL,
+			Version:      asset.Version,
 		}
 	}
-
 	return dto.NewTypedSuccessResponse(dto.GetAssetsResponse{Assets: items}), nil
+}
+
+func (h *Handler) resolveThumbnailURL(ctx context.Context, thumbnailURL string) (string, error) {
+	thumbnailURL = strings.TrimSpace(thumbnailURL)
+	if thumbnailURL == "" || h.references == nil {
+		return thumbnailURL, nil
+	}
+	return h.references.ResolveReference(ctx, thumbnailURL)
 }
 
 func (h *Handler) Detail(
