@@ -2,13 +2,10 @@ package generator
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"io"
-	"net/http"
 	"strings"
 
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -38,66 +35,6 @@ func (s *animationGenerationService) prepareAnimationReference(
 		return "", fmt.Errorf("generator: encode prepared animation reference: %w", err)
 	}
 	return encoded, nil
-}
-
-func (s *animationGenerationService) loadAnimationReference(ctx context.Context, reference string) (string, error) {
-	reference = strings.TrimSpace(reference)
-	if reference == "" {
-		return "", fmt.Errorf("generator: animation reference image is required")
-	}
-
-	if s.referenceResolver != nil {
-		resolved, err := s.referenceResolver.ResolveReference(ctx, reference)
-		if err != nil {
-			return "", fmt.Errorf("generator: resolve animation reference: %w", err)
-		}
-		reference = strings.TrimSpace(resolved)
-		if reference == "" {
-			return "", fmt.Errorf("generator: resolve animation reference: empty result")
-		}
-	}
-
-	if !strings.HasPrefix(reference, "http://") && !strings.HasPrefix(reference, "https://") {
-		return reference, nil
-	}
-
-	client := s.referenceHTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, reference, nil)
-	if err != nil {
-		return "", fmt.Errorf("generator: create animation reference download request: %w", err)
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("generator: download animation reference: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
-		return "", fmt.Errorf("generator: download animation reference: HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxAnimationReferenceBytes+1))
-	if err != nil {
-		return "", fmt.Errorf("generator: read animation reference: %w", err)
-	}
-	if len(body) > maxAnimationReferenceBytes {
-		return "", fmt.Errorf("generator: animation reference exceeds %d bytes", maxAnimationReferenceBytes)
-	}
-	if len(body) == 0 {
-		return "", fmt.Errorf("generator: download animation reference: empty response")
-	}
-	encoded := base64.StdEncoding.EncodeToString(body)
-	decoded, err := imageprocessor.DecodeBase64Image(encoded)
-	if err != nil {
-		return "", fmt.Errorf("generator: decode downloaded animation reference: %w", err)
-	}
-	canonical, err := imageprocessor.EncodePNGBase64(decoded)
-	if err != nil {
-		return "", fmt.Errorf("generator: encode downloaded animation reference: %w", err)
-	}
-	return canonical, nil
 }
 
 func (s *animationGenerationService) prepareGreenReference(

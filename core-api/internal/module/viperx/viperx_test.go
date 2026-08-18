@@ -36,6 +36,13 @@ llm:
   baseURL: https://llm.example.test
   apiKey: test-llm-key
   defaultModel: vision-model
+video:
+  baseURL: https://video.example.test
+  apiKey: test-video-key
+  pollInterval: 5s
+  pollTimeout: 45s
+  maxRetries: 3
+  retryDelay: 2s
 qiniu:
   accessKey: test-ak
   secretKey: test-sk
@@ -68,6 +75,9 @@ qiniu:
 	if loaded.LLM.BaseURL != "https://llm.example.test" || loaded.LLM.APIKey != "test-llm-key" || loaded.LLM.DefaultModel != "vision-model" {
 		t.Fatalf("unexpected LLM config: %+v", loaded.LLM)
 	}
+	if loaded.Video.BaseURL != "https://video.example.test" || loaded.Video.APIKey != "test-video-key" || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
+		t.Fatalf("unexpected video config: %+v", loaded.Video)
+	}
 	if loaded.QiNiu.AccessKey != "test-ak" || loaded.QiNiu.SecretKey != "test-sk" || loaded.QiNiu.Bucket != "asset-bucket" || loaded.QiNiu.Domain != "cdn.example.com" || loaded.QiNiu.UploadTokenExpiry != 45*time.Minute || loaded.QiNiu.DownloadURLExpiry != 20*time.Minute {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)
 	}
@@ -89,6 +99,9 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 	}
 	if loaded.LLM.BaseURL != "" || loaded.LLM.APIKey != "" || loaded.LLM.DefaultModel != "" {
 		t.Fatalf("expected example LLM config to be user-supplied: %+v", loaded.LLM)
+	}
+	if loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
+		t.Fatalf("unexpected example video config: %+v", loaded.Video)
 	}
 	if loaded.QiNiu.UploadTokenExpiry != time.Hour || loaded.QiNiu.DownloadURLExpiry != 30*time.Minute {
 		t.Fatalf("unexpected qiniu config: %+v", loaded.QiNiu)

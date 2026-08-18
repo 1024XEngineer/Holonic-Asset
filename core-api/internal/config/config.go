@@ -46,8 +46,12 @@ type LLMClientConfig struct {
 }
 
 type VideoClientConfig struct {
-	BaseURL string `mapstructure:"baseURL" yaml:"baseURL"`
-	APIKey  string `mapstructure:"apiKey" yaml:"apiKey"`
+	BaseURL      string        `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey       string        `mapstructure:"apiKey" yaml:"apiKey"`
+	PollInterval time.Duration `mapstructure:"pollInterval" yaml:"pollInterval"`
+	PollTimeout  time.Duration `mapstructure:"pollTimeout" yaml:"pollTimeout"`
+	MaxRetries   int           `mapstructure:"maxRetries" yaml:"maxRetries"`
+	RetryDelay   time.Duration `mapstructure:"retryDelay" yaml:"retryDelay"`
 }
 
 type QiniuConfig struct {
