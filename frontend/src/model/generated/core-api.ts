@@ -359,8 +359,8 @@ export interface components {
             perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
-            prototypeUrls?: string[] | null;
             tags: string[] | null;
+            thumbnailUrl?: string;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */

@@ -97,15 +97,6 @@
             "minimum": 1,
             "type": "integer"
           },
-          "prototypeUrls": {
-            "items": {
-              "type": "string"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
           "tags": {
             "items": {
               "type": "string"
@@ -114,6 +105,9 @@
               "array",
               "null"
             ]
+          },
+          "thumbnailUrl": {
+            "type": "string"
           },
           "type": {
             "enum": [
