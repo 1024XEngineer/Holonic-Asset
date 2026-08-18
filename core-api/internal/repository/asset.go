@@ -255,16 +255,17 @@ func (r *AssetRepositoryImpl) UpdateAsset(
 
 func convertAssetToDomain(asset dao.Asset) domain.Asset {
 	return domain.Asset{
-		ID:          asset.ID,
-		Name:        asset.Name,
-		ProjectID:   asset.ProjectID,
-		Type:        domain.AssetType(asset.Type),
-		Description: asset.Description,
-		Tags:        append([]string(nil), asset.Tags...),
-		Perspective: domain.Perspective(asset.Perspective),
-		Dimensions:  append([]byte(nil), asset.Dimensions...),
-		Content:     append([]byte(nil), asset.Content...),
-		Version:     asset.Version,
+		ID:           asset.ID,
+		Name:         asset.Name,
+		ProjectID:    asset.ProjectID,
+		Type:         domain.AssetType(asset.Type),
+		Description:  asset.Description,
+		Tags:         append([]string(nil), asset.Tags...),
+		Perspective:  domain.Perspective(asset.Perspective),
+		Dimensions:   append([]byte(nil), asset.Dimensions...),
+		ThumbnailURL: asset.ThumbnailURL,
+		Content:      append([]byte(nil), asset.Content...),
+		Version:      asset.Version,
 	}
 }
 
@@ -309,16 +310,17 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 	}
 
 	return &dao.Asset{
-		ID:          asset.ID,
-		Name:        asset.Name,
-		ProjectID:   asset.ProjectID,
-		Type:        string(assetType),
-		Description: asset.Description,
-		Tags:        append([]string(nil), asset.Tags...),
-		Perspective: string(perspective),
-		Dimensions:  datatypes.JSON(append([]byte(nil), dimensions...)),
-		Content:     datatypes.JSON(encoded),
-		Version:     asset.Version,
+		ID:           asset.ID,
+		Name:         asset.Name,
+		ProjectID:    asset.ProjectID,
+		Type:         string(assetType),
+		Description:  asset.Description,
+		Tags:         append([]string(nil), asset.Tags...),
+		Perspective:  string(perspective),
+		Dimensions:   datatypes.JSON(append([]byte(nil), dimensions...)),
+		ThumbnailURL: thumbnailURLFromContent(content),
+		Content:      datatypes.JSON(encoded),
+		Version:      asset.Version,
 	}, nil
 }
 
@@ -348,6 +350,13 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return fmt.Errorf("repository: content storage is not configured")
 	}
+	content, err := (domain.Asset{
+		Type:    domain.AssetType(asset.Type),
+		Content: encoded,
+	}).DecodeContent()
+	if err != nil {
+		return fmt.Errorf("repository: decode asset %d content: %w", asset.ID, err)
+	}
 	nextVersion := asset.Version + 1
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
 		AssetID: asset.ID,
@@ -367,7 +376,28 @@ func (r *AssetRepositoryImpl) replaceAssetContent(ctx context.Context, asset dao
 	}); err != nil {
 		return err
 	}
-	return r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, nextVersion, contentRecord.ID)
+	return r.AssetDao.UpdateAssetCurrentContent(
+		ctx,
+		asset.ID,
+		nextVersion,
+		contentRecord.ID,
+		thumbnailURLFromContent(content),
+	)
+}
+
+func thumbnailURLFromContent(content domain.AssetContent) string {
+	if content.Prototype == nil {
+		return ""
+	}
+	for _, resource := range *content.Prototype {
+		if resource.URL == nil {
+			continue
+		}
+		if thumbnailURL := strings.TrimSpace(*resource.URL); thumbnailURL != "" {
+			return thumbnailURL
+		}
+	}
+	return ""
 }
 
 func (r *AssetRepositoryImpl) mutateAssetContent(
@@ -476,7 +506,13 @@ func (r *AssetRepositoryImpl) createAssetResultInTransaction(ctx context.Context
 	}); err != nil {
 		return nil, err
 	}
-	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, created.ID, currentVersion, contentRecord.ID); err != nil {
+	if err := r.AssetDao.UpdateAssetCurrentContent(
+		ctx,
+		created.ID,
+		currentVersion,
+		contentRecord.ID,
+		created.ThumbnailURL,
+	); err != nil {
 		return nil, err
 	}
 	created.ContentID = &contentRecord.ID
@@ -590,6 +626,13 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 	if r.ContentDao == nil || r.RecordDao == nil {
 		return nil, fmt.Errorf("repository: content storage is not configured")
 	}
+	decodedContent, err := (domain.Asset{
+		Type:    domain.AssetType(asset.Type),
+		Content: content,
+	}).DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("repository: decode asset %d content: %w", asset.ID, err)
+	}
 	history, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, asset.ID)
 	if err != nil {
 		return nil, err
@@ -635,7 +678,13 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 	snapshot.ID = recordID
 	snapshot.ContentID = contentRecord.ID
 	snapshot.CreatedAt = daoRecord.CreatedAt
-	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, asset.ID, snapshot.Version, contentRecord.ID); err != nil {
+	if err := r.AssetDao.UpdateAssetCurrentContent(
+		ctx,
+		asset.ID,
+		snapshot.Version,
+		contentRecord.ID,
+		thumbnailURLFromContent(decodedContent),
+	); err != nil {
 		return nil, err
 	}
 	return snapshot, nil
@@ -705,6 +754,13 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 	if err != nil {
 		return nil, err
 	}
+	decodedContent, err := (domain.Asset{
+		Type:    domain.AssetType(asset.Type),
+		Content: json.RawMessage(content.Content),
+	}).DecodeContent()
+	if err != nil {
+		return nil, fmt.Errorf("repository: decode asset %d content: %w", asset.ID, err)
+	}
 	history, err := r.RecordDao.GetAssetRecordsByAssetID(ctx, assetID)
 	if err != nil {
 		return nil, err
@@ -744,7 +800,13 @@ func (r *AssetRepositoryImpl) rollbackRecord(ctx context.Context, assetID uint, 
 	}); err != nil {
 		return nil, err
 	}
-	if err := r.AssetDao.UpdateAssetCurrentContent(ctx, assetID, version, candidate.ContentID); err != nil {
+	if err := r.AssetDao.UpdateAssetCurrentContent(
+		ctx,
+		assetID,
+		version,
+		candidate.ContentID,
+		thumbnailURLFromContent(decodedContent),
+	); err != nil {
 		return nil, err
 	}
 	if err := r.RecordDao.DeleteAssetRecordsAfterVersion(ctx, assetID, version); err != nil {
@@ -797,14 +859,15 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 	}
 
 	copyAsset := &dao.Asset{
-		Name:        asset.Name,
-		ProjectID:   asset.ProjectID,
-		Type:        asset.Type,
-		Description: asset.Description,
-		Tags:        append([]string(nil), asset.Tags...),
-		Perspective: asset.Perspective,
-		Dimensions:  append(datatypes.JSON(nil), asset.Dimensions...),
-		Version:     asset.Version,
+		Name:         asset.Name,
+		ProjectID:    asset.ProjectID,
+		Type:         asset.Type,
+		Description:  asset.Description,
+		Tags:         append([]string(nil), asset.Tags...),
+		Perspective:  asset.Perspective,
+		Dimensions:   append(datatypes.JSON(nil), asset.Dimensions...),
+		ThumbnailURL: asset.ThumbnailURL,
+		Version:      asset.Version,
 	}
 	created, err := r.AssetDao.CreateAsset(ctx, copyAsset)
 	if err != nil {
@@ -853,7 +916,13 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 		if !ok {
 			return 0, fmt.Errorf("repository: current content %d for asset %d not found", *asset.ContentID, assetID)
 		}
-		if err := r.AssetDao.UpdateAssetCurrentContent(ctx, created.ID, asset.Version, contentID); err != nil {
+		if err := r.AssetDao.UpdateAssetCurrentContent(
+			ctx,
+			created.ID,
+			asset.Version,
+			contentID,
+			asset.ThumbnailURL,
+		); err != nil {
 			return 0, err
 		}
 	}

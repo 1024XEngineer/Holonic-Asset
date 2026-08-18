@@ -41,7 +41,7 @@ export function removeProjectSelection(
     : undefined;
 }
 
-function readLastProjectId() {
+export function readLastProjectId() {
   try {
     return localStorage.getItem(LAST_PROJECT_STORAGE_KEY) ?? undefined;
   } catch {

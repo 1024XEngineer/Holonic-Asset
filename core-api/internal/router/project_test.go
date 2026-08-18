@@ -27,6 +27,20 @@ type projectRouterStub struct {
 	generateReferenceRequest dto.GenerateProjectReferenceRequest
 }
 
+func (s *projectRouterStub) ListByUID(
+	_ context.Context,
+	_ dto.ListProjectsRequest,
+) (dto.SuccessResponse[dto.ListProjectsResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.ListProjectsResponse{}), nil
+}
+
+func (s *projectRouterStub) GetDetail(
+	_ context.Context,
+	_ dto.ProjectDetailRequest,
+) (dto.SuccessResponse[dto.ProjectDetailResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.ProjectDetailResponse{}), nil
+}
+
 func (s *projectRouterStub) Create(
 	_ context.Context,
 	request dto.CreateProjectRequest,
