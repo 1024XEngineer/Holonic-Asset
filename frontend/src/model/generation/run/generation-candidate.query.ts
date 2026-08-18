@@ -4,11 +4,13 @@ import { readAuthenticatedUserId } from "@/model/auth";
 import { coreGenerationApi } from "./core-generation.api";
 import { generationKeys } from "./keys";
 
-export function useGenerationCandidateQuery(runId: string | undefined) {
+export function useGenerationCandidateQuery<Content = unknown>(
+  runId: string | undefined,
+) {
   const userId = readAuthenticatedUserId();
   return useQuery({
     queryKey: generationKeys.candidate(userId, runId ?? "unselected"),
-    queryFn: () => coreGenerationApi.detail(positiveRunId(runId!)),
+    queryFn: () => coreGenerationApi.detail<Content>(positiveRunId(runId!)),
     enabled: Boolean(runId),
     staleTime: Infinity,
   });

@@ -80,6 +80,8 @@ export type {
   AssetContent,
   AssetContentByType,
   AssetContentMetadata,
+  CoreSpriteAssetContent,
+  CoreSpriteAssetContentPatch,
   AssetDetailResponse,
   AssetDimensions,
   AssetDimensionsByType,

@@ -16,8 +16,20 @@ export type GenerationRunListItemResponse =
   Schemas["GenerationRunListItemResponse"];
 export type ListGenerationRunsResponse =
   operations["listGenerationRuns"]["responses"][200]["content"]["application/json"]["data"];
-export type GenerationRunResponse =
+type GeneratedGenerationRunResponse =
   operations["getGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
+type GeneratedGenerationResult = NonNullable<
+  GeneratedGenerationRunResponse["result"]
+>;
+
+export type GenerationRunResponse<Content = unknown> = Omit<
+  GeneratedGenerationRunResponse,
+  "result"
+> & {
+  result?: Omit<GeneratedGenerationResult, "content"> & {
+    content?: Content;
+  };
+};
 export type CancelGenerationResponse =
   operations["cancelGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
 export type ResolveGenerationApplicationRequest =

@@ -6,6 +6,8 @@ describe("mergeAssetContentPatch", () => {
   it("allocates distinct IDs for generated animations without IDs", () => {
     const merged = mergeAssetContentPatch(
       {
+        directionCount: 4,
+        prototype: [],
         animations: [
           { id: 4, name: "Idle", frames: [] },
           { id: 7, name: "Walk", frames: [] },
@@ -30,6 +32,8 @@ describe("mergeAssetContentPatch", () => {
   it("preserves IDs for animation edits", () => {
     const merged = mergeAssetContentPatch(
       {
+        directionCount: 4,
+        prototype: [],
         animations: [{ id: 7, name: "Walk", frames: [{ id: 1 }] }],
       },
       {

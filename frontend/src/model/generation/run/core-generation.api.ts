@@ -23,8 +23,8 @@ export const coreGenerationApi = {
         params: { path: { project_id: projectID }, query },
       }),
     ),
-  detail: async (runID: number) =>
-    unwrapApiResponse<GenerationRunResponse>(
+  detail: async <Content = unknown>(runID: number) =>
+    unwrapApiResponse<GenerationRunResponse<Content>>(
       await coreApiClient.GET("/generation-runs/{run_id}", {
         params: { path: { run_id: runID } },
       }),

@@ -4,7 +4,11 @@ import type {
 } from "../library/asset.contract";
 import { coreAssetApi } from "../library/core-asset.api";
 import { mergeAssetContentPatch } from "../library/merge-asset-content";
-import type { CharacterAssetContent } from "../library/asset.contract";
+import type {
+  CharacterAssetContent,
+  CoreSpriteAssetContent,
+  CoreSpriteAssetContentPatch,
+} from "../library/asset.contract";
 import type {
   AssetKind,
   AssetRevision,
@@ -114,7 +118,7 @@ export function toCoreSpriteAssetWorkspace({
 export function toCoreSpriteCandidateRecord(
   record: AssetRecord,
   perspective: AssetWorkspaceData["asset"]["perspective"],
-  patch: unknown,
+  patch: CoreSpriteAssetContentPatch,
 ): AssetRecord {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error(
@@ -126,7 +130,7 @@ export function toCoreSpriteCandidateRecord(
   const content = mergeAssetContentPatch(
     toCoreSpriteAssetContent(record),
     patch,
-  ) as CharacterAssetContent;
+  );
   const sprite = {
     prototype: toPrototypeFromContent(
       content.prototype,
@@ -221,7 +225,7 @@ function readURLs(resources: Array<{ url?: string }> | undefined) {
   );
 }
 
-function toCoreSpriteAssetContent(record: AssetRecord) {
+function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error("Core sprite records require a Character or Object asset.");
   }

@@ -33,6 +33,19 @@ export type AssetAnimationResponse = {
   frames: AssetAnimationFrameResponse[];
 };
 
+export type CoreSpriteAssetContent = AssetContentBase & {
+  directionCount: number;
+  prototype: AssetImageResourceResponse[];
+  animations?: AssetAnimationResponse[];
+};
+
+export type CoreSpriteAssetContentPatch = {
+  directionCount?: number;
+  prototype?: AssetImageResourceResponse[];
+  animations?: Array<Omit<AssetAnimationResponse, "id"> & { id?: number }>;
+  metadata?: AssetContentMetadata;
+};
+
 type DirectionalAssetContent<View extends Perspective> = AssetContentBase & {
   directionCount: DirectionCountForPerspective<View>;
   prototype: AssetImageResourceResponse[];

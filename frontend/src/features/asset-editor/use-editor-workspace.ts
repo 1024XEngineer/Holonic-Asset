@@ -10,6 +10,7 @@ import {
   useGenerationRunsQuery,
   useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
+  type CoreSpriteAssetContentPatch,
   type GenerateAnimationRequest,
   type GenerationTaskType,
 } from "@/model";
@@ -50,7 +51,8 @@ export function useEditorWorkspace({
     [generationRuns],
   );
   const reviewRun = awaitingRuns[0];
-  const candidateQuery = useGenerationCandidateQuery(reviewRun?.id);
+  const candidateQuery =
+    useGenerationCandidateQuery<CoreSpriteAssetContentPatch>(reviewRun?.id);
   const [animationTask, setAnimationTask] =
     useState<EditorGenerationTask | null>(null);
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
