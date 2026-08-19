@@ -2,8 +2,11 @@ package generator
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
@@ -11,6 +14,8 @@ import (
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
+
+const maxPrototypeReferenceBytes = 32 << 20
 
 func (e *executor) generateCharacterPrototype(
 	ctx context.Context,
@@ -321,17 +326,77 @@ func (e *executor) resolveReferences(
 	references []string,
 ) ([]string, error) {
 	resolved := append([]string(nil), references...)
-	if e.references == nil {
-		return resolved, nil
-	}
 	for index, reference := range resolved {
-		value, err := e.references.ResolveReference(ctx, reference)
-		if err != nil {
-			return nil, fmt.Errorf("generator: resolve %s reference %d: %w", taskType, index+1, err)
+		value := reference
+		if e.references != nil {
+			var err error
+			value, err = e.references.ResolveReference(ctx, reference)
+			if err != nil {
+				return nil, fmt.Errorf("generator: resolve %s reference %d: %w", taskType, index+1, err)
+			}
 		}
-		resolved[index] = value
+		normalized, err := e.normalizePrototypeReference(ctx, value)
+		if err != nil {
+			return nil, fmt.Errorf("generator: normalize %s reference %d: %w", taskType, index+1, err)
+		}
+		resolved[index] = normalized
 	}
 	return resolved, nil
+}
+
+func (e *executor) normalizePrototypeReference(ctx context.Context, reference string) (string, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return "", fmt.Errorf("reference image is required")
+	}
+
+	imageBase64 := reference
+	if strings.HasPrefix(reference, "http://") || strings.HasPrefix(reference, "https://") {
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, reference, nil)
+		if err != nil {
+			return "", fmt.Errorf("create reference download request: %w", err)
+		}
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			return "", fmt.Errorf("download reference: %w", err)
+		}
+		defer func() { _ = response.Body.Close() }()
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			body, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+			return "", fmt.Errorf("download reference: HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, maxPrototypeReferenceBytes+1))
+		if err != nil {
+			return "", fmt.Errorf("read reference: %w", err)
+		}
+		if len(body) > maxPrototypeReferenceBytes {
+			return "", fmt.Errorf("reference exceeds %d bytes", maxPrototypeReferenceBytes)
+		}
+		if len(body) == 0 {
+			return "", fmt.Errorf("download reference: empty response")
+		}
+		imageBase64 = base64.StdEncoding.EncodeToString(body)
+	} else if !strings.HasPrefix(strings.ToLower(reference), "data:image/") {
+		// Non-URL values are storage/provider-specific references that cannot be
+		// decoded locally. Preserve the legacy pass-through behavior.
+		return reference, nil
+	}
+
+	normalized, err := e.processor.NormalizeReference(ctx, &imageprocessor.NormalizeReferenceRequest{
+		ImageBase64: imageBase64,
+	})
+	if err != nil {
+		return "", err
+	}
+	if normalized == nil || strings.TrimSpace(normalized.ImageBase64) == "" {
+		return "", fmt.Errorf("empty normalized reference")
+	}
+	if !normalized.Report.Upscaled {
+		return reference, nil
+	}
+	return generatedImageDataURL(imageclient.GeneratedImage{
+		Base64: normalized.ImageBase64, MediaType: normalized.MIMEType,
+	}), nil
 }
 
 func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {

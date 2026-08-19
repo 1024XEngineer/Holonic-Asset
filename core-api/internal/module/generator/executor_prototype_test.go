@@ -265,7 +265,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"pixel knight",
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
-		"reference":"https://cdn.example/reference.png",
+		"reference":"reference.png",
 		"project_id":11
 	}`)
 
@@ -288,7 +288,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		images.request.Size != "" ||
-		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
+		!reflect.DeepEqual(images.request.ReferenceImages, []string{"reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
 	}
 	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {

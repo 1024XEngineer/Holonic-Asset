@@ -11,6 +11,7 @@ import (
 // generation and provider calls belong to the generator module.
 type Processor interface {
 	RemoveBackground(context.Context, *RemoveBackgroundRequest) (*RemoveBackgroundResult, error)
+	NormalizeReference(context.Context, *NormalizeReferenceRequest) (*NormalizeReferenceResult, error)
 	Resize(context.Context, *ResizeRequest) (*ResizeResult, error)
 	Verify(context.Context, *VerifyRequest) (*VerificationReport, error)
 	SplitImage(context.Context, *SplitImageRequest) (*SplitImageResult, error)
