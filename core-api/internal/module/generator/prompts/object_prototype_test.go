@@ -9,13 +9,20 @@ import (
 
 func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T) {
 	background := prompts.SolidMatteBackground("#00FF00")
-	prompt := prompts.ObjectPrototype("a wooden chest with two locks", "Top-Down", background)
+	prompt := prompts.ObjectPrototype(
+		"a wooden chest with two locks",
+		"Top-Down",
+		background,
+		prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true},
+	)
 
 	for _, expected := range []string{
 		"pipeline processing requirements have the highest priority",
 		"uniform, solid #00FF00 colour",
 		"Do not output transparency or a checkerboard",
-		"strictly follow their art style",
+		"Reference image 1 is the project prototype image and is the Style Reference",
+		"Reference image 2 is the user-supplied reference image",
+		"user-supplied reference image is always a strong reference",
 		"exactly 4 direction views",
 		"2 row x 2 column sheet",
 		"normal reading order",
