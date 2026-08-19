@@ -16,6 +16,67 @@ type Processor interface {
 	SplitImage(context.Context, *SplitImageRequest) (*SplitImageResult, error)
 }
 
+// NormalizeReference enlarges small reference images by an integer scale
+// using exact nearest-neighbour pixel replication. It is intentionally
+// separate from Resize, whose filtering and framing rules target final assets.
+func (p *processor) NormalizeReference(
+	ctx context.Context,
+	request *NormalizeReferenceRequest,
+) (*NormalizeReferenceResult, error) {
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
+	if request == nil {
+		return nil, fmt.Errorf("normalize reference request is required")
+	}
+	if request.MaxEdge < 0 {
+		return nil, fmt.Errorf("reference max edge cannot be negative")
+	}
+
+	input, err := decodeBase64Image(request.ImageBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode reference image: %w", err)
+	}
+	maxEdge := request.MaxEdge
+	if maxEdge == 0 {
+		maxEdge = DefaultReferenceMaxEdge
+	}
+	width, height := input.image.Bounds().Dx(), input.image.Bounds().Dy()
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("reference image must not be empty")
+	}
+
+	scale := max(1, maxEdge/max(width, height))
+	if scale == 1 {
+		return &NormalizeReferenceResult{
+			ImageBase64: request.ImageBase64,
+			MIMEType:    "image/" + input.format,
+			Report: ReferenceNormalizationReport{
+				InputWidth: width, InputHeight: height,
+				OutputWidth: width, OutputHeight: height,
+				Scale: 1,
+			},
+		}, nil
+	}
+	normalized := integerNearestNeighborScale(input.image, scale)
+	encoded, err := EncodePNGBase64(normalized)
+	if err != nil {
+		return nil, fmt.Errorf("encode normalized reference image: %w", err)
+	}
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
+	return &NormalizeReferenceResult{
+		ImageBase64: encoded,
+		MIMEType:    pngMIMEType,
+		Report: ReferenceNormalizationReport{
+			InputWidth: width, InputHeight: height,
+			OutputWidth: normalized.Bounds().Dx(), OutputHeight: normalized.Bounds().Dy(),
+			Scale: scale, Upscaled: scale > 1,
+		},
+	}, nil
+}
+
 type processor struct{}
 
 // NewProcessor creates a stateless local image processor.
