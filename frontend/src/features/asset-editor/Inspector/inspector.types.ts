@@ -71,7 +71,10 @@ export type SceneryInspectorProps = {
 
 export type InspectorProps = SpriteInspectorProps | SceneryInspectorProps;
 
-export type InspectorEditProps = Omit<SpriteInspectorProps, "history" | "kind">;
+export type SpriteInspectorContentProps = Omit<
+  SpriteInspectorProps,
+  "history" | "kind"
+>;
 
 export type InspectorTargetSummary = {
   label: string;

@@ -2,7 +2,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { InspectorEdit } from "./edit";
+import { SpriteInspectorContent } from "./sprite";
 import { InspectorHistory } from "./history";
 import { SceneryInspectorContent } from "./scenery";
 import type { InspectorProps } from "./inspector.types";
@@ -38,7 +38,7 @@ export function Inspector(props: InspectorProps) {
                 onToggleVisibility={props.onToggleVisibility}
               />
             ) : (
-              <InspectorEdit
+              <SpriteInspectorContent
                 selectedNodes={props.selectedNodes}
                 selectedFrames={props.selectedFrames}
                 prompt={props.prompt}

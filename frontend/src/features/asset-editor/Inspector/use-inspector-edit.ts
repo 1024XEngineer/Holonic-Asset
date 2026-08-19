@@ -13,7 +13,7 @@ import { getInspectorTargetSummary } from "./inspector-target";
 import {
   inspectorPromptSchema,
   inspectorSubmitRequestSchema,
-  type InspectorEditProps,
+  type SpriteInspectorContentProps,
   type InspectorReference,
 } from "./inspector.types";
 
@@ -33,7 +33,7 @@ export function useInspectorEdit({
   onSubmit,
   isSubmitting = false,
 }: Pick<
-  InspectorEditProps,
+  SpriteInspectorContentProps,
   | "selectedNodes"
   | "selectedFrames"
   | "prompt"
