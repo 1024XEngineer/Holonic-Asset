@@ -25,6 +25,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/viperx"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	"github.com/1024XEngineer/Holonic-Asset/internal/pprof"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
@@ -38,6 +39,7 @@ type App struct {
 	tasks  task.Manager
 	db     *gorm.DB
 	logger logger.Logger
+	pprof  *pprof.Server
 
 	lifecycleMu sync.Mutex
 	started     bool
@@ -202,6 +204,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	)
 
 	app := NewApp(httpEngine, taskManager, db, appLogger)
+	app.pprof = pprof.New()
 	appLogger.Info("application initialized")
 	return app, nil
 }
@@ -259,8 +262,19 @@ func (a *App) Start(ctx context.Context, address string) error {
 	a.started = true
 	a.lifecycleMu.Unlock()
 
+	if a.pprof != nil {
+		if err := a.pprof.Start(ctx); err != nil {
+			return fmt.Errorf("app: start pprof server: %w", err)
+		}
+	}
+
 	if a.tasks != nil {
 		if err := a.tasks.Start(ctx); err != nil {
+			if a.pprof != nil {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultShutdownTimeout)
+				defer cancel()
+				_ = a.pprof.Shutdown(shutdownCtx)
+			}
 			return fmt.Errorf("app: start task manager: %w", err)
 		}
 	}
@@ -305,6 +319,12 @@ func (a *App) Shutdown(ctx context.Context) error {
 		if a.engine != nil {
 			if err := a.engine.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				shutdownErrors = append(shutdownErrors, fmt.Errorf("app: shutdown HTTP server: %w", err))
+			}
+		}
+
+		if a.pprof != nil {
+			if err := a.pprof.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				shutdownErrors = append(shutdownErrors, fmt.Errorf("app: shutdown pprof server: %w", err))
 			}
 		}
 
