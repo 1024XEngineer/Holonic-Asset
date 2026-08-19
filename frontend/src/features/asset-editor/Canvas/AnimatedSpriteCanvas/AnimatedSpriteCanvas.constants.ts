@@ -1,4 +1,5 @@
 import type { CharacterAnimation } from "@/model";
+import { getNearSquareGrid } from "@/lib/near-square-grid";
 import type { AnimatedSpriteNodeId } from "./animated-sprite-node";
 import {
   COLLAPSED_HEIGHT,
@@ -10,7 +11,6 @@ export type CanvasPosition = { x: number; y: number };
 
 export const PROTOTYPE_NODE_ID = "prototype";
 
-const DEFAULT_LAYOUT_COLUMNS = 4;
 const DEFAULT_LAYOUT_GAP = 64;
 const DEFAULT_LAYOUT_START = { x: 80, y: 220 };
 
@@ -28,16 +28,13 @@ export function getCanvasNodes(
 export function createDefaultCanvasPositions(
   animations: readonly CharacterAnimation[] = [],
 ): Record<AnimatedSpriteNodeId, CanvasPosition> {
-  const nodes = shuffle(getCanvasNodes(animations));
+  const nodes = getCanvasNodes(animations);
+  const { columns } = getNearSquareGrid(nodes.length);
   const positions: Record<AnimatedSpriteNodeId, CanvasPosition> = {};
   let y = DEFAULT_LAYOUT_START.y;
 
-  for (
-    let rowStart = 0;
-    rowStart < nodes.length;
-    rowStart += DEFAULT_LAYOUT_COLUMNS
-  ) {
-    const row = nodes.slice(rowStart, rowStart + DEFAULT_LAYOUT_COLUMNS);
+  for (let rowStart = 0; rowStart < nodes.length; rowStart += columns) {
+    const row = nodes.slice(rowStart, rowStart + columns);
     const rowHeight = Math.max(
       ...row.map((node) => getDefaultNodeHeight(node, animations)),
     );
@@ -54,14 +51,6 @@ export function createDefaultCanvasPositions(
   }
 
   return positions;
-}
-
-function shuffle<T>(items: T[]) {
-  for (let index = items.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-  }
-  return items;
 }
 
 function getDefaultNodeHeight(
