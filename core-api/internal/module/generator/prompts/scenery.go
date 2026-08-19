@@ -29,7 +29,6 @@ Scenery asset:
 <creative_brief>%s</creative_brief>
 <dimensions width="%d" height="%d" />
 <perspective>%s</perspective>
-<style>%s</style>
 
 Project visual context:
 <project_name>%s</project_name>
@@ -40,7 +39,6 @@ Project visual context:
 type SceneryPlanInput struct {
 	AssetName          string
 	CreativeBrief      string
-	Style              string
 	Perspective        string
 	ProjectName        string
 	GameType           string
@@ -59,7 +57,6 @@ func SceneryPlan(input SceneryPlanInput) string {
 		input.Width,
 		input.Height,
 		strings.TrimSpace(input.Perspective),
-		strings.TrimSpace(input.Style),
 		strings.TrimSpace(input.ProjectName),
 		strings.TrimSpace(input.GameType),
 		strings.TrimSpace(input.TargetPlatform),
@@ -99,7 +96,6 @@ Requested layer:
 Final canvas:
 <dimensions width="%d" height="%d" />
 <perspective>%s</perspective>
-<style>%s</style>
 
 Project visual context:
 <project_name>%s</project_name>
@@ -111,7 +107,6 @@ Project visual context:
 type SceneryLayerInput struct {
 	AssetName          string
 	CreativeBrief      string
-	Style              string
 	Perspective        string
 	ProjectName        string
 	GameType           string
@@ -149,7 +144,6 @@ func SceneryLayer(input SceneryLayerInput, backgroundConstraint string) string {
 		input.Width,
 		input.Height,
 		strings.TrimSpace(input.Perspective),
-		strings.TrimSpace(input.Style),
 		strings.TrimSpace(input.ProjectName),
 		strings.TrimSpace(input.GameType),
 		strings.TrimSpace(input.TargetPlatform),
@@ -179,7 +173,6 @@ Scenery asset:
 <creative_brief>%s</creative_brief>
 <dimensions width="%d" height="%d" />
 <perspective>%s</perspective>
-<style>%s</style>
 
 Project visual context:
 <project_name>%s</project_name>
@@ -198,7 +191,6 @@ type SceneryLayoutLayerInput struct {
 type SceneryLayoutAnalysisInput struct {
 	AssetName          string
 	CreativeBrief      string
-	Style              string
 	Perspective        string
 	ProjectName        string
 	GameType           string
@@ -218,7 +210,7 @@ func SceneryLayoutAnalysis(input SceneryLayoutAnalysisInput) string {
 		sceneryLayoutAnalysisTemplate,
 		sceneryVisualConstraints,
 		strings.TrimSpace(input.AssetName), strings.TrimSpace(input.CreativeBrief), input.Width, input.Height,
-		strings.TrimSpace(input.Perspective), strings.TrimSpace(input.Style), strings.TrimSpace(input.ProjectName),
+		strings.TrimSpace(input.Perspective), strings.TrimSpace(input.ProjectName),
 		strings.TrimSpace(input.GameType), strings.TrimSpace(input.TargetPlatform), strings.TrimSpace(input.ProjectDescription),
 		strings.TrimSpace(layerList.String()),
 	)
