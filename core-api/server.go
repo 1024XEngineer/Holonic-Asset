@@ -204,7 +204,9 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	)
 
 	app := NewApp(httpEngine, taskManager, db, appLogger)
-	app.pprof = pprof.New()
+	if cfg.Pprof.Enabled {
+		app.pprof = pprof.New()
+	}
 	appLogger.Info("application initialized")
 	return app, nil
 }
