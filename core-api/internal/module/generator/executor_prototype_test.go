@@ -261,10 +261,6 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
@@ -275,14 +271,21 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
 	}
-	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
-		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
+	if len(processor.splitRequests) != 1 {
+		t.Fatalf("expected one prototype split request, got %d", len(processor.splitRequests))
 	}
-	wantMargin := imageprocessor.AnimationFrameMargin(64, 64)
-	for index, request := range processor.resizeRequests {
-		if request.Options.Margin != wantMargin {
-			t.Fatalf("prototype direction %d margin = %d, want %d", index, request.Options.Margin, wantMargin)
-		}
+	splitRequest := processor.splitRequests[0]
+	if splitRequest.Mode != imageprocessor.ImageSplitModeAnimation ||
+		!splitRequest.ForceProportionalGrid ||
+		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
+		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
+		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
+		!splitRequest.NormalizeContentScale || splitRequest.CropToContent {
+		t.Fatalf("prototype directions were not normalized on a shared canvas: %+v", splitRequest)
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -377,7 +380,6 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	for index := range 4 {
 		wantEvents = append(wantEvents,
 			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
-			"resize_image",
 			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
 		)
 	}
@@ -432,14 +434,6 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)

@@ -49,6 +49,7 @@ func (s *animationGenerationServiceStub) Generate(
 type imageProcessorStub struct {
 	events         *[]string
 	resizeRequests []*imageprocessor.ResizeRequest
+	splitRequests  []*imageprocessor.SplitImageRequest
 	err            error
 }
 
@@ -152,6 +153,8 @@ func (s *imageProcessorStub) SplitImage(
 	if s.events != nil {
 		*s.events = append(*s.events, "split_image")
 	}
+	copy := *request
+	s.splitRequests = append(s.splitRequests, &copy)
 	if s.err != nil {
 		return nil, s.err
 	}

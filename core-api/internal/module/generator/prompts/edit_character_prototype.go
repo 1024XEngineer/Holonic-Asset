@@ -85,7 +85,7 @@ func EditCharacterPrototype(
 		backgroundConstraint,
 		originalReferenceCount,
 		originalDescription,
-		characterDirectionSheetRules,
+		prototypeDirectionSheetRules,
 		editInstructions,
 		perspective,
 		directionCount,
