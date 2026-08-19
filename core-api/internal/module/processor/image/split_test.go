@@ -182,6 +182,64 @@ func TestProcessorSplitImageRejectsEmptyGridRegion(t *testing.T) {
 	}
 }
 
+func TestProcessorSplitImageRejectsContentInInternalGridBoundaryMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 40))
+	fillRect(src, image.Rect(4, 4, 19, 15), color.NRGBA{R: 255, A: 255})
+	fillRect(src, image.Rect(25, 4, 36, 15), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(4, 25, 15, 36), color.NRGBA{B: 255, A: 255})
+	fillRect(src, image.Rect(25, 25, 36, 36), color.NRGBA{R: 255, G: 255, A: 255})
+
+	_, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeGrid,
+		Columns:                   2,
+		Rows:                      2,
+		ForceProportionalGrid:     true,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if !errors.Is(err, ErrGridBoundaryContent) {
+		t.Fatalf("error = %v, want ErrGridBoundaryContent", err)
+	}
+}
+
+func TestProcessorSplitImageAllowsContentAtOuterCanvasEdges(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, image.Rect(0, 3, 12, 17), color.NRGBA{R: 255, A: 255})
+	fillRect(src, image.Rect(28, 3, 40, 17), color.NRGBA{G: 255, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeGrid,
+		Columns:                   2,
+		Rows:                      1,
+		ForceProportionalGrid:     true,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if err != nil {
+		t.Fatalf("split content at outer edges: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("regions = %d, want 2", len(result.Regions))
+	}
+}
+
+func TestProcessorSplitImageRejectsNegativeGridBoundaryMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 20))
+	fillRect(src, image.Rect(3, 3, 17, 17), color.NRGBA{A: 255})
+	_, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:        encodeImageForTest(t, src),
+		Mode:               ImageSplitModeGrid,
+		Columns:            1,
+		Rows:               1,
+		GridBoundaryMargin: -1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "grid boundary margin must not be negative") {
+		t.Fatalf("expected negative margin validation error, got %v", err)
+	}
+}
+
 func TestProcessorSplitImageHonoursCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
