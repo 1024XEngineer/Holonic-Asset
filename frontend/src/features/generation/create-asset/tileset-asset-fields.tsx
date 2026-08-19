@@ -35,7 +35,7 @@ export function TilesetAssetFields({
 
   useEffect(
     () => setExpandedItems(new Set(draft.tiles.map((_, index) => index))),
-    [draft.tiles.length],
+    [draft.tiles],
   );
 
   const updateItems = (tiles: typeof draft.tiles) =>
@@ -69,6 +69,8 @@ export function TilesetAssetFields({
 
           return (
             <section
+              // Tiles are positional drafts and can only be added or removed at the end.
+              // oxlint-disable-next-line react/no-array-index-key
               key={index}
               className="grid gap-5 rounded-lg border p-4"
               aria-label={t("tilesetItem", { number: index + 1 })}
