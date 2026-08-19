@@ -34,9 +34,11 @@ type LogConfig struct {
 }
 
 type ImageClientConfig struct {
-	BaseURL      string `mapstructure:"baseURL" yaml:"baseURL"`
-	APIKey       string `mapstructure:"apiKey" yaml:"apiKey"`
-	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
+	BaseURL       string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey        string `mapstructure:"apiKey" yaml:"apiKey"`
+	DefaultModel  string `mapstructure:"defaultModel" yaml:"defaultModel"`
+	FallbackModel string `mapstructure:"fallbackModel" yaml:"fallbackModel"`
+	Provider      string `mapstructure:"provider" yaml:"provider"`
 }
 
 type LLMClientConfig struct {

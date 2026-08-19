@@ -54,11 +54,13 @@ func InitAuthService(cfg config.AuthConfig, store auth.Store) (*auth.Service, er
 
 // InitImageService creates the external image provider and its application service.
 func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) imageclient.ImageGenerationService {
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      cfg.BaseURL,
-		APIKey:       cfg.APIKey,
-		DefaultModel: cfg.DefaultModel,
-		Logger:       appLogger,
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       cfg.BaseURL,
+		APIKey:        cfg.APIKey,
+		DefaultModel:  cfg.DefaultModel,
+		FallbackModel: cfg.FallbackModel,
+		Provider:      cfg.Provider,
+		Logger:        appLogger,
 	})
 	return imageclient.NewImageGenerationService(provider)
 }

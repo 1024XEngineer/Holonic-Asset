@@ -1,6 +1,9 @@
-# Holonic-Asset Backend
+# Holonic Asset Core API
 
 ## Architecture
+
+The full current-state design is documented in
+[`docs/en/core-api-architecture.md`](../docs/en/core-api-architecture.md).
 
 ```text
 database.go
@@ -10,14 +13,22 @@ internal/
   config/
   middleware/
   module/
+    auth/
     generator/
       imageclient/
+      llmclient/
+      prompts/
+      video_client/
     logger/
+    processor/
+      image/
+      video/
     task/
     upload/
     viperx/
     workspace/
       asset/
+      perspective/
       project/
   dto/
   handler/
@@ -28,7 +39,7 @@ internal/
 
 Workspace is the business module for project and asset lifecycle operations. `internal/module/workspace/project` and `internal/module/workspace/asset` own their domain models, persistence ports, and managers; the root `workspace.Workspace` groups both capabilities. Repository implementations and DAOs remain infrastructure adapters under `internal/repository`.
 
-Generator is a self-contained business module under `internal/module/generator`; it owns generation requests, run projections, task types, payloads, and task-handler skeletons. HTTP request and response contracts live in the independent `internal/dto` package. External image-provider capabilities remain under `internal/module/generator/imageclient`. Shared helpers such as logging and Viper configuration loading live under `internal/module`. `internal/module/task` exposes one `task.Manager` entry point for task contracts, execution, queries, and transactional outbox dispatch.
+Generator is a self-contained business module under `internal/module/generator`; it owns generation requests, run projections, task types, payloads, and task-handler skeletons. HTTP request and response contracts live in the independent `internal/dto` package. External image-provider capabilities remain under `internal/module/generator/imageclient`. `internal/module/processor` is a business-unaware media capability module: its image and video processors perform deterministic transformations without knowing Projects, Assets, task types, providers, or persistence. Shared helpers such as logging and Viper configuration loading live under `internal/module`. `internal/module/task` exposes one `task.Manager` entry point for task contracts, execution, queries, and transactional outbox dispatch.
 
 Assets are aggregate documents. Asset metadata lives in the asset row, while nested content is stored in `asset_contents` and referenced by the asset's current `content_id`. Asset records map a version number to an immutable content snapshot; content edits use copy-on-write, records create a new snapshot, and rollback switches the current content pointer while discarding records newer than the target. Asset resources are not modeled as a separate table.
 

@@ -31,6 +31,8 @@ image:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
   defaultModel: "openai/gpt-image-2"
+  fallbackModel: "google/nano-banana-2"
+  # provider: auto # Options: auto, openai_images, gemini_chat
 
 llm:
   baseURL: ""
