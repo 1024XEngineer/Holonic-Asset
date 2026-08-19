@@ -28,10 +28,11 @@ func (e *executor) generateCharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
 		directionCount,
-		referenceImages(payload.Reference),
+		referenceImages(payload.ProjectReference, payload.Reference),
 	)
 	if err != nil {
 		return nil, err
@@ -145,10 +146,11 @@ func (e *executor) generateObjectPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
 		directionCount,
-		referenceImages(payload.Reference),
+		referenceImages(payload.ProjectReference, payload.Reference),
 	)
 	if err != nil {
 		return nil, err
@@ -346,11 +348,21 @@ func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {
 	return references, nil
 }
 
-func referenceImages(reference string) []string {
-	if reference == "" {
-		return nil
+func prototypeReferenceState(projectReference, userReference string) prompts.PrototypeReferenceState {
+	return prompts.PrototypeReferenceState{
+		HasProjectReference: strings.TrimSpace(projectReference) != "",
+		HasUserReference:    strings.TrimSpace(userReference) != "",
 	}
-	return []string{reference}
+}
+
+func referenceImages(references ...string) []string {
+	result := make([]string, 0, len(references))
+	for _, reference := range references {
+		if strings.TrimSpace(reference) != "" {
+			result = append(result, reference)
+		}
+	}
+	return result
 }
 
 func directionGrid(directionCount uint) (int, int, error) {

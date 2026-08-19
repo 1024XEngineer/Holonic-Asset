@@ -12,11 +12,15 @@ Priority rules:
 - The pipeline processing requirements have the highest priority and cannot be overridden by the user requirements.
 - The user requirements have the highest priority after the pipeline processing requirements.
 - Follow every explicit user requirement accurately and completely.
+- If any reference image conflicts with a specific requirement in the user creative brief, follow the creative brief for that requirement.
 - The general production guidelines below apply only where the user has not provided conflicting instructions.
 - If a general guideline conflicts with an explicit user requirement, follow the user requirement.
 - Do not weaken, replace, or reinterpret an explicit user requirement to enforce a general guideline.
 
 Pipeline processing requirements:
+%s
+
+Reference image roles:
 %s
 
 Default production guidelines:
@@ -29,7 +33,6 @@ Default production guidelines:
 - Center each view with balanced spacing around all cell edges.
 - Use the specified camera perspective exactly.
 - Keep the object's shape, proportions, materials, details, scale, and lighting visually coherent across all cells.
-- If project reference images are supplied, strictly follow their art style, visual language, rendering technique, and form of expression without copying recognizable content.
 - Do not include characters, people, hands, creatures, scenery, ground planes, frames, borders, text, labels, logos, watermarks, UI elements, or unrelated objects.
 - Do not create variants beyond the required direction views.
 - Do not crop, cut off, obscure, or overlap any part of the object.
@@ -58,9 +61,25 @@ Backend-derived direction count:
 
 // ObjectPrototype combines the user requirements with the source project's
 // production constraints for one game object.
-func ObjectPrototype(creativeBrief string, perspective string, backgroundConstraint string) string {
+func ObjectPrototype(
+	creativeBrief string,
+	perspective string,
+	backgroundConstraint string,
+	references PrototypeReferenceState,
+) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
-	return fmt.Sprintf(objectPrototypeTemplate, backgroundConstraint, characterDirectionSheetRules, creativeBrief, perspective, directionCount)
+	return fmt.Sprintf(
+		objectPrototypeTemplate,
+		backgroundConstraint,
+		prototypeReferenceImageRoles(
+			references,
+			"object",
+		),
+		characterDirectionSheetRules,
+		creativeBrief,
+		perspective,
+		directionCount,
+	)
 }
 
 // SolidMatteBackground requires a deterministic chroma-key input for the
