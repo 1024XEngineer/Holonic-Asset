@@ -3,6 +3,8 @@ package imageclient_test
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
@@ -130,11 +132,97 @@ func TestFailoverProviderDoesNotFailOverOnPermanentError(t *testing.T) {
 		t.Fatalf("expected error, got nil")
 	}
 	var providerErr *imageclient.ProviderError
-	if !errors.As(err, &providerErr) || providerErr.StatusCode != 400 {
+	if !errors.As(err, &providerErr) || providerErr.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 permanent error, got %v", err)
 	}
 	if fallback.calls != 0 {
 		t.Fatalf("fallback should not be called on permanent 400 error")
+	}
+}
+
+func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *testing.T) {
+	primaryErr := &imageclient.ProviderError{
+		Provider: "primary", Kind: imageclient.ErrorKindUnavailable, Transient: true,
+	}
+	fallbackErr := &imageclient.ProviderError{
+		Provider: "fallback", Kind: imageclient.ErrorKindAuthentication,
+		StatusCode: http.StatusUnauthorized, Transient: false,
+	}
+	primary := &mockImageProvider{
+		generateFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, primaryErr
+		},
+	}
+	fallback := &mockImageProvider{
+		generateFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, fallbackErr
+		},
+	}
+	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model",
+	})
+
+	service := imageclient.NewImageGenerationService(provider)
+	_, err := service.Generate(context.Background(), &imageclient.GenerateRequest{
+		Prompt: "test", MaxAttempts: 2,
+	})
+	if err == nil {
+		t.Fatal("expected both providers to fail")
+	}
+	if primary.calls != 1 || fallback.calls != 1 {
+		t.Fatalf("permanent fallback failure was retried: primary=%d fallback=%d", primary.calls, fallback.calls)
+	}
+	if !errors.Is(err, primaryErr) || !errors.Is(err, fallbackErr) {
+		t.Fatalf("error chain does not preserve both failures: %v", err)
+	}
+	if !imageclient.IsPermanent(err) || imageclient.IsTransient(err) {
+		t.Fatalf("fallback classification was not preserved: %v", err)
+	}
+	if !strings.Contains(err.Error(), "primary failed") || !strings.Contains(err.Error(), "fallback (fallback-model) failed") {
+		t.Fatalf("error lacks failover context: %v", err)
+	}
+}
+
+func TestFailoverProviderEditPreservesTransientFallbackError(t *testing.T) {
+	primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindTimeout, Transient: true}
+	fallbackErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
+	primary := &mockImageProvider{
+		editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, primaryErr
+		},
+	}
+	fallback := &mockImageProvider{
+		editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, fallbackErr
+		},
+	}
+	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model",
+	})
+
+	_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+	if err == nil || !imageclient.IsTransient(err) || imageclient.IsPermanent(err) {
+		t.Fatalf("error = %v, want transient fallback failure", err)
+	}
+	if !errors.Is(err, primaryErr) || !errors.Is(err, fallbackErr) {
+		t.Fatalf("error chain does not preserve both failures: %v", err)
+	}
+}
+
+func TestFailoverProviderSkipsFallbackAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	primary := &mockImageProvider{
+		generateFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
+		},
+	}
+	fallback := &mockImageProvider{}
+	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{Primary: primary, Fallback: fallback})
+
+	_, err := provider.Generate(ctx, &imageclient.ProviderRequest{Prompt: "test"})
+	if err == nil || fallback.calls != 0 {
+		t.Fatalf("canceled request used fallback: err=%v calls=%d", err, fallback.calls)
 	}
 }
 

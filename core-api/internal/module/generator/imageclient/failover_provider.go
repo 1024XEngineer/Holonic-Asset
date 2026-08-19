@@ -77,7 +77,7 @@ func (p *FailoverImageProvider) Generate(
 				logger.Error(fbErr),
 			)
 		}
-		return nil, fmt.Errorf("failover: primary failed (%w), fallback (%s) failed: %v", err, p.fallbackModel, fbErr)
+		return nil, joinFailoverErrors(err, fbErr, p.fallbackModel)
 	}
 
 	return fbResult, nil
@@ -122,7 +122,7 @@ func (p *FailoverImageProvider) Edit(
 				logger.Error(fbErr),
 			)
 		}
-		return nil, fmt.Errorf("failover: primary failed (%w), fallback (%s) failed: %v", err, p.fallbackModel, fbErr)
+		return nil, joinFailoverErrors(err, fbErr, p.fallbackModel)
 	}
 
 	return fbResult, nil
@@ -136,4 +136,13 @@ func (p *FailoverImageProvider) shouldFailover(ctx context.Context, err error) b
 		return false
 	}
 	return IsTransient(err)
+}
+
+func joinFailoverErrors(primaryErr, fallbackErr error, fallbackModel string) error {
+	// Keep fallback first so errors.As-based retry classification reflects the
+	// final provider attempt while both provider failures remain discoverable.
+	return fmt.Errorf("failover: %w", errors.Join(
+		fmt.Errorf("fallback (%s) failed: %w", fallbackModel, fallbackErr),
+		fmt.Errorf("primary failed: %w", primaryErr),
+	))
 }
