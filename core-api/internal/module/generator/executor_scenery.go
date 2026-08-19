@@ -25,7 +25,10 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-const maxSceneryLayerGenerationAttempts = 3
+const (
+	maxSceneryLayerGenerationAttempts = 3
+	maxSceneryLLMAttempts             = 10
+)
 
 func (e *executor) planSceneryLayers(
 	ctx context.Context,
@@ -44,7 +47,8 @@ func (e *executor) planSceneryLayers(
 		Height:             payload.Dimensions.Height,
 	})
 	completion, err := e.llm.Complete(ctx, &llmclient.CompletionRequest{
-		Prompt: prompt,
+		Prompt:      prompt,
+		MaxAttempts: maxSceneryLLMAttempts,
 		ResponseSchema: llmclient.JSONSchema{
 			Name:   sceneryLayerPlanSchemaName,
 			Schema: append([]byte(nil), sceneryLayerPlanJSONSchema...),
@@ -276,6 +280,7 @@ func (e *executor) analyzeSceneryLayout(
 	completion, err := e.llm.Complete(ctx, &llmclient.CompletionRequest{
 		Prompt:         prompt,
 		Images:         images,
+		MaxAttempts:    maxSceneryLLMAttempts,
 		ResponseSchema: llmclient.JSONSchema{Name: sceneryLayerLayoutSchemaName, Schema: append([]byte(nil), sceneryLayerLayoutJSONSchema...)},
 	})
 	if err != nil {

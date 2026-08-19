@@ -11,16 +11,22 @@ import (
 )
 
 type llmProviderStub struct {
-	request *llmclient.ProviderRequest
-	result  *llmclient.ProviderResult
-	err     error
+	completeCalls int
+	completeFunc  func(ctx context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error)
+	request       *llmclient.ProviderRequest
+	result        *llmclient.ProviderResult
+	err           error
 }
 
 func (s *llmProviderStub) Complete(
-	_ context.Context,
+	ctx context.Context,
 	request *llmclient.ProviderRequest,
 ) (*llmclient.ProviderResult, error) {
+	s.completeCalls++
 	s.request = request
+	if s.completeFunc != nil {
+		return s.completeFunc(ctx, request)
+	}
 	return s.result, s.err
 }
 
@@ -168,7 +174,10 @@ func TestLLMServicePreservesProviderError(t *testing.T) {
 	}
 	service := llmclient.NewLLMService(&llmProviderStub{err: providerErr})
 
-	_, err := service.Complete(context.Background(), validCompletionRequest())
+	req := validCompletionRequest()
+	req.MaxAttempts = 1
+
+	_, err := service.Complete(context.Background(), req)
 	if !errors.Is(err, providerErr) {
 		t.Fatalf("error = %v, want original provider error", err)
 	}
@@ -176,8 +185,9 @@ func TestLLMServicePreservesProviderError(t *testing.T) {
 
 func TestLLMServiceRejectsInvalidProviderResponses(t *testing.T) {
 	request := &llmclient.CompletionRequest{
-		Prompt: "layout",
-		Images: []llmclient.ImageInput{{URL: "https://cdn.example.test/layer.png"}},
+		Prompt:      "layout",
+		Images:      []llmclient.ImageInput{{URL: "https://cdn.example.test/layer.png"}},
+		MaxAttempts: 1,
 		ResponseSchema: llmclient.JSONSchema{
 			Name:   "layout",
 			Schema: json.RawMessage(`{"type":"object"}`),
@@ -219,3 +229,187 @@ func validCompletionRequest() *llmclient.CompletionRequest {
 }
 
 var _ llmclient.LLMProvider = (*llmProviderStub)(nil)
+
+func TestLLMServiceRetriesTransientErrorsUntilSuccess(t *testing.T) {
+	transientErr := &llmclient.ProviderError{
+		Kind:       llmclient.ErrorKindUnavailable,
+		StatusCode: 525,
+		Transient:  true,
+		Message:    "SSL Handshake Failed",
+	}
+
+	callCount := 0
+	provider := &llmProviderStub{
+		completeFunc: func(ctx context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+			callCount++
+			if callCount < 2 {
+				return nil, transientErr
+			}
+			return &llmclient.ProviderResult{
+				ID:   "success-1",
+				JSON: json.RawMessage(`{"layers":[]}`),
+			}, nil
+		},
+	}
+
+	service := llmclient.NewLLMService(provider)
+	req := validCompletionRequest()
+	req.MaxAttempts = 3
+
+	res, err := service.Complete(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected success on second attempt, got: %v", err)
+	}
+	if callCount != 2 {
+		t.Fatalf("expected 2 calls to provider, got: %d", callCount)
+	}
+	if res.ID != "success-1" || string(res.JSON) != `{"layers":[]}` {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+}
+
+func TestLLMServiceStopsAtMaxAttempts(t *testing.T) {
+	transientErr := &llmclient.ProviderError{
+		Kind:       llmclient.ErrorKindUnavailable,
+		StatusCode: 525,
+		Transient:  true,
+		Message:    "SSL Handshake Failed",
+	}
+
+	for _, maxAttempts := range []int{2, 3} {
+		callCount := 0
+		provider := &llmProviderStub{
+			completeFunc: func(ctx context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+				callCount++
+				return nil, transientErr
+			},
+		}
+
+		service := llmclient.NewLLMService(provider)
+		req := validCompletionRequest()
+		req.MaxAttempts = maxAttempts
+
+		_, err := service.Complete(context.Background(), req)
+		if err == nil {
+			t.Fatalf("expected error after %d attempts, got nil", maxAttempts)
+		}
+		if callCount != maxAttempts {
+			t.Fatalf("expected %d calls, got %d", maxAttempts, callCount)
+		}
+	}
+}
+
+func TestLLMServiceFailsImmediatelyOnPermanentError(t *testing.T) {
+	permanentErr := &llmclient.ProviderError{
+		Kind:       llmclient.ErrorKindInvalidRequest,
+		StatusCode: 400,
+		Transient:  false,
+		Message:    "invalid prompt",
+	}
+
+	callCount := 0
+	provider := &llmProviderStub{
+		completeFunc: func(ctx context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+			callCount++
+			return nil, permanentErr
+		},
+	}
+
+	service := llmclient.NewLLMService(provider)
+	req := validCompletionRequest()
+	req.MaxAttempts = 3
+
+	_, err := service.Complete(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if callCount != 1 {
+		t.Fatalf("expected exactly 1 call without retrying permanent error, got %d", callCount)
+	}
+}
+
+func TestLLMServiceFailsImmediatelyOnUnclassifiedError(t *testing.T) {
+	wantErr := errors.New("unclassified provider failure")
+	provider := &llmProviderStub{
+		completeFunc: func(context.Context, *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+			return nil, wantErr
+		},
+	}
+
+	req := validCompletionRequest()
+	req.MaxAttempts = 3
+
+	_, err := llmclient.NewLLMService(provider).Complete(context.Background(), req)
+	if !errors.Is(err, wantErr) || provider.completeCalls != 1 {
+		t.Fatalf("unclassified error should not retry: calls=%d err=%v", provider.completeCalls, err)
+	}
+}
+
+func TestLLMServiceRespectsContextCancellation(t *testing.T) {
+	transientErr := &llmclient.ProviderError{
+		Kind:       llmclient.ErrorKindUnavailable,
+		StatusCode: 525,
+		Transient:  true,
+		Message:    "SSL Handshake Failed",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	callCount := 0
+	provider := &llmProviderStub{
+		completeFunc: func(c context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+			callCount++
+			cancel()
+			return nil, transientErr
+		},
+	}
+
+	service := llmclient.NewLLMService(provider)
+	req := validCompletionRequest()
+	req.MaxAttempts = 3
+
+	_, err := service.Complete(ctx, req)
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, transientErr) {
+		t.Fatalf("expected context canceled error, got: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 call before cancellation, got %d", callCount)
+	}
+}
+
+func TestLLMServiceDefaultsMaxAttemptsWhenUnset(t *testing.T) {
+	transientErr := &llmclient.ProviderError{
+		Kind:       llmclient.ErrorKindUnavailable,
+		StatusCode: 525,
+		Transient:  true,
+		Message:    "SSL Handshake Failed",
+	}
+
+	callCount := 0
+	provider := &llmProviderStub{
+		completeFunc: func(ctx context.Context, req *llmclient.ProviderRequest) (*llmclient.ProviderResult, error) {
+			callCount++
+			if callCount == 2 {
+				return &llmclient.ProviderResult{
+					ID:   "success-default",
+					JSON: json.RawMessage(`{"layers":[]}`),
+				}, nil
+			}
+			return nil, transientErr
+		},
+	}
+
+	service := llmclient.NewLLMService(provider)
+	req := validCompletionRequest()
+	req.MaxAttempts = 0 // Unset, should default to 10 and retry
+
+	res, err := service.Complete(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected success with default MaxAttempts, got error: %v", err)
+	}
+	if callCount != 2 {
+		t.Fatalf("expected 2 calls with default MaxAttempts, got %d", callCount)
+	}
+	if res.ID != "success-default" {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+}

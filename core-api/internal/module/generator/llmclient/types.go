@@ -20,6 +20,7 @@ type CompletionRequest struct {
 	Images         []ImageInput
 	Model          string
 	ResponseSchema JSONSchema
+	MaxAttempts    int
 }
 
 // Usage contains normalized token counts reported by the provider.
