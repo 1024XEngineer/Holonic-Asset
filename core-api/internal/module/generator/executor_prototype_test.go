@@ -2,9 +2,12 @@ package generator_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -376,15 +379,22 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
 		"direction_count":"4",
-		"reference":"projects/7/reference.png",
+		"project_reference":"projects/7/style.png",
+		"reference":"uploads/user-concept.png",
 		"project_id":11
 	}`)
 
 	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
 		t.Fatalf("generate prototype: %v", err)
 	}
-	if len(references.resolved) != 1 || references.resolved[0] != "projects/7/reference.png" {
+	if !reflect.DeepEqual(references.resolved, []string{"projects/7/style.png", "uploads/user-concept.png"}) {
 		t.Fatalf("expected execution-time reference resolution, got %v", references.resolved)
+	}
+	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
+		"signed:projects/7/style.png",
+		"signed:uploads/user-concept.png",
+	}) {
+		t.Fatalf("unexpected resolved image reference order: %+v", images.request)
 	}
 	if len(references.uploads) != 8 {
 		t.Fatalf("expected four unprocessed and four final uploads, got %d: %+v", len(references.uploads), references.uploads)
@@ -419,6 +429,63 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 		if references.uploads[uploadOffset+1].key != fmt.Sprintf("uploads/prototype-%d.png", index) {
 			t.Fatalf("unexpected final key at %d: %+v", index, references.uploads[uploadOffset+1])
 		}
+	}
+}
+
+func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T) {
+	const downloaded = "small-pixel-reference"
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "image/png")
+		_, _ = response.Write([]byte(downloaded))
+	}))
+	defer server.Close()
+
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{
+		events: &events,
+		normalizeResults: []*imageprocessor.NormalizeReferenceResult{
+			{ImageBase64: "project-canonical", MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 1}},
+			{ImageBase64: "user-upscaled", MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 16, Upscaled: true}},
+		},
+	}
+	references := &executorReferenceStoreStub{resolveValues: map[string]string{
+		"projects/7/style.png": server.URL + "/project",
+		"uploads/user.png":     server.URL + "/user",
+	}}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"project_reference":"projects/7/style.png",
+		"reference":"uploads/user.png"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate normalized-reference prototype: %v", err)
+	}
+	if len(processor.normalizeRequests) != 2 {
+		t.Fatalf("normalization calls = %d, want 2", len(processor.normalizeRequests))
+	}
+	wantDownloaded := base64.StdEncoding.EncodeToString([]byte(downloaded))
+	for index, request := range processor.normalizeRequests {
+		if request.ImageBase64 != wantDownloaded {
+			t.Fatalf("normalization request %d did not receive downloaded bytes", index)
+		}
+	}
+	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
+		server.URL + "/project",
+		"data:image/png;base64,user-upscaled",
+	}) {
+		t.Fatalf("unexpected normalized reference order: %+v", images.request)
 	}
 }
 
