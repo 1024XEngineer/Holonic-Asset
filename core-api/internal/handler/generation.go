@@ -14,11 +14,16 @@ import (
 )
 
 type GenerationHandler struct {
-	runs generator.RunManager
+	runs       generator.RunManager
+	references referenceResolver
 }
 
-func NewGenerationHandler(runs generator.RunManager) *GenerationHandler {
-	return &GenerationHandler{runs: runs}
+func NewGenerationHandler(runs generator.RunManager, references ...referenceResolver) *GenerationHandler {
+	var resolver referenceResolver
+	if len(references) > 0 {
+		resolver = references[0]
+	}
+	return &GenerationHandler{runs: runs, references: resolver}
 }
 
 func (h *GenerationHandler) Create(
@@ -97,6 +102,21 @@ func (h *GenerationHandler) Get(
 		if err := json.Unmarshal(run.Result, result); err != nil {
 			return dto.SuccessResponse[dto.GetGenerationResponse]{}, fmt.Errorf("handler: decode generation result: %w", err)
 		}
+		if len(result.Content) > 0 && string(result.Content) != "null" {
+			var transform referenceTransform
+			if h.references != nil {
+				transform = h.references.ResolveReference
+			}
+			result.Content, err = transformAssetContentReferences(
+				ctx,
+				result.Content,
+				"resolve generation result",
+				transform,
+			)
+			if err != nil {
+				return dto.SuccessResponse[dto.GetGenerationResponse]{}, err
+			}
+		}
 	}
 
 	return dto.NewTypedSuccessResponse(dto.GetGenerationResponse{
@@ -119,4 +139,11 @@ func (h *GenerationHandler) Cancel(
 		return dto.SuccessResponse[dto.CancelGenerationResponse]{}, err
 	}
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{Cancelled: true}), nil
+}
+
+func (h *GenerationHandler) ResolveApplication(
+	ctx context.Context,
+	request dto.ResolveGenerationApplicationRequest,
+) error {
+	return h.runs.ResolveApplication(ctx, request.GenerationRunID, request.Applied)
 }

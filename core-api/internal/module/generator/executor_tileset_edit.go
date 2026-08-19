@@ -803,21 +803,38 @@ func (e *executor) commitTileSetEdits(
 		key := upload.objectKey
 		content.Items[upload.itemIndex].Tiles[upload.tileIndex].URL = &key
 	}
-	encoded, err := assetdomain.EncodeContent(content)
+	editedIndexes := make(map[int][]int, len(uploads))
+	for _, upload := range uploads {
+		editedIndexes[upload.itemIndex] = append(editedIndexes[upload.itemIndex], upload.tileIndex)
+	}
+	indexes := make([]int, 0, len(editedIndexes))
+	for index := range editedIndexes {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	editedItems := make([]assetdomain.TileSetItem, 0, len(indexes))
+	for _, index := range indexes {
+		tileIndexes := editedIndexes[index]
+		sort.Ints(tileIndexes)
+		tiles := make([]assetdomain.Tile, 0, len(tileIndexes))
+		for _, tileIndex := range tileIndexes {
+			tiles = append(tiles, content.Items[index].Tiles[tileIndex])
+		}
+		editedItems = append(editedItems, assetdomain.TileSetItem{
+			Name:  content.Items[index].Name,
+			Tiles: tiles,
+		})
+	}
+	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{Items: editedItems})
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode edited Tileset asset %d content: %w", assetID, err))
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: assetID,
-		Content: encoded,
-	}, expectedVersion)
-	if err != nil {
-		return nil, cleanup(fmt.Errorf("generator: revise Tileset asset %d: %w", assetID, err))
-	}
-	if record == nil || record.AssetID != assetID || record.Version == 0 {
-		return nil, cleanup(fmt.Errorf("generator: revise Tileset asset %d: empty result", assetID))
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: assetID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            assetID,
+		Version:            expectedVersion,
+		Content:            encoded,
+		GeneratedResources: uploadedKeys,
+	})
 }
 
 func formatTileSetCoordinates(cells []TileSetCoordinate) string {

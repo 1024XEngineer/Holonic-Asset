@@ -3,6 +3,7 @@ import type { AssetCanvasPosition, AssetRecord } from "@/model";
 export type EditorTarget = {
   projectId: string;
   assetId: string;
+  version?: string;
 };
 
 export type EditorCommand =
@@ -18,6 +19,7 @@ export type EditorCommand =
       label: string;
     }
   | { type: "sprite.animation.delete"; animationId: string }
+  | { type: "record.candidate.apply"; record: AssetRecord }
   | { type: "history.undo" }
   | { type: "history.redo" };
 
