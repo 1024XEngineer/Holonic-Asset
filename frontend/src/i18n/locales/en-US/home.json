@@ -35,7 +35,7 @@
   "capabilities": {
     "characters": {
       "title": "Characters",
-      "description": "Generate character prototypes (2/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
+      "description": "Create expressive characters with clear silhouettes, consistent style, and animation-ready action poses.",
       "detail": "Prototypes, Spritesheets & SFX",
       "alt": "Basketball player running south animation",
       "headline": "Make your characters move"

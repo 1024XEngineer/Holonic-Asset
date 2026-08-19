@@ -35,7 +35,7 @@
   "capabilities": {
     "characters": {
       "title": "Character",
-      "description": "生成角色原型（2/4/8 方向视图）、4-16 帧动画（待机、行走、攻击）以及配套动作音效。",
+      "description": "打造轮廓鲜明、风格统一并适合动作表现的角色资产。",
       "detail": "原型、Sprite Sheet 与音效",
       "alt": "篮球运动员向南奔跑的动画",
       "headline": "让你的角色动起来"
