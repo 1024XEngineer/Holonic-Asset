@@ -239,16 +239,20 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 	h := handler.NewHandler(managerStub)
 
 	content := json.RawMessage(`{"prototype":[{"id":2,"url":"new.png"}]}`)
+	description := "Added animation: Walk"
 	response, err := h.Record(context.Background(), dto.RecordAssetRequest{
 		AssetID:         7,
 		ExpectedVersion: 2,
+		Description:     &description,
 		Content:         content,
 	})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
 	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 ||
-		string(managerStub.recordRequest.Content) != string(content) || managerStub.expectedVersion != 2 {
+		string(managerStub.recordRequest.Content) != string(content) ||
+		managerStub.recordRequest.Description != "Added animation: Walk" ||
+		managerStub.expectedVersion != 2 {
 		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
 	data := response.Data

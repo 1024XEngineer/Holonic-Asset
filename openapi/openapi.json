@@ -219,7 +219,8 @@
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "creative_brief"
         ],
         "type": "object"
       },
@@ -847,6 +848,9 @@
             "type": "integer"
           },
           "content": {},
+          "description": {
+            "type": "string"
+          },
           "expectedVersion": {
             "format": "int64",
             "minimum": 1,

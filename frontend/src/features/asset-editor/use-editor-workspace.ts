@@ -277,13 +277,8 @@ export function useEditorWorkspace({
       perspective: asset.perspective,
       prototype: sprite.prototype,
       animations: sprite.animations ?? [],
-      nodePositions: sprite.nodePositions,
-      onPositionChange: (nodeId, position) =>
-        session.dispatch({
-          type: "sprite.node-position.set",
-          nodeId,
-          position,
-        }),
+      nodePositions: {},
+      onPositionChange: () => undefined,
     },
     tree: {
       isGeneratingAnimation: animationMutation.isPending,

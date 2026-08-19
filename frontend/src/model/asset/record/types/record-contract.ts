@@ -9,6 +9,7 @@ export type GetAssetRecordInput = {
 
 export type SaveAssetRecordInput = GetAssetRecordInput & {
   record: AssetRecord;
+  description?: string;
   version?: string;
 };
 

@@ -296,14 +296,18 @@ func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	replacement := json.RawMessage(`{"version":3,"prototype":[{"id":1,"url":"new.png"}]}`)
 
 	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
-		AssetID: 7,
-		Content: replacement,
+		AssetID:     7,
+		Description: "Changed prototype; Added 2 animations: Run, Jump",
+		Content:     replacement,
 	}, 2)
 	if err != nil {
 		t.Fatalf("create replacement record: %v", err)
 	}
 	if record.Version != 3 || record.ContentID != 5 || string(record.Content) != string(replacement) {
 		t.Fatalf("unexpected replacement record: %+v", record)
+	}
+	if record.Description != "Changed prototype; Added 2 animations: Run, Jump" {
+		t.Fatalf("unexpected revision description: %q", record.Description)
 	}
 	if got := string(contentDao.contents[record.ContentID].Content); got != string(replacement) {
 		t.Fatalf("replacement content was not persisted: %s", got)
