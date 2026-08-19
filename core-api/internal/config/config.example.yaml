@@ -40,6 +40,11 @@ llm:
 video:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
+  # Polling and retry settings apply to transient QNA HTTP failures.
+  pollInterval: 5s
+  pollTimeout: 45s
+  maxRetries: 3
+  retryDelay: 2s
 
 qiniu:
   accessKey: ""

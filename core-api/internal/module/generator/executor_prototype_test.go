@@ -14,7 +14,7 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testing.T) {
 	events := []string{}
 	originalURLs := []string{
 		"assets/hero/up.png",
@@ -38,8 +38,7 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 	}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 3,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          7,
 			Name:        "hero",
@@ -80,7 +79,7 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 	for index, reference := range originalURLs {
 		wantImageReferences[index] = "signed:" + reference
 	}
-	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, wantImageReferences) {
+	if images.request == nil || images.request.MaxAttempts != 3 || !reflect.DeepEqual(images.request.ReferenceImages, wantImageReferences) {
 		t.Fatalf("unexpected edit image references: %+v", images.request)
 	}
 	for _, expected := range []string{
@@ -93,20 +92,12 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 			t.Fatalf("edit prompt missing %q: %s", expected, images.request.Prompt)
 		}
 	}
-	if assets.createdRecord == nil || assets.createdRecord.AssetID != 7 {
-		t.Fatalf("expected version record for asset 7: %+v", assets.createdRecord)
-	}
-	updated, err := (assetdomain.Asset{
-		Type: assetdomain.AssetTypeCharacter, Content: assets.createdRecord.Content,
-	}).DecodeContent()
-	if err != nil {
-		t.Fatalf("decode version content: %v", err)
-	}
+	application, updated := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
 	if updated.DirectionCount != 4 || updated.Prototype == nil || len(*updated.Prototype) != 4 {
 		t.Fatalf("unexpected edited prototype content: %+v", updated)
 	}
-	if len(updated.Animations) != 1 || updated.Animations[0].ID != 7 || updated.Animations[0].Name != "idle" {
-		t.Fatalf("existing animations were not preserved: %+v", updated.Animations)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)
@@ -114,16 +105,14 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
 	}
-	if events[len(events)-1] != "create_record" {
-		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	if application.AssetID != 7 || application.Version != 2 || len(application.GeneratedResources) != 8 {
+		t.Fatalf("unexpected application candidate: %+v", application)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, Version: 3})
 }
 
 func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
 	wantLoadErr := errors.New("asset unavailable")
 	wantResolveErr := errors.New("reference unavailable")
-	wantRecordErr := errors.New("record unavailable")
 
 	tests := []struct {
 		name      string
@@ -176,11 +165,6 @@ func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(
 		{name: "reference resolution failure", configure: func(_ *generationAssetWriterStub, references *executorReferenceStoreStub) {
 			references.resolveErr = wantResolveErr
 		}, wantErr: wantResolveErr, withStore: true},
-		{name: "record creation failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) {
-			assets.recordErr = wantRecordErr
-		}, wantErr: wantRecordErr},
-		{name: "nil record", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) { assets.nilRecord = true }, wantText: "version: empty result"},
-		{name: "zero record version", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) { assets.emptyRecord = true }, wantText: "version: empty result"},
 	}
 
 	for _, test := range tests {
@@ -285,7 +269,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
-	if images.request == nil || !strings.Contains(images.request.Prompt, "pixel knight") ||
+	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
@@ -460,6 +444,9 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
+	if images.request == nil || images.request.MaxAttempts != 3 {
+		t.Fatalf("expected MaxAttempts 3, got %+v", images.request)
+	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
 		assets.objectAsset.ProjectID != 12 || assets.objectAsset.Type != assetdomain.AssetTypeObject {
 		t.Fatalf("unexpected object asset: %+v", assets.objectAsset)
@@ -508,7 +495,7 @@ func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *test
 	}
 }
 
-func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T) {
 	events := []string{}
 	originalURLs := []string{
 		"assets/chest/front.png",
@@ -540,8 +527,7 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 6,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          8,
 			Name:        "chest",
@@ -565,9 +551,6 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("edit object prototype: %v", err)
 	}
-	if assets.expectedVersion != 5 {
-		t.Fatalf("expected current asset version to be passed separately, got %d", assets.expectedVersion)
-	}
 	if !reflect.DeepEqual(references.resolved, originalURLs) {
 		t.Fatalf("unexpected resolved references: got %v want %v", references.resolved, originalURLs)
 	}
@@ -576,20 +559,12 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 		!strings.Contains(images.request.Prompt, "backend supplied exactly 8 current prototype direction image") {
 		t.Fatalf("unexpected edit prompt: %+v", images.request)
 	}
-	if assets.createdRecord == nil || assets.createdRecord.AssetID != 8 {
-		t.Fatalf("expected object version record: %+v", assets.createdRecord)
-	}
-	updated, err := (assetdomain.Asset{
-		Type: assetdomain.AssetTypeObject, Content: assets.createdRecord.Content,
-	}).DecodeContent()
-	if err != nil {
-		t.Fatalf("decode version content: %v", err)
-	}
+	application, updated := decodeExecutionContent(t, result, assetdomain.AssetTypeObject)
 	if updated.DirectionCount != 8 || updated.Prototype == nil || len(*updated.Prototype) != 8 {
 		t.Fatalf("unexpected edited object content: %+v", updated)
 	}
-	if len(updated.Items) != 1 || updated.Items[0].Name != "loot" || updated.Metadata["material"] != "wood" {
-		t.Fatalf("existing object content was not preserved: %+v", updated)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)
@@ -597,16 +572,14 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
 	}
-	if events[len(events)-1] != "create_record" {
-		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	if application.AssetID != 8 || application.Version != 5 || len(application.GeneratedResources) != 16 {
+		t.Fatalf("unexpected application candidate: %+v", application)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 8, Version: 6})
 }
 
 func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
 	wantLoadErr := errors.New("object unavailable")
 	wantResolveErr := errors.New("reference unavailable")
-	wantRecordErr := errors.New("record unavailable")
 	wantImageErr := errors.New("image unavailable")
 
 	tests := []struct {
@@ -665,15 +638,6 @@ func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *
 		{name: "image generation failure", configure: func(_ *generationAssetWriterStub, _ *executorReferenceStoreStub, images *imageGenerationServiceStub) {
 			images.err = wantImageErr
 		}, wantErr: wantImageErr},
-		{name: "record creation failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.recordErr = wantRecordErr
-		}, wantErr: wantRecordErr},
-		{name: "nil record", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.nilRecord = true
-		}, wantText: "version: empty result"},
-		{name: "zero record version", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.emptyRecord = true
-		}, wantText: "version: empty result"},
 	}
 
 	for _, test := range tests {

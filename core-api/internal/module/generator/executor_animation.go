@@ -12,35 +12,40 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
 	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 const (
-	defaultAnimationFrameCount  = 16
-	defaultAnimationFrameWidth  = 256
-	defaultAnimationFrameHeight = 256
-	defaultAnimationFPS         = 10
-	defaultAnimationResolution  = "720p"
-	defaultAnimationDuration    = 5
-	defaultAnimationAspectRatio = "1:1"
-	animationVideoAttempts      = 2
-	animationReferenceSize      = 1024
-	maxAnimationReferenceBytes  = 32 << 20
-	animationAnalysisFPS        = 12
-	animationMinLoopSpanFrames  = 4
-	animationMinLoopSpanRatio   = 0.50
-	animationMinStartWindow     = 1
-	animationInitialWindowRatio = 0.20
-	animationMinForegroundRatio = 0.05
-	animationEndpointQuantile   = 0.35
-	animationRichnessQuantile   = 0.90
-	animationMotionQuantile     = 0.25
-	animationSeamWarningMSE     = 0.015
+	defaultAnimationFrameCount          = 16
+	defaultAnimationFrameWidth          = 256
+	defaultAnimationFrameHeight         = 256
+	defaultAnimationFPS                 = 10
+	defaultAnimationResolution          = "720p"
+	defaultAnimationDuration            = 5
+	defaultAnimationAspectRatio         = "1:1"
+	animationVideoAttempts              = 2
+	animationReferenceSize              = 1024
+	maxAnimationReferenceBytes          = 32 << 20
+	defaultAnimationReferenceMaxRetries = 3
+	defaultAnimationReferenceTimeout    = 45 * time.Second
+	defaultAnimationReferenceRetryDelay = 2 * time.Second
+	animationAnalysisFPS                = 12
+	animationMinLoopSpanFrames          = 4
+	animationMinLoopSpanRatio           = 0.50
+	animationMinStartWindow             = 1
+	animationInitialWindowRatio         = 0.20
+	animationMinForegroundRatio         = 0.05
+	animationEndpointQuantile           = 0.35
+	animationRichnessQuantile           = 0.90
+	animationMotionQuantile             = 0.25
+	animationSeamWarningMSE             = 0.015
 
 	animationEndpointWeight          = 1.0
 	animationRichnessWeight          = 0.45
@@ -171,6 +176,18 @@ type animationGenerationService struct {
 	videoProcessor      videoprocessor.Processor
 	referenceResolver   AnimationReferenceResolver
 	referenceHTTPClient *http.Client
+	referenceMaxRetries int
+	referenceTimeout    time.Duration
+	referenceRetryDelay time.Duration
+	logger              logger.Logger
+}
+
+// AnimationGenerationDependencies configures infrastructure used by the
+// animation pipeline outside the video provider itself.
+type AnimationGenerationDependencies struct {
+	ReferenceResolver   AnimationReferenceResolver
+	ReferenceHTTPClient *http.Client
+	Logger              logger.Logger
 }
 
 // NewAnimationGenerationService creates the formal image-to-video animation
@@ -184,12 +201,44 @@ func NewAnimationGenerationService(
 	if len(resolvers) > 0 {
 		resolver = resolvers[0]
 	}
-	return newAnimationGenerationServiceWithResolver(
+	return NewAnimationGenerationServiceWithDependencies(
 		videos,
 		processor,
-		videoprocessor.NewProcessor(),
-		resolver,
+		AnimationGenerationDependencies{ReferenceResolver: resolver},
 	)
+}
+
+// NewAnimationGenerationServiceWithDependencies creates the animation pipeline
+// with explicit logging and reference-download infrastructure.
+func NewAnimationGenerationServiceWithDependencies(
+	videos videoclient.VideoGenerationService,
+	processor imageprocessor.Processor,
+	dependencies AnimationGenerationDependencies,
+) AnimationGenerationService {
+	client := dependencies.ReferenceHTTPClient
+	if client == nil {
+		client = newDefaultAnimationReferenceHTTPClient()
+	}
+	return &animationGenerationService{
+		videos:              videos,
+		processor:           processor,
+		videoProcessor:      videoprocessor.NewProcessor(),
+		referenceResolver:   dependencies.ReferenceResolver,
+		referenceHTTPClient: client,
+		referenceMaxRetries: defaultAnimationReferenceMaxRetries,
+		referenceTimeout:    defaultAnimationReferenceTimeout,
+		referenceRetryDelay: defaultAnimationReferenceRetryDelay,
+		logger:              dependencies.Logger,
+	}
+}
+
+func newDefaultAnimationReferenceHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = defaultAnimationReferenceTimeout
+	return &http.Client{
+		Transport: transport,
+		Timeout:   defaultAnimationReferenceTimeout,
+	}
 }
 
 func newAnimationGenerationService(
@@ -211,7 +260,10 @@ func newAnimationGenerationServiceWithResolver(
 		processor:           processor,
 		videoProcessor:      videoProcessor,
 		referenceResolver:   resolver,
-		referenceHTTPClient: http.DefaultClient,
+		referenceHTTPClient: newDefaultAnimationReferenceHTTPClient(),
+		referenceMaxRetries: defaultAnimationReferenceMaxRetries,
+		referenceTimeout:    defaultAnimationReferenceTimeout,
+		referenceRetryDelay: defaultAnimationReferenceRetryDelay,
 	}
 }
 
@@ -696,6 +748,12 @@ func animationFrameDimensions(asset assetdomain.Asset) (assetdomain.Size, error)
 	return dimensions, nil
 }
 
+type generatedAnimationCandidate struct {
+	Name       string                                 `json:"name"`
+	Frames     []assetdomain.Frame                    `json:"frames"`
+	Generation *assetdomain.AnimationGenerationConfig `json:"generation,omitempty"`
+}
+
 func (e *executor) generateAnimation(
 	ctx context.Context,
 	payload CreateAnimationPayload,
@@ -762,7 +820,7 @@ func (e *executor) generateAnimation(
 	if err != nil {
 		return nil, err
 	}
-	animationID, err := e.assets.CreateAnimation(ctx, payload.AssetID, assetdomain.Animation{
+	animation := generatedAnimationCandidate{
 		Name:   animationName,
 		Frames: frames,
 		Generation: &assetdomain.AnimationGenerationConfig{
@@ -778,14 +836,21 @@ func (e *executor) generateAnimation(
 			Duration:    generationRequest.Duration,
 			AspectRatio: generationRequest.AspectRatio,
 		},
+	}
+	encoded, err := json.Marshal(struct {
+		Animations []generatedAnimationCandidate `json:"animations"`
+	}{
+		Animations: []generatedAnimationCandidate{animation},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("generator: create animation for asset %d: %w", payload.AssetID, err)
+		return nil, fmt.Errorf("generator: encode animation result for asset %d: %w", payload.AssetID, err)
 	}
-	if animationID == 0 {
-		return nil, fmt.Errorf("generator: create animation for asset %d: empty result", payload.AssetID)
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: animationID})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            payload.AssetID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedFrameResourceKeys(frames),
+	})
 }
 
 func (e *executor) editAnimation(
@@ -880,21 +945,18 @@ func (e *executor) editAnimation(
 	if err != nil {
 		return nil, err
 	}
-	if err := e.assets.UpdateAnimationFrames(
-		ctx,
-		payload.AssetID,
-		payload.AnimationID,
-		frames,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"generator: update animation %d frames for asset %d: %w",
-			payload.AnimationID,
-			payload.AssetID,
-			err,
-		)
+	animation.Frames = append([]assetdomain.Frame(nil), frames...)
+	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{
+		Animations: []assetdomain.Animation{*animation},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: encode animation %d result for asset %d: %w", payload.AnimationID, payload.AssetID, err)
 	}
 	return encodeExecutionResult(ExecutionResult{
-		AssetID:     payload.AssetID,
-		AnimationID: payload.AnimationID,
+		AssetID:            payload.AssetID,
+		AnimationID:        payload.AnimationID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedFrameResourceKeys(frames),
 	})
 }

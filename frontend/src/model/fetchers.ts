@@ -1,4 +1,4 @@
-import createClient, { type Middleware } from "openapi-fetch";
+import createClient, { type Client, type Middleware } from "openapi-fetch";
 
 import { DataApiError } from "@/lib/data-api-error";
 import type { paths } from "@/model/generated/core-api";
@@ -18,6 +18,18 @@ type ApiResult = {
 type CoreApiAuth = {
   getAccessToken: () => string | undefined;
   onUnauthorized: () => void;
+};
+
+export type CoreApiConfig = {
+  readonly baseUrl: string;
+  readonly fetch?: typeof fetch;
+};
+
+export type CoreApiClient = Client<paths>;
+
+export type CoreApiClients = {
+  public: CoreApiClient;
+  authenticated: CoreApiClient;
 };
 
 let coreApiAuth: CoreApiAuth = {
@@ -47,20 +59,35 @@ const authMiddleware: Middleware = {
   },
 };
 
-export const publicCoreApiClient = createCoreApiClient();
-export const coreApiClient = createCoreApiClient(authMiddleware);
+const defaultApiClients = createCoreApiClients({ baseUrl: "/api/v1" });
 
-function createCoreApiClient(middleware?: Middleware) {
+export let publicCoreApiClient = defaultApiClients.public;
+export let coreApiClient = defaultApiClients.authenticated;
+
+export function createCoreApiClients(config: CoreApiConfig): CoreApiClients {
+  return {
+    public: createCoreApiClient(config),
+    authenticated: createCoreApiClient(config, authMiddleware),
+  };
+}
+
+export function configureCoreApi(config: CoreApiConfig) {
+  const clients = createCoreApiClients(config);
+  publicCoreApiClient = clients.public;
+  coreApiClient = clients.authenticated;
+}
+
+function createCoreApiClient(config: CoreApiConfig, middleware?: Middleware) {
   const client = createClient<paths>({
-    baseUrl: apiBaseUrl(),
-    fetch: (request) => fetch(request),
+    baseUrl: resolveApiBaseUrl(config.baseUrl),
+    fetch: (request) => (config.fetch ?? fetch)(request),
   });
   client.use(unavailableMiddleware);
   if (middleware) client.use(middleware);
   return client;
 }
 
-export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
+export function ensureApiResponseSuccess({ error, response }: ApiResult) {
   if (!response.ok) {
     throw new DataApiError(
       dataApiErrorCodeForStatus(response.status),
@@ -68,6 +95,11 @@ export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
       error,
     );
   }
+}
+
+export function unwrapApiResponse<T>(result: ApiResult): T {
+  ensureApiResponseSuccess(result);
+  const { data } = result;
 
   if (!isApiResponse(data)) {
     throw new DataApiError("UNKNOWN", "Invalid API response.", data);
@@ -82,8 +114,7 @@ export function unwrapApiResponse<T>({ data, error, response }: ApiResult): T {
   return data.data as T;
 }
 
-function apiBaseUrl() {
-  const configuredUrl = import.meta.env.PUBLIC_CORE_API_BASE_URL ?? "/api/v1";
+function resolveApiBaseUrl(configuredUrl: string) {
   if (/^https?:\/\//i.test(configuredUrl)) return configuredUrl;
 
   const origin =

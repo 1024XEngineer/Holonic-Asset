@@ -131,11 +131,16 @@ func InitHandlers(
 	workspaceModule *workspace.Workspace,
 	generatorEngine generator.RunManager,
 	uploadManager upload.Manager,
+	references ...upload.ReferenceResolver,
 ) HTTPHandlers {
+	var resolver upload.ReferenceResolver
+	if len(references) > 0 {
+		resolver = references[0]
+	}
 	return HTTPHandlers{
-		Asset:      handler.NewHandler(workspaceModule.Assets),
-		Project:    handler.NewProjectHandler(workspaceModule.Projects),
-		Generation: handler.NewGenerationHandler(generatorEngine),
+		Asset:      handler.NewHandler(workspaceModule.Assets, resolver),
+		Project:    handler.NewProjectHandler(workspaceModule.Projects, resolver),
+		Generation: handler.NewGenerationHandler(generatorEngine, resolver),
 		Upload:     handler.NewUploadHandler(uploadManager),
 	}
 }

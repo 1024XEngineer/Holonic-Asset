@@ -1,8 +1,5 @@
 import { coreAssetApi } from "./core-asset.api";
-import type {
-  AssetDetailResponse,
-  AssetListItemResponse,
-} from "./asset.contract";
+import type { AssetListItemResponse } from "./asset.contract";
 import {
   assetCanvasSizeDimensionsSchema,
   resolveAssetCanvasSize,
@@ -21,8 +18,7 @@ export type SaveAssetRevisionInput<Payload> = {
 export const assetApi = {
   listGroups: async (projectId: string) => {
     const response = await coreAssetApi.list(coreProjectId(projectId));
-    const details = await readAssetDetails(response.assets);
-    return toAssetGroups(response.assets, new Map(details));
+    return toAssetGroups(response.assets);
   },
   copy: async (projectId: string, assetId: string) => {
     await coreAssetApi.copy({ assetId: coreAssetId(assetId) });
@@ -56,25 +52,6 @@ export const assetApi = {
   },
 };
 
-const assetDetailConcurrency = 4;
-
-async function readAssetDetails(assets: AssetListItemResponse[]) {
-  const details: (readonly [number, AssetDetailResponse])[] = [];
-  for (let index = 0; index < assets.length; index += assetDetailConcurrency) {
-    const batch = assets.slice(index, index + assetDetailConcurrency);
-    const results = await Promise.allSettled(
-      batch.map(
-        async (asset) =>
-          [asset.assetId, await coreAssetApi.detail(asset.assetId)] as const,
-      ),
-    );
-    for (const result of results) {
-      if (result.status === "fulfilled") details.push(result.value);
-    }
-  }
-  return details;
-}
-
 function parseAssetDimensions(canvasSize: string) {
   if (canvasSize.trim().toUpperCase() === "N/A") return undefined;
   const result = assetCanvasSizeDimensionsSchema.safeParse(canvasSize);
@@ -84,18 +61,12 @@ function parseAssetDimensions(canvasSize: string) {
   return result.data;
 }
 
-export function toAssetGroups(
-  items: AssetListItemResponse[],
-  details: ReadonlyMap<number, AssetDetailResponse> = new Map(),
-) {
+export function toAssetGroups(items: AssetListItemResponse[]) {
   const groups = new Map<AssetKind, ProjectAsset[]>();
 
   for (const item of items) {
     const kind = item.type === "tileSet" ? "tileset" : item.type;
     const assets = groups.get(kind) ?? [];
-    const detail = details.get(item.assetId);
-    const prototypeUrls = readPrototypeURLs(detail?.content);
-    const thumbnailUrl = prototypeUrls?.[0];
     assets.push({
       id: String(item.assetId),
       name: item.name,
@@ -104,8 +75,7 @@ export function toAssetGroups(
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
       tags: item.tags ?? [],
-      ...(thumbnailUrl ? { thumbnailUrl } : {}),
-      ...(prototypeUrls ? { prototypeUrls } : {}),
+      ...(item.thumbnailUrl ? { thumbnailUrl: item.thumbnailUrl } : {}),
       history: [],
       animations: [],
     });
@@ -113,17 +83,6 @@ export function toAssetGroups(
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
-}
-
-function readPrototypeURLs(content: unknown) {
-  if (!content || typeof content !== "object") return undefined;
-  const prototype = (content as { prototype?: unknown }).prototype;
-  if (!Array.isArray(prototype) || prototype.length === 0) return undefined;
-  const urls = prototype.flatMap((resource) => {
-    const url = (resource as { url?: unknown } | null)?.url;
-    return typeof url === "string" && url.length > 0 ? [url] : [];
-  });
-  return urls.length > 0 ? urls : undefined;
 }
 
 function coreProjectId(projectId: string) {

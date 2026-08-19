@@ -44,6 +44,7 @@ export class AnimatedSpriteCanvasRuntime {
     onClearSelection: () => this.props.actions.onClearSelection(),
     onNodePositionChange: (node, position) =>
       this.props.actions.onNodePositionChange(node, position),
+    onReviewResolve: (applied) => this.props.actions.onReviewResolve(applied),
   };
 
   constructor(props: AnimatedSpriteCanvasRuntimeProps) {
@@ -88,6 +89,7 @@ export class AnimatedSpriteCanvasRuntime {
       getAnimations: () => this.props.model.animations,
       getPrototype: () => this.props.model.prototype,
       getScene: () => this.scene.getSnapshot(),
+      getReview: () => this.props.model.review,
       moveNode: (node, position) => this.scene.moveNode(node, position),
       setMarquee: (marquee) => this.scene.setMarquee(marquee),
       getDragStep: () =>
@@ -160,6 +162,20 @@ export class AnimatedSpriteCanvasRuntime {
             ? [spriteSheet.imageUrl, ...(spriteSheet.frameUrls ?? [])]
             : [];
         }),
+        ...(model.review?.kind === "comparison" &&
+        model.review.candidatePrototype
+          ? [
+              model.review.candidatePrototype.imageUrl,
+              ...(model.review.candidatePrototype.frameUrls ?? []),
+            ]
+          : []),
+        ...(model.review?.kind === "comparison" &&
+        model.review.candidateAnimation?.spriteSheet
+          ? [
+              model.review.candidateAnimation.spriteSheet.imageUrl,
+              ...(model.review.candidateAnimation.spriteSheet.frameUrls ?? []),
+            ]
+          : []),
       ].filter(Boolean),
     );
     await Promise.all(

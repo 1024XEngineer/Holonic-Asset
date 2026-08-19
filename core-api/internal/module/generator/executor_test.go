@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -177,37 +178,22 @@ func (s *imageGenerationServiceStub) Generate(
 		Model:           request.Model,
 		Size:            request.Size,
 		Params:          request.Params,
+		MaxAttempts:     request.MaxAttempts,
 	}
 	return s.result, s.err
 }
 
 type generationAssetWriterStub struct {
-	events                  *[]string
-	parentAsset             assetdomain.Asset
-	getDetailErr            error
-	characterAsset          *assetdomain.Asset
-	objectAsset             *assetdomain.Asset
-	sceneryAsset            *assetdomain.Asset
-	createdRecord           *assetdomain.AssetRecord
-	recordVersion           uint
-	expectedVersion         uint
-	animationAssetID        uint
-	animation               assetdomain.Animation
-	animationName           string
-	animationID             uint
-	frames                  []assetdomain.Frame
-	updatedAnimationAssetID uint
-	updatedAnimationID      uint
-	updatedFrames           []assetdomain.Frame
-	updateAnimationErr      error
-	updateCalls             int
-	err                     error
-	detailErr               error
-	recordErr               error
-	detailResult            *assetdomain.Asset
-	nilRecord               bool
-	emptyRecord             bool
-	asset                   assetdomain.Asset
+	events         *[]string
+	parentAsset    assetdomain.Asset
+	getDetailErr   error
+	characterAsset *assetdomain.Asset
+	objectAsset    *assetdomain.Asset
+	sceneryAsset   *assetdomain.Asset
+	err            error
+	detailErr      error
+	detailResult   *assetdomain.Asset
+	asset          assetdomain.Asset
 }
 
 func (s *generationAssetWriterStub) GetDetail(
@@ -227,9 +213,6 @@ func (s *generationAssetWriterStub) GetDetail(
 		return assetdomain.Asset{}, s.err
 	}
 	if s.parentAsset.ID == assetID {
-		if s.updateCalls > 0 && s.detailResult != nil {
-			return *s.detailResult, nil
-		}
 		return s.parentAsset, nil
 	}
 	if s.detailResult != nil {
@@ -288,72 +271,6 @@ func (s *generationAssetWriterStub) CreateTileSetAsset(
 		return 0, s.err
 	}
 	return 43, nil
-}
-
-func (s *generationAssetWriterStub) CreateAnimation(
-	_ context.Context,
-	assetID uint,
-	animation assetdomain.Animation,
-) (uint, error) {
-	*s.events = append(*s.events, "create_animation")
-	s.animationAssetID = assetID
-	s.animation = animation
-	s.animation.Frames = append([]assetdomain.Frame(nil), animation.Frames...)
-	s.animationName = animation.Name
-	s.frames = append([]assetdomain.Frame(nil), animation.Frames...)
-	if s.err != nil {
-		return 0, s.err
-	}
-	s.animationID = 3
-	return 3, nil
-}
-
-func (s *generationAssetWriterStub) UpdateAnimationFrames(
-	_ context.Context,
-	assetID uint,
-	animationID uint,
-	frames []assetdomain.Frame,
-) error {
-	if s.events != nil {
-		*s.events = append(*s.events, "update_animation_frames")
-	}
-	s.updatedAnimationAssetID = assetID
-	s.updatedAnimationID = animationID
-	s.updatedFrames = append([]assetdomain.Frame(nil), frames...)
-	s.frames = append([]assetdomain.Frame(nil), frames...)
-	s.updateCalls++
-	if s.updateAnimationErr != nil {
-		return s.updateAnimationErr
-	}
-	return s.err
-}
-
-func (s *generationAssetWriterStub) CreateRecord(
-	_ context.Context,
-	record *assetdomain.AssetRecord,
-	expectedVersion uint,
-) (*assetdomain.AssetRecord, error) {
-	s.expectedVersion = expectedVersion
-	*s.events = append(*s.events, "create_record")
-	if record != nil {
-		copy := *record
-		copy.Content = append(json.RawMessage(nil), record.Content...)
-		s.createdRecord = &copy
-	}
-	if s.recordErr != nil {
-		return nil, s.recordErr
-	}
-	if s.err != nil {
-		return nil, s.err
-	}
-	if s.nilRecord {
-		return nil, nil //nolint:nilnil // Exercise the executor's defensive empty-result check.
-	}
-	version := s.recordVersion
-	if version == 0 && !s.emptyRecord {
-		version = 2
-	}
-	return &assetdomain.AssetRecord{AssetID: record.AssetID, Version: version, Content: record.Content}, nil
 }
 
 func animationParentAsset(t *testing.T) assetdomain.Asset {
@@ -416,9 +333,30 @@ func assertExecutionResult(t *testing.T, raw json.RawMessage, want generator.Exe
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatalf("decode execution result: %v", err)
 	}
-	if got != want {
+	if got.AssetID != want.AssetID ||
+		(want.AnimationID != 0 && got.AnimationID != want.AnimationID) ||
+		(want.Version != 0 && got.Version != want.Version) ||
+		(want.Content != nil && !reflect.DeepEqual(got.Content, want.Content)) ||
+		(want.GeneratedResources != nil && !reflect.DeepEqual(got.GeneratedResources, want.GeneratedResources)) {
 		t.Fatalf("unexpected execution result: got %+v want %+v", got, want)
 	}
+}
+
+func decodeExecutionContent(
+	t *testing.T,
+	raw json.RawMessage,
+	assetType assetdomain.AssetType,
+) (generator.ExecutionResult, assetdomain.AssetContent) {
+	t.Helper()
+	var result generator.ExecutionResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("decode execution result: %v", err)
+	}
+	content, err := (assetdomain.Asset{Type: assetType, Content: result.Content}).DecodeContent()
+	if err != nil {
+		t.Fatalf("decode execution content: %v", err)
+	}
+	return result, content
 }
 
 var _ imageclient.ImageGenerationService = (*imageGenerationServiceStub)(nil)

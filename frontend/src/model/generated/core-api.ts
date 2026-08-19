@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/generation-runs/{run_id}/application": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply or discard a generation result */
+        post: operations["resolveGenerationApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/generation-runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -360,6 +377,7 @@ export interface components {
             /** Format: int64 */
             projectId: number;
             tags: string[] | null;
+            thumbnailUrl?: string;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */
@@ -491,6 +509,7 @@ export interface components {
             animation_id?: number;
             /** Format: int64 */
             asset_id?: number;
+            content?: unknown;
             /** Format: int64 */
             version?: number;
         };
@@ -504,7 +523,7 @@ export interface components {
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            status: "pending" | "processing" | "awaiting_application" | "completed" | "failed" | "cancelled";
         };
         GetAssetRecordsResponse: {
             records: components["schemas"]["RecordAssetResponse"][];
@@ -524,7 +543,7 @@ export interface components {
             projectId: number;
             result?: components["schemas"]["GenerationResult"];
             /** @enum {string} */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            status: "pending" | "processing" | "awaiting_application" | "completed" | "failed" | "cancelled";
         };
         ListGenerationRunsResponse: {
             items: components["schemas"]["GenerationRunListItemResponse"][];
@@ -573,6 +592,8 @@ export interface components {
             /** Format: int64 */
             assetId: number;
             content: unknown;
+            /** Format: int64 */
+            expectedVersion?: number;
         };
         RecordAssetResponse: {
             /** Format: int64 */
@@ -591,6 +612,9 @@ export interface components {
             recordId: number;
             /** Format: int64 */
             version: number;
+        };
+        ResolveGenerationApplicationRequest: {
+            applied: boolean;
         };
         RollBackAssetRequest: {
             /** Format: int64 */
@@ -1289,6 +1313,66 @@ export interface operations {
             };
             /** @description Error */
             default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resolveGenerationApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveGenerationApplicationRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

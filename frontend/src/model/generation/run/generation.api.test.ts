@@ -140,6 +140,54 @@ describe("generationApi", () => {
     expect(mocks.readFileAsDataUrl).toHaveBeenCalledWith(reference);
   });
 
+  it("resolves an awaiting animation edit to the owning asset kind", async () => {
+    mocks.assetDetail.mockResolvedValue({ type: "object" });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 26,
+          projectId: 42,
+          assetId: 18,
+          kind: "edit_animation",
+          status: "awaiting_application",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42", "18")).resolves.toEqual([
+      expect.objectContaining({
+        id: "26",
+        kind: "object",
+        status: "awaiting_application",
+      }),
+    ]);
+    expect(mocks.assetDetail).toHaveBeenCalledWith(18);
+  });
+
+  it("resolves an awaiting frame edit to the owning asset kind", async () => {
+    mocks.assetDetail.mockResolvedValue({ type: "object" });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 27,
+          projectId: 42,
+          assetId: 19,
+          kind: "edit_frames",
+          status: "awaiting_application",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42", "19")).resolves.toEqual([
+      expect.objectContaining({
+        id: "27",
+        kind: "object",
+        status: "awaiting_application",
+      }),
+    ]);
+    expect(mocks.assetDetail).toHaveBeenCalledWith(19);
+  });
+
   it("creates and lists remote generation runs while preserving form metadata", async () => {
     const request = creationRequest();
 
@@ -288,6 +336,28 @@ describe("generationApi", () => {
       }),
     ]);
     expect(mocks.assetDetail).toHaveBeenCalledWith(8);
+  });
+
+  it("keeps awaiting animation runs visible without local metadata", async () => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 24,
+          projectId: 42,
+          kind: "generate_animation",
+          status: "awaiting_application",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "24",
+        kind: "character",
+        status: "awaiting_application",
+      }),
+    ]);
+    expect(mocks.assetDetail).not.toHaveBeenCalled();
   });
 
   it("forgets animation metadata after a settled run is reconciled", async () => {

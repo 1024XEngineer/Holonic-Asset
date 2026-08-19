@@ -74,16 +74,17 @@
   "animationSummary": "从 {{seconds}} 秒动作素材中提取 {{frames}} 个最终帧，以 {{fps}} FPS 播放。",
   "queueingAnimation": "正在加入队列……",
   "newAsset": "新建资产",
-  "createKind": "创建{{kind}}",
+  "createKind": "创建 {{kind}}",
   "queue": "生成队列",
   "task_one": "个任务",
   "task_other": "个任务",
   "status": {
     "pending": "待处理",
     "processing": "处理中",
+    "awaiting_application": "待应用",
     "failed": "失败"
   },
-  "pageTitle": "创建{{kind}}",
+  "pageTitle": "创建 {{kind}}",
   "pageDescription": "设置新资产的制作详情。",
   "placeholderTitle": "图像生成",
   "placeholderDescription": "图像生成工作区将在后续更新中推出。"

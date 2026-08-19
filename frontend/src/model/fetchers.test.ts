@@ -4,12 +4,16 @@ import { DataApiError } from "@/lib/data-api-error";
 
 import {
   configureCoreApiAuth,
+  configureCoreApi,
   coreApiClient,
+  createCoreApiClients,
+  ensureApiResponseSuccess,
   publicCoreApiClient,
   unwrapApiResponse,
 } from "./fetchers";
 
 afterEach(() => {
+  configureCoreApi({ baseUrl: "/api/v1" });
   configureCoreApiAuth({
     getAccessToken: () => undefined,
     onUnauthorized: () => undefined,
@@ -25,7 +29,70 @@ function response(body: unknown, init: ResponseInit = {}) {
   });
 }
 
+describe("ensureApiResponseSuccess", () => {
+  it("accepts a successful response without a body", () => {
+    expect(() =>
+      ensureApiResponseSuccess({
+        response: new Response(undefined, { status: 204 }),
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws for an unsuccessful response", () => {
+    expect(() =>
+      ensureApiResponseSuccess({
+        error: { message: "transition failed" },
+        response: new Response(undefined, { status: 409 }),
+      }),
+    ).toThrow(DataApiError);
+  });
+});
+
 describe("core API client", () => {
+  it("reconfigures the exported clients with injected settings", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(response({ code: 200, message: "ok", data: {} })),
+      );
+    configureCoreApi({
+      baseUrl: "https://api.example.test/v2",
+      fetch: fetchMock,
+    });
+
+    await publicCoreApiClient.POST("/auth/login", {
+      body: { username: "kay", password: "secret" },
+    });
+    await coreApiClient.GET("/project/list", {
+      params: { query: { userID: 7 } },
+    });
+
+    expect(requestFrom(fetchMock).url).toBe(
+      "https://api.example.test/v2/auth/login",
+    );
+    expect(requestFrom(fetchMock, 1).url).toBe(
+      "https://api.example.test/v2/project/list?userID=7",
+    );
+  });
+
+  it("uses the injected API base URL", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(response({ code: 200, message: "ok", data: {} }));
+    const clients = createCoreApiClients({
+      baseUrl: "https://api.example.test/v2",
+      fetch: fetchMock,
+    });
+
+    await clients.public.POST("/auth/login", {
+      body: { username: "kay", password: "secret" },
+    });
+
+    expect(requestFrom(fetchMock).url).toBe(
+      "https://api.example.test/v2/auth/login",
+    );
+  });
+
   it("serializes typed path, query, and repeated array parameters", async () => {
     const fetchMock = vi
       .fn()

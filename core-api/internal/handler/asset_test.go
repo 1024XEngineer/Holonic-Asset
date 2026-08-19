@@ -28,6 +28,7 @@ type assetManagerStub struct {
 	update          *domain.AssetUpdate
 	record          *domain.AssetRecord
 	recordRequest   *domain.AssetRecord
+	expectedVersion uint
 	records         []domain.AssetRecord
 	rollbackAsset   uint
 	rollbackVersion uint
@@ -36,8 +37,9 @@ type assetManagerStub struct {
 	deleteErr       error
 }
 
-func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, _ uint) (*domain.AssetRecord, error) {
+func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
 	s.recordRequest = record
+	s.expectedVersion = expectedVersion
 	return s.record, nil
 }
 
@@ -109,17 +111,18 @@ func (s *assetReferenceStoreStub) PersistReference(_ context.Context, reference 
 
 func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	managerStub := &assetManagerStub{assets: []domain.Asset{{
-		ID:          7,
-		Name:        "hero",
-		ProjectID:   42,
-		Type:        domain.AssetTypeCharacter,
-		Description: "main character",
-		Perspective: domain.PerspectiveTopDown,
-		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
-		Tags:        []string{"player"},
-		Version:     3,
+		ID:           7,
+		Name:         "hero",
+		ProjectID:    42,
+		Type:         domain.AssetTypeCharacter,
+		Description:  "main character",
+		Perspective:  domain.PerspectiveTopDown,
+		Dimensions:   json.RawMessage(`{"width":64,"height":64}`),
+		Tags:         []string{"player"},
+		ThumbnailURL: "uploads/hero.png",
+		Version:      3,
 	}}}
-	h := handler.NewHandler(managerStub)
+	h := handler.NewHandler(managerStub, &assetReferenceStoreStub{})
 
 	response, err := h.GetAssets(context.Background(), dto.GetAssetsRequest{ProjectID: 42})
 	if err != nil {
@@ -140,7 +143,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal response: %v", err)
 	}
-	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"version":3}]}}` {
+	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"thumbnailUrl":"signed:uploads/hero.png","version":3}]}}` {
 		t.Fatalf("unexpected JSON response: %s", payload)
 	}
 }
@@ -160,6 +163,27 @@ func TestAssetHandlerPassesAssetQueryFilter(t *testing.T) {
 	}
 	if managerStub.filter.Query != "hero" || len(managerStub.filter.Tags) != 1 || len(managerStub.filter.Types) != 1 {
 		t.Fatalf("unexpected asset filter: %+v", managerStub.filter)
+	}
+}
+
+func TestAssetHandlerKeepsListAvailableWhenOptionalThumbnailCannotResolve(t *testing.T) {
+	managerStub := &assetManagerStub{assets: []domain.Asset{{
+		ID:           7,
+		ProjectID:    42,
+		Type:         domain.AssetTypeCharacter,
+		ThumbnailURL: "uploads/hero.png",
+	}}}
+	references := &assetReferenceStoreStub{resolveErr: errors.New("storage unavailable")}
+
+	response, err := handler.NewHandler(managerStub, references).GetAssets(
+		context.Background(),
+		dto.GetAssetsRequest{ProjectID: 42},
+	)
+	if err != nil {
+		t.Fatalf("get assets with invalid optional preview: %v", err)
+	}
+	if len(response.Data.Assets) != 1 || response.Data.Assets[0].ThumbnailURL != "" {
+		t.Fatalf("unexpected list response: %+v", response.Data.Assets)
 	}
 }
 
@@ -216,14 +240,15 @@ func TestAssetHandlerRecordReturnsCreatedSnapshot(t *testing.T) {
 
 	content := json.RawMessage(`{"prototype":[{"id":2,"url":"new.png"}]}`)
 	response, err := h.Record(context.Background(), dto.RecordAssetRequest{
-		AssetID: 7,
-		Content: content,
+		AssetID:         7,
+		ExpectedVersion: 2,
+		Content:         content,
 	})
 	if err != nil {
 		t.Fatalf("record asset: %v", err)
 	}
 	if managerStub.recordRequest == nil || managerStub.recordRequest.AssetID != 7 ||
-		string(managerStub.recordRequest.Content) != string(content) {
+		string(managerStub.recordRequest.Content) != string(content) || managerStub.expectedVersion != 2 {
 		t.Fatalf("unexpected record request: %+v", managerStub.recordRequest)
 	}
 	data := response.Data
@@ -320,6 +345,46 @@ func TestAssetHandlerRecordPersistsImageReferencesAsObjectKeys(t *testing.T) {
 	if string(layers[0]["resource"]) != `"uploads/background.png"` ||
 		string(layers[0]["custom"]) != `"kept"` {
 		t.Fatalf("layer was not normalized safely: %s", decoded["layers"])
+	}
+}
+
+func TestAssetHandlerRecordDoesNotRestoreAnimationGenerationMetadata(t *testing.T) {
+	managerStub := &assetManagerStub{
+		asset: domain.Asset{
+			ID:   7,
+			Type: domain.AssetTypeCharacter,
+			Content: json.RawMessage(`{
+				"animations":[
+					{"id":2,"name":"idle","frames":[{"id":1,"url":"uploads/idle.png"}],"generation":{"direction":"front","frameCount":8}}
+				]
+			}`),
+		},
+		record: &domain.AssetRecord{ID: 15, AssetID: 7, Version: 3, ContentID: 21},
+	}
+	h := handler.NewHandler(managerStub)
+
+	_, err := h.Record(context.Background(), dto.RecordAssetRequest{
+		AssetID: 7,
+		Content: json.RawMessage(`{
+			"animations":[{"id":2,"name":"idle renamed","frames":[{"id":1,"url":"uploads/idle.png"}]}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("record asset: %v", err)
+	}
+	var content struct {
+		Animations []struct {
+			ID         uint            `json:"id"`
+			Name       string          `json:"name"`
+			Generation json.RawMessage `json:"generation"`
+		} `json:"animations"`
+	}
+	if managerStub.recordRequest == nil || json.Unmarshal(managerStub.recordRequest.Content, &content) != nil {
+		t.Fatalf("decode recorded content: %+v", managerStub.recordRequest)
+	}
+	if len(content.Animations) != 1 || content.Animations[0].ID != 2 ||
+		content.Animations[0].Name != "idle renamed" || len(content.Animations[0].Generation) != 0 {
+		t.Fatalf("recorded content differs from submitted content: %s", managerStub.recordRequest.Content)
 	}
 }
 
@@ -474,7 +539,7 @@ func TestAssetHandlerResolvesNestedObjectKeysOnlyForResponse(t *testing.T) {
 	}
 }
 
-func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing.T) {
+func TestAssetHandlerExposesAnimationGenerationWithoutReferenceResolver(t *testing.T) {
 	raw := json.RawMessage(`{
 		"animations":[{
 			"id":3,
@@ -504,8 +569,8 @@ func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing
 	if len(animations) != 1 {
 		t.Fatalf("unexpected response animations: %s", content["animations"])
 	}
-	if _, ok := animations[0]["generation"]; ok {
-		t.Fatalf("animation generation metadata leaked in response: %s", response.Data.Content)
+	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16,"columns":4,"frameWidth":256,"frameHeight":256,"fps":10,"resolution":"720p","duration":5,"aspectRatio":"1:1"}` {
+		t.Fatalf("animation generation metadata missing from response: %s", response.Data.Content)
 	}
 	if string(animations[0]["customAnimation"]) != `{"keep":true}` ||
 		string(animations[0]["futureValue"]) != "12345678901234567890" ||
@@ -535,7 +600,7 @@ func TestAssetHandlerHidesAnimationGenerationWithoutReferenceResolver(t *testing
 	}
 }
 
-func TestAssetHandlerRecordsHideAnimationGeneration(t *testing.T) {
+func TestAssetHandlerRecordsExposeAnimationGeneration(t *testing.T) {
 	raw := json.RawMessage(`{"animations":[{"id":3,"name":"walk","frames":[],"generation":{"direction":"front","frameCount":16}}]}`)
 	managerStub := &assetManagerStub{records: []domain.AssetRecord{{
 		ID: 15, AssetID: 7, Version: 1, ContentID: 21, Content: raw,
@@ -554,8 +619,8 @@ func TestAssetHandlerRecordsHideAnimationGeneration(t *testing.T) {
 	if err := json.Unmarshal(content["animations"], &animations); err != nil {
 		t.Fatalf("decode record response animations: %v", err)
 	}
-	if _, ok := animations[0]["generation"]; ok {
-		t.Fatalf("animation generation metadata leaked in record response: %s", response.Data.Records[0].Content)
+	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16}` {
+		t.Fatalf("animation generation metadata missing from record response: %s", response.Data.Records[0].Content)
 	}
 	if string(managerStub.records[0].Content) != string(raw) {
 		t.Fatalf("handler mutated persisted record content: %s", managerStub.records[0].Content)

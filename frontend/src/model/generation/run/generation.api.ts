@@ -57,7 +57,7 @@ export const generationApi: GenerationApi = {
         return toGenerationRun(
           item,
           request,
-          await resolveAnimationAssetKind(item, request?.kind),
+          await resolveSpriteAssetKind(item, request?.kind),
         );
       }),
     );
@@ -180,30 +180,55 @@ function generationKindToAssetKind(
   requestedKind?: CreatableAssetKind,
   resolvedAnimationKind?: "character" | "object",
 ) {
-  if (kind === "generate_character_prototype") return "character" as const;
-  if (kind === "generate_object_prototype") return "object" as const;
-  if (kind === "generate_tileset") return "tileset" as const;
   if (kind === "generate_scenery") return "scenery" as const;
   if (
-    kind === "generate_animation" &&
+    kind === "generate_character_prototype" ||
+    kind === "edit_character_prototype"
+  ) {
+    return "character" as const;
+  }
+  if (
+    kind === "generate_object_prototype" ||
+    kind === "edit_object_prototype"
+  ) {
+    return "object" as const;
+  }
+  if (
+    kind === "generate_tileset" ||
+    kind === "edit_tileset_item" ||
+    kind === "edit_tiles"
+  ) {
+    return "tileset" as const;
+  }
+  if (
+    (kind === "generate_animation" || kind === "edit_animation") &&
     (requestedKind === "character" || requestedKind === "object")
   ) {
     return requestedKind;
   }
-  if (kind === "generate_animation") {
+  if (
+    kind === "generate_animation" ||
+    kind === "edit_animation" ||
+    kind === "edit_frames"
+  ) {
     return resolvedAnimationKind ?? ("character" as const);
   }
   return undefined;
 }
 
-async function resolveAnimationAssetKind(
+async function resolveSpriteAssetKind(
   item: GenerationRunListItemResponse,
   requestedKind: CreatableAssetKind | undefined,
 ): Promise<"character" | "object" | undefined> {
   if (requestedKind === "character" || requestedKind === "object") {
     return requestedKind;
   }
-  if (item.kind !== "generate_animation" || item.assetId === undefined) {
+  if (
+    (item.kind !== "generate_animation" &&
+      item.kind !== "edit_animation" &&
+      item.kind !== "edit_frames") ||
+    item.assetId === undefined
+  ) {
     return undefined;
   }
   const cachedKind = animationAssetKinds.get(item.assetId);
@@ -221,7 +246,12 @@ async function resolveAnimationAssetKind(
 function isVisibleGenerationStatus(
   status: GenerationRunListItemResponse["status"],
 ): status is GenerationRun["status"] {
-  return status === "pending" || status === "processing" || status === "failed";
+  return (
+    status === "pending" ||
+    status === "processing" ||
+    status === "awaiting_application" ||
+    status === "failed"
+  );
 }
 
 async function resolveReference(reference: unknown) {

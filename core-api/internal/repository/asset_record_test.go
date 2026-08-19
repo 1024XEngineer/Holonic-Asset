@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,10 +18,11 @@ var testRecordCreatedAt = time.Unix(1700000000, 0).UTC()
 
 type recordAssetDaoStub struct {
 	dao.AssetDao
-	asset          dao.Asset
-	updatedAsset   uint
-	updatedVersion uint
-	updatedContent uint
+	asset            dao.Asset
+	updatedAsset     uint
+	updatedVersion   uint
+	updatedContent   uint
+	updatedThumbnail string
 }
 
 func (s *recordAssetDaoStub) GetAssetDetail(_ context.Context, _ uint) (dao.Asset, error) {
@@ -37,10 +37,11 @@ func (s *recordAssetDaoStub) GetAssetForUpdate(_ context.Context, _ uint) (dao.A
 	return s.asset, nil
 }
 
-func (s *recordAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint) error {
+func (s *recordAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint, thumbnailURL string) error {
 	s.updatedAsset = assetID
 	s.updatedVersion = version
 	s.updatedContent = contentID
+	s.updatedThumbnail = thumbnailURL
 	return nil
 }
 
@@ -205,7 +206,7 @@ func TestAssetRepositoryCreatesContentSnapshotAndMovesCurrentPointer(t *testing.
 	if record.Name != "hero" || record.Description != "main character" || record.Perspective != domain.PerspectiveTopDown || string(record.Dimensions) != `{"width":64,"height":64}` {
 		t.Fatalf("record attributes were not copied: %+v", record)
 	}
-	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 {
+	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 3 || assetDao.updatedContent != 5 || assetDao.updatedThumbnail != "https://cdn.example/up.png" {
 		t.Fatalf("asset current pointer was not updated: %+v", assetDao)
 	}
 }
@@ -226,48 +227,6 @@ func TestAssetRepositoryCreateRecordReturnsCurrentContentLookupError(t *testing.
 	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{AssetID: 7}, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected content lookup error %v, got %v", wantErr, err)
-	}
-}
-
-func TestAssetRepositoryReturnsAnimationMigrationErrorWithoutWrites(t *testing.T) {
-	currentContentID := uint(5)
-	assetDao := &recordAssetDaoStub{asset: dao.Asset{
-		ID:        7,
-		Version:   3,
-		ContentID: &currentContentID,
-	}}
-	recordDao := &recordDaoStub{
-		records: map[uint]dao.AssetRecord{
-			1: {ID: 1, AssetID: 7, Version: 3, ContentID: currentContentID},
-		},
-		nextID: 1,
-	}
-	contentDao := &recordContentDaoStub{
-		contents: map[uint]dao.AssetContent{
-			currentContentID: {ID: currentContentID, AssetID: 7, Content: datatypes.JSON(`{`)},
-		},
-		nextID: currentContentID,
-	}
-	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
-
-	_, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
-		AssetID: 7,
-		Content: json.RawMessage(`{"animations":[{"id":1}]}`),
-	}, 3)
-	if err == nil {
-		t.Fatal("expected animation generation migration error")
-	}
-	if !strings.Contains(err.Error(), "decode current asset content") {
-		t.Fatalf("unexpected migration error: %v", err)
-	}
-	if len(contentDao.contents) != 1 || contentDao.nextID != currentContentID {
-		t.Fatalf("failed migration persisted content: contents=%+v next_id=%d", contentDao.contents, contentDao.nextID)
-	}
-	if len(recordDao.records) != 1 || recordDao.nextID != 1 {
-		t.Fatalf("failed migration persisted record: records=%+v next_id=%d", recordDao.records, recordDao.nextID)
-	}
-	if assetDao.updatedAsset != 0 || assetDao.updatedVersion != 0 || assetDao.updatedContent != 0 {
-		t.Fatalf("failed migration moved asset pointer: %+v", assetDao)
 	}
 }
 
@@ -349,18 +308,16 @@ func TestAssetRepositoryCreatesRecordFromReplacementContent(t *testing.T) {
 	if got := string(contentDao.contents[record.ContentID].Content); got != string(replacement) {
 		t.Fatalf("replacement content was not persisted: %s", got)
 	}
-	if assetDao.updatedVersion != 3 || assetDao.updatedContent != record.ContentID {
+	if assetDao.updatedVersion != 3 || assetDao.updatedContent != record.ContentID || assetDao.updatedThumbnail != "new.png" {
 		t.Fatalf("asset current pointer was not moved to replacement: %+v", assetDao)
 	}
 }
 
-func TestAssetRepositoryMigratesAnimationGenerationIntoReplacementContent(t *testing.T) {
+func TestAssetRepositoryPersistsReplacementAnimationContentAsSubmitted(t *testing.T) {
 	currentContentID := uint(4)
 	currentContent := datatypes.JSON(`{
 		"animations":[
-			{"id":3,"name":"walk","frames":[{"id":1,"url":"old.png"}],"generation":{"direction":"front","frameCount":16,"custom":{"keep":true}}},
-			{"id":4,"name":"idle","frames":[],"generation":{"direction":"front","frameCount":8}},
-			{"id":6,"name":"removed","frames":[],"generation":{"direction":"back","frameCount":4}}
+			{"id":3,"name":"walk","frames":[{"id":1,"url":"old.png"}],"generation":{"direction":"front","frameCount":16}}
 		]
 	}`)
 	assetDao := &recordAssetDaoStub{asset: dao.Asset{
@@ -387,11 +344,8 @@ func TestAssetRepositoryMigratesAnimationGenerationIntoReplacementContent(t *tes
 	repo := &repository.AssetRepositoryImpl{AssetDao: assetDao, ContentDao: contentDao, RecordDao: recordDao}
 	replacement := json.RawMessage(`{
 		"animations":[
-			{"id":3,"name":"walk edited","frames":[{"id":2,"url":"new.png"}],"futureValue":12345678901234567890},
-			{"id":4,"name":"idle edited","frames":[],"generation":{"direction":"side","frameCount":12}},
-			{"id":5,"name":"new","frames":[]}
-		],
-		"customTopLevel":{"keep":true}
+			{"id":3,"name":"walk edited","frames":[{"id":2,"url":"new.png"}]}
+		]
 	}`)
 
 	record, err := repo.CreateRecord(context.Background(), &domain.AssetRecord{
@@ -401,35 +355,11 @@ func TestAssetRepositoryMigratesAnimationGenerationIntoReplacementContent(t *tes
 	if err != nil {
 		t.Fatalf("create replacement record: %v", err)
 	}
-
-	var content map[string]json.RawMessage
-	if err := json.Unmarshal(record.Content, &content); err != nil {
-		t.Fatalf("decode replacement content: %v", err)
+	if string(record.Content) != string(replacement) {
+		t.Fatalf("replacement content changed: got %s, want %s", record.Content, replacement)
 	}
-	if string(content["customTopLevel"]) != `{"keep":true}` {
-		t.Fatalf("custom top-level content changed: %s", record.Content)
-	}
-	var animations []map[string]json.RawMessage
-	if err := json.Unmarshal(content["animations"], &animations); err != nil {
-		t.Fatalf("decode replacement animations: %v", err)
-	}
-	if len(animations) != 3 {
-		t.Fatalf("unexpected replacement animations: %s", content["animations"])
-	}
-	if string(animations[0]["generation"]) != `{"direction":"front","frameCount":16,"custom":{"keep":true}}` {
-		t.Fatalf("existing generation was not migrated: %s", animations[0]["generation"])
-	}
-	if string(animations[0]["futureValue"]) != "12345678901234567890" {
-		t.Fatalf("unmodeled animation content changed: %s", content["animations"])
-	}
-	if string(animations[1]["generation"]) != `{"direction":"side","frameCount":12}` {
-		t.Fatalf("supplied generation was overwritten: %s", animations[1]["generation"])
-	}
-	if _, ok := animations[2]["generation"]; ok {
-		t.Fatalf("new animation unexpectedly inherited generation: %s", content["animations"])
-	}
-	if got := string(contentDao.contents[record.ContentID].Content); got != string(record.Content) {
-		t.Fatalf("migrated content was not persisted: %s", got)
+	if got := string(contentDao.contents[record.ContentID].Content); got != string(replacement) {
+		t.Fatalf("replacement content was not persisted as submitted: %s", got)
 	}
 }
 
@@ -481,7 +411,7 @@ func TestAssetRepositoryRollsBackToContentSnapshot(t *testing.T) {
 	if record == nil || record.Version != 2 || record.ContentID != targetContentID {
 		t.Fatalf("unexpected rollback record: %+v", record)
 	}
-	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 2 || assetDao.updatedContent != targetContentID {
+	if assetDao.updatedAsset != 7 || assetDao.updatedVersion != 2 || assetDao.updatedContent != targetContentID || assetDao.updatedThumbnail != "https://cdn.example/up.png" {
 		t.Fatalf("asset current pointer was not rolled back: %+v", assetDao)
 	}
 	if assetDao.asset.Name != "saved hero" || assetDao.asset.Description != "saved description" || assetDao.asset.Perspective != "Top-Down" || string(assetDao.asset.Dimensions) != `{"width":64,"height":64}` {
@@ -528,11 +458,12 @@ func TestAssetRepositoryGetsRecordHistoryWithContent(t *testing.T) {
 
 type copyAssetDaoStub struct {
 	dao.AssetDao
-	source         dao.Asset
-	created        *dao.Asset
-	updatedAsset   uint
-	updatedVersion uint
-	updatedContent uint
+	source           dao.Asset
+	created          *dao.Asset
+	updatedAsset     uint
+	updatedVersion   uint
+	updatedContent   uint
+	updatedThumbnail string
 }
 
 func (s *copyAssetDaoStub) GetAssetForUpdate(_ context.Context, assetID uint) (dao.Asset, error) {
@@ -552,10 +483,11 @@ func (s *copyAssetDaoStub) CreateAsset(_ context.Context, asset *dao.Asset) (dao
 	return copy, nil
 }
 
-func (s *copyAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint) error {
+func (s *copyAssetDaoStub) UpdateAssetCurrentContent(_ context.Context, assetID uint, version uint, contentID uint, thumbnailURL string) error {
 	s.updatedAsset = assetID
 	s.updatedVersion = version
 	s.updatedContent = contentID
+	s.updatedThumbnail = thumbnailURL
 	return nil
 }
 
@@ -564,16 +496,17 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 	secondCreatedAt := firstCreatedAt.Add(time.Hour)
 	currentContentID := uint(12)
 	assetDao := &copyAssetDaoStub{source: dao.Asset{
-		ID:          7,
-		Name:        "hero",
-		ProjectID:   42,
-		Type:        "character",
-		Description: "main character",
-		Tags:        []string{"hero", "player"},
-		Perspective: "Side-On",
-		Dimensions:  []byte(`{"width":64,"height":64}`),
-		ContentID:   &currentContentID,
-		Version:     2,
+		ID:           7,
+		Name:         "hero",
+		ProjectID:    42,
+		Type:         "character",
+		Description:  "main character",
+		Tags:         []string{"hero", "player"},
+		Perspective:  "Side-On",
+		Dimensions:   []byte(`{"width":64,"height":64}`),
+		ThumbnailURL: "uploads/hero.png",
+		ContentID:    &currentContentID,
+		Version:      2,
 	}}
 	recordDao := &recordDaoStub{
 		records: map[uint]dao.AssetRecord{
@@ -606,6 +539,7 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 		assetDao.created.ProjectID != assetDao.source.ProjectID ||
 		assetDao.created.Type != assetDao.source.Type ||
 		assetDao.created.Description != assetDao.source.Description ||
+		assetDao.created.ThumbnailURL != assetDao.source.ThumbnailURL ||
 		assetDao.created.Version != assetDao.source.Version {
 		t.Fatalf("copied asset metadata was not preserved: %+v", assetDao.created)
 	}
@@ -644,7 +578,7 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 			t.Fatalf("version 2 timestamp was not preserved: %+v", record)
 		}
 	}
-	if assetDao.updatedAsset != newAssetID || assetDao.updatedVersion != 2 {
+	if assetDao.updatedAsset != newAssetID || assetDao.updatedVersion != 2 || assetDao.updatedThumbnail != assetDao.source.ThumbnailURL {
 		t.Fatalf("copied asset current pointer was not updated: %+v", assetDao)
 	}
 	currentContent, ok := contentDao.contents[assetDao.updatedContent]

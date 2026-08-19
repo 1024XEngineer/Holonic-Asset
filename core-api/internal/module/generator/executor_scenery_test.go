@@ -274,14 +274,14 @@ func TestExecutorRetriesRejectedSceneryLayer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("retry scenery layer: %v", err)
 	}
-	if len(images.requests) != 2 || processor.verifyCalls != 2 || assets.sceneryAsset == nil {
+	if len(images.requests) != 2 || images.requests[0].MaxAttempts != 2 || processor.verifyCalls != 2 || assets.sceneryAsset == nil {
 		t.Fatalf("expected one automatic retry: imageRequests=%d verifyCalls=%d asset=%+v", len(images.requests), processor.verifyCalls, assets.sceneryAsset)
 	}
 }
 
-func TestExecutorStopsSceneryRetriesOnPermanentProviderError(t *testing.T) {
+func TestExecutorDoesNotUseQualityRetriesForProviderErrors(t *testing.T) {
 	events := []string{}
-	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+	providerErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
 	images := &sceneryImageStub{events: &events, errors: []error{providerErr}}
 	executor := generator.NewExecutorWithDependencies(
 		images,
@@ -291,8 +291,8 @@ func TestExecutorStopsSceneryRetriesOnPermanentProviderError(t *testing.T) {
 	)
 
 	_, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
-	if err == nil || !errors.Is(err, providerErr) || !strings.Contains(err.Error(), "after 1 attempts") || len(images.requests) != 1 {
-		t.Fatalf("expected one permanent provider attempt: requests=%d err=%v", len(images.requests), err)
+	if err == nil || !errors.Is(err, providerErr) || len(images.requests) != 1 {
+		t.Fatalf("provider failure consumed quality retries: requests=%d err=%v", len(images.requests), err)
 	}
 }
 
