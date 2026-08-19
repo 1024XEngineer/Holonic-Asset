@@ -1,5 +1,6 @@
 export { recordQueryOptions, useRecordQuery } from "./record.query";
 export { toCoreSpriteCandidateRecord } from "./core-sprite-record";
+export { describeAssetRecordChanges } from "./asset-record-diff";
 export { useSaveAssetRevisionMutation } from "./revision.mutation";
 export type {
   AudioAssetKind,
