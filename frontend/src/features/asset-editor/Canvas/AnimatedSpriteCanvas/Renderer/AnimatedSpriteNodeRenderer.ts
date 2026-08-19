@@ -1,5 +1,6 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { CharacterAnimation, CharacterSpriteSheet } from "@/model";
+import type { AnimatedSpriteCanvasReview } from "../AnimatedSpriteCanvas.interface";
 import { getAnimatedSpritePixelScale } from "../animated-sprite-scale";
 import { getGridRowCount } from "../grid-row-count";
 import {
@@ -22,6 +23,8 @@ import { drawSpriteSheetFrame } from "./SpriteSheetFrameRenderer";
 import type { SpriteSheetFrameTextureCache } from "./SpriteSheetFrameTextureCache";
 
 const COLLAPSED_PREVIEW_Y = 80;
+const REVIEW_FRAME_SIZE = 52;
+const REVIEW_FRAME_GAP = 8;
 
 export function drawAnimatedSpriteNode({
   node,
@@ -35,6 +38,7 @@ export function drawAnimatedSpriteNode({
   animations,
   prototype,
   unavailableTextureUrls,
+  review,
 }: {
   node: NodeId;
   frameTextures: SpriteSheetFrameTextureCache;
@@ -47,7 +51,19 @@ export function drawAnimatedSpriteNode({
   animations: CharacterAnimation[];
   prototype: CharacterSpriteSheet;
   unavailableTextureUrls?: ReadonlySet<string>;
+  review?: AnimatedSpriteCanvasReview;
 }) {
+  if (review?.kind === "comparison" && review.nodeId === node) {
+    return drawComparisonReviewNode({
+      node,
+      frameTextures,
+      position,
+      animations,
+      prototype,
+      unavailableTextureUrls,
+      review,
+    });
+  }
   const container = new Container({ x: position.x, y: position.y });
   const layout = getAnimatedSpriteNodeLayout(
     node,
@@ -55,6 +71,7 @@ export function drawAnimatedSpriteNode({
     expanded,
     prototype,
     animations,
+    review,
   );
   const animation = getAnimatedSpriteAnimation(node, animations);
   drawLabel(
@@ -145,7 +162,220 @@ export function drawAnimatedSpriteNode({
       false,
     );
   }
+  if (review?.nodeId === node) {
+    const apply = layout.reviewApplyControl!;
+    const deny = layout.reviewDenyControl!;
+    drawControl(
+      container,
+      apply.x,
+      apply.y,
+      apply.width,
+      apply.height,
+      "Apply",
+      "v",
+      !layout.reviewEnabled,
+      "accent",
+    );
+    drawControl(
+      container,
+      deny.x,
+      deny.y,
+      deny.width,
+      deny.height,
+      "Deny",
+      "x",
+      !layout.reviewEnabled,
+    );
+  }
   return container;
+}
+
+function drawComparisonReviewNode({
+  node,
+  frameTextures,
+  position,
+  animations,
+  prototype,
+  unavailableTextureUrls,
+  review,
+}: {
+  node: NodeId;
+  frameTextures: SpriteSheetFrameTextureCache;
+  position: CanvasPosition;
+  animations: CharacterAnimation[];
+  prototype: CharacterSpriteSheet;
+  unavailableTextureUrls?: ReadonlySet<string>;
+  review: Extract<AnimatedSpriteCanvasReview, { kind: "comparison" }>;
+}) {
+  const container = new Container({ x: position.x, y: position.y });
+  const layout = getAnimatedSpriteNodeLayout(
+    node,
+    { x: 0, y: 0 },
+    false,
+    prototype,
+    animations,
+    review,
+  );
+  container.addChild(
+    new Graphics()
+      .roundRect(0, 0, layout.bounds.width, layout.bounds.height, 8)
+      .fill({ color: 0xffffff, alpha: 0.28 })
+      .stroke({ color: STAGE_ACCENT, alpha: 0.75, width: 2 }),
+  );
+  container.addChild(
+    new Graphics()
+      .moveTo(layout.bounds.width / 2, 44)
+      .lineTo(layout.bounds.width / 2, layout.bounds.height - 56)
+      .stroke({ color: 0x000000, alpha: 0.1, width: 1 }),
+  );
+
+  const currentAnimation = getAnimatedSpriteAnimation(node, animations);
+  const currentSheet =
+    node === "prototype" ? prototype : currentAnimation?.spriteSheet;
+  const candidateSheet =
+    node === "prototype"
+      ? review.candidatePrototype
+      : review.candidateAnimation?.spriteSheet;
+  const columnWidth = layout.bounds.width / 2;
+  drawReviewVersion(
+    container,
+    frameTextures,
+    currentSheet,
+    "Current",
+    0,
+    columnWidth,
+    unavailableTextureUrls,
+    node === "prototype",
+  );
+  drawReviewVersion(
+    container,
+    frameTextures,
+    candidateSheet,
+    "Generated",
+    columnWidth,
+    columnWidth,
+    unavailableTextureUrls,
+    node === "prototype",
+  );
+
+  const apply = layout.reviewApplyControl!;
+  const deny = layout.reviewDenyControl!;
+  drawControl(
+    container,
+    apply.x,
+    apply.y,
+    apply.width,
+    apply.height,
+    "Apply",
+    "v",
+    !layout.reviewEnabled,
+    "accent",
+  );
+  drawControl(
+    container,
+    deny.x,
+    deny.y,
+    deny.width,
+    deny.height,
+    "Deny",
+    "x",
+    !layout.reviewEnabled,
+  );
+  return container;
+}
+
+function drawReviewVersion(
+  container: Container,
+  frameTextures: SpriteSheetFrameTextureCache,
+  spriteSheet: CharacterSpriteSheet | undefined,
+  label: string,
+  x: number,
+  width: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
+  showAllFrames = false,
+) {
+  const labelText = new Text({
+    text: label,
+    style: {
+      fill: 0x51493f,
+      fontFamily: "ui-monospace, monospace",
+      fontSize: 11,
+      fontWeight: "600",
+    },
+  });
+  labelText.position.set(x + width / 2 - labelText.width / 2, 18);
+  container.addChild(labelText);
+  if (!spriteSheet) return;
+
+  const preview = new Container({ x, y: 18 });
+  if (showAllFrames && getSpriteSheetFrameCount(spriteSheet) > 1) {
+    drawReviewSpriteSheetPreview(
+      preview,
+      frameTextures,
+      spriteSheet,
+      width,
+      unavailableTextureUrls,
+    );
+  } else if (
+    isSpriteSheetFrameAvailable(spriteSheet, 0, unavailableTextureUrls)
+  ) {
+    drawSpriteSheetFrame({
+      container: preview,
+      frameTextures,
+      spriteSheet,
+      frame: 0,
+      bounds: {
+        x: (width - FRAME_SIZE) / 2,
+        y: COLLAPSED_PREVIEW_Y,
+        width: FRAME_SIZE,
+        height: FRAME_SIZE,
+      },
+      pixelScale: getAnimatedSpritePixelScale(spriteSheet, FRAME_SIZE),
+    });
+  }
+  container.addChild(preview);
+}
+
+function drawReviewSpriteSheetPreview(
+  container: Container,
+  frameTextures: SpriteSheetFrameTextureCache,
+  spriteSheet: CharacterSpriteSheet,
+  containerWidth: number,
+  unavailableTextureUrls?: ReadonlySet<string>,
+) {
+  const frameCount = getSpriteSheetFrameCount(spriteSheet);
+  const columns = frameCount === 1 ? 1 : 2;
+  const rows = getGridRowCount(frameCount, columns);
+  const width = columns * REVIEW_FRAME_SIZE + (columns - 1) * REVIEW_FRAME_GAP;
+  const height = rows * REVIEW_FRAME_SIZE + (rows - 1) * REVIEW_FRAME_GAP;
+  const startX = (containerWidth - width) / 2;
+  const startY = 36 + (232 - height) / 2;
+  const pixelScale = getAnimatedSpritePixelScale(
+    spriteSheet,
+    REVIEW_FRAME_SIZE,
+  );
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    if (
+      !isSpriteSheetFrameAvailable(spriteSheet, frame, unavailableTextureUrls)
+    )
+      continue;
+    drawSpriteSheetFrame({
+      container,
+      frameTextures,
+      spriteSheet,
+      frame,
+      bounds: {
+        x: startX + (frame % columns) * (REVIEW_FRAME_SIZE + REVIEW_FRAME_GAP),
+        y:
+          startY +
+          Math.floor(frame / columns) * (REVIEW_FRAME_SIZE + REVIEW_FRAME_GAP),
+        width: REVIEW_FRAME_SIZE,
+        height: REVIEW_FRAME_SIZE,
+      },
+      pixelScale,
+    });
+  }
 }
 
 function hasAvailablePrototypeFrame(
@@ -291,17 +521,25 @@ function drawControl(
   label: string,
   icon: string,
   disabled: boolean,
+  tone: "default" | "accent" = "default",
 ) {
   container.addChild(
     new Graphics()
       .roundRect(x, y, width, height, 5)
-      .fill({ color: 0xffffff, alpha: 0.4 })
-      .stroke({ color: 0x000000, alpha: 0.1, width: 1 }),
+      .fill({
+        color: tone === "accent" ? STAGE_ACCENT : 0xffffff,
+        alpha: tone === "accent" ? 0.14 : 0.4,
+      })
+      .stroke({
+        color: tone === "accent" ? STAGE_ACCENT : 0x000000,
+        alpha: tone === "accent" ? 0.5 : 0.1,
+        width: 1,
+      }),
   );
   const text = new Text({
     text: `${icon}  ${label}`,
     style: {
-      fill: 0x51493f,
+      fill: tone === "accent" ? STAGE_ACCENT : 0x51493f,
       fontFamily: "ui-sans-serif, sans-serif",
       fontSize: 11,
       fontWeight: "500",

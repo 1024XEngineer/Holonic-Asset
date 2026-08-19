@@ -19,6 +19,7 @@ export {
 export type { DirectionCountForPerspective } from "./perspective-direction";
 export {
   assetMetadataUpdateSchema,
+  type AnimationGenerationConfig,
   type AssetAnimation,
   type AssetMetadataUpdate,
   type AssetPreviewCrop,

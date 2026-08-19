@@ -16,12 +16,17 @@ export function findSettledGenerationRunIds(
   previous: GenerationRun[],
   current: GenerationRun[],
 ) {
-  const currentActiveIds = new Set(
-    current.filter(isGenerationRunActive).map((run) => run.id),
+  const currentUnsettledIds = new Set(
+    current
+      .filter(
+        (run) =>
+          isGenerationRunActive(run) || run.status === "awaiting_application",
+      )
+      .map((run) => run.id),
   );
 
   return previous
     .filter(isGenerationRunActive)
     .map((run) => run.id)
-    .filter((runId) => !currentActiveIds.has(runId));
+    .filter((runId) => !currentUnsettledIds.has(runId));
 }

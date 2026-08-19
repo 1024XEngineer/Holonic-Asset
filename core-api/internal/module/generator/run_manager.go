@@ -23,6 +23,7 @@ type RunManager interface {
 	List(ctx context.Context, query *RunListQuery) (*RunListPage, error)
 	Get(ctx context.Context, runID RunID) (*Run, error)
 	Cancel(ctx context.Context, runID RunID) error
+	ResolveApplication(ctx context.Context, runID RunID, applied bool) error
 }
 
 func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
@@ -44,11 +45,15 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 		return 0, err
 	}
 
-	taskID, err := e.tasks.Publish(ctx, &taskdomain.Task{
+	task := &taskdomain.Task{
 		Type:    string(request.Kind),
 		Status:  taskdomain.StatusPending,
 		Payload: payload,
-	})
+	}
+	if request.Kind.AwaitsApplication() {
+		task.CompletionStatus = taskdomain.StatusAwaitingApplication
+	}
+	taskID, err := e.tasks.Publish(ctx, task)
 	return RunID(taskID), err
 }
 
@@ -456,4 +461,29 @@ func (e *Engine) Cancel(ctx context.Context, runID RunID) error {
 		return ErrTaskManagerRequired
 	}
 	return e.tasks.Cancel(ctx, uint(runID))
+}
+
+func (e *Engine) ResolveApplication(ctx context.Context, runID RunID, applied bool) error {
+	if e.tasks == nil {
+		return ErrTaskManagerRequired
+	}
+	message, err := e.tasks.GetDetail(ctx, uint(runID))
+	if err != nil {
+		return err
+	}
+	if message.Status != taskdomain.StatusAwaitingApplication {
+		return fmt.Errorf("generator: run %d is not awaiting application", runID)
+	}
+	if !applied && e.references != nil {
+		result := ExecutionResult{}
+		if err := json.Unmarshal(message.Result, &result); err != nil {
+			return fmt.Errorf("generator: decode run %d result for discard: %w", runID, err)
+		}
+		if len(result.GeneratedResources) > 0 {
+			if err := e.references.DeleteObjects(ctx, result.GeneratedResources); err != nil {
+				return fmt.Errorf("generator: discard run %d resources: %w", runID, err)
+			}
+		}
+	}
+	return e.tasks.Complete(ctx, uint(runID))
 }

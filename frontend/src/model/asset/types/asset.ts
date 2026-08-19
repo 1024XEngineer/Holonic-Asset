@@ -13,12 +13,27 @@ export type CharacterSpriteSheet = {
   row?: number;
 };
 
+export type AnimationGenerationConfig = {
+  direction: string;
+  style?: string;
+  action?: string;
+  frameCount: number;
+  columns: number;
+  frameWidth: number;
+  frameHeight: number;
+  fps: number;
+  resolution: string;
+  duration: number;
+  aspectRatio: string;
+};
+
 export type CharacterAnimationClip = {
   kind: "clip";
   id: string;
   label: string;
   frameCount: number;
   spriteSheet?: CharacterSpriteSheet;
+  generation?: AnimationGenerationConfig;
   audio?: { label: string; time: string };
 };
 export type CharacterAnimation = CharacterAnimationClip;

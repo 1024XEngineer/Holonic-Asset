@@ -106,6 +106,7 @@ export function hasAnimatedSpriteCanvasModelChanged(
     previous.prototype !== next.prototype ||
     previous.animations !== next.animations ||
     previous.nodePositions !== next.nodePositions ||
-    previous.selection !== next.selection
+    previous.selection !== next.selection ||
+    previous.review !== next.review
   );
 }

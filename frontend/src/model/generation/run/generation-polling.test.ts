@@ -12,6 +12,9 @@ describe("generation polling", () => {
   it("polls while pending or processing runs exist", () => {
     expect(isGenerationRunActive(run("pending", "pending"))).toBe(true);
     expect(isGenerationRunActive(run("processing", "processing"))).toBe(true);
+    expect(isGenerationRunActive(run("ready", "awaiting_application"))).toBe(
+      false,
+    );
     expect(isGenerationRunActive(run("failed", "failed"))).toBe(false);
     expect(generationPollingInterval(undefined)).toBe(false);
     expect(generationPollingInterval([run("failed", "failed")])).toBe(false);
@@ -27,6 +30,13 @@ describe("generation polling", () => {
         [run("two", "processing"), run("three", "pending")],
       ),
     ).toEqual(["one"]);
+
+    expect(
+      findSettledGenerationRunIds(
+        [run("ready", "processing")],
+        [run("ready", "awaiting_application")],
+      ),
+    ).toEqual([]);
   });
 });
 

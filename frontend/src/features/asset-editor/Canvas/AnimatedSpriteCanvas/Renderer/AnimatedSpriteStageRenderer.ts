@@ -55,6 +55,7 @@ export class AnimatedSpriteStageRenderer {
           animations: model.animations,
           prototype: model.prototype,
           unavailableTextureUrls: model.unavailableTextureUrls,
+          review: model.review,
         }),
       );
     }
@@ -122,6 +123,13 @@ function getActiveSpriteSheets(model: AnimatedSpriteCanvasModel) {
     ...model.animations.flatMap((animation) =>
       animation.spriteSheet ? [animation.spriteSheet] : [],
     ),
+    ...(model.review?.kind === "comparison" && model.review.candidatePrototype
+      ? [model.review.candidatePrototype]
+      : []),
+    ...(model.review?.kind === "comparison" &&
+    model.review.candidateAnimation?.spriteSheet
+      ? [model.review.candidateAnimation.spriteSheet]
+      : []),
   ];
 }
 

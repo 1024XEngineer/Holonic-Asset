@@ -31,8 +31,6 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		t.Fatal(err)
 	}
 	parent.Content = encoded
-	updated := parent
-	updated.Version = 9
 	events := []string{}
 	resultFrames := make([]imageprocessor.ImageRegion, 5)
 	rawFrames := make([]imageprocessor.ImageRegion, 5)
@@ -44,11 +42,7 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		events: &events,
 		result: &generator.AnimationGenerationResult{Frames: resultFrames, RawFrames: rawFrames, FrameDurationMS: 111},
 	}
-	assets := &generationAssetWriterStub{
-		events:       &events,
-		parentAsset:  parent,
-		detailResult: &updated,
-	}
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 	references := editFrameReferenceStore(t, 12)
 	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
 		Animations: animations,
@@ -95,10 +89,15 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		animations.request.OriginalAction != "raise the hat in greeting" {
 		t.Fatalf("unexpected edit prompt or original action: %+v", animations.request)
 	}
-	if assets.updateCalls != 1 || assets.updatedAnimationID != 42 || len(assets.frames) != 12 {
-		t.Fatalf("unexpected updated animation: calls=%d id=%d frames=%d", assets.updateCalls, assets.updatedAnimationID, len(assets.frames))
+	application, candidate := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if candidate.Prototype != nil || len(candidate.Animations) != 1 || candidate.Animations[0].ID != 42 {
+		t.Fatalf("edit frames result must contain only the target animation: %+v", candidate)
 	}
-	for index, frame := range assets.frames {
+	frames := candidate.Animations[0].Frames
+	if len(frames) != 12 {
+		t.Fatalf("edit frames candidate has %d frames, want 12", len(frames))
+	}
+	for index, frame := range frames {
 		if frame.URL == nil {
 			t.Fatalf("frame %d has no URL", index+1)
 		}
@@ -125,7 +124,10 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 		references.uploads[1].reference != "data:image/png;base64,raw-3" {
 		t.Fatalf("unexpected raw persistence: %+v", references.uploads)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, AnimationID: 42, Version: 9})
+	if application.AssetID != 7 || application.AnimationID != 42 || application.Version != 3 ||
+		len(application.GeneratedResources) != 2 {
+		t.Fatalf("unexpected edit frames application candidate: %+v", application)
+	}
 }
 
 func TestExecutorEditFramesClampsBoundaryReferences(t *testing.T) {
@@ -220,9 +222,6 @@ func TestExecutorEditFramesRejectsMissingRawOutput(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "edited raw frame result contains 0 frames") {
 		t.Fatalf("expected missing raw frame error, got %v", err)
 	}
-	if assets.updateCalls != 0 {
-		t.Fatalf("asset updated without raw frames: %d", assets.updateCalls)
-	}
 }
 
 func TestExecutorEditFramesSupportsSingleFrameAndValidatesSelection(t *testing.T) {
@@ -249,8 +248,8 @@ func TestExecutorEditFramesSupportsSingleFrameAndValidatesSelection(t *testing.T
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
-			if animations.request != nil || assets.updateCalls != 0 {
-				t.Fatalf("invalid selection started generation or update: request=%+v updates=%d", animations.request, assets.updateCalls)
+			if animations.request != nil {
+				t.Fatalf("invalid selection started generation: request=%+v", animations.request)
 			}
 		})
 	}
@@ -318,8 +317,8 @@ func TestExecutorEditFramesRequiresGenerationConfiguration(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "has no generation configuration for frame editing") {
 		t.Fatalf("expected missing generation configuration error, got %v", err)
 	}
-	if animations.request != nil || assets.updateCalls != 0 {
-		t.Fatalf("missing generation configuration started edit: request=%+v updates=%d", animations.request, assets.updateCalls)
+	if animations.request != nil {
+		t.Fatalf("missing generation configuration started edit: request=%+v", animations.request)
 	}
 }
 
@@ -359,9 +358,6 @@ func TestExecutorEditFramesValidatesContextAndAssetErrors(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
-			if assetStub.updateCalls != 0 {
-				t.Fatalf("invalid edit updated animation: %d", assetStub.updateCalls)
-			}
 		})
 	}
 }
@@ -373,7 +369,6 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 		result     *generator.AnimationGenerationResult
 		generation error
 		store      *executorReferenceStoreStub
-		updateErr  error
 		want       string
 	}{
 		{name: "generation error", generation: errors.New("provider failed"), want: "generate edited frames"},
@@ -383,13 +378,12 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 		{name: "wrong raw count", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(2, "raw")}, want: "edited raw frame result contains 2"},
 		{name: "processed persist error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistErr: errors.New("processed upload failed")}, want: "persist edited animation frame"},
 		{name: "invalid processed key", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw")}, store: &executorReferenceStoreStub{persistValue: "data:image/png;base64,bad"}, want: "non-object-key"},
-		{name: "update error", result: &generator.AnimationGenerationResult{Frames: makeImageRegions(3, "edited"), RawFrames: makeImageRegions(3, "raw"), FrameDurationMS: 80}, store: editFrameReferenceStore(t, 3), updateErr: errors.New("update failed")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			events := []string{}
 			animations := &animationGenerationServiceStub{events: &events, result: test.result, err: test.generation}
-			assets := &generationAssetWriterStub{events: &events, parentAsset: parent, updateAnimationErr: test.updateErr}
+			assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
 			store := test.store
 			if store == nil {
 				store = editFrameReferenceStore(t, 3)
@@ -400,9 +394,6 @@ func TestExecutorEditFramesHandlesGenerationAndPersistenceErrors(t *testing.T) {
 			_, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[2],"prompt":"change pose"}`))
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
-			}
-			if test.name != "update error" && assets.updateCalls != 0 {
-				t.Fatalf("failed edit updated animation: %d", assets.updateCalls)
 			}
 			if test.name == "continuity gate error" && (len(store.persisted) != 0 || len(store.uploads) != 0) {
 				t.Fatalf("continuity-rejected edit persisted frames: processed=%d raw=%d", len(store.persisted), len(store.uploads))
@@ -419,11 +410,14 @@ func TestExecutorEditFramesPreservesOriginalDurationWhenGeneratedDurationIsZero(
 		Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited"}}, RawFrames: []imageprocessor.ImageRegion{{ImageBase64: "raw"}},
 	}}
 	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{Animations: animations, References: editFrameReferenceStore(t, 1)})
-	if _, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`)); err != nil {
+	result, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[1],"prompt":"change pose"}`))
+	if err != nil {
 		t.Fatalf("edit frame: %v", err)
 	}
-	if assets.frames[0].Duration != 10 {
-		t.Fatalf("generated zero duration did not preserve original duration: %+v", assets.frames[0])
+	_, candidate := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if len(candidate.Animations) != 1 || len(candidate.Animations[0].Frames) != 1 ||
+		candidate.Animations[0].Frames[0].Duration != 10 {
+		t.Fatalf("generated zero duration did not preserve original duration: %+v", candidate.Animations)
 	}
 }
 

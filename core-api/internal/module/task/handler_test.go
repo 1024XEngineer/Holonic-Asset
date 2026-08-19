@@ -48,6 +48,26 @@ func TestManagerExecutionPersistsSuccessfulHandlerResult(t *testing.T) {
 	}
 }
 
+func TestManagerExecutionCanWaitForApplication(t *testing.T) {
+	store := &taskStoreStub{}
+	queue := &queue{registry: newRegistry(), repo: store}
+	queue.Register("candidate.v1", HandlerFunc(func(context.Context, *Task) (any, error) {
+		return map[string]any{"candidate": true}, nil
+	}))
+	message := &Task{
+		ID:               8,
+		Type:             "candidate.v1",
+		CompletionStatus: StatusAwaitingApplication,
+	}
+
+	if err := queue.dispatch(context.Background(), message); err != nil {
+		t.Fatalf("dispatch candidate task: %v", err)
+	}
+	if store.resultStatus != StatusAwaitingApplication || message.Status != StatusAwaitingApplication {
+		t.Fatalf("candidate did not wait for application: persisted=%s message=%s", store.resultStatus, message.Status)
+	}
+}
+
 func TestManagerExecutionDoesNotInvokeHandlerWhenProcessingTransitionFails(t *testing.T) {
 	statusErr := errors.New("database unavailable")
 	store := &taskStoreStub{statusErr: statusErr}

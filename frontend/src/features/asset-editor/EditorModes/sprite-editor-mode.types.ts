@@ -6,12 +6,18 @@ import type {
   GenerateAnimationRequest,
   Perspective,
 } from "@/model";
-
+import type { AnimatedSpriteCanvasReview } from "../Canvas/AnimatedSpriteCanvas";
 import type { EditorHeaderProps } from "../Header/editor-header";
 import type { InspectorSubmitRequest } from "../Inspector/inspector.types";
 
+export type SpriteGenerationReview = AnimatedSpriteCanvasReview & {
+  onApply: () => void;
+  onDeny: () => void;
+};
+
 export type SpriteEditorModeProps = {
   header: EditorHeaderProps;
+  generationReview?: SpriteGenerationReview;
   sprite: {
     perspective: Perspective;
     prototype: CharacterSpriteSheet;

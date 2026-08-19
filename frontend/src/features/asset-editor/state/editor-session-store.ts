@@ -24,6 +24,7 @@ type EditorSessionState = {
   ) => void;
   renameSpriteAnimation: (animationId: string, label: string) => void;
   deleteSpriteAnimation: (animationId: string) => void;
+  applyCandidateRecord: (record: AssetRecord) => void;
 };
 
 const SPRITE_RECORD_REQUIRED_MESSAGE =
@@ -115,6 +116,11 @@ export function createEditorSessionStore(initialRecord: AssetRecord) {
                 nodePositions,
               })),
             };
+          }),
+        applyCandidateRecord: (candidateRecord) =>
+          set((state) => {
+            if (deepEqual(state.record, candidateRecord)) return state;
+            return { record: structuredClone(candidateRecord) };
           }),
       }),
       {
@@ -244,6 +250,9 @@ export function dispatchEditorCommand(
       return;
     case "sprite.animation.delete":
       store.getState().deleteSpriteAnimation(command.animationId);
+      return;
+    case "record.candidate.apply":
+      store.getState().applyCandidateRecord(command.record);
       return;
     case "history.undo":
       store.temporal.getState().undo();

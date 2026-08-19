@@ -22,7 +22,7 @@ export type {
   AssetWorkspaceDataForKind,
 } from "./asset-workspace";
 export type {
-  AssetRecordApi,
+  AssetWorkspaceApi,
   AssetRecordSaveResult,
   GetAssetRecordInput,
   SaveAssetRecordInput,

@@ -80,6 +80,7 @@
   "status": {
     "pending": "Pending",
     "processing": "Processing",
+    "awaiting_application": "Ready to apply",
     "failed": "Failed"
   },
   "pageTitle": "Create {{kind}}",

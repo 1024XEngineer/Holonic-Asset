@@ -22,8 +22,9 @@ type OutboxStore interface {
 // TaskExecutionStore persists status transitions owned by queue execution.
 type TaskExecutionStore interface {
 	UpdateTaskStatus(ctx context.Context, taskID uint, status Status) error
-	UpdateTaskResult(ctx context.Context, taskID uint, result json.RawMessage) error
+	UpdateTaskResult(ctx context.Context, taskID uint, status Status, result json.RawMessage) error
 	UpdateTaskFailure(ctx context.Context, taskID uint, errorMessage string) error
+	CompleteTask(ctx context.Context, taskID uint) error
 }
 
 // TaskStore provides task persistence and transactional outbox creation.

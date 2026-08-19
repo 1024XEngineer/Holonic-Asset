@@ -32,8 +32,8 @@ type Animation struct {
 }
 
 // AnimationGenerationConfig stores the effective parameters used to generate
-// an animation. It is persisted with asset content for future regeneration,
-// but transport handlers remove it from asset responses.
+// an animation. It is persisted with asset content and exposed through asset
+// responses so clients can round-trip the complete content.
 type AnimationGenerationConfig struct {
 	Direction string `json:"direction"`
 	Style     string `json:"style,omitempty"`

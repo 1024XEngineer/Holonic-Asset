@@ -9,6 +9,7 @@ export {
   createAssetLibraryCollection,
   getDefaultAssetCanvasSize,
   recordQueryOptions,
+  toCoreSpriteCandidateRecord,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -22,6 +23,7 @@ export {
 } from "./asset";
 export type {
   AddAudioTrackInput,
+  AnimationGenerationConfig,
   AssetAnimation,
   AssetPreviewCrop,
   AssetPreviewFrame,
@@ -36,7 +38,7 @@ export type {
   AssetCanvasPosition,
   AssetDirection,
   AssetRecord,
-  AssetRecordApi,
+  AssetWorkspaceApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
   AssetWorkspaceAsset,
@@ -79,6 +81,8 @@ export type {
   AssetContent,
   AssetContentByType,
   AssetContentMetadata,
+  CoreSpriteAssetContent,
+  CoreSpriteAssetContentPatch,
   AssetDetailResponse,
   AssetDimensions,
   AssetDimensionsByType,
@@ -114,11 +118,14 @@ export type {
 } from "./asset/library/asset.contract";
 export {
   generationKeys,
+  rememberGenerationRunMetadata,
   useDeleteQuickAssetMutation,
   useEnqueueGenerationMutation,
   useGenerateAnimationMutation,
   useGenerateQuickAssetMutation,
+  useGenerationCandidateQuery,
   useGenerationRunsQuery,
+  useResolveGenerationApplicationMutation,
   useQuickAssetsQuery,
 } from "./generation";
 export type {

@@ -12,6 +12,7 @@ type taskStoreStub struct {
 	statusUpdates []Status
 	statusErr     error
 	result        json.RawMessage
+	resultStatus  Status
 	resultCalls   int
 	failure       string
 	failureCalls  int
@@ -38,10 +39,17 @@ func (s *taskStoreStub) UpdateTaskStatus(_ context.Context, _ uint, status Statu
 	return s.statusErr
 }
 
-func (s *taskStoreStub) UpdateTaskResult(_ context.Context, _ uint, result json.RawMessage) error {
+func (s *taskStoreStub) UpdateTaskResult(_ context.Context, _ uint, status Status, result json.RawMessage) error {
+	s.resultStatus = status
 	s.result = result
 	s.resultCalls++
 	return nil
+}
+
+func (s *taskStoreStub) CompleteTask(_ context.Context, _ uint) error {
+	s.status = StatusCompleted
+	s.statusUpdates = append(s.statusUpdates, StatusCompleted)
+	return s.statusErr
 }
 
 func (s *taskStoreStub) UpdateTaskFailure(_ context.Context, _ uint, errorMessage string) error {
@@ -95,6 +103,13 @@ func TestManagerDelegatesTaskOperations(t *testing.T) {
 	}
 	if store.status != StatusCancelled {
 		t.Fatalf("unexpected task status: %s", store.status)
+	}
+
+	if err := manager.Complete(context.Background(), id); err != nil {
+		t.Fatalf("complete task: %v", err)
+	}
+	if store.status != StatusCompleted {
+		t.Fatalf("unexpected completed task status: %s", store.status)
 	}
 }
 

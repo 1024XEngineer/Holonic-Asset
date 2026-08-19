@@ -6,5 +6,6 @@ export type { CanvasPosition } from "./AnimatedSpriteCanvas.constants";
 export type {
   AnimatedSpriteCanvasEvent,
   AnimatedSpriteCanvasModel,
+  AnimatedSpriteCanvasReview,
   AnimatedSpriteCanvasSelection,
 } from "./AnimatedSpriteCanvas.interface";

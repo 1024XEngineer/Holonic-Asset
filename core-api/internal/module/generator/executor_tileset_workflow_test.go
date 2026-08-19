@@ -67,7 +67,8 @@ func TestTileSetWorkflowGeneratesEditsTileAndEditsCompleteItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("edit one Tile workflow: %v", err)
 	}
-	assertTileSetWorkflowResult(t, editedTile, 100, 2)
+	assertTileSetWorkflowResult(t, editedTile, 100, 1)
+	applyTileSetWorkflowCandidate(t, assets, editedTile)
 	afterTileEdit := tileSetWorkflowURLs(assets.content)
 	if changed := changedTileSetWorkflowURLs(beforeTileEdit, afterTileEdit); len(changed) != 1 || changed[0] != "0.1" {
 		t.Fatalf("single-Tile edit changed unexpected URLs: %v", changed)
@@ -87,7 +88,8 @@ func TestTileSetWorkflowGeneratesEditsTileAndEditsCompleteItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("edit complete Item workflow: %v", err)
 	}
-	assertTileSetWorkflowResult(t, editedItem, 100, 3)
+	assertTileSetWorkflowResult(t, editedItem, 100, 2)
+	applyTileSetWorkflowCandidate(t, assets, editedItem)
 	afterItemEdit := tileSetWorkflowURLs(assets.content)
 	changed := changedTileSetWorkflowURLs(beforeItemEdit, afterItemEdit)
 	if len(changed) != 4 {
@@ -98,13 +100,10 @@ func TestTileSetWorkflowGeneratesEditsTileAndEditsCompleteItem(t *testing.T) {
 			t.Fatalf("complete Item edit changed non-target Item URL %q", path)
 		}
 	}
-	if len(assets.records) != 2 || assets.records[0].Version != 2 || assets.records[1].Version != 3 {
-		t.Fatalf("unexpected revision history: %+v", assets.records)
-	}
 }
 
-func TestTileSetEditRevisionFailureDeletesOnlyNewObjects(t *testing.T) {
-	assets := &tileSetWorkflowAssets{reviseErr: fmt.Errorf("revision unavailable")}
+func TestTileSetEditReturnsCandidateWithoutMutatingPersistedState(t *testing.T) {
+	assets := &tileSetWorkflowAssets{}
 	existing := "uploads/existing.png"
 	content := assetdomain.AssetContent{Items: []assetdomain.TileSetItem{{
 		Name:  "Pot",
@@ -149,18 +148,22 @@ func TestTileSetEditRevisionFailureDeletesOnlyNewObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = executor.Generate(context.Background(), EditTiles, payload)
-	if err == nil || !strings.Contains(err.Error(), "revision unavailable") {
-		t.Fatalf("expected revision failure, got %v", err)
+	result, err := executor.Generate(context.Background(), EditTiles, payload)
+	if err != nil {
+		t.Fatalf("generate Tileset edit candidate: %v", err)
 	}
 	if _, retained := references.objects[existing]; !retained {
 		t.Fatal("revision cleanup deleted the historical Tile object")
 	}
-	if len(references.deleted) != 1 || references.deleted[0] == existing {
-		t.Fatalf("unexpected revision cleanup keys: %v", references.deleted)
+	if len(references.deleted) != 0 {
+		t.Fatalf("candidate resources must remain until apply or discard: %v", references.deleted)
 	}
 	if assets.asset.Version != 1 || *assets.content.Items[0].Tiles[0].URL != existing {
-		t.Fatalf("failed revision mutated persisted state: asset=%+v content=%+v", assets.asset, assets.content)
+		t.Fatalf("candidate generation mutated persisted state: asset=%+v content=%+v", assets.asset, assets.content)
+	}
+	var application ExecutionResult
+	if err := json.Unmarshal(result, &application); err != nil || application.Version != 1 || len(application.GeneratedResources) != 1 {
+		t.Fatalf("unexpected Tileset application candidate: result=%+v err=%v", application, err)
 	}
 }
 
@@ -314,10 +317,8 @@ func (s *tileSetWorkflowReferences) DeleteObjects(_ context.Context, keys []stri
 }
 
 type tileSetWorkflowAssets struct {
-	asset     assetdomain.Asset
-	content   assetdomain.AssetContent
-	records   []assetdomain.AssetRecord
-	reviseErr error
+	asset   assetdomain.Asset
+	content assetdomain.AssetContent
 }
 
 func (s *tileSetWorkflowAssets) GetDetail(_ context.Context, id uint) (assetdomain.Asset, error) {
@@ -351,37 +352,6 @@ func (s *tileSetWorkflowAssets) CreateTileSetAsset(_ context.Context, value *ass
 	return s.asset.ID, nil
 }
 
-func (*tileSetWorkflowAssets) CreateAnimation(context.Context, uint, assetdomain.Animation) (uint, error) {
-	return 0, fmt.Errorf("unexpected animation creation")
-}
-
-func (*tileSetWorkflowAssets) UpdateAnimationFrames(context.Context, uint, uint, []assetdomain.Frame) error {
-	return fmt.Errorf("unexpected animation update")
-}
-
-func (s *tileSetWorkflowAssets) CreateRecord(
-	_ context.Context,
-	record *assetdomain.AssetRecord,
-	expectedVersion uint,
-) (*assetdomain.AssetRecord, error) {
-	if s.reviseErr != nil {
-		return nil, s.reviseErr
-	}
-	if expectedVersion != s.asset.Version {
-		return nil, fmt.Errorf("version conflict: expected %d current %d", expectedVersion, s.asset.Version)
-	}
-	content, err := (assetdomain.Asset{Type: assetdomain.AssetTypeTileSet, Content: record.Content}).DecodeContent()
-	if err != nil {
-		return nil, err
-	}
-	s.content = content
-	s.asset.Content = append(json.RawMessage(nil), record.Content...)
-	s.asset.Version++
-	created := assetdomain.AssetRecord{AssetID: s.asset.ID, Version: s.asset.Version, Content: append(json.RawMessage(nil), record.Content...)}
-	s.records = append(s.records, created)
-	return &created, nil
-}
-
 func assertTileSetWorkflowResult(t *testing.T, raw json.RawMessage, assetID uint, version uint) {
 	t.Helper()
 	var result ExecutionResult
@@ -391,6 +361,51 @@ func assertTileSetWorkflowResult(t *testing.T, raw json.RawMessage, assetID uint
 	if result.AssetID != assetID || result.Version != version {
 		t.Fatalf("unexpected Tileset workflow result: %+v", result)
 	}
+}
+
+func applyTileSetWorkflowCandidate(t *testing.T, assets *tileSetWorkflowAssets, raw json.RawMessage) {
+	t.Helper()
+	var result ExecutionResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("decode Tileset application candidate: %v", err)
+	}
+	content, err := (assetdomain.Asset{Type: assetdomain.AssetTypeTileSet, Content: result.Content}).DecodeContent()
+	if err != nil {
+		t.Fatalf("decode Tileset candidate content: %v", err)
+	}
+	for _, candidate := range content.Items {
+		index := -1
+		for itemIndex := range assets.content.Items {
+			if assets.content.Items[itemIndex].Name == candidate.Name {
+				index = itemIndex
+				break
+			}
+		}
+		if index >= 0 {
+			for _, candidateTile := range candidate.Tiles {
+				tileIndex := -1
+				for currentIndex, currentTile := range assets.content.Items[index].Tiles {
+					if currentTile.Position == candidateTile.Position {
+						tileIndex = currentIndex
+						break
+					}
+				}
+				if tileIndex >= 0 {
+					assets.content.Items[index].Tiles[tileIndex] = candidateTile
+				} else {
+					assets.content.Items[index].Tiles = append(assets.content.Items[index].Tiles, candidateTile)
+				}
+			}
+		} else {
+			assets.content.Items = append(assets.content.Items, candidate)
+		}
+	}
+	encoded, err := assetdomain.EncodeContent(assets.content)
+	if err != nil {
+		t.Fatalf("encode merged Tileset candidate: %v", err)
+	}
+	assets.asset.Content = encoded
+	assets.asset.Version++
 }
 
 func tileSetWorkflowURLs(content assetdomain.AssetContent) map[string]string {

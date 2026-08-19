@@ -29,10 +29,6 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		return nil, fmt.Errorf("generator: edit frames prompt is required")
 	}
 
-	updater, ok := e.assets.(AnimationFrameUpdater)
-	if !ok {
-		return nil, ErrAssetWriterRequired
-	}
 	asset, err := e.assets.GetDetail(ctx, payload.AssetID)
 	if err != nil {
 		return nil, fmt.Errorf("generator: get edit frames asset %d: %w", payload.AssetID, err)
@@ -153,6 +149,7 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 	}
 
 	updated := append([]assetdomain.Frame(nil), animation.Frames...)
+	generatedFrames := make([]assetdomain.Frame, 0, len(indices))
 	for index, frameIndex := range indices {
 		frame := animation.Frames[frameIndex]
 		generatedIndex := targetFrameIndices[index]
@@ -166,16 +163,23 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 			persisted.Duration = frame.Duration
 		}
 		updated[frameIndex] = persisted
+		generatedFrames = append(generatedFrames, persisted)
 	}
 
-	if err := updater.UpdateAnimationFrames(ctx, payload.AssetID, payload.AnimationID, updated); err != nil {
-		return nil, fmt.Errorf("generator: update animation %d frames: %w", payload.AnimationID, err)
-	}
-	updatedAsset, err := e.assets.GetDetail(ctx, payload.AssetID)
+	animation.Frames = updated
+	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{
+		Animations: []assetdomain.Animation{animation},
+	})
 	if err != nil {
-		return nil, fmt.Errorf("generator: get updated edit frames asset %d: %w", payload.AssetID, err)
+		return nil, fmt.Errorf("generator: encode edited frames for animation %d: %w", payload.AnimationID, err)
 	}
-	return encodeExecutionResult(ExecutionResult{AssetID: payload.AssetID, AnimationID: payload.AnimationID, Version: updatedAsset.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            payload.AssetID,
+		AnimationID:        payload.AnimationID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedFrameResourceKeys(generatedFrames),
+	})
 }
 
 func resultFrameCount(result *AnimationGenerationResult) int {

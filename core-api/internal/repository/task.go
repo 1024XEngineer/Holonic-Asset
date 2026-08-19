@@ -75,12 +75,33 @@ func (r *TaskRepositoryImpl) UpdateTaskStatus(ctx context.Context, taskID uint, 
 	return r.TaskDao.UpdateStatus(ctx, taskID, uint(status))
 }
 
-func (r *TaskRepositoryImpl) UpdateTaskResult(ctx context.Context, taskID uint, result json.RawMessage) error {
-	return r.TaskDao.UpdateResult(ctx, taskID, uint(domain.StatusCompleted), datatypes.JSON(result))
+func (r *TaskRepositoryImpl) UpdateTaskResult(
+	ctx context.Context,
+	taskID uint,
+	status domain.Status,
+	result json.RawMessage,
+) error {
+	return r.TaskDao.UpdateResult(ctx, taskID, uint(status), datatypes.JSON(result))
 }
 
 func (r *TaskRepositoryImpl) UpdateTaskFailure(ctx context.Context, taskID uint, errorMessage string) error {
 	return r.TaskDao.UpdateFailure(ctx, taskID, uint(domain.StatusFailed), errorMessage)
+}
+
+func (r *TaskRepositoryImpl) CompleteTask(ctx context.Context, taskID uint) error {
+	updated, err := r.TaskDao.UpdateStatusFrom(
+		ctx,
+		taskID,
+		uint(domain.StatusAwaitingApplication),
+		uint(domain.StatusCompleted),
+	)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return fmt.Errorf("repo: task %d is not awaiting application", taskID)
+	}
+	return nil
 }
 
 func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID uint) (*domain.Task, error) {

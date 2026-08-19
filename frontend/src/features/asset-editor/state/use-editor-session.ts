@@ -89,6 +89,7 @@ export function useEditorSession({
         saveRevision({
           projectId: target.projectId,
           assetId: target.assetId,
+          version: target.version,
           record,
         }).then(() => undefined),
     });

@@ -93,3 +93,8 @@ Production workflows that must atomically persist business state and enqueue a t
 - `task.Manager` is the only task lifecycle and execution entry point exposed to application code.
 - `task.Task` and `task.Handler` define the queue-neutral task contract.
 - `task.TaskStore` is the persistence port implemented by the repository adapter.
+
+A publisher may set `Task.CompletionStatus` to `StatusAwaitingApplication` when
+successful execution produces a result that a caller must explicitly consume.
+The caller completes that task through `Manager.Complete`; the task module
+rejects completion unless the persisted task is awaiting application.

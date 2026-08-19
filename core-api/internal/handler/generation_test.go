@@ -26,6 +26,9 @@ type runManagerStub struct {
 	run           *generator.Run
 	cancelID      generator.RunID
 	cancelErr     error
+	resolveID     generator.RunID
+	resolved      bool
+	resolveErr    error
 }
 
 func (s *runManagerStub) Create(
@@ -68,6 +71,12 @@ func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, 
 func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
 	s.cancelID = runID
 	return s.cancelErr
+}
+
+func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.RunID, applied bool) error {
+	s.resolveID = runID
+	s.resolved = applied
+	return s.resolveErr
 }
 
 func TestCreateMapsTransportRequest(t *testing.T) {
@@ -124,6 +133,52 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		response.Data.Status != "completed" || response.Data.Result == nil ||
 		response.Data.Result.AssetID != assetID || response.Data.Result.Version != 2 {
 		t.Fatalf("unexpected run response: %+v", response)
+	}
+}
+
+func TestGetResolvesGenerationResultContentReferences(t *testing.T) {
+	assetID := uint(3)
+	stub := &runManagerStub{run: &generator.Run{
+		ID:        7,
+		ProjectID: 2,
+		AssetID:   &assetID,
+		Kind:      generator.GenerateAnimation,
+		Status:    taskdomain.StatusAwaitingApplication,
+		Result: json.RawMessage(`{
+			"asset_id":3,
+			"version":2,
+			"content":{"animations":[{"name":"walk","frames":[{"id":1,"url":"uploads/frame.png"}],"generation":{"direction":"front","frameCount":1,"columns":1,"frameWidth":32,"frameHeight":32,"fps":10,"resolution":"720p","duration":1,"aspectRatio":"1:1"}}]}
+		}`),
+	}}
+	resolver := &referenceResolverStub{}
+
+	response, err := handler.NewGenerationHandler(stub, resolver).Get(
+		context.Background(),
+		dto.GetGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil {
+		t.Fatalf("get generation: %v", err)
+	}
+	var content struct {
+		Animations []struct {
+			ID     *uint `json:"id"`
+			Frames []struct {
+				URL string `json:"url"`
+			} `json:"frames"`
+			Generation json.RawMessage `json:"generation"`
+		} `json:"animations"`
+	}
+	if response.Data.Result == nil || json.Unmarshal(response.Data.Result.Content, &content) != nil {
+		t.Fatalf("decode generation result content: %+v", response.Data.Result)
+	}
+	if len(content.Animations) != 1 || content.Animations[0].ID != nil ||
+		len(content.Animations[0].Frames) != 1 ||
+		content.Animations[0].Frames[0].URL != "signed:uploads/frame.png" ||
+		len(content.Animations[0].Generation) == 0 {
+		t.Fatalf("unexpected resolved generation content: %+v", content)
+	}
+	if !reflect.DeepEqual(resolver.calls, []string{"uploads/frame.png"}) {
+		t.Fatalf("unexpected resolver calls: %v", resolver.calls)
 	}
 }
 
@@ -189,5 +244,28 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	)
 	if err != nil || !response.Data.Cancelled || stub.cancelID != 7 {
 		t.Fatalf("unexpected cancel response: %+v, id=%d, err=%v", response, stub.cancelID, err)
+	}
+}
+
+func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
+	stub := &runManagerStub{}
+	err := handler.NewGenerationHandler(stub).ResolveApplication(
+		context.Background(),
+		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
+	)
+	if err != nil || stub.resolveID != 7 || !stub.resolved {
+		t.Fatalf("unexpected application result: stub=%+v, err=%v", stub, err)
+	}
+}
+
+func TestResolveApplicationReturnsManagerError(t *testing.T) {
+	wantErr := errors.New("transition failed")
+	stub := &runManagerStub{resolveErr: wantErr}
+	err := handler.NewGenerationHandler(stub).ResolveApplication(
+		context.Background(),
+		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected manager error, got %v", err)
 	}
 }
