@@ -9,15 +9,6 @@ import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
 describe("AssetCanvasEditorMode", () => {
   it.each([
     [
-      "scenery",
-      {
-        mode: "scenery",
-        prompt: "Forest clearing",
-        scenery: { layers: [] },
-      },
-      "Scenery canvas",
-    ],
-    [
       "tileset",
       {
         mode: "tileset",

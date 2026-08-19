@@ -1,48 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 
-import type {
-  AssetKind,
-  AssetRevision,
-  SceneryCanvasDimensions,
-  AssetWorkspaceData,
-  SceneryLayer,
-  TilesetItem,
-  UISetComponent,
-} from "@/model";
+import type { AssetWorkspaceData, TilesetItem, UISetComponent } from "@/model";
 
-import {
-  SceneryCanvas,
-  useSceneryCanvasStateMachine,
-} from "../Canvas/SceneryCanvas";
 import {
   TilesetCanvas,
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
 import { UISetCanvas } from "../Canvas/UISetCanvas";
-import { AssetTree } from "../AssetTree/asset-tree";
 import {
-  EditorHeader,
-  type EditorGenerationTask,
-} from "../Header/editor-header";
-import { Inspector } from "../Inspector/inspector";
+  EditorModeFrame,
+  type EditorModeFrameProps,
+} from "./editor-mode-frame";
 
 type AssetCanvasEditorModeProps = {
   data: AssetWorkspaceData;
   onBack: () => void;
 };
-
-type CanvasEditorFrameProps = {
-  assetKind: AssetKind;
-  assetName: string;
-  version: string;
-  projectName: string;
-  onBack: () => void;
-  children: React.ReactNode;
-};
-
-const emptyGenerationTasks: EditorGenerationTask[] = [];
-const noAction = () => undefined;
 
 export function AssetCanvasEditorMode({
   data,
@@ -56,14 +29,6 @@ export function AssetCanvasEditorMode({
   };
 
   switch (data.record.mode) {
-    case "scenery":
-      return (
-        <SceneryEditor
-          {...frameProps}
-          {...data.record.scenery}
-          history={data.asset.history}
-        />
-      );
     case "tileset":
       return (
         <TilesetEditor
@@ -84,79 +49,18 @@ export function AssetCanvasEditorMode({
   }
 }
 
-function SceneryEditor({
-  layers,
-  dimensions,
-  history,
-  ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
-  layers: SceneryLayer[];
-  dimensions?: SceneryCanvasDimensions;
-  history: AssetRevision[];
-}) {
-  const canvas = useSceneryCanvasStateMachine(layers);
-  const selectedLayerId = canvas.selectedLayerIds[0] ?? null;
-  const selectedLayer =
-    layers.find((layer) => layer.id === selectedLayerId) ?? null;
-
-  return (
-    <CanvasEditorFrame {...frameProps} assetKind="scenery">
-      <AssetTree
-        kind="scenery"
-        layers={layers}
-        selectedLayerId={selectedLayerId}
-        visibleLayerIds={canvas.visibleLayerIds}
-        onSelect={(layerId) =>
-          canvas.send({ type: "layer.selection.toggled", layerId })
-        }
-        onToggleVisibility={(layerId) =>
-          canvas.send({ type: "layer.visibility.toggled", layerId })
-        }
-      />
-      <SceneryCanvas
-        model={{
-          layers,
-          dimensions,
-          selectedLayerIds: canvas.selectedLayerIds,
-          visibleLayerIds: canvas.visibleLayerIds,
-        }}
-        onEvent={canvas.send}
-      />
-      <Inspector
-        kind="scenery"
-        layer={selectedLayer}
-        dimensions={dimensions}
-        history={history}
-        visible={
-          selectedLayer
-            ? canvas.visibleLayerIds.includes(selectedLayer.id)
-            : false
-        }
-        onToggleVisibility={() => {
-          if (selectedLayer) {
-            canvas.send({
-              type: "layer.visibility.toggled",
-              layerId: selectedLayer.id,
-            });
-          }
-        }}
-      />
-    </CanvasEditorFrame>
-  );
-}
-
 function TilesetEditor({
   gridSize,
   items,
   ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
+}: Omit<EditorModeFrameProps, "assetKind" | "children"> & {
   gridSize: number;
   items: TilesetItem[];
 }) {
   const canvas = useTilesetCanvasStateMachine(items, gridSize);
 
   return (
-    <CanvasEditorFrame {...frameProps} assetKind="tileset">
+    <EditorModeFrame {...frameProps} assetKind="tileset">
       <TilesetCanvas
         model={{
           gridSize,
@@ -165,14 +69,14 @@ function TilesetEditor({
         }}
         onEvent={canvas.send}
       />
-    </CanvasEditorFrame>
+    </EditorModeFrame>
   );
 }
 
 function UISetEditor({
   components,
   ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
+}: Omit<EditorModeFrameProps, "assetKind" | "children"> & {
   components: UISetComponent[];
 }) {
   const componentIds = useMemo(
@@ -193,7 +97,7 @@ function UISetEditor({
   }, [componentIds]);
 
   return (
-    <CanvasEditorFrame {...frameProps} assetKind="uiset">
+    <EditorModeFrame {...frameProps} assetKind="uiset">
       <UISetCanvas
         model={{ components, selectedComponentIds }}
         onEvent={({ componentId }) =>
@@ -204,40 +108,6 @@ function UISetEditor({
           )
         }
       />
-    </CanvasEditorFrame>
-  );
-}
-
-function CanvasEditorFrame({
-  assetKind,
-  assetName,
-  version,
-  projectName,
-  onBack,
-  children,
-}: CanvasEditorFrameProps) {
-  const { t } = useTranslation("editor");
-  return (
-    <>
-      <EditorHeader
-        assetKind={assetKind}
-        assetName={assetName}
-        version={version}
-        projectName={projectName}
-        status={t("previewReady")}
-        canUndo={false}
-        canRedo={false}
-        isDirty={false}
-        isSaving={false}
-        generationTasks={emptyGenerationTasks}
-        onBack={onBack}
-        onUndo={noAction}
-        onRedo={noAction}
-        onSave={noAction}
-      />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        {children}
-      </div>
-    </>
+    </EditorModeFrame>
   );
 }
