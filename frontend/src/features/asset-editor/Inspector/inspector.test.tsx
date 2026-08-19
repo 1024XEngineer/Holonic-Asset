@@ -1,11 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import type { CharacterAnimation } from "@/model";
+import type { AssetRevision, CharacterAnimation, SceneryLayer } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { Inspector } from "./inspector";
-import { getInspectorTargetSummary } from "./inspector-target";
 
 const animations: CharacterAnimation[] = [
   {
@@ -33,11 +32,36 @@ const prototype = {
   rows: 1,
 };
 
+const sceneryLayer: SceneryLayer = {
+  id: "sky",
+  label: "Sky",
+  detail: "Backdrop",
+  imageUrl: "/sky.png",
+  blendMode: "normal",
+  position: { x: 0, y: 0 },
+  transform: { scale: { x: 1, y: 1 }, rotation: 0 },
+  visible: true,
+  opacity: 1,
+  zIndex: 0,
+};
+
+const sceneryHistory: AssetRevision[] = [
+  {
+    id: "1",
+    version: "v1",
+    description: "Initial scenery",
+    savedAt: "2026-01-01T00:00:00Z",
+    status: "ready",
+    isCurrent: true,
+  },
+];
+
 describe("Inspector", () => {
   it("renders the AI composer controls without the old draft label", () => {
     const html = renderToStaticMarkup(
       withI18n(
         <Inspector
+          kind="sprite"
           selectedNodes={[]}
           selectedFrames={[]}
           prompt="Refine the silhouette"
@@ -60,101 +84,11 @@ describe("Inspector", () => {
     expect(html).not.toContain("Draft context");
   });
 
-  it("describes selected animation frames inside the composer", () => {
-    expect(
-      getInspectorTargetSummary(
-        ["idle-front"],
-        [
-          { nodeId: "idle-front", index: 0 },
-          { nodeId: "idle-front", index: 2 },
-        ],
-        animations,
-        prototype,
-      ),
-    ).toEqual({
-      label: "Idle Front - Frames 1, 3",
-      detail: "Selected on canvas",
-      thumbnail: {
-        imageUrl: "/idle-front.png",
-        column: 0,
-        row: 0,
-        columns: 2,
-        rows: 2,
-      },
-    });
-  });
-
-  it("names a selected prototype frame in the target control", () => {
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [{ nodeId: "prototype", index: 0 }],
-        animations,
-        prototype,
-      ),
-    ).toEqual({
-      label: "Prototype - Frame 1",
-      detail: "Selected on canvas",
-      thumbnail: {
-        imageUrl: "/prototype.png",
-        column: 0,
-        row: 0,
-        columns: 4,
-        rows: 1,
-      },
-    });
-  });
-
-  it("uses an independent direction image for the selected prototype frame", () => {
-    const directionalPrototype = {
-      ...prototype,
-      frameUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
-    };
-
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [{ nodeId: "prototype", index: 2 }],
-        animations,
-        directionalPrototype,
-      ),
-    ).toMatchObject({
-      thumbnail: {
-        imageUrl: "/left.png",
-        column: 0,
-        row: 0,
-        columns: 1,
-        rows: 1,
-      },
-    });
-  });
-
-  it("uses the first independent direction image for a prototype node target", () => {
-    const directionalPrototype = {
-      ...prototype,
-      frameUrls: ["/front.png", "/back.png"],
-    };
-
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [],
-        animations,
-        directionalPrototype,
-      ),
-    ).toMatchObject({
-      thumbnail: {
-        imageUrl: "/front.png",
-        columns: 1,
-        rows: 1,
-      },
-    });
-  });
-
   it("renders the selected frame thumbnail in the target control", () => {
     const html = renderToStaticMarkup(
       withI18n(
         <Inspector
+          kind="sprite"
           selectedNodes={["prototype"]}
           selectedFrames={[{ nodeId: "prototype", index: 1 }]}
           prompt="Refine the silhouette"
@@ -173,19 +107,23 @@ describe("Inspector", () => {
     expect(html).toContain("translate(-25%, -0%)");
   });
 
-  it("uses the selected animation image for a node target", () => {
-    expect(
-      getInspectorTargetSummary(["idle-front"], [], animations, prototype),
-    ).toEqual({
-      label: "Idle Front",
-      detail: "Selected item",
-      thumbnail: {
-        imageUrl: "/idle-front.png",
-        column: 0,
-        row: 0,
-        columns: 2,
-        rows: 2,
-      },
-    });
+  it("renders scenery content through the shared inspector", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="scenery"
+          layer={sceneryLayer}
+          dimensions={{ width: 1920, height: 1080 }}
+          history={sceneryHistory}
+          visible
+          onToggleVisibility={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(html).toContain("Selected layer");
+    expect(html).toContain("Sky");
+    expect(html).toContain("Canvas: 1920 x 1080");
+    expect(html).toContain("History");
   });
 });

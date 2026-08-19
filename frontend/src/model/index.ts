@@ -56,6 +56,7 @@ export type {
   ProjectAsset,
   SaveAssetRecordInput,
   SceneryAssetData,
+  SceneryCanvasDimensions,
   SceneryLayer,
   AudioAssetKind,
   AudioAssetRecord,

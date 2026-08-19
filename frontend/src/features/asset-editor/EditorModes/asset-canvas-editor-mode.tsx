@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import type {
   AssetKind,
+  AssetRevision,
+  SceneryCanvasDimensions,
   AssetWorkspaceData,
   SceneryLayer,
   TilesetItem,
@@ -18,10 +20,12 @@ import {
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
 import { UISetCanvas } from "../Canvas/UISetCanvas";
+import { AssetTree } from "../AssetTree/asset-tree";
 import {
   EditorHeader,
   type EditorGenerationTask,
 } from "../Header/editor-header";
+import { Inspector } from "../Inspector/inspector";
 
 type AssetCanvasEditorModeProps = {
   data: AssetWorkspaceData;
@@ -54,7 +58,11 @@ export function AssetCanvasEditorMode({
   switch (data.record.mode) {
     case "scenery":
       return (
-        <SceneryEditor {...frameProps} layers={data.record.scenery.layers} />
+        <SceneryEditor
+          {...frameProps}
+          {...data.record.scenery}
+          history={data.asset.history}
+        />
       );
     case "tileset":
       return (
@@ -78,21 +86,60 @@ export function AssetCanvasEditorMode({
 
 function SceneryEditor({
   layers,
+  dimensions,
+  history,
   ...frameProps
 }: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
   layers: SceneryLayer[];
+  dimensions?: SceneryCanvasDimensions;
+  history: AssetRevision[];
 }) {
   const canvas = useSceneryCanvasStateMachine(layers);
+  const selectedLayerId = canvas.selectedLayerIds[0] ?? null;
+  const selectedLayer =
+    layers.find((layer) => layer.id === selectedLayerId) ?? null;
 
   return (
     <CanvasEditorFrame {...frameProps} assetKind="scenery">
+      <AssetTree
+        kind="scenery"
+        layers={layers}
+        selectedLayerId={selectedLayerId}
+        visibleLayerIds={canvas.visibleLayerIds}
+        onSelect={(layerId) =>
+          canvas.send({ type: "layer.selection.toggled", layerId })
+        }
+        onToggleVisibility={(layerId) =>
+          canvas.send({ type: "layer.visibility.toggled", layerId })
+        }
+      />
       <SceneryCanvas
         model={{
           layers,
+          dimensions,
           selectedLayerIds: canvas.selectedLayerIds,
           visibleLayerIds: canvas.visibleLayerIds,
         }}
         onEvent={canvas.send}
+      />
+      <Inspector
+        kind="scenery"
+        layer={selectedLayer}
+        dimensions={dimensions}
+        history={history}
+        visible={
+          selectedLayer
+            ? canvas.visibleLayerIds.includes(selectedLayer.id)
+            : false
+        }
+        onToggleVisibility={() => {
+          if (selectedLayer) {
+            canvas.send({
+              type: "layer.visibility.toggled",
+              layerId: selectedLayer.id,
+            });
+          }
+        }}
       />
     </CanvasEditorFrame>
   );
@@ -188,7 +235,9 @@ function CanvasEditorFrame({
         onRedo={noAction}
         onSave={noAction}
       />
-      <div className="flex min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {children}
+      </div>
     </>
   );
 }

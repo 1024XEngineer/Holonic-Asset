@@ -21,6 +21,7 @@ vi.mock("../../project", async (importOriginal) => ({
 
 import {
   loadCoreAssetWorkspace,
+  toCoreSceneryAssetWorkspace,
   toCoreTilesetAssetWorkspace,
 } from "./core-asset-record";
 
@@ -31,6 +32,33 @@ beforeEach(() => {
 });
 
 describe("loadCoreAssetWorkspace", () => {
+  it("loads a persisted scenery asset without falling back to mock data", async () => {
+    mocks.assetDetail.mockResolvedValue(sceneryDetail());
+
+    await expect(
+      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toMatchObject({
+      projectName: "Demo",
+      asset: { id: "9", projectId: "11", kind: "scenery", version: "v3" },
+      record: {
+        mode: "scenery",
+        scenery: {
+          layers: [
+            {
+              id: "1",
+              label: "Sky",
+              imageUrl: "https://cdn.example/sky.png",
+              blendMode: "normal",
+            },
+          ],
+        },
+      },
+    });
+    expect(mocks.assetDetail).toHaveBeenCalledWith(9);
+    expect(mocks.projectDetail).toHaveBeenCalledWith("11");
+    expect(mocks.assetRecords).toHaveBeenCalledWith(9);
+  });
+
   it("loads a persisted tileset without falling back to mock data", async () => {
     mocks.assetDetail.mockResolvedValue(tilesetDetail());
 
@@ -100,6 +128,32 @@ describe("toCoreTilesetAssetWorkspace", () => {
   });
 });
 
+describe("toCoreSceneryAssetWorkspace", () => {
+  it("maps persisted layer resources to scenery canvas layers", () => {
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: sceneryDetail(),
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: {
+        layers: [
+          {
+            id: "1",
+            label: "Sky",
+            detail: "Sky",
+            imageUrl: "https://cdn.example/sky.png",
+            blendMode: "normal",
+          },
+        ],
+      },
+    });
+  });
+});
+
 function tilesetDetail(): Extract<AssetDetailResponse, { type: "tileSet" }> {
   return {
     assetId: 9,
@@ -122,6 +176,33 @@ function tilesetDetail(): Extract<AssetDetailResponse, { type: "tileSet" }> {
             { url: "/grass-edge-1.png", position: { x: 2, y: 1 } },
             { url: "/grass-edge-2.png", position: { x: 3, y: 1 } },
           ],
+        },
+      ],
+    },
+  };
+}
+
+function sceneryDetail(): Extract<AssetDetailResponse, { type: "scenery" }> {
+  return {
+    assetId: 9,
+    projectId: 11,
+    name: "Moonlit Forest",
+    description: "A layered moonlit forest",
+    type: "scenery",
+    perspective: "Top-Down",
+    dimensions: { width: 1920, height: 1080 },
+    tags: [],
+    version: 3,
+    content: {
+      layers: [
+        {
+          id: 1,
+          name: "Sky",
+          resource: "https://cdn.example/sky.png",
+          position: { x: 0, y: 0 },
+          visible: true,
+          opacity: 1,
+          zIndex: 0,
         },
       ],
     },

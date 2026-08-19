@@ -5,13 +5,17 @@ import type {
 import { coreAssetApi } from "../library/core-asset.api";
 import type { AssetRevision } from "../types";
 import { projectApi } from "../../project";
-import type { AssetRecord, AssetWorkspaceData } from "./types";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  SceneryCanvasDimensions,
+} from "./types";
 import type { GetAssetRecordInput } from "./types";
 import { toCoreSpriteAssetWorkspace } from "./core-sprite-record";
 
 type CoreWorkspaceAssetKind = Extract<
   AssetDetailResponse["type"],
-  "character" | "object" | "tileSet"
+  "character" | "object" | "scenery" | "tileSet"
 >;
 
 export async function loadCoreAssetWorkspace(
@@ -30,6 +34,15 @@ export async function loadCoreAssetWorkspace(
 
   if (detail.type === "tileSet") {
     return toCoreTilesetAssetWorkspace({
+      projectId: input.projectId,
+      projectName: project.name,
+      detail,
+      records: recordsResponse.records,
+    });
+  }
+
+  if (detail.type === "scenery") {
+    return toCoreSceneryAssetWorkspace({
       projectId: input.projectId,
       projectName: project.name,
       detail,
@@ -87,12 +100,86 @@ export function toCoreTilesetAssetWorkspace({
   } as AssetWorkspaceData;
 }
 
+export function toCoreSceneryAssetWorkspace({
+  projectId,
+  projectName,
+  detail,
+  records,
+}: {
+  projectId: string;
+  projectName: string;
+  detail: Extract<AssetDetailResponse, { type: "scenery" }>;
+  records: AssetRecordResponse[];
+}): AssetWorkspaceData {
+  const record: AssetRecord = {
+    mode: "scenery",
+    prompt: detail.description,
+    scenery: {
+      dimensions: toSceneryCanvasDimensions(detail.dimensions),
+      layers: (detail.content?.layers ?? []).map((layer) => ({
+        id: String(layer.id),
+        label: layer.name,
+        detail: layer.name,
+        imageUrl: layer.resource,
+        blendMode: "normal",
+        position: layer.position,
+        transform: toSceneryTransform(layer.transform),
+        ...(layer.visible === undefined ? {} : { visible: layer.visible }),
+        ...(layer.opacity === undefined ? {} : { opacity: layer.opacity }),
+        ...(layer.zIndex === undefined ? {} : { zIndex: layer.zIndex }),
+      })),
+    },
+  };
+
+  return {
+    projectName,
+    asset: {
+      id: String(detail.assetId),
+      projectId,
+      kind: "scenery",
+      name: detail.name,
+      perspective: detail.perspective,
+      version: `v${detail.version}`,
+      history: toHistory(records, detail.version),
+    },
+    record,
+  } as AssetWorkspaceData;
+}
+
+function toSceneryCanvasDimensions(
+  dimensions: Extract<AssetDetailResponse, { type: "scenery" }>["dimensions"],
+): SceneryCanvasDimensions {
+  return { width: dimensions.width, height: dimensions.height };
+}
+
+function toSceneryTransform(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const transform = value as Record<string, unknown>;
+  const scale = transform.scale;
+  if (!scale || typeof scale !== "object") return undefined;
+  const scaleRecord = scale as Record<string, unknown>;
+  const x = toFiniteNumber(scaleRecord.x);
+  const y = toFiniteNumber(scaleRecord.y);
+  const rotation = toFiniteNumber(transform.rotation);
+  if (x === undefined || y === undefined || rotation === undefined) {
+    return undefined;
+  }
+  return { scale: { x, y }, rotation };
+}
+
+function toFiniteNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
 function isCoreWorkspaceAsset(
   detail: AssetDetailResponse,
 ): detail is Extract<AssetDetailResponse, { type: CoreWorkspaceAssetKind }> {
   return (
     detail.type === "character" ||
     detail.type === "object" ||
+    detail.type === "scenery" ||
     detail.type === "tileSet"
   );
 }

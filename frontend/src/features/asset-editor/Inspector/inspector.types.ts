@@ -2,6 +2,8 @@ import type {
   AssetRevision,
   CharacterAnimation,
   CharacterSpriteSheet,
+  SceneryCanvasDimensions,
+  SceneryLayer,
 } from "@/model";
 import { z } from "zod";
 
@@ -44,7 +46,8 @@ export type InspectorSubmitRequest = z.infer<
   typeof inspectorSubmitRequestSchema
 >;
 
-export type InspectorProps = {
+export type SpriteInspectorProps = {
+  kind: "sprite";
   selectedNodes: AnimatedSpriteNodeId[];
   selectedFrames: InspectorFrameSelection[];
   prompt: string;
@@ -57,7 +60,18 @@ export type InspectorProps = {
   isSubmitting?: boolean;
 };
 
-export type InspectorEditProps = Omit<InspectorProps, "history">;
+export type SceneryInspectorProps = {
+  kind: "scenery";
+  layer: SceneryLayer | null;
+  dimensions?: SceneryCanvasDimensions;
+  history: AssetRevision[];
+  visible: boolean;
+  onToggleVisibility: () => void;
+};
+
+export type InspectorProps = SpriteInspectorProps | SceneryInspectorProps;
+
+export type InspectorEditProps = Omit<SpriteInspectorProps, "history" | "kind">;
 
 export type InspectorTargetSummary = {
   label: string;
