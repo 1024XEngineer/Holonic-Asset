@@ -51,6 +51,7 @@ type AssetDetailResponse struct {
 type RecordAssetRequest struct {
 	AssetID         uint            `json:"assetId" minimum:"1"`
 	ExpectedVersion uint            `json:"expectedVersion,omitempty" minimum:"1"`
+	Description     *string         `json:"description,omitempty"`
 	Content         json.RawMessage `json:"content"`
 }
 

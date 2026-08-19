@@ -28,7 +28,7 @@ export function getCanvasNodes(
 export function createDefaultCanvasPositions(
   animations: readonly CharacterAnimation[] = [],
 ): Record<AnimatedSpriteNodeId, CanvasPosition> {
-  const nodes = getCanvasNodes(animations);
+  const nodes = shuffle(getCanvasNodes(animations));
   const positions: Record<AnimatedSpriteNodeId, CanvasPosition> = {};
   let y = DEFAULT_LAYOUT_START.y;
 
@@ -54,6 +54,14 @@ export function createDefaultCanvasPositions(
   }
 
   return positions;
+}
+
+function shuffle<T>(items: T[]) {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+  }
+  return items;
 }
 
 function getDefaultNodeHeight(
