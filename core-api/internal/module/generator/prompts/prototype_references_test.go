@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
@@ -21,7 +22,13 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		{
 			name: "object",
 			build: func(state prompts.PrototypeReferenceState) string {
-				return prompts.ObjectPrototype("a chest", "Top-Down", prompts.TransparentBackground(), state)
+				return prompts.ObjectPrototype(
+					"a chest",
+					"Top-Down",
+					assetdomain.Size{Width: 48, Height: 48},
+					prompts.TransparentBackground(),
+					state,
+				)
 			},
 		},
 	}

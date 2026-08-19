@@ -150,6 +150,7 @@ func (e *executor) generateObjectPrototype(
 		prompts.ObjectPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
+			payload.Dimensions,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),

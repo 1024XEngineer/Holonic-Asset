@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T) {
@@ -12,6 +13,7 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 	prompt := prompts.ObjectPrototype(
 		"a wooden chest with two locks",
 		"Top-Down",
+		assetdomain.Size{Width: 48, Height: 48},
 		background,
 		prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true},
 	)
@@ -29,13 +31,46 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 		"reading-order indexes",
 		"zero-based array index is the direction identity",
 		"index 0 = front, index 1 = right, index 2 = back, index 3 = left",
+		"exact centre of its assigned grid cell",
+		"approximately 30% of the cell's width",
+		"approximately 30% of the cell's height",
 		"a wooden chest with two locks",
 		"Top-Down",
 		"<direction_count>\n4\n</direction_count>",
+		"<asset_dimensions>\n{\"width\":48,\"height\":48}\n</asset_dimensions>",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)
 		}
+	}
+}
+
+func TestObjectPrototypeDerivesContentPercentageFromTargetDimensions(t *testing.T) {
+	tests := []struct {
+		name       string
+		dimensions assetdomain.Size
+		want       string
+	}{
+		{name: "very small", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "approximately 20%"},
+		{name: "small sprite baseline", dimensions: assetdomain.Size{Width: 48, Height: 48}, want: "approximately 30%"},
+		{name: "rectangular couch", dimensions: assetdomain.Size{Width: 188, Height: 128}, want: "approximately 44%"},
+		{name: "large asset cap", dimensions: assetdomain.Size{Width: 2048, Height: 1024}, want: "approximately 70%"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			prompt := prompts.ObjectPrototype(
+				"object",
+				"Top-Down",
+				test.dimensions,
+				prompts.SolidMatteBackground("#00FF00"),
+				prompts.PrototypeReferenceState{},
+			)
+			if !strings.Contains(prompt, test.want+" of the cell's width") ||
+				!strings.Contains(prompt, test.want+" of the cell's height") {
+				t.Fatalf("prompt does not contain derived content size %q: %s", test.want, prompt)
+			}
+		})
 	}
 }
 

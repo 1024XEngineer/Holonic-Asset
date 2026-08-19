@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"fmt"
+	"math"
 
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -41,6 +42,8 @@ Default production guidelines:
 
 Direction sheet layout rules:
 %s
+- Draw each object view at the exact centre of its assigned grid cell.
+- Fit the complete object's visible bounding box inside a centred area approximately %d%% of the cell's width and approximately %d%% of the cell's height. Preserve the object's proportions, so one occupied axis may be smaller, and leave the remaining space as evenly distributed matte background.
 - Keep equal gutters and equal margins on all four sides of every cell.
 - Do not allow any object pixel, attachment, shadow, or outline to cross a cell boundary. Keep the background uniform in every cell so the processor can split the sheet by its regular grid.
 
@@ -57,17 +60,24 @@ User-selected perspective:
 Backend-derived direction count:
 <direction_count>
 %d
-</direction_count>`
+</direction_count>
+
+Backend-target per-direction asset dimensions:
+<asset_dimensions>
+{"width":%d,"height":%d}
+</asset_dimensions>`
 
 // ObjectPrototype combines the user requirements with the source project's
 // production constraints for one game object.
 func ObjectPrototype(
 	creativeBrief string,
 	perspective string,
+	dimensions assetdomain.Size,
 	backgroundConstraint string,
 	references PrototypeReferenceState,
 ) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
+	contentPercent := objectPrototypeContentPercent(dimensions)
 	return fmt.Sprintf(
 		objectPrototypeTemplate,
 		backgroundConstraint,
@@ -76,10 +86,32 @@ func ObjectPrototype(
 			"object",
 		),
 		characterDirectionSheetRules,
+		contentPercent,
+		contentPercent,
 		creativeBrief,
 		perspective,
 		directionCount,
+		dimensions.Width,
+		dimensions.Height,
 	)
+}
+
+// objectPrototypeContentPercent keeps small sprites visually compact in the
+// provider canvas while allowing larger assets to use progressively more of
+// each cell. The model receives only the resulting percentage.
+func objectPrototypeContentPercent(dimensions assetdomain.Size) int {
+	shortEdge := min(dimensions.Width, dimensions.Height)
+	if shortEdge == 0 {
+		return 20
+	}
+	percent := int(math.Round(30 + 10*math.Log2(float64(shortEdge)/48)))
+	if percent < 20 {
+		return 20
+	}
+	if percent > 70 {
+		return 70
+	}
+	return percent
 }
 
 // SolidMatteBackground requires a deterministic chroma-key input for the
