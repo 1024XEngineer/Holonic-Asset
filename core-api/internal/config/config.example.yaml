@@ -20,6 +20,10 @@ http:
   allowedOrigins:
     - "http://localhost:5173"
 
+pprof:
+  # Enable only when runtime profiling is needed.
+  enabled: false
+
 log:
   path: ./logs/holonic-asset.log
   maxSize: 100
