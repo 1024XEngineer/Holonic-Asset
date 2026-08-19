@@ -104,7 +104,7 @@ func (s *referenceStoreStub) PersistReference(_ context.Context, reference strin
 	if s.persistErr != nil {
 		return "", s.persistErr
 	}
-	return "uploads/generated-1.png", nil
+	return fmt.Sprintf("uploads/generated-%d.png", len(s.persisted)), nil
 }
 
 func (s *referenceStoreStub) NewObjectKey(string) (string, error) {
@@ -400,7 +400,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		Kind:          generator.GenerateCharacterProtoType,
 		CreativeBrief: "hero",
 		Parameters: json.RawMessage(
-			`{"asset_name":"knight","creative_brief":"incorrect parameter brief","dimensions":{"width":64,"height":64},"perspective":"Top-Down"}`,
+			`{"asset_name":"knight","creative_brief":"incorrect parameter brief","dimensions":{"width":64,"height":64},"perspective":"Top-Down","project_reference":"client-controlled.png"}`,
 		),
 	})
 	if err != nil {
@@ -412,7 +412,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
-		payload.CreativeBrief != "hero" || payload.Reference != "" ||
+		payload.CreativeBrief != "hero" || payload.Reference != "" || payload.ProjectReference != "" ||
 		payload.Dimensions.Width != 64 || payload.Dimensions.Height != 64 || payload.Perspective != "Top-Down" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
 	}
@@ -554,16 +554,19 @@ func TestCreateEditObjectPrototypeRequiresAssetID(t *testing.T) {
 	}
 }
 
-func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
+func TestCreatePersistsProjectAndUserReferencesBeforePublishing(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
+	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/style.png"}}
 	references := &referenceStoreStub{}
-	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Projects: projects, References: references,
+	})
 
 	_, err := engine.Create(context.Background(), &generator.Request{
 		ProjectID: 42,
 		Kind:      generator.GenerateObjectProtoType,
 		Parameters: json.RawMessage(`{
-			"reference":"https://cdn.example.com/projects/42/reference.png"
+			"reference":"https://cdn.example.com/user/object.png"
 		}`),
 	})
 	if err != nil {
@@ -573,9 +576,18 @@ func TestCreatePersistsExplicitReferenceBeforePublishing(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode task payload: %v", err)
 	}
-	if payload.Reference != "uploads/generated-1.png" || len(references.persisted) != 1 ||
-		references.persisted[0] != "https://cdn.example.com/projects/42/reference.png" {
-		t.Fatalf("reference was not persisted before publish: payload=%+v persisted=%v", payload, references.persisted)
+	if projects.calls != 1 || payload.ProjectReference != "uploads/generated-1.png" ||
+		payload.Reference != "uploads/generated-2.png" ||
+		!reflect.DeepEqual(references.persisted, []string{
+			"projects/42/style.png",
+			"https://cdn.example.com/user/object.png",
+		}) {
+		t.Fatalf(
+			"references were not persisted independently before publish: calls=%d payload=%+v persisted=%v",
+			projects.calls,
+			payload,
+			references.persisted,
+		)
 	}
 }
 
@@ -598,7 +610,7 @@ func TestCreateUsesProjectReferenceWhenPayloadOmitsIt(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode task payload: %v", err)
 	}
-	if projects.calls != 1 || payload.Reference != "uploads/generated-1.png" ||
+	if projects.calls != 1 || payload.Reference != "" || payload.ProjectReference != "uploads/generated-1.png" ||
 		len(references.persisted) != 1 || references.persisted[0] != "projects/42/reference.png" {
 		t.Fatalf("project reference was not used: calls=%d payload=%+v persisted=%v", projects.calls, payload, references.persisted)
 	}
