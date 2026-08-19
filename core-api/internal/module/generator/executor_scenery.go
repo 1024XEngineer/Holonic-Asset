@@ -14,6 +14,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
@@ -57,19 +60,53 @@ func (e *executor) planSceneryLayers(
 }
 
 func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPayload) (json.RawMessage, error) {
+	startedAt := time.Now()
+	e.logSceneryStage("generate scenery started", payload, "start", startedAt)
+
+	stageStartedAt := time.Now()
 	plan, err := e.planSceneryLayers(ctx, payload)
 	if err != nil {
+		e.logSceneryFailure(payload, "plan_layers", stageStartedAt, err)
 		return nil, err
 	}
+	e.logSceneryStage("scenery layers planned", payload, "plan_layers", stageStartedAt,
+		logger.Int("layer_count", len(plan)),
+	)
+
+	stageStartedAt = time.Now()
 	layers, err := e.generateSceneryLayers(ctx, payload, plan)
 	if err != nil {
+		e.logSceneryFailure(payload, "generate_layers", stageStartedAt, err)
 		return nil, err
 	}
+	e.logSceneryStage("scenery layers generated", payload, "generate_layers", stageStartedAt,
+		logger.Int("layer_count", len(layers)),
+	)
+
+	stageStartedAt = time.Now()
 	laidOut, err := e.analyzeSceneryLayout(ctx, payload, layers)
 	if err != nil {
+		e.logSceneryFailure(payload, "analyze_layout", stageStartedAt, err,
+			logger.Int("layer_count", len(layers)),
+		)
 		return nil, err
 	}
-	return e.persistScenery(ctx, payload, laidOut)
+	e.logSceneryStage("scenery layout analyzed", payload, "analyze_layout", stageStartedAt,
+		logger.Int("layer_count", len(laidOut)),
+	)
+
+	stageStartedAt = time.Now()
+	result, err := e.persistScenery(ctx, payload, laidOut)
+	if err != nil {
+		e.logSceneryFailure(payload, "persist", stageStartedAt, err,
+			logger.Int("layer_count", len(laidOut)),
+		)
+		return nil, err
+	}
+	e.logSceneryStage("generate scenery completed", payload, "complete", startedAt,
+		logger.Int("layer_count", len(laidOut)),
+	)
+	return result, nil
 }
 
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {

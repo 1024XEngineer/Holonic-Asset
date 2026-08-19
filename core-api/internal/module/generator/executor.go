@@ -7,6 +7,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -59,6 +60,7 @@ type executor struct {
 	projects   ProjectReader
 	references ReferenceStore
 	resources  ResourceStore
+	logger     logger.Logger
 }
 
 // ExecutorDependencies contains optional workflow integrations.
@@ -68,6 +70,7 @@ type ExecutorDependencies struct {
 	LLM        llmclient.LLMService
 	Animations AnimationGenerationService
 	Resources  ResourceStore
+	Logger     logger.Logger
 }
 
 // NewExecutorWithDependencies creates an executor with explicit optional
@@ -87,6 +90,7 @@ func NewExecutorWithDependencies(
 		projects:   dependencies.Projects,
 		references: dependencies.References,
 		resources:  dependencies.Resources,
+		logger:     dependencies.Logger,
 	}
 }
 
