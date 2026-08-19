@@ -27,7 +27,7 @@ func (e *executor) generateCharacterPrototype(
 		prompts.CharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		payload.Dimensions,
 		directionCount,
@@ -100,7 +100,7 @@ func (e *executor) editCharacterPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
 		directionCount,
@@ -144,7 +144,7 @@ func (e *executor) generateObjectPrototype(
 		prompts.ObjectPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		payload.Dimensions,
 		directionCount,
@@ -214,9 +214,8 @@ func (e *executor) generatePrototypeResources(
 	}
 
 	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64:               result.Images[0].Base64,
-		MatteColor:                imageprocessor.DefaultMatteColor,
-		AllowSampledMatteFallback: true,
+		ImageBase64: result.Images[0].Base64,
+		MatteColor:  "auto",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: remove %s background: %w", taskType, err)
@@ -447,7 +446,7 @@ func (e *executor) editObjectPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
 		directionCount,

@@ -286,10 +286,14 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
+		!strings.Contains(images.request.Prompt, "The subject's correct colours always take precedence") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
+	}
+	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
+		t.Fatalf("prototype background removal did not auto-detect the matte: %+v", processor.removeRequests)
 	}
 	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
 		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)

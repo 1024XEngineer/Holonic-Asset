@@ -47,6 +47,7 @@ func (s *animationGenerationServiceStub) Generate(
 
 type imageProcessorStub struct {
 	events         *[]string
+	removeRequests []*imageprocessor.RemoveBackgroundRequest
 	resizeRequests []*imageprocessor.ResizeRequest
 	err            error
 }
@@ -116,6 +117,7 @@ func (s *imageProcessorStub) RemoveBackground(
 	request *imageprocessor.RemoveBackgroundRequest,
 ) (*imageprocessor.RemoveBackgroundResult, error) {
 	*s.events = append(*s.events, "process_image")
+	s.removeRequests = append(s.removeRequests, request)
 	if s.err != nil {
 		return nil, s.err
 	}
