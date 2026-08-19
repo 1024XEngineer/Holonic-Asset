@@ -24,6 +24,7 @@ const (
 	geminiChatProviderName = "gemini_chat"
 	chatCompletionsPath    = "/chat/completions"
 	maxChatErrorBodyBytes  = 1 << 20
+	maxGeneratedImageBytes = 32 << 20
 	defaultChatHTTPTimeout = 5 * time.Minute
 )
 
@@ -38,16 +39,20 @@ type GeminiChatConfig struct {
 	APIKey       string
 	DefaultModel string
 	HTTPClient   *http.Client
-	Logger       logger.Logger
+	// DownloadHTTPClient overrides the secure client used for model-returned image URLs.
+	// It is intended for tests and other trusted transports.
+	DownloadHTTPClient *http.Client
+	Logger             logger.Logger
 }
 
 // GeminiChatProvider calls Modelink/OpenAI-compatible Chat Completions API for image generation.
 type GeminiChatProvider struct {
-	baseURL      string
-	apiKey       string
-	defaultModel string
-	httpClient   *http.Client
-	logger       logger.Logger
+	baseURL            string
+	apiKey             string
+	defaultModel       string
+	httpClient         *http.Client
+	downloadHTTPClient *http.Client
+	logger             logger.Logger
 }
 
 // NewGeminiChatProvider creates a provider targeting /v1/chat/completions.
@@ -66,13 +71,18 @@ func NewGeminiChatProvider(config GeminiChatConfig) *GeminiChatProvider {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultChatHTTPTimeout}
 	}
+	downloadHTTPClient := config.DownloadHTTPClient
+	if downloadHTTPClient == nil {
+		downloadHTTPClient = newGeneratedImageHTTPClient()
+	}
 
 	return &GeminiChatProvider{
-		baseURL:      baseURL,
-		apiKey:       config.APIKey,
-		defaultModel: defaultModel,
-		httpClient:   httpClient,
-		logger:       config.Logger,
+		baseURL:            baseURL,
+		apiKey:             config.APIKey,
+		defaultModel:       defaultModel,
+		httpClient:         httpClient,
+		downloadHTTPClient: downloadHTTPClient,
+		logger:             config.Logger,
 	}
 }
 
@@ -138,6 +148,7 @@ func (p *GeminiChatProvider) call(
 
 	payload := chatCompletionRequest{
 		Model: model,
+		N:     request.N,
 		Messages: []chatMessage{
 			{
 				Role:    "user",
@@ -329,8 +340,11 @@ func (p *GeminiChatProvider) resolveImageToB64(ctx context.Context, rawURL strin
 	if err != nil {
 		return "", newChatProviderError(ErrorKindTransport, 0, true, "create image download request: "+err.Error(), err)
 	}
+	if err := validateGeneratedImageURL(req.URL); err != nil {
+		return "", newChatProviderError(ErrorKindInvalidResponse, 0, false, "reject generated image URL", err)
+	}
 
-	resp, err := p.httpClient.Do(req)
+	resp, err := p.downloadHTTPClient.Do(req)
 	if err != nil {
 		return "", newChatProviderError(ErrorKindTransport, 0, true, "download generated image: "+err.Error(), err)
 	}
@@ -347,10 +361,38 @@ func (p *GeminiChatProvider) resolveImageToB64(ctx context.Context, rawURL strin
 			nil,
 		)
 	}
+	if resp.ContentLength > maxGeneratedImageBytes {
+		return "", newChatProviderError(
+			ErrorKindInvalidResponse,
+			resp.StatusCode,
+			false,
+			fmt.Sprintf("generated image exceeds %d bytes", maxGeneratedImageBytes),
+			nil,
+		)
+	}
+	if contentType := resp.Header.Get("Content-Type"); contentType != "" &&
+		!strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		return "", newChatProviderError(
+			ErrorKindInvalidResponse,
+			resp.StatusCode,
+			false,
+			"generated image response has non-image content type",
+			nil,
+		)
+	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxGeneratedImageBytes+1))
 	if err != nil {
 		return "", newChatProviderError(ErrorKindTransport, 0, true, "read downloaded image data: "+err.Error(), err)
+	}
+	if len(data) > maxGeneratedImageBytes {
+		return "", newChatProviderError(
+			ErrorKindInvalidResponse,
+			resp.StatusCode,
+			false,
+			fmt.Sprintf("generated image exceeds %d bytes", maxGeneratedImageBytes),
+			nil,
+		)
 	}
 	if len(data) == 0 {
 		return "", newChatProviderError(ErrorKindInvalidResponse, 0, true, "downloaded image is empty", nil)
@@ -507,6 +549,7 @@ func chatErrorMessage(body []byte) string {
 
 type chatCompletionRequest struct {
 	Model    string        `json:"model"`
+	N        int           `json:"n,omitempty"`
 	Messages []chatMessage `json:"messages"`
 	Stream   bool          `json:"stream"`
 }

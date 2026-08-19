@@ -1,10 +1,12 @@
 package imageclient_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,13 +16,14 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 )
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
 func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 	imageBytes := []byte("fake-png-content-data")
-	imageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write(imageBytes)
-	}))
-	defer imageServer.Close()
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
@@ -32,6 +35,7 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 
 		var req struct {
 			Model    string `json:"model"`
+			N        int    `json:"n"`
 			Messages []struct {
 				Role    string `json:"role"`
 				Content []struct {
@@ -46,6 +50,9 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 		if req.Model != "google/nano-banana-2" {
 			t.Fatalf("unexpected model: %s", req.Model)
 		}
+		if req.N != 2 {
+			t.Fatalf("candidate count = %d, want 2", req.N)
+		}
 		if len(req.Messages) != 1 || len(req.Messages[0].Content) != 1 || req.Messages[0].Content[0].Text != "a knight" {
 			t.Fatalf("unexpected content: %+v", req.Messages)
 		}
@@ -59,7 +66,7 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 					"index": 0,
 					"message": map[string]any{
 						"role":    "assistant",
-						"content": "Here is your generated image:\n\n![result](" + imageServer.URL + "/output.png)",
+						"content": "Here is your generated image:\n\n![result](https://images.example/output.png)",
 					},
 				},
 			},
@@ -78,11 +85,24 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 		BaseURL:      apiServer.URL,
 		APIKey:       "test-key",
 		DefaultModel: "google/nano-banana-2",
+		DownloadHTTPClient: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if request.URL.String() != "https://images.example/output.png" {
+				t.Fatalf("unexpected download URL: %s", request.URL)
+			}
+			return &http.Response{
+				StatusCode:    http.StatusOK,
+				Header:        http.Header{"Content-Type": []string{"image/png"}},
+				Body:          io.NopCloser(bytes.NewReader(imageBytes)),
+				ContentLength: int64(len(imageBytes)),
+				Request:       request,
+			}, nil
+		})},
 	})
 
 	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
 		Prompt: "a knight",
 		Size:   "1024x1024",
+		N:      2,
 	})
 	if err != nil {
 		t.Fatalf("unexpected generate error: %v", err)
@@ -97,6 +117,129 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 	if result.Usage.TotalTokens != 30 {
 		t.Fatalf("usage mismatch: got %+v", result.Usage)
 	}
+}
+
+func TestGeminiChatProviderRejectsPrivateGeneratedImageURL(t *testing.T) {
+	downloadCalled := false
+	apiServer := newChatResponseServer(t, `{
+		"choices":[{"message":{"content":"http://127.0.0.1/internal.png"}}]
+	}`)
+	defer apiServer.Close()
+
+	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+		BaseURL: apiServer.URL,
+		DownloadHTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			downloadCalled = true
+			return nil, errors.New("unexpected download")
+		})},
+	})
+
+	_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+	var providerErr *imageclient.ProviderError
+	if !errors.As(err, &providerErr) || providerErr.Kind != imageclient.ErrorKindInvalidResponse ||
+		providerErr.Transient {
+		t.Fatalf("generate error = %v, want permanent invalid-response error", err)
+	}
+	if downloadCalled {
+		t.Fatal("download client called for a private URL")
+	}
+}
+
+func TestGeminiChatProviderBoundsGeneratedImageDownloads(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		contentType   string
+		contentLength int64
+		body          string
+		want          string
+	}{
+		{name: "status", statusCode: http.StatusBadGateway, contentType: "image/png", body: "bad", want: "status 502"},
+		{name: "declared size", statusCode: http.StatusOK, contentType: "image/png", contentLength: 1 << 40, want: "exceeds"},
+		{name: "content type", statusCode: http.StatusOK, contentType: "text/html", body: "not an image", want: "non-image"},
+		{name: "empty", statusCode: http.StatusOK, contentType: "image/png", want: "empty"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			apiServer := newChatResponseServer(t, `{
+				"choices":[{"message":{"content":"https://images.example/output.png"}}]
+			}`)
+			defer apiServer.Close()
+
+			provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+				BaseURL: apiServer.URL,
+				DownloadHTTPClient: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode:    test.statusCode,
+						Status:        http.StatusText(test.statusCode),
+						Header:        http.Header{"Content-Type": []string{test.contentType}},
+						Body:          io.NopCloser(strings.NewReader(test.body)),
+						ContentLength: test.contentLength,
+						Request:       request,
+					}, nil
+				})},
+			})
+
+			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("generate error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestGeminiChatProviderParsesStructuredImageResponses(t *testing.T) {
+	fakeB64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	apiServer := newChatResponseServer(t, `{
+		"choices":[
+			{"message":{"images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,`+fakeB64+`"}}]}},
+			{"message":{"content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,`+fakeB64+`"}}]}}
+		]
+	}`)
+	defer apiServer.Close()
+
+	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{BaseURL: apiServer.URL})
+	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+	if err != nil {
+		t.Fatalf("generate structured images: %v", err)
+	}
+	if len(result.Images) != 2 || result.Images[0] != fakeB64 || result.Images[1] != fakeB64 {
+		t.Fatalf("unexpected structured images: %+v", result.Images)
+	}
+}
+
+func TestGeminiChatProviderRejectsInvalidSuccessResponses(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "malformed JSON", body: `{`, want: "decode chat completion"},
+		{name: "no choices", body: `{}`, want: "no choices"},
+		{name: "no image data", body: `{"choices":[{"message":{"content":"plain text"}}]}`, want: "no image data"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := newChatResponseServer(t, test.body)
+			defer server.Close()
+			provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{BaseURL: server.URL + "/v1"})
+			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("generate error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func newChatResponseServer(t *testing.T, responseBody string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/chat/completions" {
+			t.Errorf("unexpected path: %s", request.URL.Path)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(responseBody))
+	}))
 }
 
 func TestGeminiChatProviderEditMultiReferenceAndMask(t *testing.T) {
