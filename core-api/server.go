@@ -125,7 +125,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	assetStore := InitAssetStore(db)
 	taskStore := InitTaskStore(db)
 	imageService := InitImageService(cfg.Image, appLogger)
-	llmService := InitLLMService(cfg.LLM)
+	llmService := InitLLMService(cfg.LLM, appLogger)
 	uploadStore, err := InitUploadStore(cfg.QiNiu)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
@@ -176,6 +176,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 			Resources:  resources,
 			LLM:        llmService,
 			Animations: animations,
+			Logger:     appLogger,
 		},
 	)
 	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{

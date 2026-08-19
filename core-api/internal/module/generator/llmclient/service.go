@@ -5,9 +5,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/url"
 	"strings"
+	"time"
+)
+
+var (
+	defaultMaxAttempts = 10
+	baseRetryBackoff   = time.Second
+	maxRetryBackoff    = 3 * time.Second
 )
 
 // LLMService completes provider-independent text or multimodal calls with structured
@@ -37,28 +45,63 @@ func (s *llmService) Complete(
 		return nil, invalidRequestError("LLM provider is required", nil)
 	}
 
-	providerResult, err := s.provider.Complete(ctx, providerRequest)
-	if err != nil {
-		return nil, err
+	maxAttempts := request.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = defaultMaxAttempts
 	}
-	if providerResult == nil {
-		return nil, invalidResponseError("provider returned no completion", nil)
+
+	var (
+		providerResult *ProviderResult
+	)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		providerResult, err = s.provider.Complete(ctx, providerRequest)
+		if err == nil {
+			err = validateProviderResult(providerResult)
+		}
+		if err == nil {
+			break
+		}
+		if !IsTransient(err) || errors.Is(ctx.Err(), context.Canceled) || attempt >= maxAttempts {
+			return nil, err
+		}
+		if waitErr := backoffSleep(ctx, attempt); waitErr != nil {
+			return nil, waitErr
+		}
 	}
 
 	structuredJSON := bytes.TrimSpace(providerResult.JSON)
-	if len(structuredJSON) == 0 {
-		return nil, invalidResponseError("provider returned empty structured JSON", nil)
-	}
-	if !json.Valid(structuredJSON) {
-		return nil, invalidResponseError("provider returned invalid structured JSON", nil)
-	}
-
 	return &CompletionResult{
 		ID:    providerResult.ID,
 		Model: providerResult.Model,
 		JSON:  append(json.RawMessage(nil), structuredJSON...),
 		Usage: providerResult.Usage,
 	}, nil
+}
+
+func validateProviderResult(result *ProviderResult) error {
+	if result == nil {
+		return invalidResponseError("provider returned no completion", nil)
+	}
+	structuredJSON := bytes.TrimSpace(result.JSON)
+	if len(structuredJSON) == 0 {
+		return invalidResponseError("provider returned empty structured JSON", nil)
+	}
+	if !json.Valid(structuredJSON) {
+		return invalidResponseError("provider returned invalid structured JSON", nil)
+	}
+	return nil
+}
+
+func backoffSleep(ctx context.Context, attempt int) error {
+	delay := min(time.Duration(attempt)*baseRetryBackoff, maxRetryBackoff)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func normalizeRequest(request *CompletionRequest) (*ProviderRequest, error) {

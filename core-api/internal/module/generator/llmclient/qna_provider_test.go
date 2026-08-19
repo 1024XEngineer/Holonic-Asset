@@ -382,3 +382,157 @@ func (reader *errorReadCloser) Read([]byte) (int, error) {
 }
 
 func (*errorReadCloser) Close() error { return nil }
+
+func TestQNAProviderFallsBackWhenJSONSchemaResponseFormatIsUnavailable(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestCount++
+		var payload struct {
+			ResponseFormat struct {
+				Type       string           `json:"type"`
+				JSONSchema *json.RawMessage `json:"json_schema"`
+			} `json:"response_format"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if requestCount == 1 {
+			if payload.ResponseFormat.Type != "json_schema" || payload.ResponseFormat.JSONSchema == nil {
+				t.Fatalf("first response format = %+v, want json_schema", payload.ResponseFormat)
+			}
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = writer.Write([]byte(`{"error":{"message":"The request is invalid: This response_format type is unavailable now."}}`))
+			return
+		}
+		if payload.ResponseFormat.Type != "json_object" || payload.ResponseFormat.JSONSchema != nil {
+			t.Fatalf("fallback response format = %+v, want json_object without json_schema", payload.ResponseFormat)
+		}
+		_, _ = writer.Write([]byte(`{"id":"fallback-1","choices":[{"message":{"content":"{\"layers\":[]}"}}]}`))
+	}))
+	defer server.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      server.URL,
+		DefaultModel: "deepseek/deepseek-v4-flash-20260731",
+		HTTPClient:   server.Client(),
+	})
+	result, err := provider.Complete(context.Background(), validProviderRequest())
+	if err != nil {
+		t.Fatalf("complete with response format fallback: %v", err)
+	}
+	if requestCount != 2 {
+		t.Fatalf("request count = %d, want 2", requestCount)
+	}
+	if result.ID != "fallback-1" || string(result.JSON) != `{"layers":[]}` {
+		t.Fatalf("unexpected fallback result: %+v", result)
+	}
+}
+
+func TestQNAProviderDisablesDeepSeekThinkingForStructuredOutput(t *testing.T) {
+	var payload struct {
+		Model     string `json:"model"`
+		MaxTokens int    `json:"max_tokens"`
+		Thinking  *struct {
+			Type string `json:"type"`
+		} `json:"thinking"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}`))
+	}))
+	defer server.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      server.URL,
+		DefaultModel: "deepseek/deepseek-v4-flash-20260731",
+		HTTPClient:   server.Client(),
+	})
+	if _, err := provider.Complete(context.Background(), validProviderRequest()); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if payload.Model != "deepseek/deepseek-v4-flash-20260731" {
+		t.Fatalf("model = %q, want DeepSeek model", payload.Model)
+	}
+	if payload.MaxTokens != 8192 {
+		t.Fatalf("max_tokens = %d, want 8192", payload.MaxTokens)
+	}
+	if payload.Thinking == nil || payload.Thinking.Type != "disabled" {
+		t.Fatalf("thinking = %+v, want disabled", payload.Thinking)
+	}
+}
+
+func TestQNAProviderAcceptsSingleJSONMarkdownFence(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		response, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": "```json\n{\"layers\":[]}\n```"}}}})
+		_, _ = writer.Write(response)
+	}))
+	defer server.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      server.URL,
+		DefaultModel: "model",
+	})
+	result, err := provider.Complete(context.Background(), validProviderRequest())
+	if err != nil {
+		t.Fatalf("complete fenced JSON: %v", err)
+	}
+	if string(result.JSON) != `{"layers":[]}` {
+		t.Fatalf("JSON = %s, want {\"layers\":[]}", result.JSON)
+	}
+}
+
+func TestQNAProviderRetriesInvalidJSONObjectResponse(t *testing.T) {
+	requestCount := 0
+	var prompts []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestCount++
+		var payload struct {
+			Messages []struct {
+				Content []struct {
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"messages"`
+			ResponseFormat struct {
+				Type string `json:"type"`
+			} `json:"response_format"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		prompts = append(prompts, payload.Messages[0].Content[0].Text)
+		switch requestCount {
+		case 1:
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = writer.Write([]byte(`{"error":{"message":"response_format json_schema unavailable"}}`))
+		case 2:
+			if payload.ResponseFormat.Type != "json_object" {
+				t.Fatalf("fallback format = %q, want json_object", payload.ResponseFormat.Type)
+			}
+			_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"not JSON"}}]}`))
+		case 3:
+			if payload.ResponseFormat.Type != "json_object" {
+				t.Fatalf("retry format = %q, want json_object", payload.ResponseFormat.Type)
+			}
+			response, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": `{"layers":[]}`}}}})
+			_, _ = writer.Write(response)
+		}
+	}))
+	defer server.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      server.URL,
+		DefaultModel: "model",
+	})
+	result, err := provider.Complete(context.Background(), validProviderRequest())
+	if err != nil {
+		t.Fatalf("complete after retry: %v", err)
+	}
+	if requestCount != 3 || string(result.JSON) != `{"layers":[]}` {
+		t.Fatalf("requests = %d, result = %s", requestCount, result.JSON)
+	}
+	if len(prompts) != 3 || !strings.Contains(prompts[1], "Follow this JSON Schema exactly") || !strings.Contains(prompts[2], "previous response was not valid") {
+		t.Fatalf("unexpected fallback prompts: %#v", prompts)
+	}
+}
