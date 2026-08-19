@@ -288,7 +288,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
 		!strings.Contains(images.request.Prompt, "The subject's correct colours always take precedence") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
-		images.request.Size != "" ||
+		images.request.Size != "896x896" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
 	}
@@ -464,7 +464,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
-	if images.request == nil || images.request.MaxAttempts != 3 {
+	if images.request == nil || images.request.MaxAttempts != 3 || images.request.Size != "1536x768" {
 		t.Fatalf("expected MaxAttempts 3, got %+v", images.request)
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
@@ -486,6 +486,128 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.objectAsset, 8)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
+}
+
+func TestExecutorUsesTargetAspectRatioAndRetriesGridBoundaryCandidates(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{
+		events:      &events,
+		splitErrors: []error{imageprocessor.ErrGridBoundaryContent, nil},
+	}
+	assets := &generationAssetWriterStub{events: &events}
+	references := &executorReferenceStoreStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"king_sofa",
+		"creative_brief":"ornate black and white striped sofa",
+		"dimensions":{"width":188,"height":128},
+		"perspective":"Top-Down"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate rectangular prototype after boundary retry: %v", err)
+	}
+	if len(images.requests) != 2 {
+		t.Fatalf("generation requests = %d, want 2", len(images.requests))
+	}
+	for index, request := range images.requests {
+		if request.Size != "1504x1024" {
+			t.Fatalf("generation request %d size = %q, want 1504x1024", index, request.Size)
+		}
+	}
+	if len(processor.splitRequests) != 2 {
+		t.Fatalf("split requests = %d, want 2", len(processor.splitRequests))
+	}
+	for index, request := range processor.splitRequests {
+		if request.Columns != 2 || request.Rows != 2 || !request.RejectGridBoundaryContent || request.GridBoundaryMargin != 16 {
+			t.Fatalf("unexpected split request %d: %+v", index, request)
+		}
+	}
+	if len(processor.resizeRequests) != 4 {
+		t.Fatalf("resize requests = %d, want 4 successful-candidate directions", len(processor.resizeRequests))
+	}
+	if len(references.uploads) != 8 {
+		t.Fatalf("uploads = %d, want only 8 from the successful candidate", len(references.uploads))
+	}
+	if assets.objectAsset == nil {
+		t.Fatal("expected object asset after successful boundary retry")
+	}
+}
+
+func TestExecutorRejectsPrototypeAfterAllGridBoundaryCandidatesFail(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{
+		events: &events,
+		splitErrors: []error{
+			imageprocessor.ErrGridBoundaryContent,
+			imageprocessor.ErrGridBoundaryContent,
+			imageprocessor.ErrGridBoundaryContent,
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events}
+	references := &executorReferenceStoreStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"king_sofa",
+		"creative_brief":"ornate black and white striped sofa",
+		"dimensions":{"width":188,"height":128},
+		"perspective":"Top-Down"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if !errors.Is(err, imageprocessor.ErrGridBoundaryContent) {
+		t.Fatalf("error = %v, want ErrGridBoundaryContent", err)
+	}
+	if len(images.requests) != 3 || len(processor.splitRequests) != 3 {
+		t.Fatalf("generation/split attempts = %d/%d, want 3/3", len(images.requests), len(processor.splitRequests))
+	}
+	if assets.objectAsset != nil {
+		t.Fatalf("asset must not be created from invalid candidates: %+v", assets.objectAsset)
+	}
+	if len(references.uploads) != 0 {
+		t.Fatalf("invalid candidates must not be persisted: %+v", references.uploads)
+	}
+}
+
+func TestExecutorDownscalesOversizedTargetSheetWithinProviderLimits(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	assets := &generationAssetWriterStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"large_sofa",
+		"creative_brief":"large sofa",
+		"dimensions":{"width":2048,"height":1024},
+		"perspective":"Top-Down"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate oversized-target prototype: %v", err)
+	}
+	if images.request == nil || images.request.Size != "3840x1920" {
+		t.Fatalf("provider size = %+v, want 3840x1920", images.request)
+	}
+	if len(processor.splitRequests) != 1 || processor.splitRequests[0].GridBoundaryMargin != 30 {
+		t.Fatalf("unexpected oversized-target split request: %+v", processor.splitRequests)
+	}
 }
 
 func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *testing.T) {
