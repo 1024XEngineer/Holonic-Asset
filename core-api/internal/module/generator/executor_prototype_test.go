@@ -610,6 +610,38 @@ func TestExecutorDownscalesOversizedTargetSheetWithinProviderLimits(t *testing.T
 	}
 }
 
+func TestExecutorRejectsPrototypeSheetAspectBeyondProviderLimit(t *testing.T) {
+	for _, dimensions := range []string{
+		`{"width":1024,"height":64}`,
+		`{"width":64,"height":1024}`,
+	} {
+		t.Run(dimensions, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				&imageProcessorStub{events: &events},
+				&generationAssetWriterStub{events: &events},
+				generator.ExecutorDependencies{},
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"extreme_sofa",
+				"creative_brief":"extreme sofa",
+				"dimensions":` + dimensions + `,
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil || !strings.Contains(err.Error(), "exceeding 3:1") {
+				t.Fatalf("error = %v, want provider aspect-ratio rejection", err)
+			}
+			if len(images.requests) != 0 {
+				t.Fatalf("image requests = %d, want none", len(images.requests))
+			}
+		})
+	}
+}
+
 func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
