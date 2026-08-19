@@ -40,3 +40,17 @@ func TestTransparentBackgroundRequiresRealAlpha(t *testing.T) {
 		}
 	}
 }
+
+func TestAdaptiveMatteBackgroundPreservesSubjectColours(t *testing.T) {
+	constraint := prompts.AdaptiveMatteBackground()
+	for _, expected := range []string{
+		"strong perceptual colour separation",
+		"The subject's correct colours always take precedence",
+		"choose a different high-contrast matte colour instead",
+		"detect it automatically",
+	} {
+		if !strings.Contains(constraint, expected) {
+			t.Fatalf("expected adaptive matte constraint to contain %q: %s", expected, constraint)
+		}
+	}
+}
