@@ -7,7 +7,7 @@
 <p align="center"><strong>AI-assisted asset production for coherent game worlds.</strong></p>
 
 <p align="center">
-  <a href="https://codecov.io/gh/1024XEngineer/Holonic-Asset"><img src="https://codecov.io/gh/1024XEngineer/Holonic-Asset/branch/main/graph/badge.svg?flag=backend" alt="Backend test coverage"></a>
+  <a href="https://codecov.io/gh/1024XEngineer/Holonic-Asset"><img src="https://codecov.io/gh/1024XEngineer/Holonic-Asset/branch/main/graph/badge.svg" alt="Backend test coverage"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
 
