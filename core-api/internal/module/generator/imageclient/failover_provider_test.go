@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
 type mockImageProvider struct {
@@ -15,6 +16,21 @@ type mockImageProvider struct {
 	editFunc     func(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error)
 	calls        int
 }
+
+type failoverLoggerStub struct {
+	warnings int
+	errors   int
+}
+
+func (*failoverLoggerStub) Debug(string, ...logger.Field) {}
+func (*failoverLoggerStub) Info(string, ...logger.Field)  {}
+func (s *failoverLoggerStub) Warn(string, ...logger.Field) {
+	s.warnings++
+}
+func (s *failoverLoggerStub) Error(string, ...logger.Field) {
+	s.errors++
+}
+func (*failoverLoggerStub) Sync() error { return nil }
 
 func (m *mockImageProvider) Generate(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 	m.calls++
@@ -158,8 +174,9 @@ func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *tes
 			return nil, fallbackErr
 		},
 	}
+	providerLogger := &failoverLoggerStub{}
 	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
-		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model",
+		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model", Logger: providerLogger,
 	})
 
 	service := imageclient.NewImageGenerationService(provider)
@@ -171,6 +188,9 @@ func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *tes
 	}
 	if primary.calls != 1 || fallback.calls != 1 {
 		t.Fatalf("permanent fallback failure was retried: primary=%d fallback=%d", primary.calls, fallback.calls)
+	}
+	if providerLogger.warnings != 1 || providerLogger.errors != 1 {
+		t.Fatalf("failover logs = warnings:%d errors:%d, want one each", providerLogger.warnings, providerLogger.errors)
 	}
 	if !errors.Is(err, primaryErr) || !errors.Is(err, fallbackErr) {
 		t.Fatalf("error chain does not preserve both failures: %v", err)
@@ -242,12 +262,14 @@ func TestFailoverProviderEditFailover(t *testing.T) {
 			return &imageclient.ProviderResult{Images: []string{"fallback-edit-img"}}, nil
 		},
 	}
+	providerLogger := &failoverLoggerStub{}
 
 	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  "primary-model",
 		FallbackModel: "fallback-model",
+		Logger:        providerLogger,
 	})
 
 	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
@@ -259,5 +281,90 @@ func TestFailoverProviderEditFailover(t *testing.T) {
 	}
 	if len(result.Images) != 1 || result.Images[0] != "fallback-edit-img" {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+	if providerLogger.warnings != 1 || providerLogger.errors != 0 {
+		t.Fatalf("edit failover logs = warnings:%d errors:%d", providerLogger.warnings, providerLogger.errors)
+	}
+}
+
+func TestFailoverProviderEditTerminalBranches(t *testing.T) {
+	t.Run("primary success", func(t *testing.T) {
+		primary := &mockImageProvider{
+			editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+				return &imageclient.ProviderResult{Images: []string{"primary-edit"}}, nil
+			},
+		}
+		fallback := &mockImageProvider{}
+		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+			Primary: primary, Fallback: fallback, PrimaryModel: "primary-model",
+		})
+
+		result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{Prompt: "edit"})
+		if err != nil || len(result.Images) != 1 || result.Images[0] != "primary-edit" {
+			t.Fatalf("primary edit result = %+v, error = %v", result, err)
+		}
+		if fallback.calls != 0 {
+			t.Fatalf("fallback calls = %d, want 0", fallback.calls)
+		}
+	})
+
+	t.Run("permanent primary failure", func(t *testing.T) {
+		primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+		primary := &mockImageProvider{
+			editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+				return nil, primaryErr
+			},
+		}
+		fallback := &mockImageProvider{}
+		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+			Primary: primary, Fallback: fallback,
+		})
+
+		_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{Prompt: "edit"})
+		if !errors.Is(err, primaryErr) || fallback.calls != 0 {
+			t.Fatalf("edit error = %v, fallback calls = %d", err, fallback.calls)
+		}
+	})
+
+	t.Run("fallback failure", func(t *testing.T) {
+		primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
+		fallbackErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindAuthentication, Transient: false}
+		primary := &mockImageProvider{
+			editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+				return nil, primaryErr
+			},
+		}
+		fallback := &mockImageProvider{
+			editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+				return nil, fallbackErr
+			},
+		}
+		providerLogger := &failoverLoggerStub{}
+		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+			Primary: primary, Fallback: fallback, FallbackModel: "fallback-model", Logger: providerLogger,
+		})
+
+		_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{Prompt: "edit"})
+		if !errors.Is(err, primaryErr) || !errors.Is(err, fallbackErr) {
+			t.Fatalf("edit error does not preserve both failures: %v", err)
+		}
+		if providerLogger.warnings != 1 || providerLogger.errors != 1 {
+			t.Fatalf("edit failure logs = warnings:%d errors:%d", providerLogger.warnings, providerLogger.errors)
+		}
+	})
+}
+
+func TestFailoverProviderWithoutFallbackReturnsPrimaryError(t *testing.T) {
+	primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
+	primary := &mockImageProvider{
+		generateFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
+			return nil, primaryErr
+		},
+	}
+	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{Primary: primary})
+
+	_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+	if !errors.Is(err, primaryErr) {
+		t.Fatalf("generate error = %v, want primary failure", err)
 	}
 }
