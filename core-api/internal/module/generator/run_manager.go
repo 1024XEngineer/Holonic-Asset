@@ -53,24 +53,40 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 }
 
 func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload any) (any, error) {
-	prepare := func(reference string) (string, error) {
-		if reference == "" && e.projects != nil && projectID != 0 {
-			project, err := e.projects.GetDetail(ctx, projectID)
-			if err != nil {
-				return "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
-			}
-			if project != nil {
-				reference = project.Reference
-			}
+	persistReference := func(role, reference string) (string, error) {
+		if strings.TrimSpace(reference) == "" {
+			return "", nil
 		}
-		if e.references == nil || reference == "" {
+		if e.references == nil {
 			return reference, nil
 		}
-		resolved, err := e.references.PersistReference(ctx, reference)
+		persisted, err := e.references.PersistReference(ctx, reference)
 		if err != nil {
-			return "", fmt.Errorf("generator: persist reference: %w", err)
+			return "", fmt.Errorf("generator: persist %s reference: %w", role, err)
 		}
-		return resolved, nil
+		return persisted, nil
+	}
+	preparePrototypeReferences := func(userReference string) (string, string, error) {
+		projectReference := ""
+		if e.projects != nil && projectID != 0 {
+			project, err := e.projects.GetDetail(ctx, projectID)
+			if err != nil {
+				return "", "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
+			}
+			if project != nil {
+				projectReference = project.Reference
+			}
+		}
+		var err error
+		projectReference, err = persistReference("project", projectReference)
+		if err != nil {
+			return "", "", err
+		}
+		userReference, err = persistReference("user", userReference)
+		if err != nil {
+			return "", "", err
+		}
+		return projectReference, userReference, nil
 	}
 	persistEditReference := func(reference string) (string, error) {
 		if reference == "" || e.references == nil {
@@ -86,11 +102,11 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.Reference, err = prepare(value.Reference)
+		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.Reference, err = prepare(value.Reference)
+		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -162,6 +178,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if err := decodeParameters(request, &payload); err != nil {
 			return nil, err
 		}
+		payload.ProjectReference = ""
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
@@ -188,6 +205,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if err := decodeParameters(request, &payload); err != nil {
 			return nil, err
 		}
+		payload.ProjectReference = ""
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
