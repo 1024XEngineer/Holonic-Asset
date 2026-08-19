@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
@@ -16,7 +15,6 @@ const capabilities = [
     description:
       "Generate character prototypes (2/4/8-directional views), 4-16 frame animations (Idle, Walk, Attack), and bound action SFX.",
     detail: "Prototypes, Spritesheets & SFX",
-    to: "/projects",
     docsHref: "/docs/asset-concepts#character",
     icon: ImageIcon,
     preview: {
@@ -30,7 +28,6 @@ const capabilities = [
     description:
       "Generate distinctive game objects with consistent style, clear silhouettes, and the visual states needed for your world.",
     detail: "Game Objects & Visual States",
-    to: "/projects",
     docsHref: "/docs/asset-concepts#object",
     icon: Sparkles,
     preview: {
@@ -44,7 +41,6 @@ const capabilities = [
     description:
       "Generate multi-layer backgrounds with parallax sky, wind, and foreground detail for level design.",
     detail: "Parallax Scenery Layers",
-    to: "/projects",
     docsHref: "/docs/asset-concepts#scenery",
     icon: Layers3,
     preview: undefined,
@@ -55,7 +51,6 @@ const capabilities = [
     description:
       "Build reusable pixel-art tilesets for streets, interiors, terrain, and seamless game-world construction.",
     detail: "Modular Tiles & Map Building",
-    to: "/projects",
     docsHref: "/docs/asset-concepts#tileset",
     icon: Layers3,
     preview: {
@@ -69,7 +64,6 @@ const capabilities = [
     description:
       "Design cohesive health bars, inventory panels, skill icon frames, system menus, and UI Set interaction sounds.",
     detail: "HUD, Controls & System Menus",
-    to: "/projects",
     docsHref: "/docs/asset-concepts#ui-set",
     icon: FolderKanban,
     preview: {
@@ -83,7 +77,6 @@ const capabilities = [
     description:
       "Generate action sound effects (SFX) matched with animations, plus immersive looping background music (BGM).",
     detail: "Animation SFX & Loopable BGM",
-    to: "/projects",
     docsHref: undefined,
     icon: Music,
     preview: undefined,
@@ -95,7 +88,7 @@ export function HomeCapabilities() {
   return (
     <section aria-label={t("capabilitiesLabel")} className="bg-white">
       {capabilities.map(
-        ({ docsHref, icon: Icon, key, preview, title, to }, index) => (
+        ({ docsHref, icon: Icon, key, preview, title }, index) => (
           <article
             key={title}
             className={`mx-auto flex min-h-[calc(100svh-3.5rem)] max-w-[110rem] flex-col border-x border-neutral-950/10 px-5 py-10 text-neutral-950 sm:px-10 sm:py-12 lg:px-16 ${index % 2 === 0 ? "bg-[#fcfbf7]" : "bg-[#edf4ef]"}`}
@@ -159,29 +152,22 @@ export function HomeCapabilities() {
               </div>
 
               <div className="max-w-2xl">
-                <p className="font-mono text-xs tracking-[0.18em] text-cyan-700/70">
-                  {t(`capabilities.${key}.detail`)}
-                </p>
-                <p className="mt-5 text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
-                  {t(`capabilities.${key}.description`)}
-                </p>
                 {docsHref ? (
                   <a
                     href={docsHref}
-                    className="mt-7 inline-flex h-12 items-center gap-2 rounded-lg border border-cyan-700 px-5 text-base font-semibold text-cyan-700 transition-colors hover:bg-cyan-700 hover:text-white focus-visible:ring-3 focus-visible:ring-cyan-700/50 focus-visible:outline-none"
+                    className="inline-flex items-center gap-2 font-mono text-xs tracking-[0.18em] text-cyan-700/70 transition-colors hover:text-cyan-800 hover:underline hover:underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-700"
                   >
-                    {t("viewDocs")}
-                    <ArrowUpRight className="size-4" />
+                    {t(`capabilities.${key}.detail`)}
+                    <ArrowUpRight className="size-3" aria-hidden="true" />
                   </a>
                 ) : (
-                  <Link
-                    to={to}
-                    className="mt-7 inline-flex h-12 items-center gap-2 rounded-lg border border-cyan-700 px-5 text-base font-semibold text-cyan-700 transition-colors hover:bg-cyan-700 hover:text-white focus-visible:ring-3 focus-visible:ring-cyan-700/50 focus-visible:outline-none"
-                  >
-                    {t("explore")}
-                    <ArrowUpRight className="size-4" />
-                  </Link>
+                  <p className="font-mono text-xs tracking-[0.18em] text-cyan-700/70">
+                    {t(`capabilities.${key}.detail`)}
+                  </p>
                 )}
+                <p className="mt-5 text-lg leading-8 text-slate-600 sm:text-xl sm:leading-9">
+                  {t(`capabilities.${key}.description`)}
+                </p>
               </div>
             </div>
           </article>
