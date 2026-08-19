@@ -36,6 +36,8 @@ llm:
   baseURL: https://llm.example.test
   apiKey: test-llm-key
   defaultModel: vision-model
+pprof:
+  enabled: true
 video:
   baseURL: https://video.example.test
   apiKey: test-video-key
@@ -66,6 +68,9 @@ qiniu:
 	if loaded.DB.ConnMaxIdleTime != 15*time.Minute || loaded.Queue.JobTimeout != 30*time.Second {
 		t.Fatalf("unexpected duration config: db=%s queue=%s", loaded.DB.ConnMaxIdleTime, loaded.Queue.JobTimeout)
 	}
+	if !loaded.Pprof.Enabled {
+		t.Fatal("expected pprof to be enabled")
+	}
 	if loaded.Auth.JWTSecret != "test-secret" || loaded.Auth.TokenExpiry != 2*time.Hour {
 		t.Fatalf("unexpected auth config: %+v", loaded.Auth)
 	}
@@ -91,6 +96,9 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 		t.Fatalf("load example config: %v", err)
 	}
 
+	if loaded.Pprof.Enabled {
+		t.Fatal("expected pprof to be disabled by default in example config")
+	}
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
 	}
