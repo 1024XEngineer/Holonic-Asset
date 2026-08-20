@@ -13,6 +13,11 @@ export {
 } from "./directional-asset";
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 export {
+  DEFAULT_ANIMATION_FRAME_DURATION_MS,
+  getAnimationFrameDuration,
+  getEffectiveAnimationFps,
+} from "./animation-timing";
+export {
   getPerspectiveDirectionLayout,
   perspectiveDirectionLayouts,
 } from "./perspective-direction";
