@@ -548,6 +548,10 @@ func (s *tileSetEditProcessorStub) RemoveBackground(context.Context, *imageproce
 	return &imageprocessor.RemoveBackgroundResult{}, nil
 }
 
+func (*tileSetEditProcessorStub) NormalizeReference(_ context.Context, request *imageprocessor.NormalizeReferenceRequest) (*imageprocessor.NormalizeReferenceResult, error) {
+	return &imageprocessor.NormalizeReferenceResult{ImageBase64: request.ImageBase64, MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 1}}, nil
+}
+
 func (s *tileSetEditProcessorStub) Resize(context.Context, *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
 	index := s.resizeCalls
 	s.resizeCalls++
