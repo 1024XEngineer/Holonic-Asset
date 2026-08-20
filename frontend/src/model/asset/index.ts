@@ -18,6 +18,7 @@ export type {
   AssetLibraryItem,
 } from "./library";
 export {
+  describeAssetRecordChanges,
   toCoreSpriteCandidateRecord,
   useRecordQuery,
   useSaveAssetRevisionMutation,

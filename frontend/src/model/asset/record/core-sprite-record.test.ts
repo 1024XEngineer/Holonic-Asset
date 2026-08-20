@@ -86,7 +86,6 @@ describe("saveCoreSpriteAssetRevision", () => {
       expectedVersion: 3,
       content: expect.objectContaining({
         directionCount: 2,
-        metadata: { nodePositions: { prototype: { x: 10, y: 20 } } },
       }),
     });
   });
@@ -147,7 +146,6 @@ describe("saveCoreSpriteAssetRevision", () => {
             generation: walkGeneration,
           },
         ],
-        metadata: { nodePositions: {} },
       },
     });
     expect(result).toMatchObject({ version: "v5", record });
@@ -327,7 +325,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
     );
   });
 
-  it("keeps only valid persisted node positions", () => {
+  it("does not load persisted canvas positions", () => {
     const detail = characterDetail();
     if (detail.type !== "character" || !detail.content) {
       throw new Error("Expected character detail");
@@ -350,7 +348,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
 
     expect(workspace.record).toMatchObject({
       mode: "character",
-      character: { nodePositions: { prototype: { x: 10, y: 20 } } },
+      character: { nodePositions: {} },
     });
 
     detail.content.metadata = { nodePositions: [] };

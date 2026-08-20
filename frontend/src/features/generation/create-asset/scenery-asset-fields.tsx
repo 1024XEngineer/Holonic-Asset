@@ -55,7 +55,12 @@ export function SceneryAssetFields({
       />
       <div className="grid gap-3">
         {draft.layers.map((layer, index) => (
-          <label key={index} className="grid gap-2 text-sm font-medium">
+          <label
+            // Layers are positional drafts and can only be added or removed at the end.
+            // oxlint-disable-next-line react/no-array-index-key
+            key={index}
+            className="grid gap-2 text-sm font-medium"
+          >
             {t("layerDescription", { number: index + 1 })}
             <Textarea
               required

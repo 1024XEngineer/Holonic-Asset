@@ -125,10 +125,14 @@ func (h *Handler) Record(
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}
-	record, err := h.AssetManager.CreateRecord(x, &domain.AssetRecord{
+	recordInput := &domain.AssetRecord{
 		AssetID: asset.AssetID,
 		Content: persistedContent,
-	}, asset.ExpectedVersion)
+	}
+	if asset.Description != nil {
+		recordInput.Description = *asset.Description
+	}
+	record, err := h.AssetManager.CreateRecord(x, recordInput, asset.ExpectedVersion)
 	if err != nil {
 		return dto.SuccessResponse[dto.RecordAssetResponse]{}, err
 	}

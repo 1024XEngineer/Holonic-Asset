@@ -592,6 +592,7 @@ export interface components {
             /** Format: int64 */
             assetId: number;
             content: unknown;
+            description?: string;
             /** Format: int64 */
             expectedVersion?: number;
         };

@@ -8,9 +8,9 @@ import { projectApi } from "../../project";
 import type {
   AssetRecord,
   AssetWorkspaceData,
+  GetAssetRecordInput,
   SceneryCanvasDimensions,
 } from "./types";
-import type { GetAssetRecordInput } from "./types";
 import { toCoreSpriteAssetWorkspace } from "./core-sprite-record";
 
 type CoreWorkspaceAssetKind = Extract<

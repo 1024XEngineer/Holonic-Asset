@@ -13,11 +13,15 @@ export type SceneryEditorModeProps = {
   onBack: () => void;
 };
 
+const emptySceneryLayers = [] as const;
+
 export function SceneryEditorMode({ data, onBack }: SceneryEditorModeProps) {
   const { asset, projectName, record } = data;
+  const canvas = useSceneryCanvasStateMachine(
+    record.mode === "scenery" ? record.scenery.layers : emptySceneryLayers,
+  );
   if (record.mode !== "scenery") return null;
   const { layers, dimensions } = record.scenery;
-  const canvas = useSceneryCanvasStateMachine(layers);
   const selectedLayerId = canvas.selectedLayerIds[0] ?? null;
   const selectedLayer =
     layers.find((layer) => layer.id === selectedLayerId) ?? null;

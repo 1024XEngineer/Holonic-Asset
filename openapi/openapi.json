@@ -848,6 +848,9 @@
             "type": "integer"
           },
           "content": {},
+          "description": {
+            "type": "string"
+          },
           "expectedVersion": {
             "format": "int64",
             "minimum": 1,

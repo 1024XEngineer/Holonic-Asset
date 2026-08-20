@@ -1,14 +1,12 @@
 import type {
   AssetDetailResponse,
   AssetRecordResponse,
-} from "../library/asset.contract";
-import { coreAssetApi } from "../library/core-asset.api";
-import { mergeAssetContentPatch } from "../library/merge-asset-content";
-import type {
   CharacterAssetContent,
   CoreSpriteAssetContent,
   CoreSpriteAssetContentPatch,
 } from "../library/asset.contract";
+import { coreAssetApi } from "../library/core-asset.api";
+import { mergeAssetContentPatch } from "../library/merge-asset-content";
 import type {
   AssetKind,
   AssetRevision,
@@ -17,8 +15,9 @@ import type {
 } from "../types";
 import { getPerspectiveDirectionLayout } from "../types";
 import { projectApi } from "../../project";
-import type { AssetRecord, AssetWorkspaceData } from "./types";
 import type {
+  AssetRecord,
+  AssetWorkspaceData,
   AssetRecordSaveResult,
   GetAssetRecordInput,
   SaveAssetRecordInput,
@@ -62,6 +61,7 @@ export async function saveCoreSpriteAssetRevision(
   const saved = await coreAssetApi.record({
     assetId,
     ...(expectedVersion ? { expectedVersion } : {}),
+    ...(input.description ? { description: input.description } : {}),
     content: toCoreSpriteAssetContent(input.record),
   });
   const records = await coreAssetApi.records(assetId);
@@ -93,7 +93,7 @@ export function toCoreSpriteAssetWorkspace({
   const sprite = {
     prototype: toPrototype(detail),
     animations: toAnimations(detail),
-    nodePositions: readNodePositions(detail.content?.metadata),
+    nodePositions: {},
   };
   const record: AssetRecord =
     kind === "character"
@@ -143,7 +143,7 @@ export function toCoreSpriteCandidateRecord(
       currentSprite.prototype.frameWidth,
       currentSprite.prototype.frameHeight,
     ),
-    nodePositions: readNodePositions(content.metadata),
+    nodePositions: {},
   };
   return record.mode === "character"
     ? { ...record, character: sprite }
@@ -255,28 +255,7 @@ function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
         ? { generation: structuredClone(animation.generation) }
         : {}),
     })),
-    metadata: { nodePositions: structuredClone(sprite.nodePositions) },
   };
-}
-
-function readNodePositions(metadata: Record<string, unknown> | undefined) {
-  const value = metadata?.nodePositions;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([id, position]) => {
-      if (
-        !position ||
-        typeof position !== "object" ||
-        Array.isArray(position)
-      ) {
-        return [];
-      }
-      const { x, y } = position as { x?: unknown; y?: unknown };
-      return typeof x === "number" && typeof y === "number"
-        ? [[id, { x, y }]]
-        : [];
-    }),
-  );
 }
 
 function parseVersion(version: string | undefined) {

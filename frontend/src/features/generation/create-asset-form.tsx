@@ -115,9 +115,7 @@ export function CreateAssetForm({
       {draft.kind === "scenery" ? (
         <SceneryAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "tileset" ? (
-        <>
-          <TilesetAssetFields draft={draft} onChange={setDraft} />
-        </>
+        <TilesetAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "uiset" ? (
         <UISetAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "character" || draft.kind === "object" ? (

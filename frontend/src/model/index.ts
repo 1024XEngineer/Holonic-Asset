@@ -10,6 +10,7 @@ export {
   getDefaultAssetCanvasSize,
   recordQueryOptions,
   toCoreSpriteCandidateRecord,
+  describeAssetRecordChanges,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
