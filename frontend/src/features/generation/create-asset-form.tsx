@@ -17,6 +17,7 @@ import type { AssetCreationDraft } from "./types";
 import { TilesetAssetFields } from "./create-asset/tileset-asset-fields";
 import { VisualAssetFields } from "./create-asset/visual-asset-fields";
 import { UISetAssetFields } from "./create-asset/uiset-asset-fields";
+import { SceneryAssetFields } from "./create-asset/scenery-asset-fields";
 
 const assetNamePlaceholderKeys = {
   audio: "audioNamePlaceholder",
@@ -113,13 +114,7 @@ export function CreateAssetForm({
         </label>
       </div>
 
-      {draft.kind === "tileset" ? (
-        <TilesetAssetFields draft={draft} onChange={setDraft} />
-      ) : draft.kind === "uiset" ? (
-        <UISetAssetFields draft={draft} onChange={setDraft} />
-      ) : draft.kind === "character" || draft.kind === "object" ? (
-        <VisualAssetFields draft={draft} onChange={setDraft} />
-      ) : null}
+      <AssetSpecificFields draft={draft} onChange={setDraft} />
 
       {validationError ? (
         <p className="text-sm text-destructive" role="alert">
@@ -157,4 +152,26 @@ export function CreateAssetForm({
       </div>
     </form>
   );
+}
+
+function AssetSpecificFields({
+  draft,
+  onChange,
+}: {
+  draft: AssetCreationDraft<File>;
+  onChange: (draft: AssetCreationDraft<File>) => void;
+}) {
+  switch (draft.kind) {
+    case "tileset":
+      return <TilesetAssetFields draft={draft} onChange={onChange} />;
+    case "scenery":
+      return <SceneryAssetFields draft={draft} onChange={onChange} />;
+    case "uiset":
+      return <UISetAssetFields draft={draft} onChange={onChange} />;
+    case "character":
+    case "object":
+      return <VisualAssetFields draft={draft} onChange={onChange} />;
+    case "audio":
+      return null;
+  }
 }

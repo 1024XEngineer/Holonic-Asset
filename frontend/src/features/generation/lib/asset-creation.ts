@@ -10,6 +10,12 @@ import {
   isUISetCanvasHeight,
   isUISetCanvasWidth,
 } from "../create-asset/ui-set-canvas";
+import {
+  defaultSceneryAspectRatio,
+  getSceneryCanvasSize,
+  getSceneryDimensions,
+  sceneryAspectRatios,
+} from "../create-asset/scenery-aspect-ratio";
 import type { AssetCreationDraft } from "../types";
 
 const commonAssetCreationDraftShape = {
@@ -42,6 +48,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
     kind: z.literal("scenery"),
+    aspectRatio: z.enum(sceneryAspectRatios),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -109,7 +116,12 @@ export function createAssetCreationDraft<Reference = unknown>(
     case "audio":
       return { ...common, kind };
     case "scenery":
-      return { ...common, kind };
+      return {
+        ...common,
+        kind,
+        aspectRatio: defaultSceneryAspectRatio,
+        canvasSize: getSceneryCanvasSize(defaultSceneryAspectRatio),
+      };
     case "tileset":
       return {
         ...common,
@@ -151,7 +163,11 @@ export function toCreationRequest<Reference>(
     case "audio":
       return common;
     case "scenery":
-      return common;
+      return {
+        ...common,
+        canvasSize: getSceneryCanvasSize(draft.aspectRatio),
+        dimensions: getSceneryDimensions(draft.aspectRatio),
+      };
     case "tileset":
       return {
         ...common,

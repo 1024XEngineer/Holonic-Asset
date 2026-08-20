@@ -96,7 +96,9 @@ export async function toCreateGenerationRequest(
       creative_brief: request.prompt,
       parameters: {
         asset_name: request.name,
-        dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
+        dimensions:
+          request.dimensions ??
+          assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
         reference: await resolveReference(request.reference),
       },
     };

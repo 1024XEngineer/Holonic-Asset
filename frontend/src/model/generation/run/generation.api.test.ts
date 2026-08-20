@@ -120,7 +120,8 @@ describe("generationApi", () => {
     });
     const request = creationRequest({
       kind: "scenery",
-      canvasSize: "1920 × 1080 px",
+      canvasSize: "stale display value",
+      dimensions: { width: 1792, height: 768 },
       reference,
     });
 
@@ -129,7 +130,7 @@ describe("generationApi", () => {
       creative_brief: "A moonlit orchard keeper",
       parameters: {
         asset_name: "Orchard Keeper",
-        dimensions: { width: 1920, height: 1080 },
+        dimensions: { width: 1792, height: 768 },
         reference: "data:image/png;base64,reference",
       },
     });
