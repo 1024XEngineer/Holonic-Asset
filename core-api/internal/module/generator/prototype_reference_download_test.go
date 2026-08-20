@@ -43,6 +43,28 @@ func TestValidatePrototypeReferenceURLRejectsNonPublicLiteralTargets(t *testing.
 	}
 }
 
+func TestValidatePrototypeReferenceURLRejectsMalformedTargets(t *testing.T) {
+	tests := []struct {
+		name  string
+		value *url.URL
+		want  string
+	}{
+		{name: "missing URL", want: "URL is required"},
+		{name: "unsupported scheme", value: &url.URL{Scheme: "file", Host: "example.com"}, want: "scheme"},
+		{name: "missing host", value: &url.URL{Scheme: "https"}, want: "host is required"},
+		{name: "IPv6 zone", value: &url.URL{Scheme: "https", Host: "[fe80::1%25en0]"}, want: "zones are unsupported"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validatePrototypeReferenceURL(test.value)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("validation error = %v, want error containing %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestPrototypeReferenceDialerRejectsMixedPublicAndPrivateResolution(t *testing.T) {
 	dialCalled := false
 	dialer := prototypeReferenceDialer{
@@ -79,6 +101,64 @@ func TestPrototypeReferenceDialerPinsValidatedIPAddress(t *testing.T) {
 	_, _ = dialer.DialContext(context.Background(), "tcp", "references.example:443")
 	if dialedAddress != "8.8.8.8:443" {
 		t.Fatalf("dialed address = %q, want resolved public IP", dialedAddress)
+	}
+}
+
+func TestPrototypeReferenceDialerRejectsAddressWithoutPort(t *testing.T) {
+	dialer := prototypeReferenceDialer{}
+
+	_, err := dialer.DialContext(context.Background(), "tcp", "references.example")
+	if err == nil || !strings.Contains(err.Error(), "parse prototype reference address") {
+		t.Fatalf("dial error = %v, want address parse failure", err)
+	}
+}
+
+func TestPrototypeReferenceDialerReportsLookupFailure(t *testing.T) {
+	lookupErr := errors.New("lookup failed")
+	dialer := prototypeReferenceDialer{
+		lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+			return nil, lookupErr
+		},
+	}
+
+	_, err := dialer.DialContext(context.Background(), "tcp", "references.example:443")
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("dial error = %v, want wrapped lookup failure", err)
+	}
+}
+
+func TestPrototypeReferenceDialerRejectsEmptyResolution(t *testing.T) {
+	dialer := prototypeReferenceDialer{
+		lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+			return []netip.Addr{{}}, nil
+		},
+	}
+
+	_, err := dialer.DialContext(context.Background(), "tcp", "references.example:443")
+	if err == nil || !strings.Contains(err.Error(), "no IP addresses") {
+		t.Fatalf("dial error = %v, want empty resolution failure", err)
+	}
+}
+
+func TestPrototypeReferenceDialerConnectsToPublicLiteralAddress(t *testing.T) {
+	client, server := net.Pipe()
+	defer func() { _ = server.Close() }()
+
+	var dialedAddress string
+	dialer := prototypeReferenceDialer{
+		dialContext: func(_ context.Context, _ string, address string) (net.Conn, error) {
+			dialedAddress = address
+			return client, nil
+		},
+	}
+
+	connection, err := dialer.DialContext(context.Background(), "tcp", "8.8.8.8:443")
+	if err != nil {
+		t.Fatalf("dial public literal address: %v", err)
+	}
+	defer func() { _ = connection.Close() }()
+	if dialedAddress != "8.8.8.8:443" {
+		t.Fatalf("dialed address = %q, want public literal address", dialedAddress)
 	}
 }
 

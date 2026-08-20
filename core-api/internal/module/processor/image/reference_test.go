@@ -2,10 +2,25 @@ package image
 
 import (
 	"context"
+	"encoding/base64"
+	"errors"
 	"image"
 	"image/color"
+	"io"
+	"strings"
 	"testing"
 )
+
+type cancelingReferenceImage struct {
+	cancel context.CancelFunc
+}
+
+func (i cancelingReferenceImage) ColorModel() color.Model { return color.NRGBAModel }
+func (i cancelingReferenceImage) Bounds() image.Rectangle { return image.Rect(0, 0, 2, 2) }
+func (i cancelingReferenceImage) At(int, int) color.Color {
+	i.cancel()
+	return color.NRGBA{R: 1, G: 2, B: 3, A: 255}
+}
 
 func TestNormalizeReferenceUsesIntegerNearestNeighborScaling(t *testing.T) {
 	source := image.NewNRGBA(image.Rect(0, 0, 2, 3))
@@ -86,5 +101,82 @@ func TestNormalizeReferenceDoesNotResampleLargeImage(t *testing.T) {
 	}
 	if result.ImageBase64 != encoded {
 		t.Fatal("large reference was unnecessarily re-encoded")
+	}
+}
+
+func TestNormalizeReferenceRejectsInvalidRequests(t *testing.T) {
+	canceledContext, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		request *NormalizeReferenceRequest
+		want    string
+	}{
+		{name: "canceled context", ctx: canceledContext, request: &NormalizeReferenceRequest{}, want: context.Canceled.Error()},
+		{name: "missing request", ctx: context.Background(), want: "request is required"},
+		{name: "negative max edge", ctx: context.Background(), request: &NormalizeReferenceRequest{MaxEdge: -1}, want: "cannot be negative"},
+		{name: "invalid image", ctx: context.Background(), request: &NormalizeReferenceRequest{ImageBase64: "not-base64!"}, want: "decode reference image"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := (&processor{}).NormalizeReference(test.ctx, test.request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("normalize error = %v, want error containing %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeReferenceRejectsEmptyDecodedImage(t *testing.T) {
+	const magic = "EMPTY-REFERENCE-IMAGE"
+	image.RegisterFormat(
+		"empty-reference-test",
+		magic,
+		func(io.Reader) (image.Image, error) { return image.NewNRGBA(image.Rectangle{}), nil },
+		func(io.Reader) (image.Config, error) { return image.Config{}, nil },
+	)
+	encoded := base64.StdEncoding.EncodeToString([]byte(magic))
+
+	_, err := (&processor{}).NormalizeReference(context.Background(), &NormalizeReferenceRequest{
+		ImageBase64: encoded,
+		MaxEdge:     8,
+	})
+	if err == nil || !strings.Contains(err.Error(), "must not be empty") {
+		t.Fatalf("normalize error = %v, want empty image rejection", err)
+	}
+}
+
+func TestNormalizeReferenceChecksContextAfterScaling(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	const magic = "CANCEL-REFERENCE-IMAGE"
+	image.RegisterFormat(
+		"cancel-reference-test",
+		magic,
+		func(io.Reader) (image.Image, error) { return cancelingReferenceImage{cancel: cancel}, nil },
+		func(io.Reader) (image.Config, error) {
+			return image.Config{ColorModel: color.NRGBAModel, Width: 2, Height: 2}, nil
+		},
+	)
+	encoded := base64.StdEncoding.EncodeToString([]byte(magic))
+
+	_, err := (&processor{}).NormalizeReference(ctx, &NormalizeReferenceRequest{
+		ImageBase64: encoded,
+		MaxEdge:     4,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("normalize error = %v, want context canceled after scaling", err)
+	}
+}
+
+func TestIntegerNearestNeighborScaleReturnsInputSizeAtUnitScale(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 3, 2))
+	source.SetNRGBA(2, 1, color.NRGBA{R: 10, G: 20, B: 30, A: 40})
+
+	result := integerNearestNeighborScale(source, 1)
+	if result.Bounds() != source.Bounds() || result.NRGBAAt(2, 1) != source.NRGBAAt(2, 1) {
+		t.Fatalf("unit-scale result = bounds %v pixel %+v", result.Bounds(), result.NRGBAAt(2, 1))
 	}
 }
