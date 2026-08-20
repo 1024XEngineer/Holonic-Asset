@@ -214,6 +214,161 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(onZoomChange).toHaveBeenCalledWith(0.88);
   });
 
+  it("centers compact and wide stages and renders through the viewport", () => {
+    const onZoomChange = vi.fn();
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+      onZoomChange,
+    });
+    const viewport = {
+      scale: { x: 0.64 },
+      setZoom: vi.fn(),
+      moveCenter: vi.fn(),
+    };
+    const renderer = { render: vi.fn(), syncViewport: vi.fn() };
+    const internals = runtime as unknown as {
+      runtime: { app: { screen: { width: number; height: number } } };
+      viewport: typeof viewport;
+      renderer: typeof renderer;
+      centerWorld: () => void;
+      render: () => void;
+      syncViewportGrid: () => void;
+    };
+    internals.viewport = viewport;
+    internals.renderer = renderer;
+    Object.defineProperty(internals.runtime.app, "screen", {
+      value: { width: 500, height: 300 },
+      configurable: true,
+    });
+
+    internals.centerWorld();
+    internals.render();
+    internals.syncViewportGrid();
+
+    expect(viewport.moveCenter).toHaveBeenCalledWith(300, 300);
+    expect(renderer.render).toHaveBeenCalledOnce();
+    expect(renderer.syncViewport).toHaveBeenCalledTimes(2);
+    expect(onZoomChange).toHaveBeenLastCalledWith(0.64);
+
+    Object.defineProperty(internals.runtime.app, "screen", {
+      value: { width: 800, height: 600 },
+      configurable: true,
+    });
+    internals.centerWorld();
+    expect(viewport.moveCenter).toHaveBeenLastCalledWith(650, 700);
+  });
+
+  it("advances active animation previews at the configured cadence", () => {
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const renderer = { render: vi.fn(), syncViewport: vi.fn() };
+    const viewport = { scale: { x: 1 } };
+    const internals = runtime as unknown as {
+      scene: { togglePlaying: (node: string) => void };
+      lastAnimationFrame: number;
+      renderer: typeof renderer;
+      viewport: typeof viewport;
+      updateAnimation: () => void;
+    };
+    internals.renderer = renderer;
+    internals.viewport = viewport;
+    internals.lastAnimationFrame = 0;
+    const now = vi.spyOn(performance, "now");
+
+    now.mockReturnValue(200);
+    internals.updateAnimation();
+    expect(renderer.render).not.toHaveBeenCalled();
+
+    internals.scene.togglePlaying("prototype");
+    internals.updateAnimation();
+    expect(renderer.render).toHaveBeenCalledOnce();
+
+    now.mockReturnValue(250);
+    internals.updateAnimation();
+    expect(renderer.render).toHaveBeenCalledOnce();
+  });
+
+  it("stops initialization after destruction or an unavailable stage", async () => {
+    vi.spyOn(Assets, "load").mockResolvedValue({
+      source: { scaleMode: "linear" },
+    } as never);
+    const destroyedRuntime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    destroyedRuntime.destroy();
+
+    await destroyedRuntime.initialize({} as HTMLElement);
+
+    const unavailableRuntime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const initialize = vi
+      .spyOn(
+        (
+          unavailableRuntime as unknown as {
+            runtime: { initialize: (host: HTMLElement) => Promise<boolean> };
+          }
+        ).runtime,
+        "initialize",
+      )
+      .mockResolvedValue(false);
+    const host = {} as HTMLElement;
+
+    await unavailableRuntime.initialize(host);
+
+    expect(initialize).toHaveBeenCalledWith(host);
+  });
+
+  it("releases every initialized canvas resource only once", () => {
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: model(),
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const ticker = { remove: vi.fn() };
+    const stageRuntime = {
+      initialized: true,
+      app: { ticker },
+      destroy: vi.fn(),
+    };
+    const resizeObserver = { disconnect: vi.fn() };
+    const interaction = { destroy: vi.fn() };
+    const viewport = {
+      off: vi.fn(),
+      removeFromParent: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const renderer = { destroy: vi.fn() };
+    const internals = runtime as unknown as {
+      runtime: typeof stageRuntime;
+      resizeObserver: typeof resizeObserver;
+      interaction: typeof interaction;
+      viewport: typeof viewport | undefined;
+      renderer: typeof renderer | undefined;
+    };
+    Object.defineProperty(internals, "runtime", { value: stageRuntime });
+    internals.resizeObserver = resizeObserver;
+    internals.interaction = interaction;
+    internals.viewport = viewport;
+    internals.renderer = renderer;
+
+    runtime.destroy();
+    runtime.destroy();
+
+    expect(ticker.remove).toHaveBeenCalledOnce();
+    expect(resizeObserver.disconnect).toHaveBeenCalledOnce();
+    expect(interaction.destroy).toHaveBeenCalledOnce();
+    expect(viewport.off).toHaveBeenCalledTimes(2);
+    expect(viewport.removeFromParent).toHaveBeenCalledOnce();
+    expect(viewport.destroy).toHaveBeenCalledWith({ children: true });
+    expect(renderer.destroy).toHaveBeenCalledOnce();
+    expect(stageRuntime.destroy).toHaveBeenCalledOnce();
+  });
+
   it("does not render when only the props wrapper changes", () => {
     const initialModel = model();
     const runtime = new AnimatedSpriteCanvasRuntime({
@@ -255,7 +410,7 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(render).toHaveBeenCalledOnce();
   });
 
-  it("forwards interactions to the latest actions without rendering", () => {
+  it("forwards every interaction to the latest actions without rendering", () => {
     const initialModel = model();
     const initialOnEvent = vi.fn();
     const latestOnEvent = vi.fn();
@@ -268,14 +423,63 @@ describe("AnimatedSpriteCanvasRuntime", () => {
       model: { ...initialModel },
       actions: createAnimatedSpriteCanvasActions(latestOnEvent),
     });
-    (
+    const actions = (
       runtime as unknown as { actions: AnimatedSpriteCanvasActions }
-    ).actions.onSelect("prototype");
+    ).actions;
+    actions.onSelect("prototype");
+    actions.onSelectFrame("prototype", 0, true);
+    actions.onSelectFrames([{ nodeId: "prototype", index: 1 }], true);
+    actions.onSelectNodes(["prototype"], true);
+    actions.onClearSelection();
+    actions.onNodePositionChange("prototype", { x: 12, y: 24 });
+    actions.onReviewResolve(true);
 
     expect(initialOnEvent).not.toHaveBeenCalled();
-    expect(latestOnEvent).toHaveBeenCalledWith({
-      type: "selection.changed",
-      selection: { nodeIds: ["prototype"], frames: [] },
-    });
+    expect(latestOnEvent.mock.calls).toEqual([
+      [
+        {
+          type: "selection.changed",
+          selection: { nodeIds: ["prototype"], frames: [] },
+        },
+      ],
+      [
+        {
+          type: "selection.changed",
+          selection: {
+            nodeIds: ["prototype"],
+            frames: [{ nodeId: "prototype", index: 0 }],
+          },
+        },
+      ],
+      [
+        {
+          type: "selection.changed",
+          selection: {
+            nodeIds: ["prototype"],
+            frames: [{ nodeId: "prototype", index: 1 }],
+          },
+        },
+      ],
+      [
+        {
+          type: "selection.changed",
+          selection: { nodeIds: ["prototype"], frames: [] },
+        },
+      ],
+      [
+        {
+          type: "selection.changed",
+          selection: { nodeIds: [], frames: [] },
+        },
+      ],
+      [
+        {
+          type: "node-position.committed",
+          nodeId: "prototype",
+          position: { x: 12, y: 24 },
+        },
+      ],
+      [{ type: "generation-review.resolved", applied: true }],
+    ]);
   });
 });
