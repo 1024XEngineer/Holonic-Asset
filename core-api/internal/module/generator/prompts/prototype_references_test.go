@@ -112,3 +112,62 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		}
 	}
 }
+
+func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     prompts.PrototypeReferenceState
+		expected  []string
+		forbidden []string
+	}{
+		{
+			name:  "project user and tag assets",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true, TagReferenceCount: 2},
+			expected: []string{
+				"Exactly 4 reference images",
+				"Reference image 1 is the project prototype image",
+				"Reference image 2 is the user-supplied reference image",
+				"Reference image 3 is a same-project Tag asset",
+				"Reference image 4 is a same-project Tag asset",
+			},
+			forbidden: []string{"Reference image 3 is the highest-ranked"},
+		},
+		{
+			name:  "user and tag assets",
+			state: prompts.PrototypeReferenceState{HasUserReference: true, TagReferenceCount: 2},
+			expected: []string{
+				"Exactly 3 reference images",
+				"Reference image 1 is the user-supplied reference image",
+				"Reference image 2 is the highest-ranked same-project Tag asset and is promoted to the Style Reference",
+				"Reference image 3 is a same-project Tag asset",
+			},
+		},
+		{
+			name:  "tag assets only",
+			state: prompts.PrototypeReferenceState{TagReferenceCount: 3},
+			expected: []string{
+				"Exactly 3 reference images",
+				"Reference image 1 is the highest-ranked same-project Tag asset and is promoted to the Style Reference",
+				"Reference image 2 is a same-project Tag asset",
+				"Reference image 3 is a same-project Tag asset",
+				"Derive the requested character from the user creative brief",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			prompt := prompts.CharacterPrototype("hero", "Top-Down", prompts.TransparentBackground(), test.state)
+			for _, expected := range test.expected {
+				if !strings.Contains(prompt, expected) {
+					t.Fatalf("expected prompt to contain %q: %s", expected, prompt)
+				}
+			}
+			for _, forbidden := range test.forbidden {
+				if strings.Contains(prompt, forbidden) {
+					t.Fatalf("expected prompt not to contain %q: %s", forbidden, prompt)
+				}
+			}
+		})
+	}
+}

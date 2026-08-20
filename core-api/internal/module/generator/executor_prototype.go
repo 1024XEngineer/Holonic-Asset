@@ -41,6 +41,7 @@ func (e *executor) generateCharacterPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.TagReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateCharacterProtoType,
@@ -48,12 +49,12 @@ func (e *executor) generateCharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
 			prompts.AdaptiveMatteBackground(),
-			prototypeReferenceState(payload.ProjectReference, payload.Reference),
+			referenceState,
 		),
 		payload.Dimensions,
 		perspective,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.Reference),
+		references,
 	)
 	if err != nil {
 		return nil, err
@@ -63,6 +64,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.AssetName,
 		payload.ProjectID,
 		payload.CreativeBrief,
+		payload.Tags,
 		perspective,
 		payload.Dimensions,
 		directionCount,
@@ -158,6 +160,7 @@ func (e *executor) generateObjectPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.TagReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateObjectProtoType,
@@ -166,12 +169,12 @@ func (e *executor) generateObjectPrototype(
 			payload.Perspective,
 			payload.Dimensions,
 			prompts.AdaptiveMatteBackground(),
-			prototypeReferenceState(payload.ProjectReference, payload.Reference),
+			referenceState,
 		),
 		payload.Dimensions,
 		perspective,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.Reference),
+		references,
 	)
 	if err != nil {
 		return nil, err
@@ -181,6 +184,7 @@ func (e *executor) generateObjectPrototype(
 		payload.AssetName,
 		payload.ProjectID,
 		payload.CreativeBrief,
+		payload.Tags,
 		perspective,
 		payload.Dimensions,
 		directionCount,
@@ -507,11 +511,31 @@ func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {
 	return references, nil
 }
 
-func prototypeReferenceState(projectReference, userReference string) prompts.PrototypeReferenceState {
-	return prompts.PrototypeReferenceState{
-		HasProjectReference: strings.TrimSpace(projectReference) != "",
-		HasUserReference:    strings.TrimSpace(userReference) != "",
+func prototypeReferenceInputs(
+	projectReference string,
+	userReference string,
+	tagReferences []string,
+) ([]string, prompts.PrototypeReferenceState) {
+	references := make([]string, 0, maxPrototypeReferenceImages)
+	state := prompts.PrototypeReferenceState{}
+	if reference := strings.TrimSpace(projectReference); reference != "" {
+		references = append(references, reference)
+		state.HasProjectReference = true
 	}
+	if reference := strings.TrimSpace(userReference); reference != "" && len(references) < maxPrototypeReferenceImages {
+		references = append(references, reference)
+		state.HasUserReference = true
+	}
+	for _, reference := range tagReferences {
+		if len(references) == maxPrototypeReferenceImages {
+			break
+		}
+		if reference = strings.TrimSpace(reference); reference != "" {
+			references = append(references, reference)
+			state.TagReferenceCount++
+		}
+	}
+	return references, state
 }
 
 func referenceImages(references ...string) []string {
@@ -693,6 +717,7 @@ func newPrototypeAsset(
 	name string,
 	projectID uint,
 	description string,
+	tags []assetdomain.Tag,
 	perspective assetdomain.Perspective,
 	dimensions assetdomain.Size,
 	directionCount uint,
@@ -715,6 +740,7 @@ func newPrototypeAsset(
 		ProjectID:   projectID,
 		Type:        assetType,
 		Description: description,
+		Tags:        append([]assetdomain.Tag(nil), tags...),
 		Perspective: perspective,
 		Dimensions:  dimensionsValue,
 		Content:     encoded,
