@@ -70,44 +70,59 @@ export class AnimatedSpriteStageInteraction {
     if (event.button !== 0) return;
     const point = this.worldPoint(this.screenPoint(event));
     const hit = this.hitTest(point);
-    if (hit?.kind === "play") return this.togglePlaying(hit.node);
-    if (hit?.kind === "expand") return this.toggleExpanded(hit.node);
-    if (hit?.kind === "review-apply")
-      return this.context.actions.onReviewResolve(true);
-    if (hit?.kind === "review-deny")
-      return this.context.actions.onReviewResolve(false);
     const additive = event.ctrlKey || event.metaKey;
-    this.capture(event);
-    if (hit?.kind === "frame" || hit?.kind === "frame-grid") {
-      this.drag = {
-        kind: "marquee",
-        pointerId: event.pointerId,
-        start: point,
-        end: point,
-        additive,
-        startTarget:
-          hit.kind === "frame"
-            ? { kind: "frame", node: hit.node, index: hit.index }
-            : { kind: "frame-grid" },
-      };
-    } else if (hit?.kind === "node") {
-      this.context.actions.onSelect(hit.node, additive);
-      this.drag = {
-        kind: "node",
-        pointerId: event.pointerId,
-        start: point,
-        node: hit.node,
-        position: { ...this.context.getScene().positions[hit.node] },
-      };
-    } else {
-      this.drag = {
-        kind: "marquee",
-        pointerId: event.pointerId,
-        start: point,
-        end: point,
-        additive,
-        startTarget: { kind: "empty" },
-      };
+    switch (hit?.kind) {
+      case "play":
+        return this.togglePlaying(hit.node);
+      case "expand":
+        return this.toggleExpanded(hit.node);
+      case "review-apply":
+        return this.context.actions.onReviewResolve(true);
+      case "review-deny":
+        return this.context.actions.onReviewResolve(false);
+      case "frame":
+        this.capture(event);
+        this.drag = {
+          kind: "marquee",
+          pointerId: event.pointerId,
+          start: point,
+          end: point,
+          additive,
+          startTarget: { kind: "frame", node: hit.node, index: hit.index },
+        };
+        break;
+      case "frame-grid":
+        this.capture(event);
+        this.drag = {
+          kind: "marquee",
+          pointerId: event.pointerId,
+          start: point,
+          end: point,
+          additive,
+          startTarget: { kind: "frame-grid" },
+        };
+        break;
+      case "node":
+        this.capture(event);
+        this.context.actions.onSelect(hit.node, additive);
+        this.drag = {
+          kind: "node",
+          pointerId: event.pointerId,
+          start: point,
+          node: hit.node,
+          position: { ...this.context.getScene().positions[hit.node] },
+        };
+        break;
+      default:
+        this.capture(event);
+        this.drag = {
+          kind: "marquee",
+          pointerId: event.pointerId,
+          start: point,
+          end: point,
+          additive,
+          startTarget: { kind: "empty" },
+        };
     }
     this.syncMarquee();
   };
