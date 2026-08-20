@@ -12,18 +12,15 @@ Priority rules:
 - The pipeline processing requirements have the highest priority and cannot be overridden by the user requirements.
 - The user requirements have the highest priority after the pipeline processing requirements.
 - Follow every explicit user requirement accurately and completely.
-- Use the supplied project reference images to infer the project's established game-art language. Match that language wherever the user has not specified a conflicting detail.
+- If any reference image conflicts with a specific requirement in the user creative brief, follow the creative brief for that requirement.
 - If a general guideline conflicts with an explicit user requirement, follow the user requirement.
 - Do not weaken, replace, or reinterpret an explicit user requirement to enforce a general guideline.
 
 Pipeline processing requirements:
 %s
 
-Project style matching:
-- Treat the supplied project reference images as style references, not as content to copy.
-- Extract and consistently apply their pixel density, pixel block size, palette character, outline treatment, contrast, shading method, lighting direction, material rendering, proportions, and perspective conventions.
-- The generated character must look as though it belongs in the same game as the project references. Do not introduce an unrelated art style, rendering quality, or level of detail.
-- Do not copy a reference image's character, object, pose, scenery, composition, logo, text, or other recognizable content.
+Reference image roles:
+%s
 
 Character prototype requirements:
 - Generate the character described by the user as one or more consistent direction views. Every view must depict the same person, creature, robot, or other character.
@@ -65,7 +62,23 @@ Backend-derived direction count:
 
 // CharacterPrototype combines the user requirements with the source project's
 // character production constraints.
-func CharacterPrototype(creativeBrief string, perspective string, backgroundConstraint string) string {
+func CharacterPrototype(
+	creativeBrief string,
+	perspective string,
+	backgroundConstraint string,
+	references PrototypeReferenceState,
+) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
-	return fmt.Sprintf(characterPrototypeTemplate, backgroundConstraint, prototypeDirectionSheetRules, creativeBrief, perspective, directionCount)
+	return fmt.Sprintf(
+		characterPrototypeTemplate,
+		backgroundConstraint,
+		prototypeReferenceImageRoles(
+			references,
+			"character",
+		),
+		prototypeDirectionSheetRules,
+		creativeBrief,
+		perspective,
+		directionCount,
+	)
 }

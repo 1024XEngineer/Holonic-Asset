@@ -86,6 +86,10 @@ func (s *sceneryProcessorStub) RemoveBackground(_ context.Context, request *imag
 	return &imageprocessor.RemoveBackgroundResult{ImageBase64: "removed:" + request.ImageBase64, MIMEType: "image/png"}, nil
 }
 
+func (*sceneryProcessorStub) NormalizeReference(_ context.Context, request *imageprocessor.NormalizeReferenceRequest) (*imageprocessor.NormalizeReferenceResult, error) {
+	return &imageprocessor.NormalizeReferenceResult{ImageBase64: request.ImageBase64, MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 1}}, nil
+}
+
 func (s *sceneryProcessorStub) Resize(_ context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
 	*s.events = append(*s.events, "resize")
 	s.resizeRequests = append(s.resizeRequests, request)

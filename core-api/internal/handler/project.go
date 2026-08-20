@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -167,6 +168,10 @@ func projectHandlerError(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, domain.ErrInvalidProject):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+	case errors.Is(err, upload.ErrUntrustedReference),
+		errors.Is(err, upload.ErrInvalidObjectData),
+		errors.Is(err, upload.ErrInvalidUploadRequest):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
 	case errors.Is(err, domain.ErrProjectNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, domain.ErrProjectNotFound.Error()).SetInternal(err)

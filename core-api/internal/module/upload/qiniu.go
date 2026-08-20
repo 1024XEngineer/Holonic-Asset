@@ -219,33 +219,47 @@ func (s *QiniuStorage) privateURL(ctx context.Context, objectKey string) (string
 	return qiniustorage.MakePrivateURLv2(s.credentials, s.domain, objectKey, expiresAt), nil
 }
 
-// ResolveReference converts a persisted object key into a temporary private
-// URL. Legacy data URLs and URLs hosted outside this storage are passed through.
+// ResolveReference converts a persisted object key or configured-domain URL
+// into a temporary private URL. External URLs are never resolved by the API
+// worker.
 func (s *QiniuStorage) ResolveReference(ctx context.Context, reference string) (string, error) {
 	reference = strings.TrimSpace(reference)
 	if reference == "" || strings.HasPrefix(reference, "data:") {
 		return reference, nil
 	}
-	if parsed, err := url.Parse(reference); err == nil && parsed.IsAbs() {
-		objectKey, ownDomain := s.objectKeyFromURL(parsed)
-		if !ownDomain {
-			return reference, nil
-		}
-		return s.privateURL(ctx, objectKey)
+	objectKey, err := s.normalizeReference(reference)
+	if err != nil {
+		return "", err
 	}
-	return s.privateURL(ctx, reference)
+	return s.privateURL(ctx, objectKey)
 }
 
-func (s *QiniuStorage) normalizeReference(reference string) string {
+func (s *QiniuStorage) normalizeReference(reference string) (string, error) {
 	reference = strings.TrimSpace(reference)
 	parsed, err := url.Parse(reference)
-	if err != nil || !parsed.IsAbs() {
-		return reference
+	if err != nil {
+		return "", fmt.Errorf("%w: invalid reference URL", ErrUntrustedReference)
 	}
-	if objectKey, ownDomain := s.objectKeyFromURL(parsed); ownDomain {
-		return objectKey
+	if parsed.IsAbs() || parsed.Host != "" {
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return "", fmt.Errorf("%w: reference URL must use HTTP(S)", ErrUntrustedReference)
+		}
+		objectKey, ownDomain := s.objectKeyFromURL(parsed)
+		if !ownDomain {
+			return "", fmt.Errorf(
+				"%w: reference URL must use the configured object-storage domain",
+				ErrUntrustedReference,
+			)
+		}
+		if err := validateObjectKey(objectKey); err != nil {
+			return "", err
+		}
+		return objectKey, nil
 	}
-	return reference
+	if err := validateObjectKey(reference); err != nil {
+		return "", err
+	}
+	return reference, nil
 }
 
 // PersistReference stores generated data URLs and otherwise performs the
@@ -253,7 +267,7 @@ func (s *QiniuStorage) normalizeReference(reference string) string {
 func (s *QiniuStorage) PersistReference(ctx context.Context, reference string) (string, error) {
 	reference = strings.TrimSpace(reference)
 	if !strings.HasPrefix(reference, "data:") {
-		return s.normalizeReference(reference), nil
+		return s.normalizeReference(reference)
 	}
 	mediaType, data, err := decodeDataURL(reference)
 	if err != nil {

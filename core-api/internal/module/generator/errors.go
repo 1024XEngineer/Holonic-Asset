@@ -23,6 +23,7 @@ var (
 	ErrAssetWriterRequired    = errors.New("generator: asset writer is required")
 	ErrImageResultRequired    = errors.New("generator: image result is required")
 	ErrProjectReaderRequired  = errors.New("generator: project reader is required")
+	ErrReferenceStoreRequired = errors.New("generator: reference store is required")
 	ErrLLMServiceRequired     = errors.New("generator: LLM service is required")
 	ErrInvalidSceneryPayload  = errors.New("generator: invalid scenery payload")
 	ErrInvalidSceneryPlan     = errors.New("generator: invalid scenery plan")

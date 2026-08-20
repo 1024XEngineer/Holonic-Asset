@@ -69,6 +69,17 @@ func (s *animationProcessorStub) RemoveBackground(
 	}, nil
 }
 
+func (*animationProcessorStub) NormalizeReference(
+	_ context.Context,
+	request *imageprocessor.NormalizeReferenceRequest,
+) (*imageprocessor.NormalizeReferenceResult, error) {
+	return &imageprocessor.NormalizeReferenceResult{
+		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+		Report:      imageprocessor.ReferenceNormalizationReport{Scale: 1},
+	}, nil
+}
+
 func (s *animationProcessorStub) Resize(
 	_ context.Context,
 	request *imageprocessor.ResizeRequest,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -378,6 +380,11 @@ func (h *Handler) persistAssetReference(ctx context.Context, reference string) (
 	if h.persister != nil {
 		persisted, err = h.persister.PersistReference(ctx, reference)
 		if err != nil {
+			if errors.Is(err, upload.ErrUntrustedReference) ||
+				errors.Is(err, upload.ErrInvalidObjectData) ||
+				errors.Is(err, upload.ErrInvalidUploadRequest) {
+				return "", echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+			}
 			return "", err
 		}
 		persisted = strings.TrimSpace(persisted)

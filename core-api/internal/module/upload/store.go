@@ -15,9 +15,9 @@ type ReferenceResolver interface {
 	ResolveReference(context.Context, string) (string, error)
 }
 
-// ReferenceStore adds persistence for generated data URLs. PersistReference
-// leaves external URLs untouched and converts URLs on the configured object
-// domain back to their object key.
+// ReferenceStore adds persistence for generated data URLs. References are
+// constrained to this store: data URLs are uploaded, configured-domain URLs
+// are converted to object keys, and external URLs are rejected.
 type ReferenceStore interface {
 	ReferenceResolver
 	PersistReference(context.Context, string) (string, error)
