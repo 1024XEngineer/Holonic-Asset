@@ -5,23 +5,25 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"sort"
 )
 
 // RasterMode selects the local final-size conversion strategy.
 type RasterMode string
 
 const (
-	resizeSamplingArea     = "alpha-aware-area"
-	resizeSamplingBilinear = "alpha-aware-bilinear"
-	hardAlphaThreshold     = uint8(112)
+	resizeSamplingArea      = "alpha-aware-area"
+	resizeSamplingBilinear  = "alpha-aware-bilinear"
+	resizeSamplingPixelArea = "alpha-aware-area-then-block-recolour"
+	resizeSamplingNearest   = "nearest-neighbour"
+	hardAlphaThreshold      = uint8(112)
+	pixelAlphaRepairFloor   = uint8(48)
 
 	// RasterModeSmooth is intended for regular 2D game art. It uses alpha-aware
 	// area resampling and preserves semi-transparent edge coverage.
 	RasterModeSmooth RasterMode = "smooth"
-	// RasterModePixel is intended for deliberate pixel art. It still uses area
-	// resampling when reducing a large source; nearest-neighbour is only suitable
-	// for enlarging an already-small sprite for preview.
+	// RasterModePixel is intended for deliberate pixel art. Reduction first uses
+	// alpha-aware area sampling to lock geometry, then repairs colours and alpha
+	// only on the final logical pixel grid. Enlargement uses nearest-neighbour.
 	RasterModePixel RasterMode = "pixel"
 )
 
@@ -29,14 +31,15 @@ const (
 // illustration to a final game-asset canvas. Mode determines whether the
 // result is smooth 2D art or deliberate pixel art.
 type ResizeOptions struct {
-	Width       int        `json:"width"`
-	Height      int        `json:"height"`
-	Margin      int        `json:"margin"`       // -1 chooses a proportional margin (about 6.25%).
-	PaletteSize int        `json:"palette_size"` // 0 preserves the source colours.
-	CropContent bool       `json:"crop_content"`
-	CoverCanvas bool       `json:"cover_canvas"` // Crops to fill the full target and requires Margin 0.
-	HardAlpha   bool       `json:"hard_alpha"`
-	Mode        RasterMode `json:"mode"`
+	Width              int        `json:"width"`
+	Height             int        `json:"height"`
+	Margin             int        `json:"margin"`       // -1 chooses a proportional margin (about 6.25%).
+	PaletteSize        int        `json:"palette_size"` // 0 preserves the source colours.
+	CropContent        bool       `json:"crop_content"`
+	CoverCanvas        bool       `json:"cover_canvas"` // Crops to fill the full target and requires Margin 0.
+	HardAlpha          bool       `json:"hard_alpha"`
+	Mode               RasterMode `json:"mode"`
+	NormalizeNearRound bool       `json:"normalize_near_round"` // Object-only repair for already near-circular silhouettes.
 }
 
 // DefaultResizeOptions returns non-destructive defaults for regular 2D game
@@ -57,11 +60,11 @@ func DefaultResizeOptions(width, height int) ResizeOptions {
 // AnimationFrameMargin returns the shared safety margin used by canonical
 // prototype frames and generated animation frames. Keeping this policy in the
 // processor prevents the prototype and animation pipelines from choosing
-// different subject scales. A quarter-frame margin leaves the centre half of
-// the frame available for the canonical pose while leaving room for held
-// objects and their motion.
+// different subject scales. A three-sixteenths margin on each side gives the
+// canonical pose five-eighths of the short edge while retaining substantial
+// room for held objects and animation motion.
 func AnimationFrameMargin(width, height int) int {
-	margin := min(width, height) / 4
+	margin := min(width, height) * 3 / 16
 	if margin < 1 {
 		return 1
 	}
@@ -80,6 +83,60 @@ func AnimationFrameResizeOptions(width, height int) ResizeOptions {
 	return options
 }
 
+// PrototypePixelResizeOptions keeps the canonical animation-frame margin while
+// converting generated object art into a small, discrete sprite palette. The
+// palette budget follows the actual drawable area inside the fixed margin, not
+// the full transparent canvas.
+func PrototypePixelResizeOptions(width, height int) ResizeOptions {
+	options := prototypePixelResizeOptions(width, height)
+	innerShortEdge := min(
+		width-2*options.Margin,
+		height-2*options.Margin,
+	)
+	switch {
+	case innerShortEdge <= 24:
+		options.PaletteSize = 8
+	case innerShortEdge <= 40:
+		options.PaletteSize = 12
+	case innerShortEdge <= 80:
+		options.PaletteSize = 16
+	default:
+		options.PaletteSize = 20
+	}
+	options.NormalizeNearRound = true
+	return options
+}
+
+// CharacterPrototypePixelResizeOptions gives characters enough source colours
+// to retain tiny facial features, skin, clothing, equipment, and their shade
+// families. Characters keep the exact same canonical margin and geometry as
+// objects; only the palette budget is higher.
+func CharacterPrototypePixelResizeOptions(width, height int) ResizeOptions {
+	options := prototypePixelResizeOptions(width, height)
+	innerShortEdge := min(
+		width-2*options.Margin,
+		height-2*options.Margin,
+	)
+	switch {
+	case innerShortEdge <= 24:
+		options.PaletteSize = 10
+	case innerShortEdge <= 40:
+		options.PaletteSize = 14
+	case innerShortEdge <= 80:
+		options.PaletteSize = 18
+	default:
+		options.PaletteSize = 24
+	}
+	return options
+}
+
+func prototypePixelResizeOptions(width, height int) ResizeOptions {
+	options := AnimationFrameResizeOptions(width, height)
+	options.Mode = RasterModePixel
+	options.HardAlpha = true
+	return options
+}
+
 type ResizeReport struct {
 	InputWidth       int        `json:"input_width"`
 	InputHeight      int        `json:"input_height"`
@@ -94,14 +151,10 @@ type ResizeReport struct {
 	Sampling         string     `json:"sampling"`
 }
 
-// ResizeImage optionally crops transparent padding, downsamples with
-// alpha-aware area filtering, and returns a final-size PNG-ready canvas.
-//
-// The old implementation sampled one source pixel per destination pixel. That
-// discarded most source information and produced jagged silhouettes. Area
-// filtering instead integrates every covered source pixel with alpha-weighted
-// straight colours, avoiding transparent-edge halos and preserving small
-// features.
+// ResizeImage optionally crops transparent padding and returns a final-size
+// PNG-ready canvas. Smooth mode uses alpha-aware area or bilinear filtering.
+// Pixel mode uses the same geometry-preserving area reduction, then performs
+// palette and block repair only on the final logical pixel grid.
 func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeReport, error) {
 	if input == nil {
 		return nil, ResizeReport{}, fmt.Errorf("input image is required")
@@ -154,15 +207,53 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	var sampling string
 	if opts.CoverCanvas {
 		crop = coverCrop(crop, innerW, innerH)
-		out, sampling = qualityResize(img, crop, innerW, innerH)
+		out, sampling = qualityResize(img, crop, innerW, innerH, mode)
 	} else {
-		out, placement, sampling = resizeContain(img, crop, innerW, innerH)
+		out, placement, sampling = resizeContain(img, crop, innerW, innerH, mode)
 	}
-	if opts.PaletteSize > 0 {
-		applyPalette(out, opts.PaletteSize)
-	}
-	if opts.HardAlpha {
-		applyHardAlpha(out, hardAlphaThreshold)
+
+	if mode == RasterModePixel {
+		// Keep the untouched area-resampled pixels as evidence for every later
+		// decision. Pixel post-processing may recolour an existing logical pixel
+		// or repair a covered one-pixel gap, but it never resamples or moves it.
+		smoothReference := cloneNRGBA(out)
+		if opts.HardAlpha {
+			applyHardAlpha(out, hardAlphaThreshold)
+		}
+		var pixelPalette []color.RGBA
+		if opts.PaletteSize > 0 {
+			// Every palette entry is an exact colour selected from the reduced
+			// source. Perceptual distance is used only to choose among those
+			// colours; the pixel pipeline never synthesizes a new RGB value.
+			pixelPalette = buildPalette(out, out.Bounds(), opts.PaletteSize, TransparentAlphaMax)
+			remapToPalette(out, out.Bounds(), pixelPalette)
+			repairPixelColourBlocks(out, smoothReference)
+		}
+		if opts.HardAlpha {
+			repairPixelAlphaGaps(out, smoothReference, pixelAlphaRepairFloor)
+			applyHardAlpha(out, hardAlphaThreshold)
+		}
+		if len(pixelPalette) > 0 {
+			if opts.NormalizeNearRound {
+				// Contain resize returns only the fitted content rectangle. Stage
+				// object pixels on the complete drawable area before round-shape
+				// repair so a slightly squashed circle can grow along its short
+				// axis without changing the canonical outer margin or position.
+				out = placeNRGBAOnCanvas(out, innerW, innerH, placement)
+				smoothReference = placeNRGBAOnCanvas(smoothReference, innerW, innerH, placement)
+				placement = image.Point{}
+				regularizeNearCircularObjectSilhouette(out, smoothReference, pixelPalette)
+			} else {
+				regularizeNearEllipticalSilhouette(out, smoothReference, pixelPalette)
+			}
+		}
+	} else {
+		if opts.PaletteSize > 0 {
+			applyPalette(out, opts.PaletteSize)
+		}
+		if opts.HardAlpha {
+			applyHardAlpha(out, hardAlphaThreshold)
+		}
 	}
 
 	canvas := image.NewNRGBA(image.Rect(0, 0, opts.Width, opts.Height))
@@ -241,10 +332,11 @@ func resizeContain(
 	src *image.NRGBA,
 	crop image.Rectangle,
 	dstW, dstH int,
+	mode RasterMode,
 ) (*image.NRGBA, image.Point, string) {
 	scaledW, scaledH := containDimensions(crop.Dx(), crop.Dy(), dstW, dstH)
 	placement := image.Pt((dstW-scaledW)/2, (dstH-scaledH)/2)
-	resized, sampling := qualityResize(src, crop, scaledW, scaledH)
+	resized, sampling := qualityResize(src, crop, scaledW, scaledH, mode)
 	return resized, placement, sampling
 }
 
@@ -262,14 +354,37 @@ func roundedScale(value, numerator, denominator int) int {
 	return int((scaled + int64(denominator)/2) / int64(denominator))
 }
 
-// qualityResize integrates source coverage for reductions. For enlargement it
-// uses bilinear interpolation; nearest-neighbour enlargement is a presentation
-// choice that should be done by the game engine for an existing pixel sprite.
-func qualityResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) (*image.NRGBA, string) {
+// qualityResize determines geometry only. Both smooth and pixel reductions use
+// alpha-aware area sampling; pixel-specific colour cleanup happens afterwards
+// on the final grid so it cannot shift or distort the silhouette.
+func qualityResize(
+	src *image.NRGBA,
+	crop image.Rectangle,
+	dstW, dstH int,
+	mode RasterMode,
+) (*image.NRGBA, string) {
+	if mode == RasterModePixel {
+		if crop.Dx() <= dstW && crop.Dy() <= dstH {
+			return nearestResize(src, crop, dstW, dstH), resizeSamplingNearest
+		}
+		return areaResize(src, crop, dstW, dstH), resizeSamplingPixelArea
+	}
 	if crop.Dx() <= dstW && crop.Dy() <= dstH {
 		return bilinearResize(src, crop, dstW, dstH), resizeSamplingBilinear
 	}
 	return areaResize(src, crop, dstW, dstH), resizeSamplingArea
+}
+
+func nearestResize(src *image.NRGBA, crop image.Rectangle, dstW, dstH int) *image.NRGBA {
+	out := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
+	for dy := range dstH {
+		sy := crop.Min.Y + min(crop.Dy()-1, (2*dy+1)*crop.Dy()/(2*dstH))
+		for dx := range dstW {
+			sx := crop.Min.X + min(crop.Dx()-1, (2*dx+1)*crop.Dx()/(2*dstW))
+			out.SetNRGBA(dx, dy, src.NRGBAAt(sx, sy))
+		}
+	}
+	return out
 }
 
 // areaResize performs exact box/area resampling with alpha-weighted straight
@@ -395,6 +510,19 @@ func clampByte(value float64) uint8 {
 	return uint8(math.Round(value))
 }
 
+func placeNRGBAOnCanvas(source *image.NRGBA, width, height int, placement image.Point) *image.NRGBA {
+	if source.Bounds() == image.Rect(0, 0, width, height) && placement == (image.Point{}) {
+		return source
+	}
+	canvas := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for y := range source.Bounds().Dy() {
+		for x := range source.Bounds().Dx() {
+			canvas.SetNRGBA(placement.X+x, placement.Y+y, source.NRGBAAt(x, y))
+		}
+	}
+	return canvas
+}
+
 func applyHardAlpha(img *image.NRGBA, threshold uint8) {
 	for y := range img.Bounds().Dy() {
 		for x := range img.Bounds().Dx() {
@@ -409,6 +537,259 @@ func applyHardAlpha(img *image.NRGBA, threshold uint8) {
 	}
 }
 
+type pixelColourKey uint32
+
+const (
+	pixelBlockColourTolerance       int64   = 4096
+	pixelBlockMaxPerceptualDistance float64 = 0.025
+)
+
+// repairPixelColourBlocks examines exact-colour connected components after
+// final-size palette mapping. It only replaces tiny components surrounded by a
+// clear neighbouring colour, and only when the untouched smooth reduction says
+// that colour is an equally plausible explanation. This removes quantized
+// antialias specks without erasing genuinely dark eyes, seams, or highlights.
+func repairPixelColourBlocks(img, smoothReference *image.NRGBA) {
+	bounds := img.Bounds().Intersect(smoothReference.Bounds())
+	if bounds.Empty() {
+		return
+	}
+	componentLimit := pixelColourComponentLimit(bounds)
+	snapshot := cloneNRGBA(img)
+	visited := make([]bool, bounds.Dx()*bounds.Dy())
+	index := func(point image.Point) int {
+		return (point.Y-bounds.Min.Y)*bounds.Dx() + point.X - bounds.Min.X
+	}
+	cardinal := [...]image.Point{{X: -1}, {X: 1}, {Y: -1}, {Y: 1}}
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			start := image.Pt(x, y)
+			if visited[index(start)] {
+				continue
+			}
+			startPixel := snapshot.NRGBAAt(x, y)
+			if startPixel.A <= TransparentAlphaMax {
+				visited[index(start)] = true
+				continue
+			}
+
+			componentKey := colourKey(startPixel)
+			component := []image.Point{start}
+			visited[index(start)] = true
+			for queue := 0; queue < len(component); queue++ {
+				point := component[queue]
+				for _, direction := range cardinal {
+					neighbor := point.Add(direction)
+					if !neighbor.In(bounds) || visited[index(neighbor)] {
+						continue
+					}
+					pixel := snapshot.NRGBAAt(neighbor.X, neighbor.Y)
+					if pixel.A > TransparentAlphaMax && colourKey(pixel) == componentKey {
+						visited[index(neighbor)] = true
+						component = append(component, neighbor)
+					}
+				}
+			}
+			if len(component) > componentLimit {
+				continue
+			}
+
+			boundaryCounts := make(map[pixelColourKey]int)
+			boundaryTotal := 0
+			for _, point := range component {
+				for _, direction := range cardinal {
+					neighbor := point.Add(direction)
+					if !neighbor.In(bounds) {
+						continue
+					}
+					pixel := snapshot.NRGBAAt(neighbor.X, neighbor.Y)
+					if pixel.A <= TransparentAlphaMax {
+						continue
+					}
+					key := colourKey(pixel)
+					if key == componentKey {
+						continue
+					}
+					boundaryCounts[key]++
+					boundaryTotal++
+				}
+			}
+			candidateKey, candidateCount := dominantBoundaryColour(boundaryCounts)
+			if candidateCount < 2 || candidateCount*2 <= boundaryTotal {
+				continue
+			}
+
+			currentColour := colourFromKey(componentKey)
+			candidateColour := colourFromKey(candidateKey)
+			// High-contrast singleton and two-pixel marks are often eyes,
+			// nostrils, seams, or outline accents. Never treat them as colour
+			// noise solely because the surrounding block is larger.
+			if perceptualColourDistance(
+				nrgbaToOKLab(currentColour),
+				nrgbaToOKLab(candidateColour),
+			) > pixelBlockMaxPerceptualDistance {
+				continue
+			}
+			var currentDistance, candidateDistance int64
+			for _, point := range component {
+				reference := smoothReference.NRGBAAt(point.X, point.Y)
+				currentDistance += weightedColourDistance(reference, currentColour)
+				candidateDistance += weightedColourDistance(reference, candidateColour)
+			}
+			tolerance := int64(len(component)) * pixelBlockColourTolerance
+			if candidateDistance > currentDistance+tolerance {
+				continue
+			}
+			for _, point := range component {
+				pixel := img.NRGBAAt(point.X, point.Y)
+				pixel.R, pixel.G, pixel.B = candidateColour.R, candidateColour.G, candidateColour.B
+				img.SetNRGBA(point.X, point.Y, pixel)
+			}
+		}
+	}
+}
+
+func pixelColourComponentLimit(bounds image.Rectangle) int {
+	shortEdge := min(bounds.Dx(), bounds.Dy())
+	switch {
+	case shortEdge <= 16:
+		return 1
+	case shortEdge <= 64:
+		return 2
+	default:
+		return 3
+	}
+}
+
+func dominantBoundaryColour(counts map[pixelColourKey]int) (pixelColourKey, int) {
+	var bestKey pixelColourKey
+	bestCount := 0
+	for key, count := range counts {
+		if count > bestCount || (count == bestCount && key < bestKey) {
+			bestKey, bestCount = key, count
+		}
+	}
+	return bestKey, bestCount
+}
+
+// repairPixelAlphaGaps fills only one-pixel gaps for which the area-resampled
+// alpha still records meaningful foreground coverage. A matching horizontal or
+// vertical bridge is strongest evidence; otherwise at least three surrounding
+// pixels must agree on one existing palette colour. Decisions are made from a
+// snapshot, so a repair cannot grow recursively into transparent background.
+func repairPixelAlphaGaps(img, smoothReference *image.NRGBA, alphaFloor uint8) {
+	bounds := img.Bounds().Intersect(smoothReference.Bounds())
+	if bounds.Empty() {
+		return
+	}
+	snapshot := cloneNRGBA(img)
+	cardinalPairs := [...][2]image.Point{
+		{{X: -1}, {X: 1}},
+		{{Y: -1}, {Y: 1}},
+	}
+	neighbors := [...]image.Point{
+		{X: -1, Y: -1}, {Y: -1}, {X: 1, Y: -1},
+		{X: -1}, {X: 1},
+		{X: -1, Y: 1}, {Y: 1}, {X: 1, Y: 1},
+	}
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			if snapshot.NRGBAAt(x, y).A > TransparentAlphaMax {
+				continue
+			}
+			reference := smoothReference.NRGBAAt(x, y)
+			if reference.A < alphaFloor {
+				continue
+			}
+			point := image.Pt(x, y)
+			counts := make(map[pixelColourKey]int)
+			opaqueNeighbors := 0
+			for _, offset := range neighbors {
+				neighbor := point.Add(offset)
+				if !neighbor.In(bounds) {
+					continue
+				}
+				pixel := snapshot.NRGBAAt(neighbor.X, neighbor.Y)
+				if pixel.A <= TransparentAlphaMax {
+					continue
+				}
+				counts[colourKey(pixel)]++
+				opaqueNeighbors++
+			}
+
+			bridgeColours := make(map[pixelColourKey]bool)
+			for _, pair := range cardinalPairs {
+				first, second := point.Add(pair[0]), point.Add(pair[1])
+				if !first.In(bounds) || !second.In(bounds) {
+					continue
+				}
+				firstPixel := snapshot.NRGBAAt(first.X, first.Y)
+				secondPixel := snapshot.NRGBAAt(second.X, second.Y)
+				if firstPixel.A > TransparentAlphaMax && secondPixel.A > TransparentAlphaMax &&
+					colourKey(firstPixel) == colourKey(secondPixel) {
+					bridgeColours[colourKey(firstPixel)] = true
+				}
+			}
+
+			candidate, ok := chooseAlphaRepairColour(counts, bridgeColours, opaqueNeighbors, reference)
+			if !ok {
+				continue
+			}
+			colour := colourFromKey(candidate)
+			img.SetNRGBA(x, y, color.NRGBA{R: colour.R, G: colour.G, B: colour.B, A: 255})
+		}
+	}
+}
+
+func chooseAlphaRepairColour(
+	counts map[pixelColourKey]int,
+	bridges map[pixelColourKey]bool,
+	opaqueNeighbors int,
+	reference color.NRGBA,
+) (pixelColourKey, bool) {
+	var best pixelColourKey
+	bestBridge, bestCount := false, 0
+	bestDistance := int64(math.MaxInt64)
+	found := false
+	for key, count := range counts {
+		bridge := bridges[key]
+		if !bridge && (count < 3 || count*2 < opaqueNeighbors) {
+			continue
+		}
+		distance := weightedColourDistance(reference, colourFromKey(key))
+		if !found || (bridge && !bestBridge) ||
+			(bridge == bestBridge && (count > bestCount ||
+				(count == bestCount && (distance < bestDistance ||
+					(distance == bestDistance && key < best))))) {
+			best, bestBridge, bestCount, bestDistance, found = key, bridge, count, distance, true
+		}
+	}
+	return best, found
+}
+
+func colourKey(pixel color.NRGBA) pixelColourKey {
+	return pixelColourKey(uint32(pixel.R)<<16 | uint32(pixel.G)<<8 | uint32(pixel.B))
+}
+
+func colourFromKey(key pixelColourKey) color.NRGBA {
+	packed := uint32(key)
+	return color.NRGBA{
+		R: uint8((packed >> 16) & 0xff),
+		G: uint8((packed >> 8) & 0xff),
+		B: uint8(packed & 0xff),
+		A: 255,
+	}
+}
+
+func weightedColourDistance(a, b color.NRGBA) int64 {
+	dr := int64(a.R) - int64(b.R)
+	dg := int64(a.G) - int64(b.G)
+	db := int64(a.B) - int64(b.B)
+	return 2*dr*dr + 4*dg*dg + 3*db*db
+}
+
 func scrubTransparentNRGBA(img *image.NRGBA) {
 	for y := range img.Bounds().Dy() {
 		for x := range img.Bounds().Dx() {
@@ -416,168 +797,6 @@ func scrubTransparentNRGBA(img *image.NRGBA) {
 			if pixel.A <= TransparentAlphaMax {
 				img.SetNRGBA(x, y, color.NRGBA{})
 			}
-		}
-	}
-}
-
-type palettePoint struct {
-	r, g, b float64
-	weight  uint64
-}
-
-type paletteBox struct {
-	points      []palettePoint
-	minR, maxR  float64
-	minG, maxG  float64
-	minB, maxB  float64
-	totalWeight uint64
-}
-
-func newPaletteBox(points []palettePoint) paletteBox {
-	box := paletteBox{points: points, minR: 255, minG: 255, minB: 255}
-	for _, p := range points {
-		box.minR, box.maxR = math.Min(box.minR, p.r), math.Max(box.maxR, p.r)
-		box.minG, box.maxG = math.Min(box.minG, p.g), math.Max(box.maxG, p.g)
-		box.minB, box.maxB = math.Min(box.minB, p.b), math.Max(box.maxB, p.b)
-		box.totalWeight += p.weight
-	}
-	return box
-}
-
-func (box paletteBox) score() float64 {
-	rangeMax := math.Max(box.maxR-box.minR, math.Max(box.maxG-box.minG, box.maxB-box.minB))
-	return rangeMax * rangeMax * math.Sqrt(float64(box.totalWeight))
-}
-
-func splitPaletteBox(box paletteBox) (paletteBox, paletteBox, bool) {
-	if len(box.points) < 2 {
-		return paletteBox{}, paletteBox{}, false
-	}
-	rRange, gRange, bRange := box.maxR-box.minR, box.maxG-box.minG, box.maxB-box.minB
-	channel := 0
-	if gRange >= rRange && gRange >= bRange {
-		channel = 1
-	} else if bRange >= rRange && bRange >= gRange {
-		channel = 2
-	}
-	sort.Slice(box.points, func(i, j int) bool {
-		a, b := box.points[i], box.points[j]
-		switch channel {
-		case 1:
-			return a.g < b.g
-		case 2:
-			return a.b < b.b
-		default:
-			return a.r < b.r
-		}
-	})
-	half, accumulated, split := box.totalWeight/2, uint64(0), 1
-	for i, point := range box.points[:len(box.points)-1] {
-		accumulated += point.weight
-		if accumulated >= half {
-			split = i + 1
-			break
-		}
-	}
-	return newPaletteBox(box.points[:split]), newPaletteBox(box.points[split:]), true
-}
-
-// applyPalette uses weighted median-cut rather than retaining only the most
-// frequent histogram buckets. This keeps isolated accent colours and small
-// equipment details much more reliably.
-func applyPalette(img *image.NRGBA, limit int) {
-	if limit <= 0 {
-		return
-	}
-	type accumulator struct{ r, g, b, weight uint64 }
-	hist := make(map[int]*accumulator)
-	for y := range img.Bounds().Dy() {
-		for x := range img.Bounds().Dx() {
-			p := img.NRGBAAt(x, y)
-			if p.A <= TransparentAlphaMax {
-				continue
-			}
-			key := int(p.R>>3)<<10 | int(p.G>>3)<<5 | int(p.B>>3)
-			entry := hist[key]
-			if entry == nil {
-				entry = &accumulator{}
-				hist[key] = entry
-			}
-			weight := uint64(p.A)
-			entry.r += uint64(p.R) * weight
-			entry.g += uint64(p.G) * weight
-			entry.b += uint64(p.B) * weight
-			entry.weight += weight
-		}
-	}
-	points := make([]palettePoint, 0, len(hist))
-	for _, entry := range hist {
-		if entry.weight == 0 {
-			continue
-		}
-		points = append(points, palettePoint{
-			r:      float64(entry.r) / float64(entry.weight),
-			g:      float64(entry.g) / float64(entry.weight),
-			b:      float64(entry.b) / float64(entry.weight),
-			weight: entry.weight,
-		})
-	}
-	if len(points) == 0 {
-		return
-	}
-	boxes := []paletteBox{newPaletteBox(points)}
-	for len(boxes) < limit {
-		best := -1
-		bestScore := -1.0
-		for i, box := range boxes {
-			if len(box.points) > 1 && box.score() > bestScore {
-				best, bestScore = i, box.score()
-			}
-		}
-		if best < 0 {
-			break
-		}
-		left, right, ok := splitPaletteBox(boxes[best])
-		if !ok {
-			break
-		}
-		boxes[best] = left
-		boxes = append(boxes, right)
-	}
-	palette := make([]color.RGBA, 0, len(boxes))
-	for _, box := range boxes {
-		var r, g, b float64
-		for _, point := range box.points {
-			weight := float64(point.weight)
-			r += point.r * weight
-			g += point.g * weight
-			b += point.b * weight
-		}
-		weight := math.Max(1, float64(box.totalWeight))
-		palette = append(palette, color.RGBA{R: clampByte(r / weight), G: clampByte(g / weight), B: clampByte(b / weight), A: 255})
-	}
-	for y := range img.Bounds().Dy() {
-		for x := range img.Bounds().Dx() {
-			p := img.NRGBAAt(x, y)
-			if p.A <= TransparentAlphaMax {
-				continue
-			}
-			best, bestDist := palette[0], int64(math.MaxInt64)
-			for _, candidate := range palette {
-				dr := int64(p.R) - int64(candidate.R)
-				dg := int64(p.G) - int64(candidate.G)
-				db := int64(p.B) - int64(candidate.B)
-				distance := 2*dr*dr + 4*dg*dg + 3*db*db
-				if distance < bestDist {
-					best, bestDist = candidate, distance
-				}
-			}
-			img.SetNRGBA(x, y, color.NRGBA{
-				R: best.R,
-				G: best.G,
-				B: best.B,
-				A: p.A,
-			})
 		}
 	}
 }

@@ -20,6 +20,7 @@ type imageGenerationServiceStub struct {
 	result   *imageclient.GenerateResult
 	results  []*imageclient.GenerateResult
 	err      error
+	errors   []error
 }
 
 type animationGenerationServiceStub struct {
@@ -229,7 +230,7 @@ func (s *imageGenerationServiceStub) Generate(
 	request *imageclient.GenerateRequest,
 ) (*imageclient.GenerateResult, error) {
 	*s.events = append(*s.events, "generate_image")
-	s.request = &imageclient.GenerateRequest{
+	requestCopy := &imageclient.GenerateRequest{
 		Prompt:          request.Prompt,
 		ReferenceImages: append([]string(nil), request.ReferenceImages...),
 		MaskImage:       request.MaskImage,
@@ -239,12 +240,21 @@ func (s *imageGenerationServiceStub) Generate(
 		Params:          request.Params,
 		MaxAttempts:     request.MaxAttempts,
 	}
-	s.requests = append(s.requests, s.request)
-	call := len(s.requests) - 1
-	if call < len(s.results) {
-		return s.results[call], s.err
+	if s.request == nil {
+		s.request = requestCopy
 	}
-	return s.result, s.err
+	s.requests = append(s.requests, requestCopy)
+	call := len(s.requests) - 1
+	var err error
+	if call < len(s.errors) {
+		err = s.errors[call]
+	} else {
+		err = s.err
+	}
+	if call < len(s.results) {
+		return s.results[call], err
+	}
+	return s.result, err
 }
 
 type generationAssetWriterStub struct {

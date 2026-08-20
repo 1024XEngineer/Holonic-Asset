@@ -48,11 +48,13 @@ Object framing and style requirements:
 - Keep equal gutters and margins in every cell. Do not allow any object pixel, attachment, shadow, or outline to cross a cell boundary. Keep the background uniform so the processor can split the sheet by its regular grid.
 - Match the supplied prototype's pixel density, palette, outlines, contrast, shading, lighting, materials, and perspective conventions unless the user explicitly requests a change to one of them.
 - Render as unmistakable classic low-resolution pixel art with large, clearly visible square pixel blocks and a deliberately coarse pixel grid.
-- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional colour palette.
+- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, broad connected colour shapes, and a small intentional colour palette. Avoid dithering when it would become native-size speckle.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Do not include characters, people, hands, creatures, scenery, ground planes, frames, borders, text, labels, logos, watermarks, UI elements, or unrelated objects.
 - Do not create variants beyond the required direction views.
 - Make the result suitable for direct isolation and use as a game object asset.
+
+%s
 
 Original asset description:
 <original_description>
@@ -72,7 +74,12 @@ User-selected perspective:
 Backend-derived direction count:
 <direction_count>
 %d
-</direction_count>`
+</direction_count>
+
+Backend-target per-direction asset dimensions:
+<asset_dimensions>
+{"width":%d,"height":%d}
+</asset_dimensions>`
 
 // EditObjectPrototype combines the original object description and direction
 // references with the user's edit instructions.
@@ -81,6 +88,7 @@ func EditObjectPrototype(
 	editInstructions string,
 	perspective string,
 	originalReferenceCount uint,
+	dimensions assetdomain.Size,
 	backgroundConstraint string,
 ) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
@@ -89,9 +97,12 @@ func EditObjectPrototype(
 		backgroundConstraint,
 		originalReferenceCount,
 		prototypeDirectionSheetRules,
+		prototypeLogicalPixelRules(dimensions, "object"),
 		originalDescription,
 		editInstructions,
 		perspective,
 		directionCount,
+		dimensions.Width,
+		dimensions.Height,
 	)
 }
