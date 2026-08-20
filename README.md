@@ -14,8 +14,7 @@
 <p align="center">
   <a href="#tech-stack">Tech stack</a> ·
   <a href="#core-capabilities">Capabilities</a> ·
-  <a href="#domain-model">Domain model</a> ·
-  <a href="#roadmap">Roadmap</a>
+  <a href="#domain-model">Domain model</a>
 </p>
 
 <p align="center">
@@ -76,13 +75,3 @@ An Asset is an independently created, iterated, and deliverable unit within a Pr
 ### Record
 
 A Record is a complete snapshot of an Asset after a creation or edit is confirmed. It makes generation history traceable, comparable, and reversible so users can confidently explore different creative directions.
-
-## Roadmap
-
-The first milestone focuses on completing the core workflow:
-
-- [ ] Web application for asset creation and management
-- [ ] Project creation, editing, and global visual configuration
-- [ ] Asset creation, search, duplication, editing, and deletion
-- [ ] AI regeneration and asset content editing
-- [ ] Animation generation from character or object prototypes
