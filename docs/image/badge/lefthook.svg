@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="20" role="img" aria-label="Lefthook: 2.1.9">
+  <title>Lefthook: 2.1.9</title>
+  <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r">
+    <rect width="120" height="20" rx="3"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="77" height="20" fill="#555"/>
+    <rect x="77" width="43" height="20" fill="#ff1e1e"/>
+    <rect width="120" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    <image x="5" y="3" width="14" height="14" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgMjcyIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI3MiI+PHBhdGggZmlsbD0iI0ZGMUUxRSIgZD0iTTI1OCAyNjIuNkwxNDkgMjEwbC03Mi40IDIyLjNMNSAxOTcuOGw3Ni43LTk4LjQtMTMuMS0yNC41TDExMC44IDM2bDY1LjQtMi43TDI1MS45IDUgMzg2LjcgMTUwIDMyMyAyNDYuNnoiLz48cGF0aCBkPSJNODMuMiAxNjYuOGMyOC42IDguNiA1OC41LjYgODkuOS0yNC4xbDE0NyA5NS4yLTMwIDE4LjVoLTQ5bC03Ny41LTM4LjItNzAuOCAxOC04MC40LTM2LjZMNjkuNyAxNzBsMTMuNS0zLjJ6bTUyLTExMi43YzEwLjMtMi43IDMxLjcgMjIuMyAzMi43IDI4LjQgMy44IDIxLjIgNS40IDM1LjUtMjAuNyA1Ni40YTY5LjggNjkuOCAwIDAgMS01Ni41IDE1LjdsNS4yLTIzLjNMNzcgOTMuN2E5Ni42IDk2LjYgMCAwIDEgNTguMS0zOS42eiIgZmlsbD0iI0JGMDAwMCIvPjxwYXRoIGQ9Ik05MC41IDI0My42bC0xLjcuNUwuMyAyMDQuM2wyLTQuNWMxNC4xLTMyLjYgMzUtNjEuMiA2Mi4zLTg1LjhhMzYwLjYgMzYwLjYgMCAwIDEgMTEuOC0xMC4ybC00LjYtOC43LTUuNi0xMC41LTEuOC0zLjUtMS4yLTIuMyAxLjEtMi4zYzEyLjMtMjUgMzEuNS0zOSA2Mi44LTQ3LjUgMTkuMS01IDM1LjEtNC43IDQ4IDEuNEEyODcuNiAyODcuNiAwIDAgMSAyNTEuMy43bDEtLjIgMTQ0LjUgMTU1LTEuNiAzYTMxODQgMzE4NCAwIDAgMS0zNy40IDcyLjZjLTE3LjMgMzIuNi00NiA0NC40LTgzLjMgMzktMjgtNC01OC41LTE3LTk1LTM3LjhsLTExLTYuMWMtMTYuOSAyLjUtNDMgOC4zLTc4LjEgMTcuNHpNNzEuMiAxMjEuNWEyMzcuMiAyMzcuMiAwIDAgMC01Ny43IDc3LjdsNjEuMiAyNy42YTUxNy41IDUxNy41IDAgMCAxIDYyLjUtMTguMyAyNzI0NC44IDI3MjQ0LjggMCAwIDAtNjMuNi0zNS42bC00LjYtMi42IDIzLjMtMzYuNS0xMS4xLTIxYTM1MS4yIDM1MS4yIDAgMCAwLTEwIDguN3ptMzcuMiA0OC42aC4xYzM3LjgtNi43IDY3LjQtMzYuNyA3OC01NS43YTIxNC4yIDIxNC4yIDAgMCAwIDUuOC05LjJMMjQ0LjEgMTNhMjc0LjggMjc0LjggMCAwIDAtNzQuOCAzMi40bC0xMC44LTVhMzc3LjMgMzc3LjMgMCAwIDEgNS40LTMuNCA2OC4yIDY4LjIgMCAwIDAtMzQuMyAxLjhDMTAyIDQ2LjEgODUuNCA1OCA3NC40IDc4LjdsLjcgMS4yIDUuNSAxMC41IDE5LjYgMzdhNTAuNCA1MC40IDAgMCAwIDE5IC4yYzkuNi0xLjQgMTguNC01IDI1LjUtMTAuNyAxNC4xLTExLjQgMjEuNi0yMCAyMi4yLTI3LjYuNy05LTUuMi0yMS4xLTIxLjctNDQuMSAyMy4zIDE1LjYgMzkuMiA0MC42IDI2LjQgNTguNnYuMWE1NyA1NyAwIDAgMS00LjMgNS42Yy00LjIgNC44LTkuMyA5LjUtMTYuMyAxNS4yYTYzLjQgNjMuNCAwIDAgMS0zMC4zIDEyLjggNjYgNjYgMCAwIDEtMTkuMS4zbC0xOC41IDI5YTI4MDc0LjcgMjgwNzQuNyAwIDAgMSA0OS41IDI3LjZ2LS4yYzUxLTIuNyA4NC0zMy42IDExNS45LTg0LjMtMjQuNCA1MS44LTU0LjYgODUtMTAxLjIgOTIuOCA5LjggNS40IDE4LjYgMTAuNCAyNi42IDE1IDUwLTMuMyA4MC4yLTMwLjcgMTExLjgtODAuOS0yNC4xIDUxLjItNTEuOSA4MS40LTk3IDg5LjJhNTUwLjcgNTUwLjcgMCAwIDAgMTQuNyA4IDc1IDc1IDAgMCAxLS41LS41IDIyMi4zIDIyMi4zIDAgMCAwIDUuNSAzIDQxMCA0MTAgMCAwIDAgOC4zIDRjNDkuOC0zLjIgNzcuNi0yNy4xIDEwOS4yLTc3LjMtMjMuMiA0OS4zLTQ4IDc2LjUtODkuNyA4NSAzMC41IDkgNTUuMiAzLjUgODAtMTIgOC41LTUuNSAyOC45LTM0LjUgNjEtODcuMkwyNTMuNiAxNi40IDIwMSAxMTAuMmExNzIuOSAxNzIuOSAwIDAgMS0zMC4xIDM4LjQgOTQgOTQgMCAwIDEtNjIuNCAyMS41eiIgZmlsbD0iIzFEMUQxRCIvPjwvc3ZnPg=="/>
+    <g transform="scale(.1)">
+      <text x="490" y="150" fill="#010101" fill-opacity=".3" textLength="480">Lefthook</text>
+      <text x="490" y="140" textLength="480">Lefthook</text>
+      <text x="985" y="150" fill="#010101" fill-opacity=".3" textLength="310">2.1.9</text>
+      <text x="985" y="140" textLength="310">2.1.9</text>
+    </g>
+  </g>
+</svg>
