@@ -104,4 +104,72 @@ describe("createAnimatedSpriteCanvasActions", () => {
       },
     });
   });
+
+  it("replaces the selection with frames from a marquee", () => {
+    const onEvent = vi.fn();
+    const actions = createAnimatedSpriteCanvasActions(onEvent, {
+      nodeIds: ["idle"],
+      frames: [{ nodeId: "idle", index: 0 }],
+    });
+
+    actions.onSelectFrames([
+      { nodeId: "walk", index: 1 },
+      { nodeId: "run", index: 2 },
+    ]);
+
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "selection.changed",
+      selection: {
+        nodeIds: ["walk", "run"],
+        frames: [
+          { nodeId: "walk", index: 1 },
+          { nodeId: "run", index: 2 },
+        ],
+      },
+    });
+  });
+
+  it("toggles animation groups from a modifier marquee", () => {
+    const onEvent = vi.fn();
+    const actions = createAnimatedSpriteCanvasActions(onEvent, {
+      nodeIds: ["idle", "walk"],
+      frames: [{ nodeId: "idle", index: 0 }],
+    });
+
+    actions.onSelectNodes(["idle", "run"], true);
+
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "selection.changed",
+      selection: {
+        nodeIds: ["walk", "run"],
+        frames: [],
+      },
+    });
+  });
+
+  it("emits clear, position, and review events", () => {
+    const onEvent = vi.fn();
+    const actions = createAnimatedSpriteCanvasActions(onEvent);
+
+    actions.onClearSelection();
+    actions.onNodePositionChange("idle", { x: 12, y: 24 });
+    actions.onReviewResolve(true);
+
+    expect(onEvent.mock.calls).toEqual([
+      [
+        {
+          type: "selection.changed",
+          selection: { nodeIds: [], frames: [] },
+        },
+      ],
+      [
+        {
+          type: "node-position.committed",
+          nodeId: "idle",
+          position: { x: 12, y: 24 },
+        },
+      ],
+      [{ type: "generation-review.resolved", applied: true }],
+    ]);
+  });
 });
