@@ -259,7 +259,7 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(viewport.moveCenter).toHaveBeenLastCalledWith(650, 700);
   });
 
-  it("advances active animation previews at the configured cadence", () => {
+  it("renders only when an active animation reaches its frame duration", () => {
     const runtime = new AnimatedSpriteCanvasRuntime({
       model: model(),
       actions: createAnimatedSpriteCanvasActions(vi.fn()),
@@ -268,14 +268,14 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     const viewport = { scale: { x: 1 } };
     const internals = runtime as unknown as {
       scene: { togglePlaying: (node: string) => void };
-      lastAnimationFrame: number;
+      lastAnimationTick: number;
       renderer: typeof renderer;
       viewport: typeof viewport;
       updateAnimation: () => void;
     };
     internals.renderer = renderer;
     internals.viewport = viewport;
-    internals.lastAnimationFrame = 0;
+    internals.lastAnimationTick = 0;
     const now = vi.spyOn(performance, "now");
 
     now.mockReturnValue(200);
@@ -283,10 +283,15 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(renderer.render).not.toHaveBeenCalled();
 
     internals.scene.togglePlaying("prototype");
+    now.mockReturnValue(359);
+    internals.updateAnimation();
+    expect(renderer.render).not.toHaveBeenCalled();
+
+    now.mockReturnValue(360);
     internals.updateAnimation();
     expect(renderer.render).toHaveBeenCalledOnce();
 
-    now.mockReturnValue(250);
+    now.mockReturnValue(519);
     internals.updateAnimation();
     expect(renderer.render).toHaveBeenCalledOnce();
   });
