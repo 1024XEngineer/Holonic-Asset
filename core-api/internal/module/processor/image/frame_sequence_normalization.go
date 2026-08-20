@@ -286,7 +286,7 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		frame := image.NewNRGBA(image.Rect(0, 0, frameWidth, frameHeight))
 		if cells[i].visible {
 			cropped := cloneNRGBA(working[i].SubImage(renderCrop))
-			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH)
+			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH, RasterModeSmooth)
 			draw.Draw(frame, image.Rect(destX, destY, destX+drawW, destY+drawH), resized, image.Point{}, draw.Over)
 		}
 		scrubTransparentNRGBA(frame)
@@ -427,7 +427,7 @@ func normalizeAnimationCellContentScale(
 		content := cloneNRGBA(cell.image.SubImage(cell.bbox))
 		drawW := max(1, int(math.Round(float64(cell.bbox.Dx())*scale)))
 		drawH := max(1, int(math.Round(float64(cell.bbox.Dy())*scale)))
-		resized, _ := qualityResize(content, content.Bounds(), drawW, drawH)
+		resized, _ := qualityResize(content, content.Bounds(), drawW, drawH, RasterModeSmooth)
 		relativeAnchorX := (cell.anchor.X - float64(cell.bbox.Min.X)) * scale
 		relativeAnchorY := (cell.anchor.Y - float64(cell.bbox.Min.Y)) * scale
 		dstX := int(math.Round(cell.anchor.X - relativeAnchorX))

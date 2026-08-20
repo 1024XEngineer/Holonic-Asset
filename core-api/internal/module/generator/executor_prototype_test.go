@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -264,15 +265,27 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
+		!strings.Contains(images.request.Prompt, "<asset_dimensions>\n{\"width\":64,\"height\":64}\n</asset_dimensions>") ||
+		!strings.Contains(images.request.Prompt, "at most 40 x 40 drawable logical pixels") ||
 		images.request.Size != "" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
+	}
+	if len(images.requests) != 1 {
+		t.Fatalf("image generation call count = %d, want one high-quality direction sheet", len(images.requests))
+	}
+	if request := images.requests[0]; request.MaxAttempts != 3 || request.Params["quality"] != "high" {
+		t.Fatalf("image request did not ask for high quality with retries: %+v", request)
 	}
 	if len(processor.splitRequests) != 1 {
 		t.Fatalf("expected one prototype split request, got %d", len(processor.splitRequests))
@@ -287,8 +300,17 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		!splitRequest.NormalizeContentScale || splitRequest.CropToContent {
 		t.Fatalf("prototype directions were not normalized on a shared canvas: %+v", splitRequest)
 	}
-	if len(processor.resizeRequests) != 0 {
-		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
+	if len(processor.resizeRequests) != 4 {
+		t.Fatalf("pixel post-process request count = %d, want 4: %+v", len(processor.resizeRequests), processor.resizeRequests)
+	}
+	for index, request := range processor.resizeRequests {
+		if request.Options.Width != 64 || request.Options.Height != 64 ||
+			request.Options.Margin != 0 || request.Options.CropContent {
+			t.Fatalf("prototype direction %d changed canonical frame geometry: %+v", index, request.Options)
+		}
+		if request.Options.Mode != imageprocessor.RasterModePixel || !request.Options.HardAlpha || request.Options.PaletteSize != 14 {
+			t.Fatalf("prototype direction %d did not use character pixel output options: %+v", index, request.Options)
+		}
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -390,6 +412,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	for index := range 4 {
 		wantEvents = append(wantEvents,
 			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
+			"resize_image",
 			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
 		)
 	}
@@ -554,9 +577,10 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{events: &events}
 	executor := generator.NewExecutorWithDependencies(
 		images,
-		&imageProcessorStub{events: &events},
+		processor,
 		assets,
 		generator.ExecutorDependencies{},
 	)
@@ -576,12 +600,30 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
+		"resize_image",
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	if images.request == nil || images.request.MaxAttempts != 3 {
 		t.Fatalf("expected MaxAttempts 3, got %+v", images.request)
+	}
+	if len(processor.resizeRequests) != 8 {
+		t.Fatalf("pixel post-process request count = %d, want 8", len(processor.resizeRequests))
+	}
+	for index, request := range processor.resizeRequests {
+		if request.Options.Width != 128 || request.Options.Height != 128 ||
+			request.Options.Margin != 0 || request.Options.CropContent ||
+			request.Options.PaletteSize != 16 || !request.Options.NormalizeNearRound {
+			t.Fatalf("object direction %d did not preserve canonical geometry with object pixel options: %+v", index, request.Options)
+		}
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
 		assets.objectAsset.ProjectID != 12 || assets.objectAsset.Type != assetdomain.AssetTypeObject {
@@ -602,6 +644,37 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.objectAsset, 8)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
+}
+
+func TestExecutorUsesGeneratedPrototypeSheetForFinalProcessing(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{
+		events: &events,
+		result: &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{{Base64: "generated-sheet", MediaType: "image/webp"}}},
+	}
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{},
+	)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, json.RawMessage(`{
+		"asset_name":"player",
+		"creative_brief":"a readable fantasy athlete",
+		"dimensions":{"width":64,"height":64},
+		"perspective":"Side-On"
+	}`))
+	if err != nil {
+		t.Fatalf("generate prototype: %v", err)
+	}
+	if len(images.requests) != 1 {
+		t.Fatalf("prototype used %d image generation calls, want one", len(images.requests))
+	}
+	if len(processor.removeRequests) != 1 || processor.removeRequests[0].ImageBase64 != "generated-sheet" {
+		t.Fatalf("final processing did not use generated sheet: %+v", processor.removeRequests)
+	}
 }
 
 func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *testing.T) {

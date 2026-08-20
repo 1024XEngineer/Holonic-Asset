@@ -16,7 +16,13 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		{
 			name: "character",
 			build: func(state prompts.PrototypeReferenceState) string {
-				return prompts.CharacterPrototype("a hero", "Top-Down", prompts.TransparentBackground(), state)
+				return prompts.CharacterPrototype(
+					"a hero",
+					"Top-Down",
+					assetdomain.Size{Width: 32, Height: 32},
+					prompts.TransparentBackground(),
+					state,
+				)
 			},
 		},
 		{

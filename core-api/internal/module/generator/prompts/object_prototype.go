@@ -26,7 +26,7 @@ Reference image roles:
 
 Default production guidelines:
 - Render as unmistakable classic low-resolution pixel art with large, clearly visible square pixel blocks and a deliberately coarse pixel grid.
-- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional colour palette.
+- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, broad connected colour shapes, and a small intentional colour palette. Avoid dithering when it would become native-size speckle.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbour scaling. Never turn it into a high-definition illustration.
 - Generate direction views of one consistent object as the only subject. Every cell must depict the same object.
@@ -39,6 +39,8 @@ Default production guidelines:
 - Do not crop, cut off, obscure, or overlap any part of the object.
 - Preserve the requested visual style without introducing an unrelated art style.
 - Make the result suitable for direct isolation and use as a game asset.
+
+%s
 
 Direction sheet layout rules:
 %s
@@ -85,6 +87,7 @@ func ObjectPrototype(
 			references,
 			"object",
 		),
+		prototypeLogicalPixelRules(dimensions, "object"),
 		prototypeDirectionSheetRules,
 		contentPercent,
 		contentPercent,

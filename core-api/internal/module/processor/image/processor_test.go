@@ -483,3 +483,618 @@ func controlledMatteFixtureBase64(t *testing.T) string {
 	}
 	return encoded
 }
+
+func TestResizeImagePixelModeLocksReductionToAreaSampling(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	for y := range 4 {
+		for x := range 4 {
+			source.SetNRGBA(x, y, color.NRGBA{R: 240, G: 30, B: 30, A: 255})
+		}
+	}
+	// A minority blue sample exists in every 2x2 destination footprint. The
+	// old structure-aware reducer promoted a source colour and shifted apparent
+	// features. The new reducer must retain the exact area blend first.
+	for _, point := range []image.Point{{0, 0}, {2, 0}, {0, 2}, {2, 2}} {
+		source.SetNRGBA(point.X, point.Y, color.NRGBA{R: 20, G: 50, B: 240, A: 255})
+	}
+
+	pixelOptions := DefaultResizeOptions(2, 2)
+	pixelOptions.Margin = 0
+	pixelOptions.CropContent = false
+	pixelOptions.Mode = RasterModePixel
+	pixelOptions.PaletteSize = 2
+	pixelImage, pixelReport, err := ResizeImage(source, pixelOptions)
+	if err != nil {
+		t.Fatalf("pixel resize: %v", err)
+	}
+	if pixelReport.Sampling != resizeSamplingPixelArea {
+		t.Fatalf("pixel sampling = %q, want %q", pixelReport.Sampling, resizeSamplingPixelArea)
+	}
+
+	smoothOptions := pixelOptions
+	smoothOptions.Mode = RasterModeSmooth
+	smoothOptions.PaletteSize = 0
+	smoothImage, smoothReport, err := ResizeImage(source, smoothOptions)
+	if err != nil {
+		t.Fatalf("smooth resize: %v", err)
+	}
+	if smoothReport.Sampling != resizeSamplingArea {
+		t.Fatalf("smooth sampling = %q, want %q", smoothReport.Sampling, resizeSamplingArea)
+	}
+	for y := range 2 {
+		for x := range 2 {
+			pixel := pixelImage.RGBAAt(x, y)
+			smooth := smoothImage.RGBAAt(x, y)
+			if pixel != smooth {
+				t.Fatalf("pixel reduction moved away from area result at (%d,%d): got %+v, want %+v", x, y, pixel, smooth)
+			}
+			if pixel.R >= 220 || pixel.B <= 50 {
+				t.Fatalf("area blend was replaced by a source minority/majority colour: %+v", pixel)
+			}
+		}
+	}
+}
+
+func TestRepairPixelColourBlocksMergesAmbiguousSingleton(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 80, G: 80, B: 80, A: 255}
+	ambiguous := color.NRGBA{R: 100, G: 100, B: 100, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+	reference := image.NewNRGBA(quantized.Bounds())
+	for y := range 3 {
+		for x := range 3 {
+			quantized.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	quantized.SetNRGBA(1, 1, ambiguous)
+	// The smooth pixel lies between the singleton and its surrounding block;
+	// either palette colour is plausible, so spatial coherence should win.
+	reference.SetNRGBA(1, 1, color.NRGBA{R: 95, G: 95, B: 95, A: 255})
+
+	repairPixelColourBlocks(quantized, reference)
+	if got := quantized.NRGBAAt(1, 1); got != base {
+		t.Fatalf("ambiguous singleton was not merged into its colour block: %+v", got)
+	}
+}
+
+func TestRepairPixelColourBlocksPreservesTrueHighContrastDetail(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 220, G: 130, B: 55, A: 255}
+	detail := color.NRGBA{R: 18, G: 14, B: 12, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+	reference := image.NewNRGBA(quantized.Bounds())
+	for y := range 3 {
+		for x := range 3 {
+			quantized.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	quantized.SetNRGBA(1, 1, detail)
+	reference.SetNRGBA(1, 1, color.NRGBA{R: 20, G: 16, B: 13, A: 255})
+
+	repairPixelColourBlocks(quantized, reference)
+	if got := quantized.NRGBAAt(1, 1); got != detail {
+		t.Fatalf("real high-contrast detail was erased: %+v", got)
+	}
+}
+
+func TestRepairPixelColourBlocksPreservesTwoBlendedSinglePixelEyes(t *testing.T) {
+	t.Parallel()
+
+	skin := color.NRGBA{R: 184, G: 116, B: 82, A: 255}
+	eye := color.NRGBA{R: 24, G: 20, B: 22, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 8, 5))
+	reference := image.NewNRGBA(quantized.Bounds())
+	for y := range 5 {
+		for x := range 8 {
+			quantized.SetNRGBA(x, y, skin)
+			reference.SetNRGBA(x, y, skin)
+		}
+	}
+	for _, point := range []image.Point{{2, 2}, {5, 2}} {
+		quantized.SetNRGBA(point.X, point.Y, eye)
+		// Area reduction can blend a tiny dark eye with surrounding skin. The
+		// repair pass must still recognize the mapped high-contrast mark as a
+		// deliberate detail rather than replacing it with the face colour.
+		reference.SetNRGBA(point.X, point.Y, color.NRGBA{R: 92, G: 64, B: 55, A: 255})
+	}
+
+	repairPixelColourBlocks(quantized, reference)
+	for _, point := range []image.Point{{2, 2}, {5, 2}} {
+		if got := quantized.NRGBAAt(point.X, point.Y); got != eye {
+			t.Fatalf("eye at %v was erased: %+v", point, got)
+		}
+	}
+}
+
+func TestRepairPixelAlphaGapsFillsCoveredBridgeOnly(t *testing.T) {
+	t.Parallel()
+
+	green := color.NRGBA{R: 40, G: 170, B: 75, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 5, 3))
+	reference := image.NewNRGBA(quantized.Bounds())
+	quantized.SetNRGBA(1, 1, green)
+	quantized.SetNRGBA(3, 1, green)
+	reference.SetNRGBA(2, 1, color.NRGBA{R: 45, G: 165, B: 78, A: 80})
+	// This second apparent gap has matching neighbours but no meaningful source
+	// coverage, so it must remain transparent rather than growing the shape.
+	quantized.SetNRGBA(0, 0, green)
+	quantized.SetNRGBA(2, 0, green)
+	reference.SetNRGBA(1, 0, color.NRGBA{R: 45, G: 165, B: 78, A: 20})
+
+	repairPixelAlphaGaps(quantized, reference, pixelAlphaRepairFloor)
+	if got := quantized.NRGBAAt(2, 1); got != green {
+		t.Fatalf("covered one-pixel bridge was not filled: %+v", got)
+	}
+	if got := quantized.NRGBAAt(1, 0); got.A != 0 {
+		t.Fatalf("low-coverage background was incorrectly filled: %+v", got)
+	}
+}
+
+func TestRegularizeNearEllipticalSilhouetteSnapsSymmetricRoundProp(t *testing.T) {
+	t.Parallel()
+
+	dark := color.NRGBA{R: 65, G: 28, B: 10, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	// This is the distorted 16x16 width profile observed after hard-alpha
+	// thresholding: symmetric and recognisably circular, but pinched at both
+	// ends compared with the ellipse implied by the same bounds.
+	widths := []int{6, 8, 10, 12, 14, 16, 16, 16, 16, 16, 16, 14, 12, 10, 8, 6}
+	for y, width := range widths {
+		left := (16 - width) / 2
+		for x := left; x < left+width; x++ {
+			img.SetNRGBA(x, y, dark)
+		}
+	}
+	reference := cloneNRGBA(img)
+	regularizeNearEllipticalSilhouette(
+		img,
+		reference,
+		[]color.RGBA{{R: dark.R, G: dark.G, B: dark.B, A: 255}},
+	)
+
+	changed := 0
+	for y := range 16 {
+		for x := range 16 {
+			dx := (float64(x) + 0.5 - 8) / 8
+			dy := (float64(y) + 0.5 - 8) / 8
+			wantOpaque := dx*dx+dy*dy <= 1
+			gotOpaque := img.NRGBAAt(x, y).A == 255
+			if gotOpaque != wantOpaque {
+				t.Fatalf("ellipse mismatch at (%d,%d): opaque=%v, want %v", x, y, gotOpaque, wantOpaque)
+			}
+			if gotOpaque != (reference.NRGBAAt(x, y).A == 255) {
+				changed++
+			}
+		}
+	}
+	if changed == 0 {
+		t.Fatal("near-circular silhouette was not regularized")
+	}
+}
+
+func TestRegularizeNearEllipticalSilhouettePreservesAsymmetricShape(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 90, G: 55, B: 30, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			dx := (float64(x) + 0.5 - 8) / 8
+			dy := (float64(y) + 0.5 - 8) / 8
+			if dx*dx+dy*dy <= 1 {
+				img.SetNRGBA(x, y, fill)
+			}
+		}
+	}
+	for _, point := range []image.Point{
+		{X: 2, Y: 5}, {X: 1, Y: 6}, {X: 0, Y: 7}, {X: 0, Y: 8},
+		{X: 1, Y: 9}, {X: 2, Y: 10},
+	} {
+		img.SetNRGBA(point.X, point.Y, color.NRGBA{})
+	}
+	original := cloneNRGBA(img)
+	regularizeNearEllipticalSilhouette(
+		img,
+		cloneNRGBA(img),
+		[]color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}},
+	)
+	for y := range 16 {
+		for x := range 16 {
+			if got, want := img.NRGBAAt(x, y), original.NRGBAAt(x, y); got != want {
+				t.Fatalf("asymmetric shape changed at (%d,%d): got %+v, want %+v", x, y, got, want)
+			}
+		}
+	}
+}
+
+func TestRegularizeNearCircularObjectSilhouetteRepairsPinchedRoundObject(t *testing.T) {
+	t.Parallel()
+
+	outline := color.NRGBA{R: 72, G: 31, B: 12, A: 255}
+	fill := color.NRGBA{R: 196, G: 91, B: 28, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	widths := []int{4, 8, 10, 12, 14, 14, 16, 16, 16, 16, 14, 14, 12, 10, 8, 4}
+	for y, width := range widths {
+		left := (16 - width) / 2
+		for x := left; x < left+width; x++ {
+			value := fill
+			if x == left || x == left+width-1 {
+				value = outline
+			}
+			img.SetNRGBA(x, y, value)
+		}
+	}
+	palette := []color.RGBA{
+		{R: outline.R, G: outline.G, B: outline.B, A: 255},
+		{R: fill.R, G: fill.G, B: fill.B, A: 255},
+	}
+	regularizeNearCircularObjectSilhouette(img, cloneNRGBA(img), palette)
+
+	assertOpaqueRowWidths(t, img, []int{6, 10, 12, 14, 14, 16, 16, 16, 16, 16, 16, 14, 14, 12, 10, 6})
+	assertImageUsesOnlyPalette(t, img, palette)
+}
+
+func TestRegularizeNearCircularObjectSilhouetteExpandsSquashedRoundObject(t *testing.T) {
+	t.Parallel()
+
+	orange := color.NRGBA{R: 201, G: 93, B: 30, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	widths := []int{6, 10, 12, 14, 15, 16, 16, 16, 16, 16, 14, 12, 10, 6}
+	for row, width := range widths {
+		left := (16 - width) / 2
+		for x := left; x < left+width; x++ {
+			img.SetNRGBA(x, row+1, orange)
+		}
+	}
+	palette := []color.RGBA{{R: orange.R, G: orange.G, B: orange.B, A: 255}}
+	regularizeNearCircularObjectSilhouette(img, cloneNRGBA(img), palette)
+
+	bounds, ok := alphaBounds(img, TransparentAlphaMax)
+	if !ok || bounds != image.Rect(0, 0, 16, 16) {
+		t.Fatalf("squashed round object bounds = %v, want 16x16 square", bounds)
+	}
+	assertOpaqueRowWidths(t, img, []int{6, 10, 12, 14, 14, 16, 16, 16, 16, 16, 16, 14, 14, 12, 10, 6})
+	assertImageUsesOnlyPalette(t, img, palette)
+}
+
+func TestResizeImageObjectPipelineExpandsSquashedRoundObjectInsideCanonicalMargin(t *testing.T) {
+	t.Parallel()
+
+	orange := color.NRGBA{R: 204, G: 92, B: 27, A: 255}
+	source := image.NewNRGBA(image.Rect(0, 0, 16, 14))
+	widths := []int{6, 10, 12, 14, 15, 16, 16, 16, 16, 16, 14, 12, 10, 6}
+	for y, width := range widths {
+		left := (16 - width) / 2
+		for x := left; x < left+width; x++ {
+			source.SetNRGBA(x, y, orange)
+		}
+	}
+
+	result, _, err := ResizeImage(source, PrototypePixelResizeOptions(32, 32))
+	if err != nil {
+		t.Fatalf("resize squashed round object: %v", err)
+	}
+	bounds, ok := alphaBounds(toNRGBA(result), TransparentAlphaMax)
+	if !ok || bounds != image.Rect(6, 6, 26, 26) {
+		t.Fatalf("round object bounds = %v, want canonical 20x20 drawable area", bounds)
+	}
+	assertOpaqueRowWidths(t, toNRGBA(result).SubImage(bounds).(*image.NRGBA), []int{
+		6, 10, 14, 16, 16, 18, 18, 20, 20, 20, 20, 20, 20, 18, 18, 16, 16, 14, 10, 6,
+	})
+}
+
+func TestRegularizeNearCircularObjectSilhouettePreservesSquareObject(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 118, G: 79, B: 42, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			img.SetNRGBA(x, y, fill)
+		}
+	}
+	original := cloneNRGBA(img)
+	regularizeNearCircularObjectSilhouette(
+		img,
+		cloneNRGBA(img),
+		[]color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}},
+	)
+	assertImagesEqual(t, img, original)
+}
+
+func TestRegularizeNearCircularObjectSilhouettePreservesAsymmetricObject(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 101, G: 67, B: 38, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			dx := (float64(x) + 0.5 - 8) / 8
+			dy := (float64(y) + 0.5 - 8) / 8
+			if dx*dx+dy*dy <= 1 {
+				img.SetNRGBA(x, y, fill)
+			}
+		}
+	}
+	for y := 5; y <= 10; y++ {
+		img.SetNRGBA(0, y, color.NRGBA{})
+	}
+	original := cloneNRGBA(img)
+	regularizeNearCircularObjectSilhouette(
+		img,
+		cloneNRGBA(img),
+		[]color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}},
+	)
+	assertImagesEqual(t, img, original)
+}
+
+func assertOpaqueRowWidths(t *testing.T, img *image.NRGBA, want []int) {
+	t.Helper()
+	if img.Bounds().Dy() != len(want) {
+		t.Fatalf("image height = %d, want %d", img.Bounds().Dy(), len(want))
+	}
+	for y, wantWidth := range want {
+		gotWidth := 0
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			if img.NRGBAAt(x, img.Bounds().Min.Y+y).A > TransparentAlphaMax {
+				gotWidth++
+			}
+		}
+		if gotWidth != wantWidth {
+			t.Fatalf("opaque width at row %d = %d, want %d", y, gotWidth, wantWidth)
+		}
+	}
+}
+
+func assertImageUsesOnlyPalette(t *testing.T, img *image.NRGBA, palette []color.RGBA) {
+	t.Helper()
+	allowed := make(map[color.NRGBA]struct{}, len(palette))
+	for _, value := range palette {
+		allowed[color.NRGBA{R: value.R, G: value.G, B: value.B, A: 255}] = struct{}{}
+	}
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel := img.NRGBAAt(x, y)
+			if pixel.A <= TransparentAlphaMax {
+				continue
+			}
+			if _, ok := allowed[pixel]; !ok {
+				t.Fatalf("image invented colour %+v at (%d,%d)", pixel, x, y)
+			}
+		}
+	}
+}
+
+func assertImagesEqual(t *testing.T, got, want *image.NRGBA) {
+	t.Helper()
+	if got.Bounds() != want.Bounds() {
+		t.Fatalf("image bounds = %v, want %v", got.Bounds(), want.Bounds())
+	}
+	for y := got.Bounds().Min.Y; y < got.Bounds().Max.Y; y++ {
+		for x := got.Bounds().Min.X; x < got.Bounds().Max.X; x++ {
+			if gotPixel, wantPixel := got.NRGBAAt(x, y), want.NRGBAAt(x, y); gotPixel != wantPixel {
+				t.Fatalf("image changed at (%d,%d): got %+v, want %+v", x, y, gotPixel, wantPixel)
+			}
+		}
+	}
+}
+
+func TestResizeImagePixelModeUsesNearestNeighbourForEnlargement(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+	source.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+	source.SetNRGBA(1, 0, color.NRGBA{B: 255, A: 255})
+	options := DefaultResizeOptions(4, 2)
+	options.Margin = 0
+	options.CropContent = false
+	options.Mode = RasterModePixel
+
+	result, report, err := ResizeImage(source, options)
+	if err != nil {
+		t.Fatalf("enlarge pixel image: %v", err)
+	}
+	if report.Sampling != resizeSamplingNearest {
+		t.Fatalf("sampling = %q, want %q", report.Sampling, resizeSamplingNearest)
+	}
+	for y := range 2 {
+		if got := result.RGBAAt(1, y); got.R != 255 || got.B != 0 {
+			t.Fatalf("left block was interpolated at y=%d: %+v", y, got)
+		}
+		if got := result.RGBAAt(2, y); got.R != 0 || got.B != 255 {
+			t.Fatalf("right block was interpolated at y=%d: %+v", y, got)
+		}
+	}
+}
+
+func TestRemapToPaletteUsesPerceptualColourDistance(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	source.SetNRGBA(0, 0, color.NRGBA{R: 192, G: 32, B: 224, A: 255})
+	perceptualMatch := color.RGBA{R: 192, G: 224, B: 96, A: 255}
+	rgbArithmeticMatch := color.RGBA{R: 0, G: 0, B: 64, A: 255}
+	remapToPalette(source, source.Bounds(), []color.RGBA{perceptualMatch, rgbArithmeticMatch})
+	if got := source.NRGBAAt(0, 0); got != (color.NRGBA{
+		R: perceptualMatch.R,
+		G: perceptualMatch.G,
+		B: perceptualMatch.B,
+		A: 255,
+	}) {
+		t.Fatalf("perceptual remap chose %+v, want %+v", got, perceptualMatch)
+	}
+}
+
+func TestCharacterPrototypePixelPipelinePreservesSourceColoursAndBothEyes(t *testing.T) {
+	t.Parallel()
+
+	hair := color.NRGBA{R: 42, G: 25, B: 22, A: 255}
+	skin := color.NRGBA{R: 178, G: 110, B: 78, A: 255}
+	eye := color.NRGBA{R: 18, G: 17, B: 21, A: 255}
+	shirt := color.NRGBA{R: 34, G: 78, B: 148, A: 255}
+	highlight := color.NRGBA{R: 211, G: 151, B: 112, A: 255}
+	sourceColours := map[color.RGBA]struct{}{}
+	for _, value := range []color.NRGBA{hair, skin, eye, shirt, highlight} {
+		sourceColours[color.RGBA{R: value.R, G: value.G, B: value.B, A: 255}] = struct{}{}
+	}
+
+	logical := image.NewNRGBA(image.Rect(0, 0, 20, 20))
+	for y := range 20 {
+		for x := range 20 {
+			value := skin
+			switch {
+			case y < 5:
+				value = hair
+			case y >= 14:
+				value = shirt
+			case y == 12 && x >= 8 && x <= 11:
+				value = highlight
+			}
+			logical.SetNRGBA(x, y, value)
+		}
+	}
+	eyes := []image.Point{{7, 8}, {12, 8}}
+	for _, point := range eyes {
+		logical.SetNRGBA(point.X, point.Y, eye)
+	}
+	// Scale the logical fixture up so the production path must perform its
+	// alpha-aware area reduction before palette mapping. Each 4x4 eye becomes
+	// one final logical pixel in the canonical 20x20 drawable area.
+	source := image.NewNRGBA(image.Rect(0, 0, 80, 80))
+	for y := range 80 {
+		for x := range 80 {
+			source.SetNRGBA(x, y, logical.NRGBAAt(x/4, y/4))
+		}
+	}
+
+	options := CharacterPrototypePixelResizeOptions(32, 32)
+	result, report, err := ResizeImage(source, options)
+	if err != nil {
+		t.Fatalf("resize character prototype: %v", err)
+	}
+	if report.Sampling != resizeSamplingPixelArea {
+		t.Fatalf("character fixture did not exercise area reduction: %+v", report)
+	}
+	margin := AnimationFrameMargin(32, 32)
+	for _, point := range eyes {
+		got := result.RGBAAt(margin+point.X, margin+point.Y)
+		if got != (color.RGBA{R: eye.R, G: eye.G, B: eye.B, A: 255}) {
+			t.Fatalf("eye at %v was not preserved through the full pipeline: %+v", point, got)
+		}
+	}
+	for y := range result.Bounds().Dy() {
+		for x := range result.Bounds().Dx() {
+			pixel := result.RGBAAt(x, y)
+			if pixel.A == 0 {
+				continue
+			}
+			if _, ok := sourceColours[pixel]; !ok {
+				t.Fatalf("pipeline invented colour %+v at (%d,%d)", pixel, x, y)
+			}
+		}
+	}
+}
+
+func TestAnimationFrameMarginUsesThreeSixteenthsOfShortEdge(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		width, height      int
+		wantMargin         int
+		wantDrawableWidth  int
+		wantDrawableHeight int
+	}{
+		{width: 32, height: 32, wantMargin: 6, wantDrawableWidth: 20, wantDrawableHeight: 20},
+		{width: 48, height: 64, wantMargin: 9, wantDrawableWidth: 30, wantDrawableHeight: 46},
+		{width: 64, height: 64, wantMargin: 12, wantDrawableWidth: 40, wantDrawableHeight: 40},
+		{width: 128, height: 128, wantMargin: 24, wantDrawableWidth: 80, wantDrawableHeight: 80},
+		{width: 256, height: 256, wantMargin: 48, wantDrawableWidth: 160, wantDrawableHeight: 160},
+	}
+	for _, test := range tests {
+		margin := AnimationFrameMargin(test.width, test.height)
+		if margin != test.wantMargin {
+			t.Fatalf("%dx%d margin = %d, want %d", test.width, test.height, margin, test.wantMargin)
+		}
+		if got := test.width - 2*margin; got != test.wantDrawableWidth {
+			t.Fatalf("%dx%d drawable width = %d, want %d", test.width, test.height, got, test.wantDrawableWidth)
+		}
+		if got := test.height - 2*margin; got != test.wantDrawableHeight {
+			t.Fatalf("%dx%d drawable height = %d, want %d", test.width, test.height, got, test.wantDrawableHeight)
+		}
+	}
+}
+
+func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		width, height int
+		palette       int
+	}{
+		{width: 32, height: 32, palette: 8},
+		{width: 48, height: 64, palette: 12},
+		{width: 64, height: 64, palette: 12},
+		{width: 128, height: 128, palette: 16},
+		{width: 256, height: 256, palette: 20},
+	}
+	for _, test := range tests {
+		options := PrototypePixelResizeOptions(test.width, test.height)
+		if options.Margin != AnimationFrameMargin(test.width, test.height) {
+			t.Fatalf("%dx%d margin = %d, want canonical margin %d", test.width, test.height, options.Margin, AnimationFrameMargin(test.width, test.height))
+		}
+		if options.Mode != RasterModePixel || !options.HardAlpha || options.PaletteSize != test.palette || !options.NormalizeNearRound {
+			t.Fatalf("unexpected %dx%d prototype options: %+v", test.width, test.height, options)
+		}
+	}
+
+	characterPalettes := map[int]int{32: 10, 64: 14, 128: 18, 256: 24}
+	for dimension, wantPalette := range characterPalettes {
+		character := CharacterPrototypePixelResizeOptions(dimension, dimension)
+		object := PrototypePixelResizeOptions(dimension, dimension)
+		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha || character.NormalizeNearRound {
+			t.Fatalf("character %dx%d changed canonical geometry or enabled object-only rounding: character=%+v object=%+v", dimension, dimension, character, object)
+		}
+		if character.PaletteSize != wantPalette || character.PaletteSize <= object.PaletteSize {
+			t.Fatalf("character %dx%d palette = %d, want %d and greater than object %d", dimension, dimension, character.PaletteSize, wantPalette, object.PaletteSize)
+		}
+	}
+
+	source := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for y := range 64 {
+		for x := range 64 {
+			source.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(x * 4), G: uint8(y * 4), B: uint8((x + y) * 2),
+				A: uint8(96 + (x+y)%160),
+			})
+		}
+	}
+	options := PrototypePixelResizeOptions(32, 32)
+	result, report, err := ResizeImage(source, options)
+	if err != nil {
+		t.Fatalf("resize prototype: %v", err)
+	}
+	if report.Mode != RasterModePixel || report.Sampling != resizeSamplingPixelArea || !report.HardAlpha {
+		t.Fatalf("unexpected prototype report: %+v", report)
+	}
+	colours := map[color.RGBA]struct{}{}
+	for y := range result.Bounds().Dy() {
+		for x := range result.Bounds().Dx() {
+			pixel := result.RGBAAt(x, y)
+			if pixel.A != 0 && pixel.A != 255 {
+				t.Fatalf("prototype retained partial alpha at (%d,%d): %d", x, y, pixel.A)
+			}
+			if pixel.A == 255 {
+				colours[color.RGBA{R: pixel.R, G: pixel.G, B: pixel.B, A: 255}] = struct{}{}
+			}
+		}
+	}
+	if len(colours) > options.PaletteSize {
+		t.Fatalf("visible colour count = %d, palette limit = %d", len(colours), options.PaletteSize)
+	}
+}

@@ -32,6 +32,7 @@ func (e *executor) generateCharacterPrototype(
 		prompts.CharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
+			payload.Dimensions,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
@@ -106,6 +107,7 @@ func (e *executor) editCharacterPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
+			dimensions,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
 		),
 		dimensions,
@@ -206,20 +208,19 @@ func (e *executor) generatePrototypeResources(
 	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
 		Prompt:          prompt,
 		ReferenceImages: resolvedReferences,
+		Params:          imageclient.Params{"quality": "high"},
 		MaxAttempts:     3,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
 	}
-	if result == nil || len(result.Images) == 0 {
-		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
-	}
-	if len(result.Images) != 1 {
-		return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
+	generatedImage, err := singlePrototypeSheet(taskType, "generated", result)
+	if err != nil {
+		return nil, err
 	}
 
 	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64:               result.Images[0].Base64,
+		ImageBase64:               generatedImage.Base64,
 		MatteColor:                imageprocessor.DefaultMatteColor,
 		AllowSampledMatteFallback: true,
 	})
@@ -285,12 +286,27 @@ func (e *executor) generatePrototypeResources(
 			}
 		}
 
-		// Animation-mode splitting has already produced the final canonical PNG
-		// at the requested dimensions. Persist those bytes directly. Running the
-		// frame through Resize again performs a redundant raster resample, which
-		// can damage fine seams and asymmetric details even when the canvas size
-		// does not change.
-		finalURL := unprocessedURL
+		// Animation-mode splitting has already fixed the final frame geometry,
+		// shared scale, and centre anchor. Run pixel cleanup on that exact canvas
+		// without cropping, adding another margin, or changing pixel positions.
+		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+			ImageBase64: region.ImageBase64,
+			Options: prototypePixelPostProcessOptions(
+				taskType,
+				int(dimensions.Width),
+				int(dimensions.Height),
+			),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: %w", taskType, index, err)
+		}
+		if resized == nil || resized.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: empty result", taskType, index)
+		}
+		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    resized.ImageBase64,
+			MediaType: resized.MIMEType,
+		})
 		if e.references != nil {
 			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
@@ -304,6 +320,55 @@ func (e *executor) generatePrototypeResources(
 	}
 	return resources, nil
 }
+
+func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imageprocessor.ResizeOptions {
+	var options imageprocessor.ResizeOptions
+	switch taskType {
+	case GenerateCharacterProtoType, EditCharacterProtoType:
+		options = imageprocessor.CharacterPrototypePixelResizeOptions(width, height)
+	default:
+		options = imageprocessor.PrototypePixelResizeOptions(width, height)
+	}
+	// SplitImage already produced a canonical target-size frame with the shared
+	// prototype/animation margin. Preserve that canvas exactly while applying
+	// hard alpha, source-colour palette reduction, and block repair.
+	options.Margin = 0
+	options.CropContent = false
+	return options
+}
+
+func singlePrototypeSheet(
+	taskType TaskType,
+	stage string,
+	result *imageclient.GenerateResult,
+) (imageclient.GeneratedImage, error) {
+	if result == nil || len(result.Images) == 0 {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: %w",
+			taskType,
+			stage,
+			ErrImageResultRequired,
+		)
+	}
+	if len(result.Images) != 1 {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: expected one direction sheet, got %d",
+			taskType,
+			stage,
+			len(result.Images),
+		)
+	}
+	if result.Images[0].Base64 == "" {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: %w",
+			taskType,
+			stage,
+			ErrImageResultRequired,
+		)
+	}
+	return result.Images[0], nil
+}
+
 func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 	value := assetdomain.Perspective(strings.TrimSpace(perspective))
 	if !value.Valid() {
@@ -534,6 +599,7 @@ func (e *executor) editObjectPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
+			dimensions,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
 		),
 		dimensions,

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
@@ -13,6 +14,7 @@ func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
 		"change only the chest trim to silver",
 		"Top-Down",
 		4,
+		assetdomain.Size{Width: 48, Height: 48},
 		prompts.SolidMatteBackground("#00FF00"),
 	)
 
@@ -29,9 +31,31 @@ func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
 		"uniform, solid #00FF00 colour",
 		"change only the chest trim to silver",
 		"Top-Down",
+		"<asset_dimensions>\n{\"width\":48,\"height\":48}\n</asset_dimensions>",
+		"at most 30 x 30 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object edit prompt to contain %q: %s", expected, prompt)
+		}
+	}
+}
+
+func TestEditObjectPrototypeExplicitlyLowersDetailAt32Pixels(t *testing.T) {
+	prompt := prompts.EditObjectPrototype(
+		"a wooden chest",
+		"change the trim",
+		"Top-Down",
+		4,
+		assetdomain.Size{Width: 32, Height: 32},
+		prompts.TransparentBackground(),
+	)
+	for _, expected := range []string{
+		"short edge of 32 pixels or less",
+		"Explicitly lower the design detail level before rendering",
+		"Omit secondary texture, seams, folds, small accessories, tiny construction parts, logos, and decorative marks",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected 32px object edit prompt to contain %q: %s", expected, prompt)
 		}
 	}
 }

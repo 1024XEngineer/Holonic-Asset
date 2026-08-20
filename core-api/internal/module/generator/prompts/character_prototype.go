@@ -37,13 +37,15 @@ Direction sheet layout rules:
 
 Default production guidelines:
 - Render as unmistakable classic low-resolution pixel art with large, clearly visible square pixel blocks and a deliberately coarse pixel grid.
-- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional color palette.
+- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, broad connected color shapes, and a small intentional color palette. Avoid dithering when it would become native-size speckle.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbor scaling. Never turn it into a high-definition illustration.
 - Center each full-body direction view in its own equal-sized cell with balanced spacing and enough room to read the complete silhouette.
 - Do not include characters or creatures other than the requested direction views of the same character. Do not include scenery, ground planes, frames, borders, text, labels, logos, watermarks, UI elements, or unrelated objects.
 - Do not add a cast shadow, pedestal, environment, particles, or decorative background marks.
 - Make the result suitable for direct isolation and use as a game character asset.
+
+%s
 
 User creative brief:
 <creative_brief>
@@ -58,13 +60,19 @@ User-selected perspective:
 Backend-derived direction count:
 <direction_count>
 %d
-</direction_count>`
+</direction_count>
+
+Backend-target per-direction asset dimensions:
+<asset_dimensions>
+{"width":%d,"height":%d}
+</asset_dimensions>`
 
 // CharacterPrototype combines the user requirements with the source project's
 // character production constraints.
 func CharacterPrototype(
 	creativeBrief string,
 	perspective string,
+	dimensions assetdomain.Size,
 	backgroundConstraint string,
 	references PrototypeReferenceState,
 ) string {
@@ -77,8 +85,11 @@ func CharacterPrototype(
 			"character",
 		),
 		prototypeDirectionSheetRules,
+		prototypeLogicalPixelRules(dimensions, "character"),
 		creativeBrief,
 		perspective,
 		directionCount,
+		dimensions.Width,
+		dimensions.Height,
 	)
 }
