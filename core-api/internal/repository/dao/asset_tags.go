@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"gorm.io/gorm/schema"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 const assetTagsSerializerName = "asset_tags"
@@ -16,7 +18,7 @@ func init() {
 	schema.RegisterSerializer(assetTagsSerializerName, assetTagsSerializer{})
 }
 
-// assetTagsSerializer stores tags as JSON text and tolerates the legacy scalar
+// assetTagsSerializer stores tags as JSON and tolerates the legacy scalar
 // values written by the old map-based update path.
 type assetTagsSerializer struct{}
 
@@ -49,7 +51,7 @@ func (assetTagsSerializer) Value(
 	return string(encoded), nil
 }
 
-func decodeAssetTags(dbValue any) ([]string, error) {
+func decodeAssetTags(dbValue any) ([]assetdomain.Tag, error) {
 	if dbValue == nil {
 		return nil, nil
 	}
@@ -73,9 +75,11 @@ func decodeAssetTags(dbValue any) ([]string, error) {
 		return nil, nil
 	}
 
-	var tags []string
+	var tags []assetdomain.Tag
 	if err := json.Unmarshal(raw, &tags); err == nil {
 		return tags, nil
+	} else if strings.HasPrefix(value, "[") || strings.HasPrefix(value, "{") {
+		return nil, fmt.Errorf("dao: decode asset tags: %w", err)
 	}
 
 	// Some rows were written by the previous update path as a JSON scalar
@@ -83,7 +87,7 @@ func decodeAssetTags(dbValue any) ([]string, error) {
 	// backward-compatible; the next update rewrites it as a JSON array.
 	var tag string
 	if err := json.Unmarshal(raw, &tag); err == nil {
-		return []string{tag}, nil
+		return []assetdomain.Tag{{Name: tag, Color: assetdomain.DefaultTagColor}}, nil
 	}
-	return []string{value}, nil
+	return []assetdomain.Tag{{Name: value, Color: assetdomain.DefaultTagColor}}, nil
 }

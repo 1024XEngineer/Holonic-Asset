@@ -11,6 +11,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestAssetListLoadsStoredThumbnailWithoutJoiningContent(t *testing.T) {
@@ -89,22 +91,25 @@ func TestAssetDaoUpdateCurrentContentReportsMissingAsset(t *testing.T) {
 func TestAssetDaoUpdateAssetEncodesTagsAsJSON(t *testing.T) {
 	tests := []struct {
 		name       string
-		tags       []string
+		tags       []assetdomain.Tag
 		storedTags string
 	}{
 		{
 			name:       "one tag",
-			tags:       []string{"pixel-art"},
-			storedTags: `["pixel-art"]`,
+			tags:       []assetdomain.Tag{{Name: "pixel-art", Color: "#123456"}},
+			storedTags: `[{"name":"pixel-art","color":"#123456"}]`,
 		},
 		{
-			name:       "multiple tags",
-			tags:       []string{"object", "pixel-art"},
-			storedTags: `["object","pixel-art"]`,
+			name: "multiple tags",
+			tags: []assetdomain.Tag{
+				{Name: "object", Description: "game object"},
+				{Name: "pixel-art", Color: "#123456"},
+			},
+			storedTags: `[{"name":"object","description":"game object"},{"name":"pixel-art","color":"#123456"}]`,
 		},
 		{
 			name:       "legacy scalar is readable",
-			tags:       []string{"pixel-art"},
+			tags:       []assetdomain.Tag{{Name: "pixel-art", Color: assetdomain.DefaultTagColor}},
 			storedTags: `pixel-art`,
 		},
 	}
@@ -138,7 +143,7 @@ func TestAssetDaoUpdateAssetEncodesTagsAsJSON(t *testing.T) {
 				t.Fatalf("unexpected tags: %#v, want %#v", got.Tags, tt.tags)
 			}
 			for index := range tt.tags {
-				if got.Tags[index] != tt.tags[index] {
+				if !reflect.DeepEqual(got.Tags[index], tt.tags[index]) {
 					t.Fatalf("unexpected tags: %#v, want %#v", got.Tags, tt.tags)
 				}
 			}
@@ -153,11 +158,12 @@ func TestDecodeAssetTagsAcceptsJSONArraysAndLegacyScalars(t *testing.T) {
 	tests := []struct {
 		name  string
 		input any
-		want  []string
+		want  []assetdomain.Tag
 	}{
-		{name: "array", input: `["object","pixel-art"]`, want: []string{"object", "pixel-art"}},
-		{name: "json scalar", input: `"pixel-art"`, want: []string{"pixel-art"}},
-		{name: "plain text", input: "pixel-art", want: []string{"pixel-art"}},
+		{name: "structured array", input: `[{"name":"object","description":"prop","color":"#123456"}]`, want: []assetdomain.Tag{{Name: "object", Description: "prop", Color: "#123456"}}},
+		{name: "legacy array", input: `["object","pixel-art"]`, want: []assetdomain.Tag{{Name: "object", Color: assetdomain.DefaultTagColor}, {Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
+		{name: "json scalar", input: `"pixel-art"`, want: []assetdomain.Tag{{Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
+		{name: "plain text", input: "pixel-art", want: []assetdomain.Tag{{Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
 		{name: "null", input: "null", want: nil},
 	}
 
@@ -170,10 +176,8 @@ func TestDecodeAssetTagsAcceptsJSONArraysAndLegacyScalars(t *testing.T) {
 			if len(got) != len(tt.want) {
 				t.Fatalf("unexpected tags: %#v, want %#v", got, tt.want)
 			}
-			for index := range got {
-				if got[index] != tt.want[index] {
-					t.Fatalf("unexpected tags: %#v, want %#v", got, tt.want)
-				}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("unexpected tags: %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -182,11 +186,11 @@ func TestDecodeAssetTagsAcceptsJSONArraysAndLegacyScalars(t *testing.T) {
 func TestAssetTagsSerializerValue(t *testing.T) {
 	serializer := assetTagsSerializer{}
 
-	got, err := serializer.Value(context.Background(), nil, reflect.Value{}, []string{"object", "pixel-art"})
+	got, err := serializer.Value(context.Background(), nil, reflect.Value{}, []assetdomain.Tag{{Name: "object"}, {Name: "pixel-art", Color: "#123456"}})
 	if err != nil {
 		t.Fatalf("serialize tags: %v", err)
 	}
-	if got != `["object","pixel-art"]` {
+	if got != `[{"name":"object"},{"name":"pixel-art","color":"#123456"}]` {
 		t.Fatalf("unexpected serialized tags: %#v", got)
 	}
 
@@ -200,14 +204,14 @@ func TestDecodeAssetTagsInputTypes(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   any
-		want    []string
+		want    []assetdomain.Tag
 		wantErr bool
 	}{
 		{name: "nil", input: nil, want: nil},
 		{name: "empty string", input: "", want: nil},
 		{name: "whitespace", input: "  ", want: nil},
-		{name: "byte array", input: []byte(`["object","pixel-art"]`), want: []string{"object", "pixel-art"}},
-		{name: "string slice", input: []string{"object", "pixel-art"}, want: []string{"object", "pixel-art"}},
+		{name: "byte array", input: []byte(`["object","pixel-art"]`), want: []assetdomain.Tag{{Name: "object", Color: assetdomain.DefaultTagColor}, {Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
+		{name: "string slice", input: []string{"object", "pixel-art"}, want: []assetdomain.Tag{{Name: "object", Color: assetdomain.DefaultTagColor}, {Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
 		{name: "unsupported database type", input: func() {}, wantErr: true},
 	}
 
@@ -272,7 +276,7 @@ func TestAssetDaoUpdateAssetWithoutFieldsReloadsExistingAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload asset: %v", err)
 	}
-	if len(got.Tags) != 1 || got.Tags[0] != "pixel-art" {
+	if len(got.Tags) != 1 || got.Tags[0].Name != "pixel-art" || got.Tags[0].Color != assetdomain.DefaultTagColor {
 		t.Fatalf("unexpected tags: %#v", got.Tags)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -290,11 +294,11 @@ func TestAssetDaoUpdateAssetErrors(t *testing.T) {
 
 	t.Run("update query error", func(t *testing.T) {
 		db, mock := newMockAssetDatabase(t)
-		tags := []string{"pixel-art"}
+		tags := []assetdomain.Tag{{Name: "pixel-art"}}
 		queryErr := errors.New("update failed")
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(`UPDATE "assets" SET "tags"=$1 WHERE id = $2`)).
-			WithArgs(`["pixel-art"]`, uint(32)).
+			WithArgs(`[{"name":"pixel-art"}]`, uint(32)).
 			WillReturnError(queryErr)
 		mock.ExpectRollback()
 
@@ -309,10 +313,10 @@ func TestAssetDaoUpdateAssetErrors(t *testing.T) {
 
 	t.Run("asset not found", func(t *testing.T) {
 		db, mock := newMockAssetDatabase(t)
-		tags := []string{"pixel-art"}
+		tags := []assetdomain.Tag{{Name: "pixel-art"}}
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(`UPDATE "assets" SET "tags"=$1 WHERE id = $2`)).
-			WithArgs(`["pixel-art"]`, uint(32)).
+			WithArgs(`[{"name":"pixel-art"}]`, uint(32)).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
 
@@ -327,11 +331,11 @@ func TestAssetDaoUpdateAssetErrors(t *testing.T) {
 
 	t.Run("reload error", func(t *testing.T) {
 		db, mock := newMockAssetDatabase(t)
-		tags := []string{"pixel-art"}
+		tags := []assetdomain.Tag{{Name: "pixel-art"}}
 		queryErr := errors.New("reload failed")
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(`UPDATE "assets" SET "tags"=$1 WHERE id = $2`)).
-			WithArgs(`["pixel-art"]`, uint(32)).
+			WithArgs(`[{"name":"pixel-art"}]`, uint(32)).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 		mock.ExpectQuery(
@@ -351,7 +355,7 @@ func TestAssetDaoUpdateAssetErrors(t *testing.T) {
 	})
 }
 
-func encodeTestTags(t *testing.T, tags []string) string {
+func encodeTestTags(t *testing.T, tags []assetdomain.Tag) string {
 	t.Helper()
 	encoded, err := json.Marshal(tags)
 	if err != nil {

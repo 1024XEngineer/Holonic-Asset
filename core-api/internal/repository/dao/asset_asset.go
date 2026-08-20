@@ -8,6 +8,8 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 type Asset struct {
@@ -16,7 +18,7 @@ type Asset struct {
 	ProjectID    uint `gorm:"index"`
 	Type         string
 	Description  string
-	Tags         []string `json:"tags" gorm:"serializer:asset_tags"`
+	Tags         []assetdomain.Tag `json:"tags" gorm:"type:jsonb;serializer:asset_tags"`
 	Perspective  string
 	Dimensions   datatypes.JSON `gorm:"type:jsonb"`
 	ThumbnailURL string
@@ -28,7 +30,7 @@ type Asset struct {
 type AssetUpdate struct {
 	Name        *string
 	Description *string
-	Tags        *[]string
+	Tags        *[]assetdomain.Tag
 	Perspective *string
 	Dimensions  *datatypes.JSON
 }
