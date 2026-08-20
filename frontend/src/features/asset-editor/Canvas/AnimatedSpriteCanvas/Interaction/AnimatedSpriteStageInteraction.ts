@@ -12,6 +12,9 @@ import {
   hitTestAnimatedSpriteScene,
 } from "./AnimatedSpriteStageGeometry";
 import type { AnimatedSpriteStageContext } from "../Runtime/AnimatedSpriteCanvas.types";
+import type { AnimatedSpriteCanvasFrameSelection } from "../AnimatedSpriteCanvas.interface";
+
+const MARQUEE_DRAG_THRESHOLD = 3;
 
 type DragState =
   | {
@@ -26,13 +29,11 @@ type DragState =
       pointerId: number;
       start: CanvasPosition;
       end: CanvasPosition;
-    }
-  | {
-      kind: "frame-marquee";
-      pointerId: number;
-      start: CanvasPosition;
-      end: CanvasPosition;
-      node: NodeId;
+      additive: boolean;
+      startTarget:
+        | { kind: "frame"; node: NodeId; index: number }
+        | { kind: "frame-grid" }
+        | { kind: "empty" };
     };
 
 export class AnimatedSpriteStageInteraction {
@@ -69,19 +70,22 @@ export class AnimatedSpriteStageInteraction {
       return this.context.actions.onReviewResolve(true);
     if (hit?.kind === "review-deny")
       return this.context.actions.onReviewResolve(false);
-    if (hit?.kind === "frame")
-      return this.context.actions.onSelectFrame(hit.node, hit.index);
+    const additive = event.ctrlKey || event.metaKey;
     this.capture(event);
-    if (hit?.kind === "frame-grid") {
+    if (hit?.kind === "frame" || hit?.kind === "frame-grid") {
       this.drag = {
-        kind: "frame-marquee",
+        kind: "marquee",
         pointerId: event.pointerId,
         start: point,
         end: point,
-        node: hit.node,
+        additive,
+        startTarget:
+          hit.kind === "frame"
+            ? { kind: "frame", node: hit.node, index: hit.index }
+            : { kind: "frame-grid" },
       };
     } else if (hit?.kind === "node") {
-      this.context.actions.onSelect(hit.node);
+      this.context.actions.onSelect(hit.node, additive);
       this.drag = {
         kind: "node",
         pointerId: event.pointerId,
@@ -95,6 +99,8 @@ export class AnimatedSpriteStageInteraction {
         pointerId: event.pointerId,
         start: point,
         end: point,
+        additive,
+        startTarget: { kind: "empty" },
       };
     }
     this.syncMarquee();
@@ -111,14 +117,7 @@ export class AnimatedSpriteStageInteraction {
   private finishPointer = (event: PointerEvent) => {
     if (!this.drag || this.drag.pointerId !== event.pointerId) return;
     const completed = this.drag;
-    if (completed.kind === "marquee")
-      this.completeNodeSelection(completed.start, completed.end);
-    if (completed.kind === "frame-marquee")
-      this.completeFrameSelection(
-        completed.node,
-        completed.start,
-        completed.end,
-      );
+    if (completed.kind === "marquee") this.completeMarquee(completed);
     if (completed.kind === "node")
       this.context.actions.onNodePositionChange(completed.node, {
         ...this.context.getScene().positions[completed.node],
@@ -164,52 +163,78 @@ export class AnimatedSpriteStageInteraction {
     });
   }
 
-  private completeNodeSelection(start: CanvasPosition, end: CanvasPosition) {
-    const bounds = normalizeRect(start, end);
-    const scene = this.context.getScene();
-    const selected = getCanvasNodes(this.context.getAnimations()).filter(
-      (node) =>
-        intersectsRect(
-          bounds,
-          getNodeBounds(
-            node,
-            scene.positions[node],
-            scene.expanded.has(node),
-            this.context.getPrototype(),
-            this.context.getAnimations(),
-            this.context.getReview(),
-          ),
-        ),
-    );
-    if (selected.length > 0) this.context.actions.onSelectNodes(selected);
-    else this.context.actions.onClearSelection();
-  }
+  private completeMarquee(drag: Extract<DragState, { kind: "marquee" }>) {
+    if (!this.hasMarqueeDrag(drag)) {
+      if (drag.startTarget.kind === "frame") {
+        this.context.actions.onSelectFrame(
+          drag.startTarget.node,
+          drag.startTarget.index,
+          drag.additive,
+        );
+      } else if (drag.startTarget.kind === "empty" && !drag.additive) {
+        this.context.actions.onClearSelection();
+      }
+      return;
+    }
 
-  private completeFrameSelection(
-    node: NodeId,
-    start: CanvasPosition,
-    end: CanvasPosition,
-  ) {
-    const bounds = normalizeRect(start, end);
-    const position = this.context.getScene().positions[node];
-    const indexes = Array.from(
-      {
-        length: getAnimatedSpriteFrameCount(
+    const bounds = normalizeRect(drag.start, drag.end);
+    const scene = this.context.getScene();
+    const nodes = getCanvasNodes(this.context.getAnimations());
+    const frames: AnimatedSpriteCanvasFrameSelection[] = nodes.flatMap(
+      (node) =>
+        scene.expanded.has(node)
+          ? Array.from(
+              {
+                length: getAnimatedSpriteFrameCount(
+                  node,
+                  this.context.getPrototype(),
+                  this.context.getAnimations(),
+                ),
+              },
+              (_, index) => ({ nodeId: node, index }),
+            ).filter(({ index }) =>
+              intersectsRect(
+                bounds,
+                getFrameBounds(scene.positions[node], index),
+              ),
+            )
+          : [],
+    );
+    if (frames.length > 0) {
+      this.context.actions.onSelectFrames(frames, drag.additive);
+      return;
+    }
+
+    const selectedNodes = nodes.filter((node) =>
+      intersectsRect(
+        bounds,
+        getNodeBounds(
           node,
+          scene.positions[node],
+          scene.expanded.has(node),
           this.context.getPrototype(),
           this.context.getAnimations(),
+          this.context.getReview(),
         ),
-      },
-      (_, index) => index,
-    ).filter((index) =>
-      intersectsRect(bounds, getFrameBounds(position, index)),
+      ),
     );
-    if (indexes.length > 0) this.context.actions.onSelectFrames(node, indexes);
+    if (selectedNodes.length > 0)
+      this.context.actions.onSelectNodes(selectedNodes, drag.additive);
+    else if (!drag.additive) this.context.actions.onClearSelection();
+  }
+
+  private hasMarqueeDrag(drag: Extract<DragState, { kind: "marquee" }>) {
+    return (
+      Math.max(
+        Math.abs(drag.end.x - drag.start.x),
+        Math.abs(drag.end.y - drag.start.y),
+      ) >= MARQUEE_DRAG_THRESHOLD
+    );
   }
 
   private syncMarquee() {
     this.context.setMarquee(
-      this.drag?.kind === "marquee" || this.drag?.kind === "frame-marquee"
+      this.drag?.kind === "marquee"
         ? { start: this.drag.start, end: this.drag.end }
         : null,
     );
