@@ -14,18 +14,21 @@
 <p align="center">
   <a href="#tech-stack">Tech stack</a> ·
   <a href="#core-capabilities">Capabilities</a> ·
-  <a href="#domain-model">Domain model</a> ·
-  <a href="#roadmap">Roadmap</a>
+  <a href="#domain-model">Domain model</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=00ADD8" alt="Go 1.26.5">
   <img src="https://img.shields.io/badge/React-19.2.7-149eca?logo=react&logoColor=61DAFB" alt="React 19.2.7">
   <img src="https://img.shields.io/badge/TypeScript-6.0.x-3178C6?logo=typescript&logoColor=3178C6" alt="TypeScript 6.0.x">
   <img src="https://img.shields.io/badge/Tailwind%20CSS-4.3.3-06B6D4?logo=tailwindcss&logoColor=06B6D4" alt="Tailwind CSS 4.3.3">
   <img src="https://img.shields.io/badge/TanStack-1.170.18-FF4154?logo=tanstack&logoColor=FF4154" alt="TanStack Router 1.170.18">
-  <a href="https://pixijs.com/"><img src="https://github.com/pixijs.png?size=32" alt="PixiJS logo" height="20"><img src="https://img.shields.io/badge/PixiJS-8.19.0-E72264" alt="PixiJS 8.19.0"></a>
+  <a href="https://pixijs.com/"><img src="docs/image/badge/pixijs.svg" alt="PixiJS 8.19.0"></a>
+  <br>
+  <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=00ADD8" alt="Go 1.26.5">
+  <a href="https://www.postgresql.org/"><img src="docs/image/badge/postgresql.svg" alt="PostgreSQL 18.4"></a>
+  <br>
   <img src="https://img.shields.io/badge/OpenAPI%20TypeScript-7.13.0-6BA539?logo=openapiinitiative&logoColor=6BA539" alt="OpenAPI TypeScript 7.13.0">
+  <a href="https://github.com/evilmartians/lefthook"><img src="docs/image/badge/lefthook.svg" alt="Lefthook 2.1.9"></a>
 </p>
 
 Holonic Asset brings AI generation into real-world game development workflows. Within a shared project context, creators can generate, iterate on, connect, manage, and export characters, objects, scenes, tilesets, and UI Set assets instead of ending up with isolated images.
@@ -72,13 +75,3 @@ An Asset is an independently created, iterated, and deliverable unit within a Pr
 ### Record
 
 A Record is a complete snapshot of an Asset after a creation or edit is confirmed. It makes generation history traceable, comparable, and reversible so users can confidently explore different creative directions.
-
-## Roadmap
-
-The first milestone focuses on completing the core workflow:
-
-- [ ] Web application for asset creation and management
-- [ ] Project creation, editing, and global visual configuration
-- [ ] Asset creation, search, duplication, editing, and deletion
-- [ ] AI regeneration and asset content editing
-- [ ] Animation generation from character or object prototypes
