@@ -113,9 +113,6 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(string(project.GameType)),
 			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
 		}
-		if strings.TrimSpace(value.Style) == "" {
-			value.Style = strings.TrimSpace(project.Style)
-		}
 		if strings.TrimSpace(value.Reference) == "" {
 			value.Reference = project.Reference
 		}
@@ -199,7 +196,6 @@ func buildTaskPayload(request *Request) (any, error) {
 	case GenerateScenery:
 		parameters := struct {
 			AssetName  string           `json:"asset_name"`
-			Style      string           `json:"style"`
 			Dimensions assetdomain.Size `json:"dimensions"`
 			Reference  string           `json:"reference"`
 		}{}
@@ -211,8 +207,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload := CreateSceneryPayload{
 			AssetName: parameters.AssetName, CreativeBrief: request.CreativeBrief,
-			Style: parameters.Style, Dimensions: parameters.Dimensions,
-			Reference: parameters.Reference, ProjectID: request.ProjectID,
+			Dimensions: parameters.Dimensions, Reference: parameters.Reference,
+			ProjectID: request.ProjectID,
 		}
 		if payload.ProjectID == 0 || strings.TrimSpace(payload.AssetName) == "" || strings.TrimSpace(payload.CreativeBrief) == "" {
 			return nil, fmt.Errorf("%w: project ID, asset name, and creative brief are required", ErrInvalidSceneryPayload)
