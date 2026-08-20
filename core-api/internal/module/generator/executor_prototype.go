@@ -221,13 +221,22 @@ func (e *executor) generatePrototypeResources(
 	if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
 		return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
 	}
+	// Prototype directions are static views of one subject, not independent
+	// component crops. Normalize the known grid as an animation sequence so
+	// every direction shares one content scale and one centre anchor. Cropping
+	// each cell independently makes a model-generated subject appear at a
+	// different size (and preserves any off-centre placement) in each direction.
 	split, err := e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 		ImageBase64:           backgroundRemoved.ImageBase64,
-		Mode:                  imageprocessor.ImageSplitModeGrid,
+		Mode:                  imageprocessor.ImageSplitModeAnimation,
 		Columns:               columns,
 		Rows:                  rows,
 		ForceProportionalGrid: true,
-		CropToContent:         true,
+		FrameWidth:            int(dimensions.Width),
+		FrameHeight:           int(dimensions.Height),
+		Margin:                imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+		Anchor:                imageprocessor.AnimationAnchorCenter,
+		NormalizeContentScale: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: split %s direction sheet: %w", taskType, err)
@@ -268,27 +277,12 @@ func (e *executor) generatePrototypeResources(
 			}
 		}
 
-		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-			ImageBase64: region.ImageBase64,
-			// Prototype cells share the padded canonical-frame contract used by
-			// animation references and final animation frames. This leaves room
-			// for large animation poses without making the prototype appear
-			// larger at the same nominal dimensions.
-			Options: imageprocessor.AnimationFrameResizeOptions(
-				int(dimensions.Width),
-				int(dimensions.Height),
-			),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generator: resize %s direction %d image: %w", taskType, index, err)
-		}
-		if resized == nil || resized.ImageBase64 == "" {
-			return nil, fmt.Errorf("generator: resize %s direction %d image: empty result", taskType, index)
-		}
-		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
-			Base64:    resized.ImageBase64,
-			MediaType: resized.MIMEType,
-		})
+		// Animation-mode splitting has already produced the final canonical PNG
+		// at the requested dimensions. Persist those bytes directly. Running the
+		// frame through Resize again performs a redundant raster resample, which
+		// can damage fine seams and asymmetric details even when the canvas size
+		// does not change.
+		finalURL := unprocessedURL
 		if e.references != nil {
 			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)

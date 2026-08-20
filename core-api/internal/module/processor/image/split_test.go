@@ -354,3 +354,51 @@ func TestProcessorSplitImageProjectionUsesConfiguredMergeGap(t *testing.T) {
 		t.Fatalf("wide merge gap regions = %d, want 1 merged group", len(result.Regions))
 	}
 }
+
+func TestProcessorSplitImageAnimationNormalizesPrototypeScaleAndCenter(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	// Two views of the same static object are intentionally rendered at
+	// different scales and at different positions inside their fixed cells.
+	fillRect(src, image.Rect(14, 15, 24, 25), color.NRGBA{R: 220, G: 80, B: 40, A: 255})
+	fillRect(src, image.Rect(50, 10, 70, 30), color.NRGBA{R: 220, G: 80, B: 40, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:           encodeImageForTest(t, src),
+		Mode:                  ImageSplitModeAnimation,
+		Columns:               2,
+		Rows:                  1,
+		ForceProportionalGrid: true,
+		FrameWidth:            64,
+		FrameHeight:           64,
+		Anchor:                AnimationAnchorCenter,
+		NormalizeContentScale: true,
+	})
+	if err != nil {
+		t.Fatalf("split normalized prototype: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("got %d regions, want 2", len(result.Regions))
+	}
+
+	var bounds [2]image.Rectangle
+	for index, region := range result.Regions {
+		decoded, err := DecodeBase64Image(region.ImageBase64)
+		if err != nil {
+			t.Fatalf("decode region %d: %v", index, err)
+		}
+		var ok bool
+		bounds[index], ok = alphaBounds(decoded, defaultImageSplitAlphaThreshold)
+		if !ok {
+			t.Fatalf("region %d has no visible content", index)
+		}
+		if got := decoded.Bounds().Size(); got != image.Pt(64, 64) {
+			t.Fatalf("region %d size = %v, want 64x64", index, got)
+		}
+	}
+	if bounds[0].Dx() != bounds[1].Dx() || bounds[0].Dy() != bounds[1].Dy() {
+		t.Fatalf("normalized content sizes differ: %v and %v", bounds[0].Size(), bounds[1].Size())
+	}
+	// Registration is driven by the configured anchor metadata rather than by
+	// recentering the final alpha bounding box. This keeps irregular silhouettes
+	// and asymmetric details intact.
+}

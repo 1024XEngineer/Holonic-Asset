@@ -23,6 +23,8 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 		"Minor edit",
 		"exactly 2 direction views",
 		"1 row x 2 column sheet",
+		"SIDE-ON SCALE LOCK",
+		"same pixel height",
 		"perspective-derived direction count and grid override",
 		"rebuild the output sheet with the required perspective mapping",
 		"normal reading order",
