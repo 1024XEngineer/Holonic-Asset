@@ -1,4 +1,5 @@
 export {
+  DEFAULT_ANIMATION_FRAME_DURATION_MS,
   assetDirectionSchema,
   assetDirections,
   assetDirectionsByPerspective,
@@ -7,6 +8,8 @@ export {
   assetKeys,
   creatableAssetKinds,
   createAssetLibraryCollection,
+  getAnimationFrameDuration,
+  getEffectiveAnimationFps,
   getDefaultAssetCanvasSize,
   recordQueryOptions,
   toCoreSpriteCandidateRecord,
