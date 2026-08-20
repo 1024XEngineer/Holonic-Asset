@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CharacterAnimation } from "@/model";
 import { getAnimatedSpriteFrameCount } from "../animated-sprite-frame-count";
 import {
+  getAnimatedSpriteNodeLayout,
   getFrameBounds,
   getNodeBounds,
   hitTestAnimatedSpriteScene,
@@ -58,5 +59,77 @@ describe("AnimatedSpriteStageGeometry", () => {
         animations,
       ),
     ).toEqual({ kind: "frame", node: "idle", index: 0 });
+  });
+
+  it("places new-animation review controls below play and expand", () => {
+    const collapsedScene = { ...scene, expanded: new Set<string>() };
+    const review = {
+      kind: "new-animation" as const,
+      nodeId: "idle",
+      isResolving: false,
+    };
+    const layout = getAnimatedSpriteNodeLayout(
+      "idle",
+      scene.positions.idle,
+      false,
+      { columns: 1, rows: 1 },
+      animations,
+      review,
+    );
+
+    expect(layout.bounds.height).toBe(348);
+    expect(layout.reviewApplyControl!.y).toBeGreaterThan(layout.playControl!.y);
+    expect(
+      hitTestAnimatedSpriteScene(
+        collapsedScene,
+        {
+          x: layout.reviewApplyControl!.x + 2,
+          y: layout.reviewApplyControl!.y + 2,
+        },
+        { columns: 1, rows: 1 },
+        animations,
+        review,
+      ),
+    ).toEqual({ kind: "review-apply", node: "idle" });
+  });
+
+  it("uses one large comparison box with review controls underneath", () => {
+    const review = {
+      kind: "comparison" as const,
+      nodeId: "prototype",
+      candidatePrototype: {
+        format: "png-sprite-sheet" as const,
+        imageUrl: "candidate.png",
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 4,
+        rows: 1,
+      },
+      isResolving: false,
+    };
+    const layout = getAnimatedSpriteNodeLayout(
+      "prototype",
+      scene.positions.prototype,
+      false,
+      { columns: 4, rows: 1 },
+      animations,
+      review,
+    );
+
+    expect(layout.bounds).toMatchObject({ width: 480, height: 348 });
+    expect(layout.frames).toEqual([]);
+    expect(layout.reviewApplyControl!.y).toBeGreaterThan(300);
+    expect(
+      hitTestAnimatedSpriteScene(
+        scene,
+        {
+          x: layout.reviewDenyControl!.x + 2,
+          y: layout.reviewDenyControl!.y + 2,
+        },
+        { columns: 4, rows: 1 },
+        animations,
+        review,
+      ),
+    ).toEqual({ kind: "review-deny", node: "prototype" });
   });
 });

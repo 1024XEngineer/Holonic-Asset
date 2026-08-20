@@ -86,12 +86,11 @@ A Record snapshots `name`, `description`, `perspective`, `dimensions`, `content`
 and `version`. Content remains in `asset_contents`, and the Record references
 its immutable content snapshot by `contentId`.
 
-Save requires the new `content` payload from the caller and creates a new immutable
-content row and snapshot from that payload. Because animation generation metadata is
-hidden from transport responses, a replacement animation that omits `generation`
-inherits it from the current animation with the same non-zero `id`. Explicitly supplied
-`generation` values are preserved, while new or removed animation IDs are not migrated.
-Before persistence, image references are normalized to object keys: existing keys
+Save requires the complete new `content` payload from the caller and creates a new
+immutable content row and snapshot from that payload. Animation `generation` metadata
+is exposed in asset responses and must be round-tripped by callers when it should be
+preserved; the backend does not merge it from previous content. Before persistence,
+image references are normalized to object keys: existing keys
 remain unchanged, configured storage URLs are converted back to keys, and data URLs
 are uploaded. References that remain URLs or browser-local absolute paths are
 rejected, so Records never persist image URLs.

@@ -166,8 +166,8 @@ func splitImage(src image.Image, request SplitImageRequest) (*SplitImageResult, 
 	if request.RejectGridBoundaryContent && request.GridBoundaryMargin == 0 {
 		return nil, fmt.Errorf("grid boundary margin must be positive when boundary content rejection is enabled")
 	}
-	if request.RejectGridBoundaryContent && mode != ImageSplitModeGrid {
-		return nil, fmt.Errorf("grid boundary content rejection requires grid splitting mode")
+	if request.RejectGridBoundaryContent && mode != ImageSplitModeGrid && mode != ImageSplitModeAnimation {
+		return nil, fmt.Errorf("grid boundary content rejection requires grid or animation splitting mode")
 	}
 
 	input := toNRGBA(src)
@@ -287,7 +287,29 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 	if background == nil && !hasTransparentPixel(input, threshold) {
 		background = &AnimationBackgroundOptions{MatteColor: "auto"}
 	}
-	result, err := normalizeAnimationImage(input, normalizeAnimationRequest{
+	normalizationInput := input
+	var boundaryExtractionReport *ExtractionReport
+	if request.RejectGridBoundaryContent {
+		if background != nil {
+			prepared, report, err := removeAnimationBackground(input, *background)
+			if err != nil {
+				return nil, err
+			}
+			normalizationInput = prepared
+			boundaryExtractionReport = &report
+			background = nil
+		}
+		if err := validateAnimationGridBoundaryContent(
+			normalizationInput,
+			request.Columns,
+			request.Rows,
+			threshold,
+			request.GridBoundaryMargin,
+		); err != nil {
+			return nil, err
+		}
+	}
+	result, err := normalizeAnimationImage(normalizationInput, normalizeAnimationRequest{
 		Columns: request.Columns, Rows: request.Rows, FrameCount: request.FrameCount,
 		FrameWidth: request.FrameWidth, FrameHeight: request.FrameHeight,
 		Margin: request.Margin, CropPadding: request.CropPadding,
@@ -303,6 +325,9 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 	})
 	if err != nil {
 		return nil, err
+	}
+	if boundaryExtractionReport != nil {
+		result.Report.BackgroundRemovalReport = boundaryExtractionReport
 	}
 
 	regions := make([]ImageRegion, 0, len(result.Frames))
@@ -325,6 +350,37 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		ImageBase64: result.ImageBase64, MIMEType: result.MIMEType,
 		AnimationReport: &report, Regions: regions,
 	}, nil
+}
+
+func validateAnimationGridBoundaryContent(
+	input *image.NRGBA,
+	columns, rows int,
+	threshold uint8,
+	margin int,
+) error {
+	if columns <= 0 || rows <= 0 {
+		return fmt.Errorf("columns and rows must be positive")
+	}
+	if columns > input.Bounds().Dx() || rows > input.Bounds().Dy() {
+		return fmt.Errorf(
+			"grid dimensions %dx%d exceed source image size %dx%d",
+			columns,
+			rows,
+			input.Bounds().Dx(),
+			input.Bounds().Dy(),
+		)
+	}
+	for index, sourceRegion := range gridRegions(input, columns, rows, false, threshold) {
+		cell := cloneNRGBA(input.SubImage(sourceRegion.bounds))
+		content, hasContent := alphaBoundsNRGBA(cell, threshold)
+		if !hasContent {
+			continue
+		}
+		if err := validateGridBoundaryMargin(content, cell.Bounds(), index, columns, rows, margin); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type splitRegion struct {

@@ -14,7 +14,7 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+func TestExecutorEditsCharacterPrototypeAndReturnsApplicationCandidate(t *testing.T) {
 	events := []string{}
 	originalURLs := []string{
 		"assets/hero/up.png",
@@ -38,8 +38,7 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 	}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 3,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          7,
 			Name:        "hero",
@@ -93,20 +92,12 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 			t.Fatalf("edit prompt missing %q: %s", expected, images.request.Prompt)
 		}
 	}
-	if assets.createdRecord == nil || assets.createdRecord.AssetID != 7 {
-		t.Fatalf("expected version record for asset 7: %+v", assets.createdRecord)
-	}
-	updated, err := (assetdomain.Asset{
-		Type: assetdomain.AssetTypeCharacter, Content: assets.createdRecord.Content,
-	}).DecodeContent()
-	if err != nil {
-		t.Fatalf("decode version content: %v", err)
-	}
+	application, updated := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
 	if updated.DirectionCount != 4 || updated.Prototype == nil || len(*updated.Prototype) != 4 {
 		t.Fatalf("unexpected edited prototype content: %+v", updated)
 	}
-	if len(updated.Animations) != 1 || updated.Animations[0].ID != 7 || updated.Animations[0].Name != "idle" {
-		t.Fatalf("existing animations were not preserved: %+v", updated.Animations)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)
@@ -114,16 +105,14 @@ func TestExecutorEditsCharacterPrototypeAndCreatesNewVersionRecord(t *testing.T)
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
 	}
-	if events[len(events)-1] != "create_record" {
-		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	if application.AssetID != 7 || application.Version != 2 || len(application.GeneratedResources) != 8 {
+		t.Fatalf("unexpected application candidate: %+v", application)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 7, Version: 3})
 }
 
 func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
 	wantLoadErr := errors.New("asset unavailable")
 	wantResolveErr := errors.New("reference unavailable")
-	wantRecordErr := errors.New("record unavailable")
 
 	tests := []struct {
 		name      string
@@ -176,11 +165,6 @@ func TestExecutorEditCharacterPrototypeRejectsInvalidStateAndDependencyFailures(
 		{name: "reference resolution failure", configure: func(_ *generationAssetWriterStub, references *executorReferenceStoreStub) {
 			references.resolveErr = wantResolveErr
 		}, wantErr: wantResolveErr, withStore: true},
-		{name: "record creation failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) {
-			assets.recordErr = wantRecordErr
-		}, wantErr: wantRecordErr},
-		{name: "nil record", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) { assets.nilRecord = true }, wantText: "version: empty result"},
-		{name: "zero record version", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub) { assets.emptyRecord = true }, wantText: "version: empty result"},
 	}
 
 	for _, test := range tests {
@@ -277,10 +261,6 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
@@ -295,14 +275,22 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
 		t.Fatalf("prototype background removal did not auto-detect the matte: %+v", processor.removeRequests)
 	}
-	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
-		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
+	if len(processor.splitRequests) != 1 {
+		t.Fatalf("expected one prototype split request, got %d", len(processor.splitRequests))
 	}
-	wantMargin := imageprocessor.AnimationFrameMargin(64, 64)
-	for index, request := range processor.resizeRequests {
-		if request.Options.Margin != wantMargin {
-			t.Fatalf("prototype direction %d margin = %d, want %d", index, request.Options.Margin, wantMargin)
-		}
+	splitRequest := processor.splitRequests[0]
+	if splitRequest.Mode != imageprocessor.ImageSplitModeAnimation ||
+		!splitRequest.ForceProportionalGrid ||
+		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
+		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
+		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
+		!splitRequest.NormalizeContentScale || splitRequest.CropToContent ||
+		!splitRequest.RejectGridBoundaryContent || splitRequest.GridBoundaryMargin != 14 {
+		t.Fatalf("prototype directions were not normalized on a shared canvas: %+v", splitRequest)
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -397,7 +385,6 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	for index := range 4 {
 		wantEvents = append(wantEvents,
 			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
-			"resize_image",
 			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
 		)
 	}
@@ -452,14 +439,6 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
@@ -525,12 +504,17 @@ func TestExecutorUsesTargetAspectRatioAndRetriesGridBoundaryCandidates(t *testin
 		t.Fatalf("split requests = %d, want 2", len(processor.splitRequests))
 	}
 	for index, request := range processor.splitRequests {
-		if request.Columns != 2 || request.Rows != 2 || !request.RejectGridBoundaryContent || request.GridBoundaryMargin != 16 {
+		if request.Mode != imageprocessor.ImageSplitModeAnimation ||
+			request.Columns != 2 || request.Rows != 2 ||
+			request.FrameWidth != 188 || request.FrameHeight != 128 ||
+			request.Anchor != imageprocessor.AnimationAnchorCenter ||
+			!request.NormalizeContentScale || !request.RejectGridBoundaryContent ||
+			request.GridBoundaryMargin != 16 {
 			t.Fatalf("unexpected split request %d: %+v", index, request)
 		}
 	}
-	if len(processor.resizeRequests) != 4 {
-		t.Fatalf("resize requests = %d, want 4 successful-candidate directions", len(processor.resizeRequests))
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
 	}
 	if len(references.uploads) != 8 {
 		t.Fatalf("uploads = %d, want only 8 from the successful candidate", len(references.uploads))
@@ -669,7 +653,7 @@ func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *test
 	}
 }
 
-func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
+func TestExecutorEditsObjectPrototypeAndReturnsApplicationCandidate(t *testing.T) {
 	events := []string{}
 	originalURLs := []string{
 		"assets/chest/front.png",
@@ -701,8 +685,7 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
 	assets := &generationAssetWriterStub{
-		events:        &events,
-		recordVersion: 6,
+		events: &events,
 		asset: assetdomain.Asset{
 			ID:          8,
 			Name:        "chest",
@@ -726,9 +709,6 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("edit object prototype: %v", err)
 	}
-	if assets.expectedVersion != 5 {
-		t.Fatalf("expected current asset version to be passed separately, got %d", assets.expectedVersion)
-	}
 	if !reflect.DeepEqual(references.resolved, originalURLs) {
 		t.Fatalf("unexpected resolved references: got %v want %v", references.resolved, originalURLs)
 	}
@@ -737,20 +717,12 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 		!strings.Contains(images.request.Prompt, "backend supplied exactly 8 current prototype direction image") {
 		t.Fatalf("unexpected edit prompt: %+v", images.request)
 	}
-	if assets.createdRecord == nil || assets.createdRecord.AssetID != 8 {
-		t.Fatalf("expected object version record: %+v", assets.createdRecord)
-	}
-	updated, err := (assetdomain.Asset{
-		Type: assetdomain.AssetTypeObject, Content: assets.createdRecord.Content,
-	}).DecodeContent()
-	if err != nil {
-		t.Fatalf("decode version content: %v", err)
-	}
+	application, updated := decodeExecutionContent(t, result, assetdomain.AssetTypeObject)
 	if updated.DirectionCount != 8 || updated.Prototype == nil || len(*updated.Prototype) != 8 {
 		t.Fatalf("unexpected edited object content: %+v", updated)
 	}
-	if len(updated.Items) != 1 || updated.Items[0].Name != "loot" || updated.Metadata["material"] != "wood" {
-		t.Fatalf("existing object content was not preserved: %+v", updated)
+	if len(updated.Animations) != 0 || len(updated.Items) != 0 || len(updated.Metadata) != 0 {
+		t.Fatalf("prototype candidate included unrelated asset content: %+v", updated)
 	}
 	for index, resource := range *updated.Prototype {
 		want := fmt.Sprintf("uploads/prototype-%d.png", index)
@@ -758,16 +730,14 @@ func TestExecutorEditsObjectPrototypeAndCreatesNewVersionRecord(t *testing.T) {
 			t.Fatalf("unexpected edited prototype resource %d: %+v", index, resource)
 		}
 	}
-	if events[len(events)-1] != "create_record" {
-		t.Fatalf("record must be created after generated images are persisted: %v", events)
+	if application.AssetID != 8 || application.Version != 5 || len(application.GeneratedResources) != 16 {
+		t.Fatalf("unexpected application candidate: %+v", application)
 	}
-	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 8, Version: 6})
 }
 
 func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *testing.T) {
 	wantLoadErr := errors.New("object unavailable")
 	wantResolveErr := errors.New("reference unavailable")
-	wantRecordErr := errors.New("record unavailable")
 	wantImageErr := errors.New("image unavailable")
 
 	tests := []struct {
@@ -826,15 +796,6 @@ func TestExecutorEditObjectPrototypeRejectsInvalidStateAndDependencyFailures(t *
 		{name: "image generation failure", configure: func(_ *generationAssetWriterStub, _ *executorReferenceStoreStub, images *imageGenerationServiceStub) {
 			images.err = wantImageErr
 		}, wantErr: wantImageErr},
-		{name: "record creation failure", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.recordErr = wantRecordErr
-		}, wantErr: wantRecordErr},
-		{name: "nil record", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.nilRecord = true
-		}, wantText: "version: empty result"},
-		{name: "zero record version", configure: func(assets *generationAssetWriterStub, _ *executorReferenceStoreStub, _ *imageGenerationServiceStub) {
-			assets.emptyRecord = true
-		}, wantText: "version: empty result"},
 	}
 
 	for _, test := range tests {

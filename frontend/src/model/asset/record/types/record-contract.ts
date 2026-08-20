@@ -9,6 +9,8 @@ export type GetAssetRecordInput = {
 
 export type SaveAssetRecordInput = GetAssetRecordInput & {
   record: AssetRecord;
+  description?: string;
+  version?: string;
 };
 
 export type AssetRecordSaveResult = GetAssetRecordInput & {
@@ -17,7 +19,7 @@ export type AssetRecordSaveResult = GetAssetRecordInput & {
   history: AssetRevision[];
 };
 
-export type AssetRecordApi = {
-  get: (input: GetAssetRecordInput) => Promise<AssetWorkspaceData>;
+export type AssetWorkspaceApi = {
+  load: (input: GetAssetRecordInput) => Promise<AssetWorkspaceData>;
   saveRevision: (input: SaveAssetRecordInput) => Promise<AssetRecordSaveResult>;
 };

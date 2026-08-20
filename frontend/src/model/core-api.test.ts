@@ -39,9 +39,10 @@ describe("core API clients", () => {
     await coreGenerationApi.list(7, { status: "active" });
     await coreGenerationApi.detail(10);
     await coreGenerationApi.cancel(10);
+    await coreGenerationApi.resolveApplication(10, true);
     await uploadApi.createTarget({} as never);
 
-    expect(fetchMock).toHaveBeenCalledTimes(21);
+    expect(fetchMock).toHaveBeenCalledTimes(22);
     expect(fetchMock.mock.calls.map(([request]) => request.url)).toEqual(
       [
         "/auth/login",
@@ -64,6 +65,7 @@ describe("core API clients", () => {
         "/projects/7/generation-runs?status=active",
         "/generation-runs/10",
         "/generation-runs/10/cancel",
+        "/generation-runs/10/application",
         "/uploads",
       ].map((path) => `http://localhost/api/v1${path}`),
     );
@@ -87,6 +89,7 @@ describe("core API clients", () => {
       "POST",
       "GET",
       "GET",
+      "POST",
       "POST",
       "POST",
     ]);

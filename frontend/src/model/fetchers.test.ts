@@ -7,6 +7,7 @@ import {
   configureCoreApi,
   coreApiClient,
   createCoreApiClients,
+  ensureApiResponseSuccess,
   publicCoreApiClient,
   unwrapApiResponse,
 } from "./fetchers";
@@ -27,6 +28,25 @@ function response(body: unknown, init: ResponseInit = {}) {
     ...init,
   });
 }
+
+describe("ensureApiResponseSuccess", () => {
+  it("accepts a successful response without a body", () => {
+    expect(() =>
+      ensureApiResponseSuccess({
+        response: new Response(undefined, { status: 204 }),
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws for an unsuccessful response", () => {
+    expect(() =>
+      ensureApiResponseSuccess({
+        error: { message: "transition failed" },
+        response: new Response(undefined, { status: 409 }),
+      }),
+    ).toThrow(DataApiError);
+  });
+});
 
 describe("core API client", () => {
   it("reconfigures the exported clients with injected settings", async () => {
@@ -264,13 +284,10 @@ describe("core API client", () => {
         .mockResolvedValue(new Response("upstream failure", { status: 502 })),
     );
 
-    try {
-      await listProjects();
-      expect.unreachable();
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataApiError);
-      expect(error).toMatchObject({ details: "upstream failure" });
-    }
+    await expect(listProjects()).rejects.toMatchObject({
+      name: DataApiError.name,
+      details: "upstream failure",
+    });
   });
 });
 

@@ -23,7 +23,9 @@ export function GenerationTaskDropdown({
 }) {
   const { t } = useTranslation("editor");
   if (tasks.length === 0) return null;
-  const hasActiveTasks = tasks.some((task) => task.status !== "failed");
+  const hasActiveTasks = tasks.some(
+    (task) => task.status === "queued" || task.status === "processing",
+  );
 
   return (
     <DropdownMenu>

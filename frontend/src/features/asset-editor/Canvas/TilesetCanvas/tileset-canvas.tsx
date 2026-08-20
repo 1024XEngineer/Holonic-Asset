@@ -56,7 +56,7 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
 
                       return [
                         <img
-                          key={`${item.id}:${tileIndex}`}
+                          key={`${item.id}:${tile[0]}:${tile[1]}`}
                           src={url}
                           alt=""
                           draggable={false}

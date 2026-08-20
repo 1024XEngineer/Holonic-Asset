@@ -13,6 +13,8 @@ export type {
   AssetContentBase,
   AssetContentByType,
   AssetContentMetadata,
+  CoreSpriteAssetContent,
+  CoreSpriteAssetContentPatch,
   AssetImageResourceResponse,
   AssetPositionResponse,
   AssetSizeResponse,

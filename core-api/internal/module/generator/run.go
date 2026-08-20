@@ -52,6 +52,7 @@ func ActiveTaskStatuses() []taskdomain.Status {
 	return []taskdomain.Status{
 		taskdomain.StatusPending,
 		taskdomain.StatusProcessing,
+		taskdomain.StatusAwaitingApplication,
 		taskdomain.StatusFailed,
 	}
 }

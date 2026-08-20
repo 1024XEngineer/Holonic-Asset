@@ -126,23 +126,20 @@ func (e *executor) editCharacterPrototype(
 		return nil, err
 	}
 	prototype := assetdomain.Prototype(resources)
-	content.Prototype = &prototype
-	content.DirectionCount = directionCount
-	encoded, err := assetdomain.EncodeContent(content)
+	candidate := assetdomain.AssetContent{
+		DirectionCount: directionCount,
+		Prototype:      &prototype,
+	}
+	encoded, err := assetdomain.EncodeContent(candidate)
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited character asset %d content: %w", asset.ID, err)
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: asset.ID,
-		Content: encoded,
-	}, asset.Version)
-	if err != nil {
-		return nil, fmt.Errorf("generator: create character asset %d version: %w", asset.ID, err)
-	}
-	if record == nil || record.Version == 0 {
-		return nil, fmt.Errorf("generator: create character asset %d version: empty result", asset.ID)
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            asset.ID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedPrototypeResourceKeys(resources),
+	})
 }
 
 func (e *executor) generateObjectPrototype(
@@ -245,13 +242,20 @@ func (e *executor) generatePrototypeResources(
 		if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
 			return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
 		}
+		// Prototype directions are static views of one subject, not independent
+		// component crops. Animation mode keeps one content scale and centre anchor
+		// while boundary validation still rejects unsafe generated sheets.
 		split, err = e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 			ImageBase64:               backgroundRemoved.ImageBase64,
-			Mode:                      imageprocessor.ImageSplitModeGrid,
+			Mode:                      imageprocessor.ImageSplitModeAnimation,
 			Columns:                   columns,
 			Rows:                      rows,
 			ForceProportionalGrid:     true,
-			CropToContent:             true,
+			FrameWidth:                int(dimensions.Width),
+			FrameHeight:               int(dimensions.Height),
+			Margin:                    imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			Anchor:                    imageprocessor.AnimationAnchorCenter,
+			NormalizeContentScale:     true,
 			RejectGridBoundaryContent: true,
 			GridBoundaryMargin:        sheet.GridBoundaryMargin,
 		})
@@ -306,27 +310,12 @@ func (e *executor) generatePrototypeResources(
 			}
 		}
 
-		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-			ImageBase64: region.ImageBase64,
-			// Prototype cells share the padded canonical-frame contract used by
-			// animation references and final animation frames. This leaves room
-			// for large animation poses without making the prototype appear
-			// larger at the same nominal dimensions.
-			Options: imageprocessor.AnimationFrameResizeOptions(
-				int(dimensions.Width),
-				int(dimensions.Height),
-			),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generator: resize %s direction %d image: %w", taskType, index, err)
-		}
-		if resized == nil || resized.ImageBase64 == "" {
-			return nil, fmt.Errorf("generator: resize %s direction %d image: empty result", taskType, index)
-		}
-		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
-			Base64:    resized.ImageBase64,
-			MediaType: resized.MIMEType,
-		})
+		// Animation-mode splitting has already produced the final canonical PNG
+		// at the requested dimensions. Persist those bytes directly. Running the
+		// frame through Resize again performs a redundant raster resample, which
+		// can damage fine seams and asymmetric details even when the canvas size
+		// does not change.
+		finalURL := unprocessedURL
 		if e.references != nil {
 			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
@@ -636,21 +625,18 @@ func (e *executor) editObjectPrototype(
 		return nil, err
 	}
 	prototype := assetdomain.Prototype(resources)
-	content.Prototype = &prototype
-	content.DirectionCount = directionCount
-	encoded, err := assetdomain.EncodeContent(content)
+	candidate := assetdomain.AssetContent{
+		DirectionCount: directionCount,
+		Prototype:      &prototype,
+	}
+	encoded, err := assetdomain.EncodeContent(candidate)
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode edited object asset %d content: %w", asset.ID, err)
 	}
-	record, err := e.assets.CreateRecord(ctx, &assetdomain.AssetRecord{
-		AssetID: asset.ID,
-		Content: encoded,
-	}, asset.Version)
-	if err != nil {
-		return nil, fmt.Errorf("generator: create object asset %d version: %w", asset.ID, err)
-	}
-	if record == nil || record.Version == 0 {
-		return nil, fmt.Errorf("generator: create object asset %d version: empty result", asset.ID)
-	}
-	return encodeExecutionResult(ExecutionResult{AssetID: asset.ID, Version: record.Version})
+	return encodeExecutionResult(ExecutionResult{
+		AssetID:            asset.ID,
+		Version:            asset.Version,
+		Content:            encoded,
+		GeneratedResources: generatedPrototypeResourceKeys(resources),
+	})
 }

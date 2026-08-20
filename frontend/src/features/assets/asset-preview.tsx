@@ -172,7 +172,7 @@ function TilesetPreview({
 
             return [
               <img
-                key={`${item.id}:${tileIndex}`}
+                key={`${item.id}:${tile[0]}:${tile[1]}`}
                 alt=""
                 className="z-10 size-full object-fill [image-rendering:pixelated]"
                 src={url}

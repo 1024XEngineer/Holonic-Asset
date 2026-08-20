@@ -8,6 +8,7 @@ import type {
 const mocks = vi.hoisted(() => ({
   assetDetail: vi.fn(),
   assetRecords: vi.fn(),
+  assetRecord: vi.fn(),
   projectDetail: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("../library/core-asset.api", () => ({
   coreAssetApi: {
     detail: mocks.assetDetail,
     records: mocks.assetRecords,
+    record: mocks.assetRecord,
   },
 }));
 vi.mock("../../project", async (importOriginal) => ({
@@ -24,6 +26,8 @@ vi.mock("../../project", async (importOriginal) => ({
 
 import {
   loadCoreSpriteAssetWorkspace,
+  saveCoreSpriteAssetRevision,
+  toCoreSpriteCandidateRecord,
   toCoreSpriteAssetWorkspace,
 } from "./core-sprite-record";
 
@@ -31,6 +35,144 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.projectDetail.mockResolvedValue({ name: "Demo" });
   mocks.assetRecords.mockResolvedValue({ records: [] });
+});
+
+const walkGeneration = {
+  direction: "front",
+  style: "pixel art",
+  action: "walk",
+  frameCount: 2,
+  columns: 2,
+  frameWidth: 32,
+  frameHeight: 32,
+  fps: 12,
+  resolution: "720p",
+  duration: 5,
+  aspectRatio: "1:1",
+};
+
+describe("saveCoreSpriteAssetRevision", () => {
+  it("persists a Core sprite revision with its loaded base version", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 4 });
+    mocks.assetRecords.mockResolvedValue({ records: [] });
+
+    await expect(
+      saveCoreSpriteAssetRevision({
+        projectId: "11",
+        assetId: "9",
+        version: "v3",
+        record: {
+          mode: "character",
+          prompt: "Hero",
+          character: {
+            prototype: {
+              format: "png-sprite-sheet",
+              imageUrl: "/front.png",
+              frameUrls: ["/front.png", "/back.png"],
+              frameWidth: 32,
+              frameHeight: 32,
+              columns: 2,
+              rows: 1,
+            },
+            animations: [],
+            nodePositions: { prototype: { x: 10, y: 20 } },
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ version: "v4" });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      expectedVersion: 3,
+      content: expect.objectContaining({
+        directionCount: 2,
+      }),
+    });
+  });
+
+  it("serializes object sprites with fallback IDs and no invalid version", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 5 });
+    const record = {
+      mode: "object" as const,
+      prompt: "Chest",
+      object: {
+        prototype: {
+          format: "png-sprite-sheet" as const,
+          imageUrl: "/chest.png",
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 1,
+          rows: 1,
+        },
+        animations: [
+          {
+            kind: "clip" as const,
+            id: "draft-animation",
+            label: "Open",
+            frameCount: 1,
+            spriteSheet: {
+              format: "png-sprite-sheet" as const,
+              imageUrl: "/open.png",
+              frameUrls: ["/open.png"],
+              frameWidth: 32,
+              frameHeight: 32,
+              columns: 1,
+              rows: 1,
+            },
+            generation: walkGeneration,
+          },
+        ],
+        nodePositions: {},
+      },
+    };
+
+    const result = await saveCoreSpriteAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      version: "draft",
+      record,
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      content: {
+        directionCount: 1,
+        prototype: [{ id: 1, url: "/chest.png" }],
+        animations: [
+          {
+            id: 1,
+            name: "Open",
+            frames: [{ id: 1, url: "/open.png" }],
+            generation: walkGeneration,
+          },
+        ],
+      },
+    });
+    expect(result).toMatchObject({ version: "v5", record });
+    expect(result?.record).not.toBe(record);
+  });
+
+  it.each([
+    {
+      name: "non-persisted asset",
+      input: {
+        projectId: "11",
+        assetId: "draft",
+        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+      },
+    },
+    {
+      name: "unsupported record",
+      input: {
+        projectId: "11",
+        assetId: "9",
+        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+      },
+    },
+  ])("skips $name saves", async ({ input }) => {
+    await expect(saveCoreSpriteAssetRevision(input)).resolves.toBeUndefined();
+    expect(mocks.assetRecord).not.toHaveBeenCalled();
+  });
 });
 
 describe("loadCoreSpriteAssetWorkspace", () => {
@@ -125,6 +267,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
               id: "7",
               label: "Walk",
               frameCount: 2,
+              generation: walkGeneration,
               spriteSheet: {
                 imageUrl: "/walk-1.png",
                 frameUrls: ["/walk-1.png", "/walk-2.png"],
@@ -181,6 +324,89 @@ describe("toCoreSpriteAssetWorkspace", () => {
       "spriteSheet",
     );
   });
+
+  it("does not load persisted canvas positions", () => {
+    const detail = characterDetail();
+    if (detail.type !== "character" || !detail.content) {
+      throw new Error("Expected character detail");
+    }
+    detail.content.metadata = {
+      nodePositions: {
+        prototype: { x: 10, y: 20 },
+        missingCoordinate: { x: 5 },
+        arrayValue: [1, 2],
+        emptyValue: null,
+      },
+    };
+
+    const workspace = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "character",
+      character: { nodePositions: {} },
+    });
+
+    detail.content.metadata = { nodePositions: [] };
+    const withoutPositions = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+    expect(withoutPositions.record).toMatchObject({
+      mode: "character",
+      character: { nodePositions: {} },
+    });
+  });
+});
+
+describe("toCoreSpriteCandidateRecord", () => {
+  it("overlays a generated patch while preserving unchanged sprite content", () => {
+    const current = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: characterDetail(),
+      records: [],
+    }).record;
+
+    const candidate = toCoreSpriteCandidateRecord(current, "Top-Down", {
+      prototype: [
+        { id: 1, url: "/new-front.png" },
+        { id: 2, url: "/new-right.png" },
+        { id: 3, url: "/new-back.png" },
+        { id: 4, url: "/new-left.png" },
+      ],
+      animations: [
+        {
+          id: 8,
+          name: "Run",
+          frames: [{ id: 1, url: "/run.png" }],
+          generation: { ...walkGeneration, action: "run" },
+        },
+      ],
+    });
+
+    expect(candidate).toMatchObject({
+      mode: "character",
+      character: {
+        prototype: { imageUrl: "/new-front.png" },
+        animations: [
+          { id: "7", label: "Walk" },
+          {
+            id: "8",
+            label: "Run",
+            frameCount: 1,
+            generation: { ...walkGeneration, action: "run" },
+          },
+        ],
+      },
+    });
+  });
 });
 
 function characterDetail(): AssetDetailResponse {
@@ -206,6 +432,7 @@ function characterDetail(): AssetDetailResponse {
         {
           id: 7,
           name: "Walk",
+          generation: walkGeneration,
           frames: [
             { id: 1, url: "/walk-1.png", duration: 83 },
             { id: 2, url: "/walk-2.png", duration: 83 },

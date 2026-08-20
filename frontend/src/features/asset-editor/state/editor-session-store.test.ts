@@ -254,6 +254,35 @@ describe("editor session store", () => {
     expect(getEditorSessionSnapshot(store, idleSaveState).dirty).toBe(true);
   });
 
+  it("applies a candidate to the draft without changing the save baseline", () => {
+    const store = createEditorSessionStore(createCharacterRecord());
+    const candidate = createCharacterRecord();
+    candidate.prompt = "A candidate knight";
+
+    dispatchEditorCommand(store, {
+      type: "record.candidate.apply",
+      record: candidate,
+    });
+    candidate.prompt = "Mutated outside";
+
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: { prompt: "A candidate knight" },
+      dirty: true,
+      canUndo: true,
+      canRedo: false,
+    });
+    expect(store.getState().savedRecord).toMatchObject({
+      prompt: "A knight",
+    });
+
+    dispatchEditorCommand(store, { type: "history.undo" });
+    expect(getEditorSessionSnapshot(store, idleSaveState)).toMatchObject({
+      record: { prompt: "A knight" },
+      dirty: false,
+      canRedo: true,
+    });
+  });
+
   it("rejects sprite commands for non-sprite asset records", () => {
     const record: AssetRecord = {
       mode: "scenery",

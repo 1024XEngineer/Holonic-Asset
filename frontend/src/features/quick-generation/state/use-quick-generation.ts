@@ -39,8 +39,8 @@ export function useQuickGeneration() {
   };
 
   useEffect(() => {
-    if (assetsQuery.isSuccess) session.synchronize(assets);
-  }, [assets, assetsQuery.isSuccess, session]);
+    if (assetsQuery.isSuccess) session.synchronize(assetsQuery.data);
+  }, [assetsQuery.data, assetsQuery.isSuccess, session]);
 
   useEffect(() => () => session.dispose(), [session]);
 

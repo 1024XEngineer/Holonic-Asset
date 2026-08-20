@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { useStore } from "zustand";
 
-import { useSaveAssetRevisionMutation, type AssetRecord } from "@/model";
+import {
+  describeAssetRecordChanges,
+  useSaveAssetRevisionMutation,
+  type AssetRecord,
+} from "@/model";
 
 import { saveEditorSessionRevision } from "./editor-session-save";
 import {
@@ -79,18 +83,26 @@ export function useEditorSession({
     const saveToken = Symbol("editor-save");
     latestSaveTokenRef.current = saveToken;
     setSaveStateEntry({ store, state: { phase: "saving" } });
+    const previousRecord = store.getState?.()?.savedRecord;
 
     const result = await saveEditorSessionRevision({
       store,
       isActive: () =>
         activeStoreRef.current === store &&
         latestSaveTokenRef.current === saveToken,
-      saveRevision: (record) =>
-        saveRevision({
+      saveRevision: async (record) => {
+        await saveRevision({
           projectId: target.projectId,
           assetId: target.assetId,
+          version: target.version,
+          ...(previousRecord
+            ? {
+                description: describeAssetRecordChanges(previousRecord, record),
+              }
+            : {}),
           record,
-        }).then(() => undefined),
+        });
+      },
     });
 
     if (result.status === "saved") {
@@ -102,7 +114,7 @@ export function useEditorSession({
       });
     }
     return result;
-  }, [saveRevision, store, target.assetId, target.projectId]);
+  }, [saveRevision, store, target.assetId, target.projectId, target.version]);
 
   return {
     snapshot: getEditorSessionSnapshot(store, saveState),

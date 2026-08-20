@@ -3,12 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useTimeout } from "@/hooks/use-timeout";
 import {
   coreGenerationApi,
+  rememberGenerationRunMetadata,
+  toCoreSpriteCandidateRecord,
   useGenerateAnimationMutation,
+  useGenerationCandidateQuery,
   useGenerationRunsQuery,
+  useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
+  type CoreSpriteAssetContentPatch,
   type GenerateAnimationRequest,
+  type GenerationTaskType,
 } from "@/model";
 
+import type { AnimatedSpriteCanvasReview } from "./Canvas/AnimatedSpriteCanvas";
 import type { SpriteEditorModeProps } from "./EditorModes/sprite-editor-mode.types";
 import type { EditorGenerationTask } from "./Header/editor-header";
 import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
@@ -25,15 +32,27 @@ export function useEditorWorkspace({
 }): SpriteEditorModeProps | null {
   const { asset, projectName } = data;
   const session = useEditorSession({
-    target: { projectId: asset.projectId, assetId: asset.id },
+    target: {
+      projectId: asset.projectId,
+      assetId: asset.id,
+      version: asset.version,
+    },
     initialRecord: data.record,
   });
-  const { snapshot } = session;
+  const { snapshot, syncExternalRecord } = session;
   const animationMutation = useGenerateAnimationMutation();
+  const applicationMutation = useResolveGenerationApplicationMutation();
   const { data: generationRuns = [] } = useGenerationRunsQuery(
     asset.projectId,
     asset.id,
   );
+  const awaitingRuns = useMemo(
+    () => generationRuns.filter((run) => run.status === "awaiting_application"),
+    [generationRuns],
+  );
+  const reviewRun = awaitingRuns[0];
+  const candidateQuery =
+    useGenerationCandidateQuery<CoreSpriteAssetContentPatch>(reviewRun?.id);
   const [animationTask, setAnimationTask] =
     useState<EditorGenerationTask | null>(null);
   const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
@@ -52,8 +71,33 @@ export function useEditorWorkspace({
   }, [asset.id, asset.projectId]);
 
   useEffect(() => {
-    session.syncExternalRecord(data.record);
-  }, [data.record, session.syncExternalRecord]);
+    syncExternalRecord(data.record);
+  }, [data.record, syncExternalRecord]);
+
+  const reportAction = (message: string) => {
+    setNotice(message);
+    scheduleNoticeReset(() => setNotice(null), 2400);
+  };
+  const resolveApplication = async (
+    runId: string,
+    applied: boolean,
+    candidate?: AssetWorkspaceData["record"] | null,
+  ) => {
+    try {
+      await applicationMutation.mutateAsync({
+        projectId: asset.projectId,
+        assetId: asset.id,
+        runId,
+        applied,
+      });
+      if (applied && candidate) {
+        session.dispatch({ type: "record.candidate.apply", record: candidate });
+      }
+      reportAction(applied ? "Generation applied" : "Generation denied");
+    } catch {
+      reportAction("Unable to consume generation result");
+    }
+  };
 
   const generationTasks = useMemo<EditorGenerationTask[]>(
     () => [
@@ -83,10 +127,20 @@ export function useEditorWorkspace({
     [animationTask, generationRuns, promptTask],
   );
 
-  const reportAction = (message: string) => {
-    setNotice(message);
-    scheduleNoticeReset(() => setNotice(null), 2400);
-  };
+  const candidateRecord = useMemo(() => {
+    const content = candidateQuery.data?.result?.content;
+    if (content === undefined) return null;
+    try {
+      return toCoreSpriteCandidateRecord(
+        snapshot.record,
+        asset.perspective,
+        content,
+      );
+    } catch {
+      return null;
+    }
+  }, [asset.perspective, candidateQuery.data, snapshot.record]);
+
   const status = getEditorStatus({
     saveState: snapshot.saveState,
     isPromptSubmitting: promptTask !== null,
@@ -110,10 +164,19 @@ export function useEditorWorkspace({
     return null;
   }
 
-  const sprite =
-    snapshot.record.mode === "character"
-      ? snapshot.record.character
-      : snapshot.record.object;
+  const reviewKind = candidateQuery.data?.kind;
+  const displayRecord =
+    reviewKind === "generate_animation" && candidateRecord
+      ? candidateRecord
+      : snapshot.record;
+  const sprite = getSpriteRecordData(displayRecord);
+  const generationReview = buildGenerationReview({
+    taskKind: reviewKind,
+    currentRecord: snapshot.record,
+    candidateRecord,
+    animationId: candidateQuery.data?.result?.animation_id,
+    isResolving: applicationMutation.isPending,
+  });
   const assetKind = snapshot.record.mode;
 
   const generateAnimation = async (request: GenerateAnimationRequest) => {
@@ -156,9 +219,19 @@ export function useEditorWorkspace({
       const projectId = Number(asset.projectId);
       const assetId = Number(asset.id);
       if (Number.isSafeInteger(projectId) && Number.isSafeInteger(assetId)) {
-        await coreGenerationApi.create(
+        const created = await coreGenerationApi.create(
           projectId,
           buildInspectorGenerationRequest(assetKind, assetId, request),
+        );
+        rememberGenerationRunMetadata(
+          asset.projectId,
+          created.generationRunId,
+          {
+            kind: assetKind,
+            name: `Edit ${asset.name}`,
+            prompt,
+            assetId: asset.id,
+          },
         );
       }
 
@@ -190,17 +263,22 @@ export function useEditorWorkspace({
       onRedo: () => session.dispatch({ type: "history.redo" }),
       onSave: () => void save(),
     },
+    ...(reviewRun && generationReview
+      ? {
+          generationReview: {
+            ...generationReview,
+            onApply: () =>
+              void resolveApplication(reviewRun.id, true, candidateRecord),
+            onDeny: () => void resolveApplication(reviewRun.id, false),
+          },
+        }
+      : {}),
     sprite: {
       perspective: asset.perspective,
       prototype: sprite.prototype,
       animations: sprite.animations ?? [],
-      nodePositions: sprite.nodePositions,
-      onPositionChange: (nodeId, position) =>
-        session.dispatch({
-          type: "sprite.node-position.set",
-          nodeId,
-          position,
-        }),
+      nodePositions: {},
+      onPositionChange: () => undefined,
     },
     tree: {
       isGeneratingAnimation: animationMutation.isPending,
@@ -225,4 +303,89 @@ export function useEditorWorkspace({
       onSubmit: submitInspectorPrompt,
     },
   };
+}
+
+function getSpriteRecordData(record: AssetWorkspaceData["record"]) {
+  if (record.mode === "character") return record.character;
+  if (record.mode === "object") return record.object;
+  throw new Error("Sprite editor requires a Character or Object asset.");
+}
+
+function buildGenerationReview({
+  taskKind,
+  currentRecord,
+  candidateRecord,
+  animationId,
+  isResolving,
+}: {
+  taskKind: GenerationTaskType | undefined;
+  currentRecord: AssetWorkspaceData["record"];
+  candidateRecord: AssetWorkspaceData["record"] | null;
+  animationId?: number;
+  isResolving: boolean;
+}): AnimatedSpriteCanvasReview | undefined {
+  if (!taskKind || !candidateRecord) return undefined;
+  const current = getSpriteRecordData(currentRecord);
+  const candidate = getSpriteRecordData(candidateRecord);
+
+  if (taskKind === "generate_animation") {
+    const animation = findCandidateAnimation(
+      current.animations ?? [],
+      candidate.animations ?? [],
+      animationId,
+    );
+    return animation
+      ? {
+          kind: "new-animation",
+          nodeId: animation.id,
+          isResolving,
+        }
+      : undefined;
+  }
+
+  if (
+    taskKind === "edit_character_prototype" ||
+    taskKind === "edit_object_prototype"
+  ) {
+    return {
+      kind: "comparison",
+      nodeId: "prototype",
+      candidatePrototype: candidate.prototype,
+      isResolving,
+    };
+  }
+
+  if (taskKind === "edit_animation" || taskKind === "edit_frames") {
+    const animation = findCandidateAnimation(
+      current.animations ?? [],
+      candidate.animations ?? [],
+      animationId,
+    );
+    return animation
+      ? {
+          kind: "comparison",
+          nodeId: animation.id,
+          candidateAnimation: animation,
+          isResolving,
+        }
+      : undefined;
+  }
+  return undefined;
+}
+
+function findCandidateAnimation(
+  current: ReturnType<typeof getSpriteRecordData>["animations"],
+  candidate: ReturnType<typeof getSpriteRecordData>["animations"],
+  animationId?: number,
+) {
+  const targetId = animationId === undefined ? undefined : String(animationId);
+  return (
+    candidate?.find((animation) => animation.id === targetId) ??
+    candidate?.find(
+      (animation) =>
+        !current?.some(
+          (currentAnimation) => currentAnimation.id === animation.id,
+        ),
+    )
+  );
 }

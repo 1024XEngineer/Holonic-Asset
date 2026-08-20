@@ -54,3 +54,20 @@ func TestAdaptiveMatteBackgroundPreservesSubjectColours(t *testing.T) {
 		}
 	}
 }
+
+func TestObjectPrototypeSideOnLocksBothViewsToOneScale(t *testing.T) {
+	prompt := prompts.ObjectPrototype("a regulation basketball", "Side-On", prompts.TransparentBackground())
+	for _, expected := range []string{
+		"SIDE-ON SCALE LOCK",
+		"exactly the same camera distance and zoom",
+		"same pixel height",
+		"identical transparent or matte padding",
+		"never treat the second cell as an independently framed composition",
+		"redraw the mismatched view rather than compensating with a different zoom",
+		"one shared camera, zoom factor, subject scale, and cell-local coordinate system",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected side-on object prompt to contain %q: %s", expected, prompt)
+		}
+	}
+}
