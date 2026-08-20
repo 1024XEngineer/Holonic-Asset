@@ -15,6 +15,103 @@ import { CreateAssetForm } from "./create-asset-form";
 afterEach(cleanup);
 
 describe("CreateAssetForm", () => {
+  it.each([
+    ["audio", "Describe the mood, instruments, rhythm, and intended use..."],
+    [
+      "scenery",
+      "Describe the complete scene, atmosphere, depth, and important elements. Layers will be planned automatically...",
+    ],
+    [
+      "object",
+      "Describe the subject, material, mood, and details to generate...",
+    ],
+  ] as const)(
+    "shows the %s creative brief placeholder",
+    (kind, placeholder) => {
+      render(
+        withI18n(
+          <CreateAssetForm kind={kind} onCancel={vi.fn()} onCreate={vi.fn()} />,
+        ),
+      );
+
+      expect(screen.getByLabelText("Creative brief")).toHaveProperty(
+        "placeholder",
+        placeholder,
+      );
+    },
+  );
+
+  it("submits scenery with the default aspect ratio dimensions", async () => {
+    const onCreate = vi.fn();
+    render(
+      withI18n(
+        <CreateAssetForm
+          kind="scenery"
+          onCancel={vi.fn()}
+          onCreate={onCreate}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Asset name"), {
+      target: { value: "Moonlit orchard" },
+    });
+    fireEvent.change(screen.getByLabelText("Creative brief"), {
+      target: { value: "An orchard under a full moon" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Aspect ratio" }).textContent,
+    ).toContain("16:9");
+    fireEvent.click(screen.getByRole("button", { name: "Create Scenery" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(onCreate).toHaveBeenCalledWith({
+      kind: "scenery",
+      name: "Moonlit orchard",
+      prompt: "An orchard under a full moon",
+      canvasSize: "1536 × 1024 px",
+      dimensions: { width: 1536, height: 1024 },
+    });
+  });
+
+  it("maps a selected scenery aspect ratio to output dimensions", async () => {
+    const onCreate = vi.fn();
+    render(
+      withI18n(
+        <CreateAssetForm
+          kind="scenery"
+          onCancel={vi.fn()}
+          onCreate={onCreate}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Asset name"), {
+      target: { value: "Wide canyon" },
+    });
+    fireEvent.change(screen.getByLabelText("Creative brief"), {
+      target: { value: "A panoramic canyon at sunrise" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Aspect ratio" }));
+
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(7);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /^21:9/ }));
+    expect(
+      screen.getByRole("button", { name: "Aspect ratio" }).textContent,
+    ).toContain("1792 × 768 px");
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Scenery" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(onCreate).toHaveBeenCalledWith({
+      kind: "scenery",
+      name: "Wide canyon",
+      prompt: "A panoramic canyon at sunrise",
+      canvasSize: "1792 × 768 px",
+      dimensions: { width: 1792, height: 768 },
+    });
+  });
+
   it("keeps a UI Set draft stable after adding a component", () => {
     render(
       withI18n(

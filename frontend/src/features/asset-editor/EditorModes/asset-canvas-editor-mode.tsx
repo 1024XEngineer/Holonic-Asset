@@ -1,44 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 
-import type {
-  AssetKind,
-  AssetWorkspaceData,
-  SceneryLayer,
-  TilesetItem,
-  UISetComponent,
-} from "@/model";
+import type { AssetWorkspaceData, TilesetItem, UISetComponent } from "@/model";
 
-import {
-  SceneryCanvas,
-  useSceneryCanvasStateMachine,
-} from "../Canvas/SceneryCanvas";
 import {
   TilesetCanvas,
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
 import { UISetCanvas } from "../Canvas/UISetCanvas";
 import {
-  EditorHeader,
-  type EditorGenerationTask,
-} from "../Header/editor-header";
+  EditorModeFrame,
+  type EditorModeFrameProps,
+} from "./editor-mode-frame";
 
 type AssetCanvasEditorModeProps = {
   data: AssetWorkspaceData;
   onBack: () => void;
 };
-
-type CanvasEditorFrameProps = {
-  assetKind: AssetKind;
-  assetName: string;
-  version: string;
-  projectName: string;
-  onBack: () => void;
-  children: React.ReactNode;
-};
-
-const emptyGenerationTasks: EditorGenerationTask[] = [];
-const noAction = () => undefined;
 
 export function AssetCanvasEditorMode({
   data,
@@ -52,10 +29,6 @@ export function AssetCanvasEditorMode({
   };
 
   switch (data.record.mode) {
-    case "scenery":
-      return (
-        <SceneryEditor {...frameProps} layers={data.record.scenery.layers} />
-      );
     case "tileset":
       return (
         <TilesetEditor
@@ -76,40 +49,18 @@ export function AssetCanvasEditorMode({
   }
 }
 
-function SceneryEditor({
-  layers,
-  ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
-  layers: SceneryLayer[];
-}) {
-  const canvas = useSceneryCanvasStateMachine(layers);
-
-  return (
-    <CanvasEditorFrame {...frameProps} assetKind="scenery">
-      <SceneryCanvas
-        model={{
-          layers,
-          selectedLayerIds: canvas.selectedLayerIds,
-          visibleLayerIds: canvas.visibleLayerIds,
-        }}
-        onEvent={canvas.send}
-      />
-    </CanvasEditorFrame>
-  );
-}
-
 function TilesetEditor({
   gridSize,
   items,
   ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
+}: Omit<EditorModeFrameProps, "assetKind" | "children"> & {
   gridSize: number;
   items: TilesetItem[];
 }) {
   const canvas = useTilesetCanvasStateMachine(items, gridSize);
 
   return (
-    <CanvasEditorFrame {...frameProps} assetKind="tileset">
+    <EditorModeFrame {...frameProps} assetKind="tileset">
       <TilesetCanvas
         model={{
           gridSize,
@@ -118,14 +69,14 @@ function TilesetEditor({
         }}
         onEvent={canvas.send}
       />
-    </CanvasEditorFrame>
+    </EditorModeFrame>
   );
 }
 
 function UISetEditor({
   components,
   ...frameProps
-}: Omit<CanvasEditorFrameProps, "assetKind" | "children"> & {
+}: Omit<EditorModeFrameProps, "assetKind" | "children"> & {
   components: UISetComponent[];
 }) {
   const componentIds = useMemo(
@@ -146,7 +97,7 @@ function UISetEditor({
   }, [componentIds]);
 
   return (
-    <CanvasEditorFrame {...frameProps} assetKind="uiset">
+    <EditorModeFrame {...frameProps} assetKind="uiset">
       <UISetCanvas
         model={{ components, selectedComponentIds }}
         onEvent={({ componentId }) =>
@@ -157,38 +108,6 @@ function UISetEditor({
           )
         }
       />
-    </CanvasEditorFrame>
-  );
-}
-
-function CanvasEditorFrame({
-  assetKind,
-  assetName,
-  version,
-  projectName,
-  onBack,
-  children,
-}: CanvasEditorFrameProps) {
-  const { t } = useTranslation("editor");
-  return (
-    <>
-      <EditorHeader
-        assetKind={assetKind}
-        assetName={assetName}
-        version={version}
-        projectName={projectName}
-        status={t("previewReady")}
-        canUndo={false}
-        canRedo={false}
-        isDirty={false}
-        isSaving={false}
-        generationTasks={emptyGenerationTasks}
-        onBack={onBack}
-        onUndo={noAction}
-        onRedo={noAction}
-        onSave={noAction}
-      />
-      <div className="flex min-h-0 flex-1 overflow-hidden">{children}</div>
-    </>
+    </EditorModeFrame>
   );
 }

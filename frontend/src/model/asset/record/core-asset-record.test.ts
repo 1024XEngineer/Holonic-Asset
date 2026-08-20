@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AssetDetailResponse } from "../library/asset.contract";
+import type {
+  AssetDetailResponse,
+  AssetRecordResponse,
+} from "../library/asset.contract";
 
 const mocks = vi.hoisted(() => ({
   assetDetail: vi.fn(),
@@ -21,6 +24,7 @@ vi.mock("../../project", async (importOriginal) => ({
 
 import {
   loadCoreAssetWorkspace,
+  toCoreSceneryAssetWorkspace,
   toCoreTilesetAssetWorkspace,
 } from "./core-asset-record";
 
@@ -31,6 +35,33 @@ beforeEach(() => {
 });
 
 describe("loadCoreAssetWorkspace", () => {
+  it("loads a persisted scenery asset without falling back to mock data", async () => {
+    mocks.assetDetail.mockResolvedValue(sceneryDetail());
+
+    await expect(
+      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toMatchObject({
+      projectName: "Demo",
+      asset: { id: "9", projectId: "11", kind: "scenery", version: "v3" },
+      record: {
+        mode: "scenery",
+        scenery: {
+          layers: [
+            {
+              id: "1",
+              label: "Sky",
+              imageUrl: "https://cdn.example/sky.png",
+              blendMode: "normal",
+            },
+          ],
+        },
+      },
+    });
+    expect(mocks.assetDetail).toHaveBeenCalledWith(9);
+    expect(mocks.projectDetail).toHaveBeenCalledWith("11");
+    expect(mocks.assetRecords).toHaveBeenCalledWith(9);
+  });
+
   it("loads a persisted tileset without falling back to mock data", async () => {
     mocks.assetDetail.mockResolvedValue(tilesetDetail());
 
@@ -71,6 +102,16 @@ describe("loadCoreAssetWorkspace", () => {
       expect(mocks.assetDetail).not.toHaveBeenCalled();
     },
   );
+
+  it("skips an asset type that the editor cannot load", async () => {
+    mocks.assetDetail.mockResolvedValue(audioDetail());
+
+    await expect(
+      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toBeUndefined();
+    expect(mocks.projectDetail).not.toHaveBeenCalled();
+    expect(mocks.assetRecords).not.toHaveBeenCalled();
+  });
 });
 
 describe("toCoreTilesetAssetWorkspace", () => {
@@ -100,6 +141,102 @@ describe("toCoreTilesetAssetWorkspace", () => {
   });
 });
 
+describe("toCoreSceneryAssetWorkspace", () => {
+  it("maps persisted layer resources to scenery canvas layers", () => {
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: sceneryDetail(),
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: {
+        layers: [
+          {
+            id: "1",
+            label: "Sky",
+            detail: "Sky",
+            imageUrl: "https://cdn.example/sky.png",
+            blendMode: "normal",
+          },
+        ],
+      },
+    });
+  });
+
+  it("maps canvas dimensions, transforms, and revision history", () => {
+    const detail = sceneryDetail();
+    const layer = detail.content?.layers?.[0];
+    if (!layer) throw new Error("Expected a scenery layer.");
+    layer.transform = {
+      scale: { x: 1.25, y: 0.75 },
+      rotation: 12.4,
+    };
+
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [sceneryRecord()],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: {
+        dimensions: { width: 1920, height: 1080 },
+        layers: [
+          {
+            transform: {
+              scale: { x: 1.25, y: 0.75 },
+              rotation: 12.4,
+            },
+            visible: true,
+            opacity: 1,
+            zIndex: 0,
+          },
+        ],
+      },
+    });
+    expect(workspace.asset.history).toEqual([
+      {
+        id: "21",
+        version: "v3",
+        description: "Generated scenery",
+        savedAt: "2026-08-19T08:00:00Z",
+        status: "ready",
+        isCurrent: true,
+      },
+    ]);
+  });
+
+  it.each([
+    {},
+    { scale: "wide", rotation: 0 },
+    { scale: { x: Number.POSITIVE_INFINITY, y: 1 }, rotation: 0 },
+    { scale: { x: 1, y: Number.NaN }, rotation: 0 },
+    { scale: { x: 1, y: 1 }, rotation: "upright" },
+  ])("ignores an invalid persisted transform: %j", (transform) => {
+    const detail = sceneryDetail();
+    const layer = detail.content?.layers?.[0];
+    if (!layer) throw new Error("Expected a scenery layer.");
+    layer.transform = transform;
+
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: { layers: [{ transform: undefined }] },
+    });
+  });
+});
+
 function tilesetDetail(): Extract<AssetDetailResponse, { type: "tileSet" }> {
   return {
     assetId: 9,
@@ -125,5 +262,62 @@ function tilesetDetail(): Extract<AssetDetailResponse, { type: "tileSet" }> {
         },
       ],
     },
+  };
+}
+
+function sceneryDetail(): Extract<AssetDetailResponse, { type: "scenery" }> {
+  return {
+    assetId: 9,
+    projectId: 11,
+    name: "Moonlit Forest",
+    description: "A layered moonlit forest",
+    type: "scenery",
+    perspective: "Top-Down",
+    dimensions: { width: 1920, height: 1080 },
+    tags: [],
+    version: 3,
+    content: {
+      layers: [
+        {
+          id: 1,
+          name: "Sky",
+          resource: "https://cdn.example/sky.png",
+          position: { x: 0, y: 0 },
+          visible: true,
+          opacity: 1,
+          zIndex: 0,
+        },
+      ],
+    },
+  };
+}
+
+function audioDetail(): Extract<AssetDetailResponse, { type: "audio" }> {
+  return {
+    assetId: 9,
+    projectId: 11,
+    name: "Forest ambience",
+    description: "A quiet forest ambience",
+    type: "audio",
+    perspective: "Top-Down",
+    dimensions: null,
+    tags: [],
+    version: 1,
+    content: {},
+  };
+}
+
+function sceneryRecord(): AssetRecordResponse<"scenery"> {
+  return {
+    assetId: 9,
+    contentId: 31,
+    recordId: 21,
+    name: "Moonlit Forest",
+    description: "Generated scenery",
+    dimensions: { width: 1920, height: 1080 },
+    perspective: "Top-Down",
+    version: 3,
+    createdAt: "2026-08-19T08:00:00Z",
+    content: sceneryDetail().content,
   };
 }

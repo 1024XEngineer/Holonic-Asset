@@ -33,6 +33,8 @@ export type TilesetAssetKind = "tileset";
 export type UISetAssetKind = "uiset";
 export type AudioAssetKind = "audio";
 
+export type SceneryCanvasDimensions = { width: number; height: number };
+
 type AssetRecordBase<K extends AssetKind> = {
   mode: K;
   prompt: string;
@@ -53,7 +55,10 @@ export type ObjectAssetRecord = AssetRecordBase<ObjectAssetKind> & {
 };
 
 export type SceneryAssetRecord = AssetRecordBase<SceneryAssetKind> & {
-  scenery: { layers: SceneryLayer[] };
+  scenery: {
+    layers: SceneryLayer[];
+    dimensions?: SceneryCanvasDimensions;
+  };
 };
 
 export type TilesetAssetRecord = AssetRecordBase<TilesetAssetKind> & {

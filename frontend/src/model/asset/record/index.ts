@@ -21,6 +21,7 @@ export type {
   SaveAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SceneryCanvasDimensions,
   SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
