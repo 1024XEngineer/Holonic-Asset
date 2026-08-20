@@ -141,14 +141,10 @@ describe("createAssetLibraryCollection", () => {
 
     for (const operation of operations) {
       expect(operation).toThrowError("Asset was not found.");
-      try {
-        operation();
-      } catch (error) {
-        expect(error).toMatchObject({
-          code: "NOT_FOUND",
-          details: { projectId: "project-1", assetId: "missing" },
-        });
-      }
+      expect(captureError(operation)).toMatchObject({
+        code: "NOT_FOUND",
+        details: { projectId: "project-1", assetId: "missing" },
+      });
     }
   });
 
@@ -166,3 +162,12 @@ describe("createAssetLibraryCollection", () => {
     ).toThrowError("Asset updates cannot change asset identity.");
   });
 });
+
+function captureError(operation: () => unknown): unknown {
+  try {
+    operation();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected operation to throw.");
+}

@@ -85,9 +85,13 @@ export function refreshAssetLibraryCacheInBackground(
   userID: number,
   projectId: string,
 ) {
-  void refreshAssetLibraryCache(queryClient, userID, projectId).catch(
-    () => undefined,
-  );
+  void (async () => {
+    try {
+      await refreshAssetLibraryCache(queryClient, userID, projectId);
+    } catch {
+      // Background refresh is best effort.
+    }
+  })();
 }
 
 export function refreshAssetLibraryCache(

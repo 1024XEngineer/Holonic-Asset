@@ -284,13 +284,10 @@ describe("core API client", () => {
         .mockResolvedValue(new Response("upstream failure", { status: 502 })),
     );
 
-    try {
-      await listProjects();
-      expect.unreachable();
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataApiError);
-      expect(error).toMatchObject({ details: "upstream failure" });
-    }
+    await expect(listProjects()).rejects.toMatchObject({
+      name: DataApiError.name,
+      details: "upstream failure",
+    });
   });
 });
 

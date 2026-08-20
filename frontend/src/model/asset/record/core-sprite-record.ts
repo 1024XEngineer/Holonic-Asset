@@ -1,14 +1,12 @@
 import type {
   AssetDetailResponse,
   AssetRecordResponse,
-} from "../library/asset.contract";
-import { coreAssetApi } from "../library/core-asset.api";
-import { mergeAssetContentPatch } from "../library/merge-asset-content";
-import type {
   CharacterAssetContent,
   CoreSpriteAssetContent,
   CoreSpriteAssetContentPatch,
 } from "../library/asset.contract";
+import { coreAssetApi } from "../library/core-asset.api";
+import { mergeAssetContentPatch } from "../library/merge-asset-content";
 import type {
   AssetKind,
   AssetRevision,
@@ -17,8 +15,9 @@ import type {
 } from "../types";
 import { getPerspectiveDirectionLayout } from "../types";
 import { projectApi } from "../../project";
-import type { AssetRecord, AssetWorkspaceData } from "./types";
 import type {
+  AssetRecord,
+  AssetWorkspaceData,
   AssetRecordSaveResult,
   GetAssetRecordInput,
   SaveAssetRecordInput,

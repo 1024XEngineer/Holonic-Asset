@@ -1,4 +1,5 @@
-import { Container, Sprite } from "pixi.js";
+import type { Container } from "pixi.js";
+import { Sprite } from "pixi.js";
 import type { CharacterSpriteSheet } from "@/model";
 import { snapToStep } from "@/lib/snap-to-step";
 import type { SpriteSheetFrameTextureCache } from "./SpriteSheetFrameTextureCache";

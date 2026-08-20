@@ -128,9 +128,15 @@ export function useAssetLibraryController({
       if (!projectId || !markAssetCopying(assetId)) return;
       resetActionErrors();
 
-      void mutateCopyAsset({ projectId, assetId })
-        .catch(() => undefined)
-        .finally(() => unmarkAssetCopying(assetId));
+      void (async () => {
+        try {
+          await mutateCopyAsset({ projectId, assetId });
+        } catch {
+          // The mutation exposes its error through controller state.
+        } finally {
+          unmarkAssetCopying(assetId);
+        }
+      })();
     },
     [
       markAssetCopying,
@@ -147,9 +153,15 @@ export function useAssetLibraryController({
       resetActionErrors();
       if (editingAssetId === assetId) setEditingAssetId(undefined);
 
-      void mutateDeleteAsset({ projectId, assetId })
-        .catch(() => undefined)
-        .finally(() => unmarkAssetDeleting(assetId));
+      void (async () => {
+        try {
+          await mutateDeleteAsset({ projectId, assetId });
+        } catch {
+          // The mutation exposes its error through controller state.
+        } finally {
+          unmarkAssetDeleting(assetId);
+        }
+      })();
     },
     [
       markAssetDeleting,
@@ -188,13 +200,16 @@ export function useAssetLibraryController({
       if (!projectId || !editingAssetId) return;
       const assetId = editingAssetId;
 
-      void mutateUpdateAsset({ projectId, assetId, metadata })
-        .then(() => {
+      void (async () => {
+        try {
+          await mutateUpdateAsset({ projectId, assetId, metadata });
           setEditingAssetId((currentId) =>
             currentId === assetId ? undefined : currentId,
           );
-        })
-        .catch(() => undefined);
+        } catch {
+          // The mutation exposes its error through controller state.
+        }
+      })();
     },
     [editingAssetId, mutateUpdateAsset, projectId],
   );

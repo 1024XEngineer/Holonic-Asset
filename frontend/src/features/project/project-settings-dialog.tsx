@@ -166,13 +166,11 @@ export function ProjectSettingsDialog({
                 <div className="relative grid gap-2">
                   <p className="text-sm font-medium">{t("reference")}</p>
                   {field.state.value ? (
-                    <>
-                      <ReferenceImage
-                        src={field.state.value}
-                        alt={t("referenceImageAlt")}
-                        onPreview={() => setPreviewImage(field.state.value)}
-                      />
-                    </>
+                    <ReferenceImage
+                      src={field.state.value}
+                      alt={t("referenceImageAlt")}
+                      onPreview={() => setPreviewImage(field.state.value)}
+                    />
                   ) : (
                     <div className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground">
                       {t("uploadReference")}
@@ -202,18 +200,21 @@ export function ProjectSettingsDialog({
                           setImageError(undefined);
                           const controller = new AbortController();
                           imageReadController.current = controller;
-                          void readFileAsDataUrl(file, controller.signal).then(
-                            (dataUrl) => {
+                          void (async () => {
+                            try {
+                              const dataUrl = await readFileAsDataUrl(
+                                file,
+                                controller.signal,
+                              );
                               if (controller.signal.aborted) return;
                               field.handleChange(dataUrl);
-                            },
-                            () => {
+                            } catch {
                               if (controller.signal.aborted) return;
                               setImageError(
                                 "We couldn't read that image. Try another file.",
                               );
-                            },
-                          );
+                            }
+                          })();
                         }}
                       />
                       <Button

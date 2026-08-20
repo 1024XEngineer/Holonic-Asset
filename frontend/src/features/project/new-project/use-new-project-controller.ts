@@ -158,17 +158,17 @@ export function useNewProjectController() {
       previewReadController.current = controller;
       setUploadedPreview("");
       setPreviewError(undefined);
-      void readFileAsDataUrl(file, controller.signal).then(
-        (dataUrl) => {
+      void (async () => {
+        try {
+          const dataUrl = await readFileAsDataUrl(file, controller.signal);
           if (controller.signal.aborted) return;
           setUploadedPreview(dataUrl);
           form.setFieldValue("reference", dataUrl);
-        },
-        () => {
+        } catch {
           if (controller.signal.aborted) return;
           setPreviewError("We couldn't read that image. Try another file.");
-        },
-      );
+        }
+      })();
     },
     [form],
   );

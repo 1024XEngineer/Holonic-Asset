@@ -1,6 +1,5 @@
-import { perspectiveOptions } from "@/model/project";
+import { perspectiveOptions, perspectiveSchema } from "@/model/project";
 import type { CreateProjectInput, ProjectSummary } from "@/model/project";
-import { perspectiveSchema } from "@/model/project";
 import { z } from "zod";
 
 import type {

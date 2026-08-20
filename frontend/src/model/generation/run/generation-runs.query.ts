@@ -148,7 +148,14 @@ export function useGenerationRunsQuery(
         }
       }),
     );
-  }, [assetId, projectId, query.data, query.dataUpdatedAt, queryClient]);
+  }, [
+    assetId,
+    projectId,
+    query.data,
+    query.dataUpdatedAt,
+    queryClient,
+    userID,
+  ]);
 
   return query;
 }

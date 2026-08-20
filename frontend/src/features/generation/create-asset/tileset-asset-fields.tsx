@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,24 @@ export function TilesetAssetFields({
   const [expandedItems, setExpandedItems] = useState(
     () => new Set(draft.tiles.map((_, index) => index)),
   );
+  const previousTileCountRef = useRef(draft.tiles.length);
 
-  useEffect(
-    () => setExpandedItems(new Set(draft.tiles.map((_, index) => index))),
-    [draft.tiles.length],
-  );
+  useEffect(() => {
+    const previousTileCount = previousTileCountRef.current;
+    const nextTileCount = draft.tiles.length;
+    if (previousTileCount === nextTileCount) return;
+
+    setExpandedItems((current) => {
+      const next = new Set(
+        [...current].filter((index) => index < nextTileCount),
+      );
+      for (let index = previousTileCount; index < nextTileCount; index += 1) {
+        next.add(index);
+      }
+      return next;
+    });
+    previousTileCountRef.current = nextTileCount;
+  }, [draft.tiles.length]);
 
   const updateItems = (tiles: typeof draft.tiles) =>
     onChange({ ...draft, tiles });
@@ -69,6 +82,8 @@ export function TilesetAssetFields({
 
           return (
             <section
+              // Tiles are positional drafts and can only be added or removed at the end.
+              // oxlint-disable-next-line react/no-array-index-key
               key={index}
               className="grid gap-5 rounded-lg border p-4"
               aria-label={t("tilesetItem", { number: index + 1 })}
