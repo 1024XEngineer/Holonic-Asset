@@ -12,6 +12,7 @@ export type AnimatedSpriteCanvasActions = {
   onSelectNodes: (nodes: NodeId[]) => void;
   onClearSelection: () => void;
   onNodePositionChange: (node: NodeId, position: CanvasPosition) => void;
+  onReviewResolve: (applied: boolean) => void;
 };
 
 export type AnimatedSpriteCanvasRuntimeProps = {
@@ -47,6 +48,7 @@ export type AnimatedSpriteStageContext = {
   getAnimations: () => CharacterAnimation[];
   getPrototype: () => { columns: number; rows: number };
   getScene: () => AnimatedSpriteSceneSnapshot;
+  getReview: () => AnimatedSpriteCanvasRuntimeProps["model"]["review"];
   moveNode: (node: NodeId, position: CanvasPosition) => void;
   setMarquee: (marquee: AnimatedSpriteSceneState["marquee"]) => void;
   getDragStep: () => number;

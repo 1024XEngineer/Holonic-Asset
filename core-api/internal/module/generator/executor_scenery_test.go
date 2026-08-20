@@ -311,7 +311,7 @@ func TestCreateBuildsSceneryPayloadFromProjectContext(t *testing.T) {
 
 	_, err := engine.Create(context.Background(), &generator.Request{
 		ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "a valley at dawn",
-		Parameters: json.RawMessage(`{"asset_name":"Dawn Valley","style":"","dimensions":{"width":640,"height":360},"reference":""}`),
+		Parameters: json.RawMessage(`{"asset_name":"Dawn Valley","dimensions":{"width":640,"height":360},"reference":""}`),
 	})
 	if err != nil {
 		t.Fatalf("create scenery: %v", err)
@@ -320,7 +320,7 @@ func TestCreateBuildsSceneryPayloadFromProjectContext(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode scenery payload: %v", err)
 	}
-	if payload.AssetName != "Dawn Valley" || payload.Style != "pixel art" || payload.Perspective != "Side-On" ||
+	if payload.AssetName != "Dawn Valley" || payload.Perspective != "Side-On" ||
 		payload.ProjectContext.Name != "Moon Valley" || payload.ProjectContext.GameType != "RPG" ||
 		payload.ProjectContext.TargetPlatform != "PC" || payload.ProjectContext.Description != "exploration" ||
 		payload.Reference != "uploads/generated-1.png" || projects.calls != 1 ||
@@ -415,7 +415,7 @@ func sceneryImageResults() []*imageclient.GenerateResult {
 func sceneryPayload(t *testing.T) json.RawMessage {
 	t.Helper()
 	payload, err := json.Marshal(generator.CreateSceneryPayload{
-		AssetName: "Mountain Valley", CreativeBrief: "A valley at dawn", Style: "pixel art",
+		AssetName: "Mountain Valley", CreativeBrief: "A valley at dawn",
 		Dimensions: assetdomain.Size{Width: 640, Height: 360}, Perspective: "Side-On", ProjectID: 42,
 	})
 	if err != nil {

@@ -24,6 +24,8 @@ type taskManagerStub struct {
 	listFilter    *taskdomain.ListFilter
 	listedTasks   []*taskdomain.Task
 	listErr       error
+	detailErr     error
+	completeErr   error
 }
 
 type taskStatusUpdate struct {
@@ -48,7 +50,7 @@ func (s *taskManagerStub) Publish(_ context.Context, message *taskdomain.Task) (
 }
 
 func (s *taskManagerStub) GetDetail(context.Context, uint) (*taskdomain.Task, error) {
-	return s.detail, nil
+	return s.detail, s.detailErr
 }
 
 func (s *taskManagerStub) List(
@@ -67,6 +69,11 @@ func (s *taskManagerStub) List(
 func (s *taskManagerStub) Cancel(_ context.Context, taskID uint) error {
 	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: taskdomain.StatusCancelled})
 	return nil
+}
+
+func (s *taskManagerStub) Complete(_ context.Context, taskID uint) error {
+	s.statusUpdates = append(s.statusUpdates, taskStatusUpdate{taskID: taskID, status: taskdomain.StatusCompleted})
+	return s.completeErr
 }
 
 func (s *taskManagerStub) dispatch(
@@ -93,7 +100,9 @@ type projectReaderStub struct {
 
 type referenceStoreStub struct {
 	persisted  []string
+	deleted    []string
 	persistErr error
+	deleteErr  error
 }
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
@@ -116,8 +125,9 @@ func (s *referenceStoreStub) PersistReferenceAt(context.Context, string, string)
 	return nil
 }
 
-func (s *referenceStoreStub) DeleteObjects(context.Context, []string) error {
-	return nil
+func (s *referenceStoreStub) DeleteObjects(_ context.Context, keys []string) error {
+	s.deleted = append(s.deleted, keys...)
+	return s.deleteErr
 }
 
 func (s *projectReaderStub) GetDetail(_ context.Context, _ uint) (*projectdomain.Project, error) {
@@ -147,7 +157,8 @@ func TestCreateBuildsOneTaskFromRequest(t *testing.T) {
 		t.Fatalf("unexpected task creation: run=%d task=%+v", runID, tasks.createdTask)
 	}
 	if tasks.createdTask.Type != string(request.Kind) ||
-		tasks.createdTask.Status != taskdomain.StatusPending {
+		tasks.createdTask.Status != taskdomain.StatusPending ||
+		tasks.createdTask.CompletionStatus != taskdomain.StatusAwaitingApplication {
 		t.Fatalf("unexpected task envelope: %+v", tasks.createdTask)
 	}
 
@@ -178,6 +189,9 @@ func TestCreateBuildsUnifiedEditFramesPayload(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create edit frames: %v", err)
+	}
+	if tasks.createdTask == nil || tasks.createdTask.CompletionStatus != taskdomain.StatusAwaitingApplication {
+		t.Fatalf("edit frames task must await application: %+v", tasks.createdTask)
 	}
 	var payload generator.EditFramesPayload
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
@@ -819,6 +833,100 @@ func TestCancelUpdatesTaskStatus(t *testing.T) {
 	}
 }
 
+func TestResolveApplicationCompletesAwaitingRun(t *testing.T) {
+	for _, applied := range []bool{true, false} {
+		t.Run(fmt.Sprintf("applied=%t", applied), func(t *testing.T) {
+			tasks := &taskManagerStub{detail: &taskdomain.Task{
+				ID:     17,
+				Status: taskdomain.StatusAwaitingApplication,
+				Result: json.RawMessage(`{"asset_id":9,"generated_resources":["generated/a.png"]}`),
+			}}
+			references := &referenceStoreStub{}
+			engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+			if err := engine.ResolveApplication(context.Background(), 17, applied); err != nil {
+				t.Fatalf("resolve generation application: %v", err)
+			}
+			if len(tasks.statusUpdates) != 1 || tasks.statusUpdates[0].status != taskdomain.StatusCompleted {
+				t.Fatalf("unexpected task completion: %+v", tasks.statusUpdates)
+			}
+			if applied && len(references.deleted) != 0 {
+				t.Fatalf("applied resources were deleted: %v", references.deleted)
+			}
+			if !applied && !reflect.DeepEqual(references.deleted, []string{"generated/a.png"}) {
+				t.Fatalf("discarded resources were not deleted: %v", references.deleted)
+			}
+		})
+	}
+}
+
+func TestResolveApplicationRejectsNonAwaitingRun(t *testing.T) {
+	tasks := &taskManagerStub{detail: &taskdomain.Task{ID: 17, Status: taskdomain.StatusCompleted}}
+	err := generator.NewEngine(tasks, nil).ResolveApplication(context.Background(), 17, true)
+	if err == nil || !strings.Contains(err.Error(), "not awaiting application") {
+		t.Fatalf("expected invalid application transition, got %v", err)
+	}
+	if len(tasks.statusUpdates) != 0 {
+		t.Fatalf("non-awaiting task was completed: %+v", tasks.statusUpdates)
+	}
+}
+
+func TestResolveApplicationReturnsDependencyAndDiscardErrors(t *testing.T) {
+	t.Run("task manager required", func(t *testing.T) {
+		if err := generator.NewEngine(nil, nil).ResolveApplication(context.Background(), 17, true); !errors.Is(err, generator.ErrTaskManagerRequired) {
+			t.Fatalf("expected task manager error, got %v", err)
+		}
+	})
+
+	t.Run("task lookup", func(t *testing.T) {
+		wantErr := errors.New("lookup failed")
+		err := generator.NewEngine(&taskManagerStub{detailErr: wantErr}, nil).
+			ResolveApplication(context.Background(), 17, true)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected lookup error, got %v", err)
+		}
+	})
+
+	t.Run("malformed discard result", func(t *testing.T) {
+		tasks := &taskManagerStub{detail: &taskdomain.Task{
+			Status: taskdomain.StatusAwaitingApplication,
+			Result: json.RawMessage(`{`),
+		}}
+		err := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+			References: &referenceStoreStub{},
+		}).ResolveApplication(context.Background(), 17, false)
+		if err == nil || !strings.Contains(err.Error(), "decode run 17 result") {
+			t.Fatalf("expected decode error, got %v", err)
+		}
+	})
+
+	t.Run("resource deletion", func(t *testing.T) {
+		wantErr := errors.New("delete failed")
+		tasks := &taskManagerStub{detail: &taskdomain.Task{
+			Status: taskdomain.StatusAwaitingApplication,
+			Result: json.RawMessage(`{"generated_resources":["generated/a.png"]}`),
+		}}
+		err := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+			References: &referenceStoreStub{deleteErr: wantErr},
+		}).ResolveApplication(context.Background(), 17, false)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected deletion error, got %v", err)
+		}
+	})
+
+	t.Run("task completion", func(t *testing.T) {
+		wantErr := errors.New("completion failed")
+		tasks := &taskManagerStub{
+			detail:      &taskdomain.Task{Status: taskdomain.StatusAwaitingApplication},
+			completeErr: wantErr,
+		}
+		err := generator.NewEngine(tasks, nil).ResolveApplication(context.Background(), 17, true)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected completion error, got %v", err)
+		}
+	})
+}
+
 type executorStub struct {
 	taskType generator.TaskType
 	payload  json.RawMessage
@@ -995,7 +1103,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			Type:    string(taskType),
 			Payload: payload,
 		}
-		if _, err := tasks.dispatch(context.Background(), message); err != nil {
+		_, err := tasks.dispatch(context.Background(), message)
+		if err != nil {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}

@@ -16,6 +16,7 @@ export function SpriteEditorMode({
   sprite,
   tree,
   inspector,
+  generationReview,
 }: SpriteEditorModeProps) {
   const { animations } = sprite;
   const [selection, setSelection] = useState<AnimatedSpriteCanvasSelection>({
@@ -51,7 +52,12 @@ export function SpriteEditorMode({
   };
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
     if (event.type === "selection.changed") setSelection(event.selection);
-    else sprite.onPositionChange(event.nodeId, event.position);
+    else if (event.type === "node-position.committed")
+      sprite.onPositionChange(event.nodeId, event.position);
+    else if (event.type === "generation-review.resolved") {
+      if (event.applied) generationReview?.onApply();
+      else generationReview?.onDeny();
+    }
   };
   const clearInspectorSelection = () => {
     setSelection({ nodeIds: [], frames: [] });
@@ -79,6 +85,7 @@ export function SpriteEditorMode({
             animations,
             nodePositions: sprite.nodePositions,
             selection,
+            ...(generationReview ? { review: generationReview } : {}),
           }}
           onEvent={handleCanvasEvent}
         />

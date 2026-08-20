@@ -49,32 +49,50 @@ func (*generationRouterStub) Cancel(
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{}), nil
 }
 
+func (*generationRouterStub) ResolveApplication(
+	context.Context,
+	dto.ResolveGenerationApplicationRequest,
+) error {
+	return nil
+}
+
 func TestGenerationRoutesAreRegistered(t *testing.T) {
 	stub := &generationRouterStub{}
 	e := router.Register(nil, nil, stub, nil)
 
 	tests := []struct {
-		method string
-		path   string
-		body   string
+		method         string
+		path           string
+		body           string
+		expectedStatus int
 	}{
 		{
-			method: http.MethodPost,
-			path:   "/api/v1/projects/42/generation-runs",
-			body:   `{"kind":"generate_character_prototype","creative_brief":"hero"}`,
+			method:         http.MethodPost,
+			path:           "/api/v1/projects/42/generation-runs",
+			body:           `{"kind":"generate_character_prototype","creative_brief":"hero"}`,
+			expectedStatus: http.StatusOK,
 		},
 		{
-			method: http.MethodGet,
-			path:   "/api/v1/generation-runs/7",
+			method:         http.MethodGet,
+			path:           "/api/v1/generation-runs/7",
+			expectedStatus: http.StatusOK,
 		},
 		{
-			method: http.MethodGet,
-			path:   "/api/v1/projects/42/generation-runs?assetId=9&status=active&limit=10&cursor=next",
+			method:         http.MethodGet,
+			path:           "/api/v1/projects/42/generation-runs?assetId=9&status=active&limit=10&cursor=next",
+			expectedStatus: http.StatusOK,
 		},
 		{
-			method: http.MethodPost,
-			path:   "/api/v1/generation-runs/7/cancel",
-			body:   `{}`,
+			method:         http.MethodPost,
+			path:           "/api/v1/generation-runs/7/cancel",
+			body:           `{}`,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			method:         http.MethodPost,
+			path:           "/api/v1/generation-runs/7/application",
+			body:           `{"applied":true}`,
+			expectedStatus: http.StatusNoContent,
 		},
 	}
 
@@ -86,8 +104,8 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 
 			e.ServeHTTP(recorder, req)
 
-			if recorder.Code != http.StatusOK {
-				t.Fatalf("expected status %d, got %d: %s", http.StatusOK, recorder.Code, recorder.Body.String())
+			if recorder.Code != test.expectedStatus {
+				t.Fatalf("expected status %d, got %d: %s", test.expectedStatus, recorder.Code, recorder.Body.String())
 			}
 		})
 	}

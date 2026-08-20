@@ -134,12 +134,16 @@ func (q *queue) dispatch(ctx context.Context, message *Task) error {
 	if err != nil {
 		return fmt.Errorf("task: encode result for task %d: %w", message.ID, err)
 	}
-	if err := q.repo.UpdateTaskResult(ctx, message.ID, result); err != nil {
+	completionStatus := StatusCompleted
+	if message.CompletionStatus == StatusAwaitingApplication {
+		completionStatus = StatusAwaitingApplication
+	}
+	if err := q.repo.UpdateTaskResult(ctx, message.ID, completionStatus, result); err != nil {
 		return fmt.Errorf("task: persist result for task %d: %w", message.ID, err)
 	}
 
 	message.Result = result
-	message.Status = StatusCompleted
+	message.Status = completionStatus
 	return nil
 }
 

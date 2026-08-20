@@ -8,15 +8,11 @@ type Manager interface {
 	GetDetail(ctx context.Context, id uint) (Asset, error)
 	Delete(ctx context.Context, id uint) error
 	UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (*Asset, error)
-	UpdateContent(ctx context.Context, id uint, content AssetContent) error
-	UpdateAnimationFrames(ctx context.Context, assetID uint, animationID uint, frames []Frame) error
-	UpdatePrototypeImages(ctx context.Context, assetID uint, images []ImageResource) error
 	CreateCharacterAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	CreateObjectAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateTileSetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateUISetAsset(ctx context.Context, asset *Asset) (uint, error)
 	CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error)
-	CreateAnimation(ctx context.Context, assetID uint, animation Animation) (uint, error)
 	CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error)
 	GetRecordHistory(ctx context.Context, assetID uint) ([]AssetRecord, error)
 	RollBackRecord(ctx context.Context, assetID uint, version uint) (*AssetRecord, error)
@@ -54,18 +50,6 @@ func (m *manager) UpdateAsset(ctx context.Context, id uint, update *AssetUpdate)
 	return m.store.UpdateAsset(ctx, id, update)
 }
 
-func (m *manager) UpdateContent(ctx context.Context, id uint, content AssetContent) error {
-	return m.store.UpdateContent(ctx, id, content)
-}
-
-func (m *manager) UpdateAnimationFrames(ctx context.Context, assetID uint, animationID uint, frames []Frame) error {
-	return m.store.UpdateAnimationFrames(ctx, assetID, animationID, frames)
-}
-
-func (m *manager) UpdatePrototypeImages(ctx context.Context, assetID uint, images []ImageResource) error {
-	return m.store.UpdatePrototypeImages(ctx, assetID, images)
-}
-
 func (m *manager) CreateCharacterAsset(ctx context.Context, asset *Asset) (*Asset, error) {
 	return m.store.CreateCharacterAsset(ctx, asset)
 }
@@ -84,10 +68,6 @@ func (m *manager) CreateUISetAsset(ctx context.Context, asset *Asset) (uint, err
 
 func (m *manager) CreateSceneryAsset(ctx context.Context, asset *Asset) (uint, error) {
 	return m.store.CreateSceneryAsset(ctx, asset)
-}
-
-func (m *manager) CreateAnimation(ctx context.Context, assetID uint, animation Animation) (uint, error) {
-	return m.store.CreateAnimation(ctx, assetID, animation)
 }
 
 func (m *manager) CreateRecord(ctx context.Context, record *AssetRecord, expectedVersion uint) (*AssetRecord, error) {

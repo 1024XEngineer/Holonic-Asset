@@ -22,5 +22,7 @@ export function createAnimatedSpriteCanvasActions(
     onClearSelection: () => changeSelection({ nodeIds: [], frames: [] }),
     onNodePositionChange: (nodeId, position) =>
       onEvent({ type: "node-position.committed", nodeId, position }),
+    onReviewResolve: (applied) =>
+      onEvent({ type: "generation-review.resolved", applied }),
   };
 }

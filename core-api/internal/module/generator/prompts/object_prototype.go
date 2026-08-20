@@ -85,7 +85,7 @@ func ObjectPrototype(
 			references,
 			"object",
 		),
-		characterDirectionSheetRules,
+		prototypeDirectionSheetRules,
 		contentPercent,
 		contentPercent,
 		creativeBrief,

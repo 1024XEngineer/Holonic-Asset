@@ -1,7 +1,6 @@
 import { useMemo, useReducer } from "react";
 
-import type { ItemTile } from "@/model";
-import type { TilesetItem } from "@/model";
+import type { ItemTile, TilesetItem } from "@/model";
 
 import type { TilesetCanvasEvent } from "./TilesetCanvas.interface";
 

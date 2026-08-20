@@ -64,11 +64,16 @@ func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) ima
 }
 
 // InitLLMService creates the external multimodal provider and its application service.
-func InitLLMService(cfg config.LLMClientConfig) llmclient.LLMService {
+func InitLLMService(cfg config.LLMClientConfig, appLogger ...logger.Logger) llmclient.LLMService {
+	var providerLogger logger.Logger
+	if len(appLogger) > 0 {
+		providerLogger = appLogger[0]
+	}
 	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
 		BaseURL:      cfg.BaseURL,
 		APIKey:       cfg.APIKey,
 		DefaultModel: cfg.DefaultModel,
+		Logger:       providerLogger,
 	})
 	return llmclient.NewLLMService(provider)
 }
@@ -131,11 +136,16 @@ func InitHandlers(
 	workspaceModule *workspace.Workspace,
 	generatorEngine generator.RunManager,
 	uploadManager upload.Manager,
+	references ...upload.ReferenceResolver,
 ) HTTPHandlers {
+	var resolver upload.ReferenceResolver
+	if len(references) > 0 {
+		resolver = references[0]
+	}
 	return HTTPHandlers{
-		Asset:      handler.NewHandler(workspaceModule.Assets),
-		Project:    handler.NewProjectHandler(workspaceModule.Projects),
-		Generation: handler.NewGenerationHandler(generatorEngine),
+		Asset:      handler.NewHandler(workspaceModule.Assets, resolver),
+		Project:    handler.NewProjectHandler(workspaceModule.Projects, resolver),
+		Generation: handler.NewGenerationHandler(generatorEngine, resolver),
 		Upload:     handler.NewUploadHandler(uploadManager),
 	}
 }

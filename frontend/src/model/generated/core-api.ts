@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/generation-runs/{run_id}/application": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply or discard a generation result */
+        post: operations["resolveGenerationApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/generation-runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -380,9 +397,9 @@ export interface components {
         CreateGenerationRequest: {
             /** Format: int64 */
             assetId?: number;
-            creative_brief?: string;
+            creative_brief: string;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
             targetAssetPaths?: string[] | null;
         };
@@ -487,17 +504,26 @@ export interface components {
         GenerateProjectReferenceResponse: {
             reference: string;
         };
+        GenerationResult: {
+            /** Format: int64 */
+            animation_id?: number;
+            /** Format: int64 */
+            asset_id?: number;
+            content?: unknown;
+            /** Format: int64 */
+            version?: number;
+        };
         GenerationRunListItemResponse: {
             /** Format: int64 */
             assetId?: number;
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            status: "pending" | "processing" | "awaiting_application" | "completed" | "failed" | "cancelled";
         };
         GetAssetRecordsResponse: {
             records: components["schemas"]["RecordAssetResponse"][];
@@ -512,12 +538,12 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
-            result?: unknown;
+            result?: components["schemas"]["GenerationResult"];
             /** @enum {string} */
-            status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+            status: "pending" | "processing" | "awaiting_application" | "completed" | "failed" | "cancelled";
         };
         ListGenerationRunsResponse: {
             items: components["schemas"]["GenerationRunListItemResponse"][];
@@ -566,6 +592,9 @@ export interface components {
             /** Format: int64 */
             assetId: number;
             content: unknown;
+            description?: string;
+            /** Format: int64 */
+            expectedVersion?: number;
         };
         RecordAssetResponse: {
             /** Format: int64 */
@@ -584,6 +613,9 @@ export interface components {
             recordId: number;
             /** Format: int64 */
             version: number;
+        };
+        ResolveGenerationApplicationRequest: {
+            applied: boolean;
         };
         RollBackAssetRequest: {
             /** Format: int64 */
@@ -1282,6 +1314,66 @@ export interface operations {
             };
             /** @description Error */
             default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resolveGenerationApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveGenerationApplicationRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
