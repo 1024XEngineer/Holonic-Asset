@@ -96,7 +96,6 @@ type SceneryProjectContext struct {
 type CreateSceneryPayload struct {
 	AssetName      string                `json:"asset_name"`
 	CreativeBrief  string                `json:"creative_brief"`
-	Style          string                `json:"style"`
 	Dimensions     assetdomain.Size      `json:"dimensions"`
 	Perspective    string                `json:"perspective"`
 	ProjectContext SceneryProjectContext `json:"project_context"`

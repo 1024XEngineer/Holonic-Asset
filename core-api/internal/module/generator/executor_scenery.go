@@ -37,7 +37,6 @@ func (e *executor) planSceneryLayers(
 	prompt := prompts.SceneryPlan(prompts.SceneryPlanInput{
 		AssetName:          payload.AssetName,
 		CreativeBrief:      payload.CreativeBrief,
-		Style:              payload.Style,
 		Perspective:        payload.Perspective,
 		ProjectName:        payload.ProjectContext.Name,
 		GameType:           payload.ProjectContext.GameType,
@@ -150,7 +149,7 @@ func (e *executor) generateSceneryLayer(
 	references []string,
 ) (*ProcessedSceneryLayer, error) {
 	prompt := prompts.SceneryLayer(prompts.SceneryLayerInput{
-		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style,
+		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief,
 		Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType,
 		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
 		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, LayerID: layer.ID,
@@ -272,7 +271,7 @@ func (e *executor) analyzeSceneryLayout(
 		images[index] = llmclient.ImageInput{URL: "data:" + layer.MediaType + ";base64," + layer.ImageBase64}
 	}
 	prompt := prompts.SceneryLayoutAnalysis(prompts.SceneryLayoutAnalysisInput{
-		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style,
+		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief,
 		Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType,
 		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
 		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, Layers: promptLayers,
