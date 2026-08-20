@@ -96,5 +96,7 @@ describe("core API clients", () => {
     expect(fetchMock.mock.calls[7]?.[0].cache).toBe("no-store");
     expect(fetchMock.mock.calls[8]?.[0].cache).toBe("no-store");
     expect(fetchMock.mock.calls[9]?.[0].cache).toBe("no-store");
+    expect(fetchMock.mock.calls[17]?.[0].cache).toBe("no-store");
+    expect(fetchMock.mock.calls[18]?.[0].cache).toBe("no-store");
   });
 });
