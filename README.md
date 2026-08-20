@@ -26,7 +26,7 @@
   <a href="https://pixijs.com/"><img src="docs/image/badge/pixijs.svg" alt="PixiJS 8.19.0"></a>
   <br>
   <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=00ADD8" alt="Go 1.26.5">
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <a href="https://www.postgresql.org/"><img src="docs/image/badge/postgresql.svg" alt="PostgreSQL 18.4"></a>
   <br>
   <img src="https://img.shields.io/badge/OpenAPI%20TypeScript-7.13.0-6BA539?logo=openapiinitiative&logoColor=6BA539" alt="OpenAPI TypeScript 7.13.0">
   <a href="https://github.com/evilmartians/lefthook"><img src="docs/image/badge/lefthook.svg" alt="Lefthook 2.1.9"></a>
