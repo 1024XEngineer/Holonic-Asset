@@ -56,10 +56,8 @@ describe("asset creation", () => {
       }),
       expect.objectContaining({
         kind: "scenery",
-        style: "",
-        aspectRatio: "16:9",
-        layers: [{ description: "" }],
-        reference,
+        name: "Asset name",
+        prompt: "Asset prompt",
       }),
       expect.objectContaining({
         kind: "tileset",

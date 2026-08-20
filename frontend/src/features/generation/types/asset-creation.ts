@@ -17,13 +17,7 @@ export type VisualAssetCreationDraft<Reference = unknown> =
     reference: Reference | undefined;
   };
 
-export type SceneryAssetCreationDraft<Reference = unknown> =
-  CommonAssetCreationDraft<"scenery"> & {
-    style: string;
-    aspectRatio: string;
-    layers: { description: string }[];
-    reference: Reference | undefined;
-  };
+export type SceneryAssetCreationDraft = CommonAssetCreationDraft<"scenery">;
 
 export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
   tiles: {
@@ -45,7 +39,7 @@ export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
 
 export type AssetCreationDraft<Reference = unknown> =
   | VisualAssetCreationDraft<Reference>
-  | SceneryAssetCreationDraft<Reference>
+  | SceneryAssetCreationDraft
   | TilesetAssetCreationDraft
   | UISetAssetCreationDraft<Reference>
   | AudioAssetCreationDraft;

@@ -42,10 +42,6 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
     kind: z.literal("scenery"),
-    style: z.string(),
-    aspectRatio: z.string(),
-    layers: z.array(z.object({ description: z.string() })),
-    reference: z.unknown().optional(),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -113,14 +109,7 @@ export function createAssetCreationDraft<Reference = unknown>(
     case "audio":
       return { ...common, kind };
     case "scenery":
-      return {
-        ...common,
-        kind,
-        style: "",
-        aspectRatio: "16:9",
-        layers: [{ description: "" }],
-        reference: undefined,
-      };
+      return { ...common, kind };
     case "tileset":
       return {
         ...common,
@@ -162,13 +151,7 @@ export function toCreationRequest<Reference>(
     case "audio":
       return common;
     case "scenery":
-      return {
-        ...common,
-        style: draft.style,
-        aspectRatio: draft.aspectRatio,
-        layers: draft.layers,
-        reference: draft.reference,
-      };
+      return common;
     case "tileset":
       return {
         ...common,

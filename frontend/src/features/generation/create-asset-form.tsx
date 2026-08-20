@@ -16,7 +16,6 @@ import {
 import type { AssetCreationDraft } from "./types";
 import { TilesetAssetFields } from "./create-asset/tileset-asset-fields";
 import { VisualAssetFields } from "./create-asset/visual-asset-fields";
-import { SceneryAssetFields } from "./create-asset/scenery-asset-fields";
 import { UISetAssetFields } from "./create-asset/uiset-asset-fields";
 
 const assetNamePlaceholderKeys = {
@@ -102,7 +101,9 @@ export function CreateAssetForm({
             placeholder={
               draft.kind === "audio"
                 ? t("audioPromptPlaceholder")
-                : t("promptPlaceholder")
+                : draft.kind === "scenery"
+                  ? t("sceneryPromptPlaceholder")
+                  : t("promptPlaceholder")
             }
             value={draft.prompt}
             onChange={(event) =>
@@ -112,9 +113,7 @@ export function CreateAssetForm({
         </label>
       </div>
 
-      {draft.kind === "scenery" ? (
-        <SceneryAssetFields draft={draft} onChange={setDraft} />
-      ) : draft.kind === "tileset" ? (
+      {draft.kind === "tileset" ? (
         <TilesetAssetFields draft={draft} onChange={setDraft} />
       ) : draft.kind === "uiset" ? (
         <UISetAssetFields draft={draft} onChange={setDraft} />

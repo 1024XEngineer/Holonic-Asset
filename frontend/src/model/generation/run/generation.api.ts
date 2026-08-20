@@ -96,7 +96,6 @@ export async function toCreateGenerationRequest(
       creative_brief: request.prompt,
       parameters: {
         asset_name: request.name,
-        style: request.style?.trim() ?? "",
         dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
         reference: await resolveReference(request.reference),
       },

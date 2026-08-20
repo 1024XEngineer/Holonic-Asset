@@ -121,9 +121,6 @@ describe("generationApi", () => {
     const request = creationRequest({
       kind: "scenery",
       canvasSize: "1920 × 1080 px",
-      style: "Painterly pixel art",
-      aspectRatio: "16:9",
-      layers: [{ description: "Distant mountains" }],
       reference,
     });
 
@@ -132,7 +129,6 @@ describe("generationApi", () => {
       creative_brief: "A moonlit orchard keeper",
       parameters: {
         asset_name: "Orchard Keeper",
-        style: "Painterly pixel art",
         dimensions: { width: 1920, height: 1080 },
         reference: "data:image/png;base64,reference",
       },
