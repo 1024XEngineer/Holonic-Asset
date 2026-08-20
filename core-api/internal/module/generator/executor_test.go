@@ -47,10 +47,13 @@ func (s *animationGenerationServiceStub) Generate(
 }
 
 type imageProcessorStub struct {
-	events         *[]string
-	resizeRequests []*imageprocessor.ResizeRequest
-	splitRequests  []*imageprocessor.SplitImageRequest
-	err            error
+	events            *[]string
+	normalizeRequests []*imageprocessor.NormalizeReferenceRequest
+	normalizeResults  []*imageprocessor.NormalizeReferenceResult
+	removeRequests    []*imageprocessor.RemoveBackgroundRequest
+	resizeRequests    []*imageprocessor.ResizeRequest
+	splitRequests     []*imageprocessor.SplitImageRequest
+	err               error
 }
 
 type referenceUpload struct {
@@ -118,12 +121,36 @@ func (s *imageProcessorStub) RemoveBackground(
 	request *imageprocessor.RemoveBackgroundRequest,
 ) (*imageprocessor.RemoveBackgroundResult, error) {
 	*s.events = append(*s.events, "process_image")
+	s.removeRequests = append(s.removeRequests, request)
 	if s.err != nil {
 		return nil, s.err
 	}
 	return &imageprocessor.RemoveBackgroundResult{
 		ImageBase64: request.ImageBase64,
 		MIMEType:    "image/png",
+	}, nil
+}
+
+func (s *imageProcessorStub) NormalizeReference(
+	_ context.Context,
+	request *imageprocessor.NormalizeReferenceRequest,
+) (*imageprocessor.NormalizeReferenceResult, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "normalize_reference")
+	}
+	s.normalizeRequests = append(s.normalizeRequests, request)
+	if s.err != nil {
+		return nil, s.err
+	}
+	if len(s.normalizeResults) > 0 {
+		result := s.normalizeResults[0]
+		s.normalizeResults = s.normalizeResults[1:]
+		return result, nil
+	}
+	return &imageprocessor.NormalizeReferenceResult{
+		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+		Report:      imageprocessor.ReferenceNormalizationReport{Scale: 1},
 	}, nil
 }
 

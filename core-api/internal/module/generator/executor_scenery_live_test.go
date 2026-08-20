@@ -48,7 +48,6 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 		name        string
 		assetName   string
 		brief       string
-		style       string
 		perspective string
 		width       int
 		height      int
@@ -57,7 +56,6 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 			name:        "Forest",
 			assetName:   "森林",
 			brief:       "A mystical ancient forest at twilight with tall pine silhouettes and misty atmosphere",
-			style:       "pixel art",
 			perspective: "Side-On",
 			width:       640,
 			height:      360,
@@ -66,7 +64,6 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 			name:        "Snow",
 			assetName:   "冰天雪地",
 			brief:       "A frozen winter landscape with snow-covered peaks, icy pine trees, and drifting snowflakes",
-			style:       "pixel art",
 			perspective: "Side-On",
 			width:       640,
 			height:      360,
@@ -82,7 +79,6 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 				ProjectID:     22,
 				AssetName:     tc.assetName,
 				CreativeBrief: tc.brief,
-				Style:         tc.style,
 				Perspective:   tc.perspective,
 				Dimensions:    assetdomain.Size{Width: uint(tc.width), Height: uint(tc.height)},
 				ProjectContext: SceneryProjectContext{
