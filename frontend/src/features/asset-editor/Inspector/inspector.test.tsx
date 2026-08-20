@@ -1,10 +1,28 @@
+// @vitest-environment happy-dom
+
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { AssetRevision, CharacterAnimation, SceneryLayer } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { Inspector } from "./inspector";
+
+beforeAll(() => {
+  Object.defineProperty(Element.prototype, "getAnimations", {
+    configurable: true,
+    value: () => [],
+  });
+});
+
+afterEach(cleanup);
 
 const animations: CharacterAnimation[] = [
   {
@@ -107,6 +125,46 @@ describe("Inspector", () => {
     expect(html).toContain("translate(-25%, -0%)");
   });
 
+  it("updates the prompt and previews an attached reference", async () => {
+    const onPromptChange = vi.fn();
+    render(
+      withI18n(
+        <Inspector
+          kind="sprite"
+          selectedNodes={[]}
+          selectedFrames={[]}
+          prompt="Refine the silhouette"
+          onPromptChange={onPromptChange}
+          history={[]}
+          animations={animations}
+          prototype={prototype}
+          onSubmit={vi.fn()}
+          onClearSelection={vi.fn()}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Edit prompt"), {
+      target: { value: "Add a stronger outline" },
+    });
+    expect(onPromptChange).toHaveBeenCalledWith("Add a stronger outline");
+
+    const fileInput =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!fileInput) throw new Error("Expected the reference file input.");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [
+          new File(["reference"], "reference.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByAltText("reference.png")).toBeTruthy(),
+    );
+  });
+
   it("renders scenery content through the shared inspector", () => {
     const html = renderToStaticMarkup(
       withI18n(
@@ -125,5 +183,31 @@ describe("Inspector", () => {
     expect(html).toContain("Sky");
     expect(html).toContain("Canvas: 1920 x 1080");
     expect(html).toContain("History");
+  });
+
+  it("renders scenery defaults when optional layer metadata is absent", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="scenery"
+          layer={{
+            ...sceneryLayer,
+            position: undefined,
+            transform: undefined,
+            opacity: undefined,
+            zIndex: undefined,
+          }}
+          history={[]}
+          visible={false}
+          onToggleVisibility={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(html).toContain("Hidden");
+    expect(html).toContain("0, 0");
+    expect(html).toContain("1.00 x 1.00 / 0°");
+    expect(html).toContain("100%");
+    expect(html).not.toContain("Canvas:");
   });
 });

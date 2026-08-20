@@ -1,9 +1,14 @@
+// @vitest-environment happy-dom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withI18n } from "@/testing/with-i18n";
 
 import { AssetTree } from "./asset-tree";
+
+afterEach(cleanup);
 
 const layers = [
   {
@@ -42,5 +47,47 @@ describe("AssetTree", () => {
     expect(html).toContain("Trees");
     expect(html).toContain("Backdrop");
     expect(html).toContain("Hide Sky");
+  });
+
+  it("routes scenery layer selection and visibility actions", () => {
+    const onSelect = vi.fn();
+    const onToggleVisibility = vi.fn();
+    render(
+      withI18n(
+        <AssetTree
+          kind="scenery"
+          layers={layers}
+          selectedLayerId="trees"
+          visibleLayerIds={["sky"]}
+          onSelect={onSelect}
+          onToggleVisibility={onToggleVisibility}
+        />,
+      ),
+    );
+
+    const layerButton = screen.getByText("Trees").closest("button");
+    if (!layerButton) throw new Error("Expected the scenery layer button.");
+    fireEvent.click(layerButton);
+    fireEvent.click(screen.getByRole("button", { name: "Show Trees" }));
+
+    expect(onSelect).toHaveBeenCalledWith("trees");
+    expect(onToggleVisibility).toHaveBeenCalledWith("trees");
+  });
+
+  it("renders the empty scenery state", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <AssetTree
+          kind="scenery"
+          layers={[]}
+          selectedLayerId={null}
+          visibleLayerIds={[]}
+          onSelect={vi.fn()}
+          onToggleVisibility={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(html).toContain("No scenery layers");
   });
 });
