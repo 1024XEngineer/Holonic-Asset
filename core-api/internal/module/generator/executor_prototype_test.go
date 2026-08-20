@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -704,6 +705,157 @@ func TestExecutorRejectsPrototypeAfterAllGridBoundaryCandidatesFail(t *testing.T
 	}
 	if len(references.uploads) != 0 {
 		t.Fatalf("invalid candidates must not be persisted: %+v", references.uploads)
+	}
+}
+
+func TestExecutorRejectsInvalidGeneratedPrototypeCandidates(t *testing.T) {
+	wantSplitErr := errors.New("split failed")
+	wantPersistErr := errors.New("persist failed")
+	tests := []struct {
+		name      string
+		result    *imageclient.GenerateResult
+		configure func(*imageProcessorStub, *executorReferenceStoreStub)
+		wantErr   error
+		wantText  string
+		withStore bool
+	}{
+		{name: "nil generation result", wantText: "image result is required"},
+		{name: "empty generation result", result: &imageclient.GenerateResult{}, wantText: "image result is required"},
+		{
+			name: "multiple direction sheets",
+			result: &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{
+				{Base64: "first", MediaType: "image/png"},
+				{Base64: "second", MediaType: "image/png"},
+			}},
+			wantText: "expected one direction sheet, got 2",
+		},
+		{
+			name:     "empty background removal result",
+			result:   &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{{MediaType: "image/png"}}},
+			wantText: "remove generate_object_prototype background: empty result",
+		},
+		{
+			name:   "non-boundary split failure",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitErrors = []error{wantSplitErr}
+			},
+			wantErr: wantSplitErr,
+		},
+		{
+			name:   "wrong region count",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitResults = []*imageprocessor.SplitImageResult{{
+					Regions: []imageprocessor.ImageRegion{{ImageBase64: "only-one"}},
+				}}
+			},
+			wantText: "got 1 regions, want 4",
+		},
+		{
+			name:   "empty direction image",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitResults = []*imageprocessor.SplitImageResult{{Regions: []imageprocessor.ImageRegion{
+					{ImageBase64: "first"},
+					{ImageBase64: "second"},
+					{},
+					{ImageBase64: "fourth"},
+				}}}
+			},
+			wantText:  "direction 2 is empty",
+			withStore: true,
+		},
+		{
+			name:   "unprocessed image persistence failure",
+			result: generatedImages(),
+			configure: func(_ *imageProcessorStub, references *executorReferenceStoreStub) {
+				references.persistErr = wantPersistErr
+			},
+			wantErr:   wantPersistErr,
+			withStore: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: test.result}
+			processor := &imageProcessorStub{events: &events}
+			references := &executorReferenceStoreStub{events: &events}
+			if test.configure != nil {
+				test.configure(processor, references)
+			}
+			dependencies := generator.ExecutorDependencies{}
+			if test.withStore {
+				dependencies.References = references
+			}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				processor,
+				&generationAssetWriterStub{events: &events},
+				dependencies,
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"king_sofa",
+				"creative_brief":"ornate sofa",
+				"dimensions":{"width":128,"height":128},
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil {
+				t.Fatal("expected prototype generation failure")
+			}
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("error = %v, want wrapped %v", err, test.wantErr)
+			}
+			if test.wantText != "" && !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("error = %v, want text %q", err, test.wantText)
+			}
+		})
+	}
+}
+
+func TestExecutorRejectsUnsafePrototypeSheetDimensions(t *testing.T) {
+	tests := []struct {
+		name       string
+		dimensions string
+		wantText   string
+	}{
+		{name: "zero width", dimensions: `{"width":0,"height":64}`, wantText: "dimensions must be positive"},
+		{
+			name:       "sheet dimension overflow",
+			dimensions: `{"width":18446744073709551615,"height":18446744073709551615}`,
+			wantText:   "overflow sheet dimensions",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				&imageProcessorStub{events: &events},
+				&generationAssetWriterStub{events: &events},
+				generator.ExecutorDependencies{},
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"unsafe_sofa",
+				"creative_brief":"unsafe dimensions",
+				"dimensions":` + test.dimensions + `,
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("error = %v, want text %q", err, test.wantText)
+			}
+			if len(images.requests) != 0 {
+				t.Fatalf("image requests = %d, want none", len(images.requests))
+			}
+		})
 	}
 }
 

@@ -263,6 +263,87 @@ func TestProcessorSplitImageRejectsNegativeGridBoundaryMargin(t *testing.T) {
 	}
 }
 
+func TestProcessorSplitImageValidatesGridBoundaryRejectionConfiguration(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 20))
+	fillRect(src, image.Rect(4, 4, 16, 16), color.NRGBA{A: 255})
+	encoded := encodeImageForTest(t, src)
+	tests := []struct {
+		name    string
+		request SplitImageRequest
+		want    string
+	}{
+		{
+			name: "zero margin",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeGrid, Columns: 1, Rows: 1,
+				RejectGridBoundaryContent: true,
+			},
+			want: "grid boundary margin must be positive",
+		},
+		{
+			name: "unsupported mode",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeComponents,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "requires grid or animation splitting mode",
+		},
+		{
+			name: "missing animation grid",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeAnimation,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "columns and rows must be positive",
+		},
+		{
+			name: "animation grid exceeds source",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeAnimation, Columns: 21, Rows: 1,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "grid dimensions 21x1 exceed source image size 20x20",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewProcessor().SplitImage(context.Background(), &test.request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want text %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestProcessorSplitImageAnimationChecksOpaqueContentBeforeNormalization(t *testing.T) {
+	matte := color.NRGBA{R: 240, G: 240, B: 240, A: 255}
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, src.Bounds(), matte)
+	fillRect(src, image.Rect(4, 4, 14, 16), color.NRGBA{R: 220, G: 60, B: 40, A: 255})
+	fillRect(src, image.Rect(26, 4, 36, 16), color.NRGBA{R: 40, G: 80, B: 220, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeAnimation,
+		Columns:                   2,
+		Rows:                      1,
+		FrameWidth:                32,
+		FrameHeight:               32,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if err != nil {
+		t.Fatalf("split opaque animation with boundary validation: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("regions = %d, want 2", len(result.Regions))
+	}
+	if result.AnimationReport == nil || result.AnimationReport.BackgroundRemovalReport == nil {
+		t.Fatal("opaque boundary validation should report automatic matte extraction")
+	}
+}
+
 func TestProcessorSplitImageHonoursCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
