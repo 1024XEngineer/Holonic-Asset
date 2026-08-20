@@ -309,6 +309,48 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
 }
 
+func TestExecutorNormalizesSideOnPrototypeToOppositeDirections(t *testing.T) {
+	events := []string{}
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		&imageGenerationServiceStub{events: &events, result: generatedImages()},
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel basketball player",
+		"dimensions":{"width":64,"height":64},
+		"perspective":"Side-On",
+		"project_id":17
+	}`)
+	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
+		t.Fatalf("generate side-on character prototype: %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{
+		"generate_image",
+		"process_image",
+		"split_image",
+		"flip_horizontal",
+		"create_character_asset",
+	}) {
+		t.Fatalf("unexpected workflow order: %v", events)
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized Side-On directions must not be resampled again: %+v", processor.resizeRequests)
+	}
+	content, err := assets.characterAsset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode character content: %v", err)
+	}
+	if content.DirectionCount != 2 || content.Prototype == nil || len(*content.Prototype) != 2 {
+		t.Fatalf("unexpected side-on content: %+v", content)
+	}
+}
+
 func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyInput(t *testing.T) {
 	for _, test := range []struct {
 		perspective assetdomain.Perspective

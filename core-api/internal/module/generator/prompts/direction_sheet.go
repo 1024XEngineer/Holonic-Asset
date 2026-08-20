@@ -10,8 +10,9 @@ const prototypeDirectionSheetRules = `- Treat the selected perspective as author
 - Top-down perspective: render exactly 4 direction views in a 2 row x 2 column sheet, with one view in each equal-sized cell.
 - Isometric perspective: render exactly 8 direction views in a 2 row x 4 column sheet, with one view in each equal-sized cell.
 - Fill cells in normal reading order: left to right across the first row, then left to right across each following row. Complete the first row before starting the second row.
-- The zero-based array index is the direction identity used later when an animation selects its prototype reference image. The cell order is therefore mandatory, not illustrative: never reorder, mirror, omit, or duplicate views.
+- The zero-based array index is the direction identity used later when an animation selects its prototype reference image. The cell order is therefore mandatory, not illustrative: never reorder, omit, or duplicate views, except for the explicit Side-On mirroring rule below.
 - For 2 directions, use this exact array order: index 0 = left, index 1 = right.
+- For Side-On specifically, make index 1 the canonical right-facing view and make index 0 the same character facing left, preferably as its exact horizontal mirror; never render both cells facing the same way.
 - For 4 directions, use this exact array order: index 0 = front, index 1 = right, index 2 = back, index 3 = left.
 - For 8 directions, use this exact array order: index 0 = front, index 1 = front-right, index 2 = right, index 3 = back-right, index 4 = back, index 5 = back-left, index 6 = left, index 7 = front-left.
 - Keep the direction sequence internally consistent, but do not add direction names or labels inside the image. The pipeline identifies directions only by their reading-order indexes, which are these zero-based array indexes.
