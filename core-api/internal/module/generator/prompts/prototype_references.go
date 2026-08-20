@@ -42,7 +42,7 @@ func prototypeReferenceImageRoles(
 			)
 			index++
 		}
-		for tagIndex := 0; tagIndex < state.TagReferenceCount; tagIndex++ {
+		for tagIndex := range state.TagReferenceCount {
 			if !state.HasProjectReference && tagIndex == 0 {
 				lines = append(lines, fmt.Sprintf(
 					"- Reference image %d is the highest-ranked same-project Tag asset and is promoted to the Style Reference. %s",
