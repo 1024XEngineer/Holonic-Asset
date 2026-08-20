@@ -90,6 +90,20 @@ const generationRequestsStorageKey = "holonic-generation-requests";
 export async function toCreateGenerationRequest(
   request: CreationRequest,
 ): Promise<CreateGenerationRequest> {
+  if (request.kind === "scenery") {
+    return {
+      kind: "generate_scenery",
+      creative_brief: request.prompt,
+      parameters: {
+        asset_name: request.name,
+        dimensions:
+          request.dimensions ??
+          assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
+        reference: await resolveReference(request.reference),
+      },
+    };
+  }
+
   if (request.kind === "tileset") {
     if (!request.tiles || request.tiles.length === 0) {
       throw new Error("At least one tileset item is required.");
@@ -115,7 +129,7 @@ export async function toCreateGenerationRequest(
 
   if (request.kind !== "character" && request.kind !== "object") {
     throw new Error(
-      "Core API creation currently supports Character, Object, and Tileset assets only.",
+      "Core API creation currently supports Character, Object, Scenery, and Tileset assets only.",
     );
   }
   if (!request.perspective) {
@@ -167,6 +181,7 @@ function generationKindToAssetKind(
   requestedKind?: CreatableAssetKind,
   resolvedAnimationKind?: "character" | "object",
 ) {
+  if (kind === "generate_scenery") return "scenery" as const;
   if (
     kind === "generate_character_prototype" ||
     kind === "edit_character_prototype"

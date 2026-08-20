@@ -51,6 +51,11 @@ export type SceneryLayer = {
   detail: string;
   imageUrl: string;
   blendMode: "normal" | "multiply";
+  position?: { x: number; y: number };
+  transform?: { scale: { x: number; y: number }; rotation: number };
+  visible?: boolean;
+  opacity?: number;
+  zIndex?: number;
 };
 
 export type SceneryAssetData = { layers: SceneryLayer[] };

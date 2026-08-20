@@ -13,7 +13,12 @@ const layerBlendClasses: Record<SceneryLayer["blendMode"], string> = {
 
 export function SceneryCanvas({ model, onEvent }: SceneryCanvasProps) {
   const { t } = useTranslation("editor");
-  const { layers, selectedLayerIds, visibleLayerIds } = model;
+  const {
+    layers,
+    dimensions = { width: 16, height: 9 },
+    selectedLayerIds,
+    visibleLayerIds,
+  } = model;
   const selectedLayers = new Set(selectedLayerIds);
   const visibleLayers = new Set(visibleLayerIds);
   const selectionLabel = layers
@@ -26,11 +31,18 @@ export function SceneryCanvas({ model, onEvent }: SceneryCanvasProps) {
       aria-label="Scenery canvas"
       className="relative flex min-h-[24rem] min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#eeece7] p-4 sm:p-6 lg:h-full lg:p-8"
     >
-      <div className="relative aspect-video w-full max-w-5xl overflow-hidden rounded-md border border-black/10 bg-[#c8e8ed] shadow-[0_18px_50px_rgb(45_41_35/0.14)]">
+      <div
+        className="relative w-full max-w-5xl overflow-hidden rounded-md border border-black/10 bg-[#c8e8ed] shadow-[0_18px_50px_rgb(45_41_35/0.14)]"
+        style={{ aspectRatio: `${dimensions.width} / ${dimensions.height}` }}
+      >
         {layers.length === 0 ? <EmptySceneryCanvas /> : null}
         {layers.map((layer) => {
           const selected = selectedLayers.has(layer.id);
           const visible = visibleLayers.has(layer.id);
+
+          const position = layer.position ?? { x: 0, y: 0 };
+          const scale = layer.transform?.scale ?? { x: 1, y: 1 };
+          const rotation = layer.transform?.rotation ?? 0;
 
           return (
             <button
@@ -46,8 +58,18 @@ export function SceneryCanvas({ model, onEvent }: SceneryCanvasProps) {
                   layerId: layer.id,
                 })
               }
+              style={{
+                left: `${(position.x / dimensions.width) * 100}%`,
+                top: `${(position.y / dimensions.height) * 100}%`,
+                width: `${scale.x * 100}%`,
+                height: `${scale.y * 100}%`,
+                opacity: layer.opacity ?? 1,
+                zIndex: layer.zIndex,
+                transform: `rotate(${rotation}deg)`,
+                transformOrigin: "center",
+              }}
               className={cn(
-                "absolute inset-0 transition-[filter,opacity] duration-200 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[#b86b70]",
+                "absolute transition-[filter,opacity] duration-200 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-[#b86b70]",
                 layerBlendClasses[layer.blendMode],
                 !visible && "invisible opacity-0",
                 selected &&

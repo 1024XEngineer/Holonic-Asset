@@ -9,10 +9,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { InspectorEditProps, InspectorReference } from "./inspector.types";
+import type {
+  InspectorReference,
+  SpriteInspectorContentProps,
+} from "./inspector.types";
 import { useInspectorEdit } from "./use-inspector-edit";
 
-export function InspectorEdit(props: InspectorEditProps) {
+export function SpriteInspectorContent(props: SpriteInspectorContentProps) {
   const { t } = useTranslation("editor");
   const {
     selectedNodes,

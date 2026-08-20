@@ -10,6 +10,7 @@ export type {
   UISetComponent,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SceneryCanvasDimensions,
   SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
