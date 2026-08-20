@@ -267,6 +267,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
               id: "7",
               label: "Walk",
               frameCount: 2,
+              frameDurations: [83, 83],
               generation: walkGeneration,
               spriteSheet: {
                 imageUrl: "/walk-1.png",
@@ -282,6 +283,38 @@ describe("toCoreSpriteAssetWorkspace", () => {
         },
       },
     });
+  });
+
+  it("preserves animation frame durations when saving", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 4 });
+    const workspace = toCoreSpriteAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: characterDetail(),
+      records: [],
+    });
+
+    await saveCoreSpriteAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      version: "v3",
+      record: workspace.record,
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          animations: [
+            expect.objectContaining({
+              frames: [
+                { id: 1, url: "/walk-1.png", duration: 83 },
+                { id: 2, url: "/walk-2.png", duration: 83 },
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
   });
 
   it("rejects non-sprite Core assets", () => {

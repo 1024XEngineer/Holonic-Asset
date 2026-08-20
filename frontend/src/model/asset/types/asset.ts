@@ -32,6 +32,7 @@ export type CharacterAnimationClip = {
   id: string;
   label: string;
   frameCount: number;
+  frameDurations?: Array<number | undefined>;
   spriteSheet?: CharacterSpriteSheet;
   generation?: AnimationGenerationConfig;
   audio?: { label: string; time: string };
