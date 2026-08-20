@@ -60,7 +60,7 @@ Backend-derived direction count:
 // production constraints for one game object.
 func ObjectPrototype(creativeBrief string, perspective string, backgroundConstraint string) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
-	return fmt.Sprintf(objectPrototypeTemplate, backgroundConstraint, characterDirectionSheetRules, creativeBrief, perspective, directionCount)
+	return fmt.Sprintf(objectPrototypeTemplate, backgroundConstraint, prototypeDirectionSheetRules, creativeBrief, perspective, directionCount)
 }
 
 // SolidMatteBackground requires a deterministic chroma-key input for the
