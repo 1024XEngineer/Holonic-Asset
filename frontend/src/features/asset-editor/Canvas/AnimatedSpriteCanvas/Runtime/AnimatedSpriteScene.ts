@@ -1,4 +1,5 @@
 import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
+import { getAnimationFrameDuration } from "@/model";
 import type { NodeId } from "../animated-sprite-node";
 import {
   createDefaultCanvasPositions,
@@ -20,6 +21,7 @@ export class AnimatedSpriteScene {
       expanded: new Set(),
       playing: new Set(),
       previewFrames: new Map(),
+      playbackElapsed: new Map(),
       marquee: null,
     };
     this.synchronize(model);
@@ -51,6 +53,9 @@ export class AnimatedSpriteScene {
     this.state.previewFrames = new Map(
       [...this.state.previewFrames].filter(([node]) => canvasNodes.has(node)),
     );
+    this.state.playbackElapsed = new Map(
+      [...this.state.playbackElapsed].filter(([node]) => canvasNodes.has(node)),
+    );
     for (const frame of model.selection.frames) {
       if (canvasNodes.has(frame.nodeId)) this.state.expanded.add(frame.nodeId);
     }
@@ -75,26 +80,56 @@ export class AnimatedSpriteScene {
   }
   toggleExpanded(node: NodeId) {
     this.state.playing.delete(node);
+    this.state.playbackElapsed.delete(node);
     if (this.state.expanded.has(node)) this.state.expanded.delete(node);
     else this.state.expanded.add(node);
   }
   togglePlaying(node: NodeId) {
     if (this.state.expanded.has(node)) return;
-    if (this.state.playing.has(node)) this.state.playing.delete(node);
-    else this.state.playing.add(node);
+    if (this.state.playing.has(node)) {
+      this.state.playing.delete(node);
+      this.state.playbackElapsed.delete(node);
+    } else {
+      this.state.playing.add(node);
+      this.state.playbackElapsed.set(node, 0);
+    }
   }
-  advanceAnimation(model: AnimatedSpriteCanvasModel) {
+  advanceAnimation(model: AnimatedSpriteCanvasModel, elapsedMs: number) {
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return false;
+    let changed = false;
     for (const node of this.state.playing) {
       const frameCount = getAnimatedSpriteFrameCount(
         node,
         model.prototype,
         model.animations,
       );
-      this.state.previewFrames.set(
-        node,
-        ((this.state.previewFrames.get(node) ?? 0) + 1) % frameCount,
+      const animation = model.animations.find(
+        (candidate) => candidate.id === node,
       );
+      let frame = this.state.previewFrames.get(node) ?? 0;
+      let elapsed = (this.state.playbackElapsed.get(node) ?? 0) + elapsedMs;
+      const cycleDuration = Array.from(
+        { length: frameCount },
+        (_, frameIndex) => getAnimationFrameDuration(animation, frameIndex),
+      ).reduce((total, duration) => total + duration, 0);
+
+      const currentDuration = getAnimationFrameDuration(animation, frame);
+      if (elapsed >= currentDuration) {
+        elapsed -= currentDuration;
+        frame = (frame + 1) % frameCount;
+        changed = true;
+
+        if (elapsed >= cycleDuration) elapsed %= cycleDuration;
+        while (elapsed >= getAnimationFrameDuration(animation, frame)) {
+          elapsed -= getAnimationFrameDuration(animation, frame);
+          frame = (frame + 1) % frameCount;
+        }
+      }
+
+      this.state.previewFrames.set(node, frame);
+      this.state.playbackElapsed.set(node, elapsed);
     }
+    return changed;
   }
 }
 

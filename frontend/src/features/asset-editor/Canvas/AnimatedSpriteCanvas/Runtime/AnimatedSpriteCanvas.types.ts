@@ -45,6 +45,7 @@ export type AnimatedSpriteSceneState = {
   expanded: Set<NodeId>;
   playing: Set<NodeId>;
   previewFrames: Map<NodeId, number>;
+  playbackElapsed: Map<NodeId, number>;
   marquee: { start: CanvasPosition; end: CanvasPosition } | null;
 };
 

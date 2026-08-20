@@ -10,6 +10,12 @@ import {
   isUISetCanvasHeight,
   isUISetCanvasWidth,
 } from "../create-asset/ui-set-canvas";
+import {
+  defaultSceneryAspectRatio,
+  getSceneryCanvasSize,
+  getSceneryDimensions,
+  sceneryAspectRatios,
+} from "../create-asset/scenery-aspect-ratio";
 import type { AssetCreationDraft } from "../types";
 
 const commonAssetCreationDraftShape = {
@@ -42,10 +48,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
   z.object({
     ...commonAssetCreationDraftShape,
     kind: z.literal("scenery"),
-    style: z.string(),
-    aspectRatio: z.string(),
-    layers: z.array(z.object({ description: z.string() })),
-    reference: z.unknown().optional(),
+    aspectRatio: z.enum(sceneryAspectRatios),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -116,10 +119,8 @@ export function createAssetCreationDraft<Reference = unknown>(
       return {
         ...common,
         kind,
-        style: "",
-        aspectRatio: "16:9",
-        layers: [{ description: "" }],
-        reference: undefined,
+        aspectRatio: defaultSceneryAspectRatio,
+        canvasSize: getSceneryCanvasSize(defaultSceneryAspectRatio),
       };
     case "tileset":
       return {
@@ -164,9 +165,8 @@ export function toCreationRequest<Reference>(
     case "scenery":
       return {
         ...common,
-        style: draft.style,
-        aspectRatio: draft.aspectRatio,
-        layers: draft.layers,
+        canvasSize: getSceneryCanvasSize(draft.aspectRatio),
+        dimensions: getSceneryDimensions(draft.aspectRatio),
       };
     case "tileset":
       return {

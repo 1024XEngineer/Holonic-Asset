@@ -410,6 +410,48 @@ describe("AnimatedSpriteCanvasRuntime", () => {
     expect(render).toHaveBeenCalledOnce();
   });
 
+  it("advances playback from elapsed time without a global interval gate", () => {
+    const animationModel: AnimatedSpriteCanvasModel = {
+      ...model(),
+      animations: [
+        {
+          kind: "clip",
+          id: "walk",
+          label: "Walk",
+          frameCount: 2,
+          frameDurations: [50, 50],
+        },
+      ],
+    };
+    const runtime = new AnimatedSpriteCanvasRuntime({
+      model: animationModel,
+      actions: createAnimatedSpriteCanvasActions(vi.fn()),
+    });
+    const internals = runtime as unknown as {
+      lastAnimationTick: number;
+      scene: {
+        togglePlaying: (node: string) => void;
+        getSnapshot: () => { previewFrames: ReadonlyMap<string, number> };
+      };
+      updateAnimation: () => void;
+      render: () => void;
+    };
+    internals.lastAnimationTick = 1_000;
+    internals.scene.togglePlaying("walk");
+    const render = vi.spyOn(internals, "render");
+    vi.spyOn(performance, "now")
+      .mockReturnValueOnce(1_049)
+      .mockReturnValueOnce(1_050);
+
+    internals.updateAnimation();
+    expect(internals.scene.getSnapshot().previewFrames.get("walk")).toBe(0);
+    expect(render).not.toHaveBeenCalled();
+
+    internals.updateAnimation();
+    expect(internals.scene.getSnapshot().previewFrames.get("walk")).toBe(1);
+    expect(render).toHaveBeenCalledOnce();
+  });
+
   it("forwards every interaction to the latest actions without rendering", () => {
     const initialModel = model();
     const initialOnEvent = vi.fn();

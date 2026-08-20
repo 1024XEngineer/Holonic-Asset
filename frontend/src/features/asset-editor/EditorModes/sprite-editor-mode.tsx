@@ -68,6 +68,7 @@ export function SpriteEditorMode({
       <EditorHeader {...header} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <AssetTree
+          kind="sprite"
           animations={animations}
           perspective={sprite.perspective}
           selectedNode={selection.nodeIds[0] ?? null}
@@ -90,6 +91,7 @@ export function SpriteEditorMode({
           onEvent={handleCanvasEvent}
         />
         <Inspector
+          kind="sprite"
           {...inspector}
           selectedNodes={selection.nodeIds}
           selectedFrames={selection.frames}

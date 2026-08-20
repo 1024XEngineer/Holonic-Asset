@@ -11,8 +11,6 @@ export type CreationRequest<Reference = unknown> = {
   perspective?: Perspective;
   reference?: Reference;
   style?: string;
-  aspectRatio?: string;
-  layers?: { description: string }[];
   tiles?: {
     name: string;
     description: string;

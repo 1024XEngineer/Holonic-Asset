@@ -40,6 +40,7 @@ export type {
   SaveAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SceneryCanvasDimensions,
   SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
@@ -64,6 +65,7 @@ export type {
   UpdateAudioTrackInput,
 } from "./audio";
 export {
+  DEFAULT_ANIMATION_FRAME_DURATION_MS,
   assetDirectionSchema,
   assetDirections,
   assetDirectionsByPerspective,
@@ -71,6 +73,8 @@ export {
   assetKindSchema,
   assetKinds,
   creatableAssetKinds,
+  getAnimationFrameDuration,
+  getEffectiveAnimationFps,
   type AnimationGenerationConfig,
   type AssetAnimation,
   type AssetDirection,

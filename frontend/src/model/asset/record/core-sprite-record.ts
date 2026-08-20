@@ -196,12 +196,18 @@ function toAnimationsFromContent(
   frameHeight: number,
 ): CharacterAnimation[] {
   return (animations ?? []).map((animation) => {
-    const frameUrls = readURLs(animation.frames);
+    const frames = (animation.frames ?? []).flatMap((frame) =>
+      frame.url ? [{ url: frame.url, duration: frame.duration }] : [],
+    );
+    const frameUrls = frames.map((frame) => frame.url);
     return {
       kind: "clip",
       id: String(animation.id),
       label: animation.name,
       frameCount: frameUrls.length,
+      ...(frames.some((frame) => frame.duration !== undefined)
+        ? { frameDurations: frames.map((frame) => frame.duration) }
+        : {}),
       ...(animation.generation
         ? { generation: structuredClone(animation.generation) }
         : {}),
@@ -249,6 +255,9 @@ function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
         (url, frameIndex) => ({
           id: frameIndex + 1,
           url,
+          ...(animation.frameDurations?.[frameIndex] !== undefined
+            ? { duration: animation.frameDurations[frameIndex] }
+            : {}),
         }),
       ),
       ...(animation.generation

@@ -30,7 +30,7 @@ export class AnimatedSpriteCanvasRuntime {
   private renderer?: AnimatedSpriteStageRenderer;
   private viewport?: Viewport;
   private props: AnimatedSpriteCanvasRuntimeProps;
-  private lastAnimationFrame = performance.now();
+  private lastAnimationTick = performance.now();
   private readonly unavailableTextureUrls = new Set<string>();
   private readonly scene: AnimatedSpriteScene;
   private destroyed = false;
@@ -105,6 +105,7 @@ export class AnimatedSpriteCanvasRuntime {
       this.render();
     });
     this.resizeObserver.observe(host);
+    this.lastAnimationTick = performance.now();
     app.ticker.add(this.updateAnimation);
     this.centerWorld();
     void this.preloadAnimatedSpriteTextures(this.props.model);
@@ -225,11 +226,11 @@ export class AnimatedSpriteCanvasRuntime {
   }
 
   private updateAnimation = () => {
-    if (this.scene.getSnapshot().playing.size === 0) return;
     const now = performance.now();
-    if (now - this.lastAnimationFrame < 160) return;
-    this.lastAnimationFrame = now;
-    this.scene.advanceAnimation(this.props.model);
+    const elapsed = now - this.lastAnimationTick;
+    this.lastAnimationTick = now;
+    if (this.scene.getSnapshot().playing.size === 0) return;
+    if (!this.scene.advanceAnimation(this.props.model, elapsed)) return;
     this.render();
   };
 }

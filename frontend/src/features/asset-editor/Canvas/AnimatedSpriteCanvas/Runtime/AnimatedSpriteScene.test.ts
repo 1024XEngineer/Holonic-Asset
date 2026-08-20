@@ -51,7 +51,64 @@ describe("AnimatedSpriteScene", () => {
   it("advances playing previews and wraps by frame count", () => {
     const scene = new AnimatedSpriteScene(model());
     scene.togglePlaying("idle");
-    for (let index = 0; index < 5; index += 1) scene.advanceAnimation(model());
+    for (let index = 0; index < 5; index += 1)
+      scene.advanceAnimation(model(), 160);
     expect(scene.getSnapshot().previewFrames.get("idle")).toBe(1);
+  });
+
+  it("advances simultaneous animations using independent frame timings", () => {
+    const timedModel = model({
+      animations: [
+        {
+          kind: "clip",
+          id: "fast",
+          label: "Fast",
+          frameCount: 4,
+          frameDurations: [50, 50, 50, 50],
+        },
+        {
+          kind: "clip",
+          id: "slow",
+          label: "Slow",
+          frameCount: 4,
+          frameDurations: [200, 200, 200, 200],
+        },
+      ],
+    });
+    const scene = new AnimatedSpriteScene(timedModel);
+    scene.togglePlaying("fast");
+    scene.togglePlaying("slow");
+
+    scene.advanceAnimation(timedModel, 150);
+
+    expect(scene.getSnapshot().previewFrames.get("fast")).toBe(3);
+    expect(scene.getSnapshot().previewFrames.get("slow")).toBe(0);
+
+    scene.advanceAnimation(timedModel, 50);
+
+    expect(scene.getSnapshot().previewFrames.get("fast")).toBe(0);
+    expect(scene.getSnapshot().previewFrames.get("slow")).toBe(1);
+  });
+
+  it("uses per-frame durations and falls back for invalid values", () => {
+    const timedModel = model({
+      animations: [
+        {
+          kind: "clip",
+          id: "idle",
+          label: "Idle",
+          frameCount: 3,
+          frameDurations: [40, 0, undefined],
+        },
+      ],
+    });
+    const scene = new AnimatedSpriteScene(timedModel);
+    scene.togglePlaying("idle");
+
+    scene.advanceAnimation(timedModel, 199);
+    expect(scene.getSnapshot().previewFrames.get("idle")).toBe(1);
+
+    scene.advanceAnimation(timedModel, 1);
+    expect(scene.getSnapshot().previewFrames.get("idle")).toBe(2);
   });
 });

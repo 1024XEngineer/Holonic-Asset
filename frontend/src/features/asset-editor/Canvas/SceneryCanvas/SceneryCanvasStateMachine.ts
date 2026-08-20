@@ -15,9 +15,7 @@ export type SceneryCanvasStateEvent =
   | { type: "layer.visibility.toggled"; layerId: string }
   | { type: "layers.synced"; layerIds: string[] };
 
-type SceneryCanvasPublicEvent =
-  | SceneryCanvasEvent
-  | { type: "layer.visibility.toggled"; layerId: string };
+type SceneryCanvasPublicEvent = SceneryCanvasEvent;
 
 export function createInitialSceneryCanvasState(
   layers: readonly SceneryLayer[],
@@ -27,7 +25,10 @@ export function createInitialSceneryCanvasState(
   return {
     layerIds,
     selectedLayerIds: [],
-    visibleLayerIds: [...layerIds],
+    visibleLayerIds: layerIds.filter(
+      (layerId) =>
+        layers.find((layer) => layer.id === layerId)?.visible !== false,
+    ),
   };
 }
 
