@@ -880,3 +880,35 @@ func editableObjectAsset() assetdomain.Asset {
 		Version:     4,
 	}
 }
+
+func TestExecutorRejectsSideOnPrototypeWhenDirectionNormalizationFails(t *testing.T) {
+	events := []string{}
+	wantErr := errors.New("horizontal flip unavailable")
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{events: &events, flipErr: wantErr}
+	executor := generator.NewExecutorWithDependencies(
+		&imageGenerationServiceStub{events: &events, result: generatedImages()},
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel basketball player",
+		"dimensions":{"width":64,"height":64},
+		"perspective":"Side-On",
+		"project_id":17
+	}`)
+	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err == nil {
+		t.Fatal("expected Side-On normalization failure")
+	} else if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want wrapped error %v", err, wantErr)
+	}
+	if assets.characterAsset != nil {
+		t.Fatal("invalid Side-On prototype was persisted")
+	}
+	if reflect.DeepEqual(events, []string{"generate_image", "process_image", "split_image", "flip_horizontal"}) == false {
+		t.Fatalf("unexpected workflow after normalization failure: %v", events)
+	}
+}

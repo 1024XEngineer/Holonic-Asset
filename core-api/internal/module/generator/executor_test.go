@@ -54,6 +54,7 @@ type imageProcessorStub struct {
 	resizeRequests    []*imageprocessor.ResizeRequest
 	splitRequests     []*imageprocessor.SplitImageRequest
 	err               error
+	flipErr           error
 }
 
 type referenceUpload struct {
@@ -159,6 +160,9 @@ func (s *imageProcessorStub) FlipHorizontal(
 	request *imageprocessor.FlipHorizontalRequest,
 ) (*imageprocessor.FlipHorizontalResult, error) {
 	*s.events = append(*s.events, "flip_horizontal")
+	if s.flipErr != nil {
+		return nil, s.flipErr
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
