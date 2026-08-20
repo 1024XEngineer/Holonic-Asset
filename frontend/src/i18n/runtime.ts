@@ -30,10 +30,9 @@ i18n.on("languageChanged", (language) => {
   applyDocumentLanguage(language);
 });
 
-export function initializeI18n(): Promise<void> {
-  initialization ??= i18n
-    .use(initReactI18next)
-    .init({
+export async function initializeI18n(): Promise<void> {
+  initialization ??= (async () => {
+    await i18n.use(initReactI18next).init({
       resources,
       lng: readLanguagePreference(),
       fallbackLng: defaultLanguage,
@@ -42,12 +41,11 @@ export function initializeI18n(): Promise<void> {
       defaultNS: defaultNamespace,
       returnEmptyString: false,
       interpolation: { escapeValue: false },
-    })
-    .then(() => undefined);
+    });
+  })();
 
-  return initialization.then(() => {
-    applyDocumentLanguage(i18n.resolvedLanguage ?? defaultLanguage);
-  });
+  await initialization;
+  applyDocumentLanguage(i18n.resolvedLanguage ?? defaultLanguage);
 }
 
 export async function changeLanguage(language: Language): Promise<void> {

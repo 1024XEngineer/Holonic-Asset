@@ -5,8 +5,11 @@ import type {
 import { coreAssetApi } from "../library/core-asset.api";
 import type { AssetRevision } from "../types";
 import { projectApi } from "../../project";
-import type { AssetRecord, AssetWorkspaceData } from "./types";
-import type { GetAssetRecordInput } from "./types";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  GetAssetRecordInput,
+} from "./types";
 import { toCoreSpriteAssetWorkspace } from "./core-sprite-record";
 
 type CoreWorkspaceAssetKind = Extract<

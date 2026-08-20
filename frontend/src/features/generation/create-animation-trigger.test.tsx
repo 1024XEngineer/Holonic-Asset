@@ -20,7 +20,11 @@ describe("CreateAnimationTrigger", () => {
           isGenerating={false}
           onGenerate={onGenerate}
         >
-          {(openDialog) => <button onClick={openDialog}>Open form</button>}
+          {(openDialog) => (
+            <button type="button" onClick={openDialog}>
+              Open form
+            </button>
+          )}
         </CreateAnimationTrigger>,
       ),
     );
@@ -64,7 +68,11 @@ describe("CreateAnimationTrigger", () => {
           isGenerating={false}
           onGenerate={onGenerate}
         >
-          {(openDialog) => <button onClick={openDialog}>Open form</button>}
+          {(openDialog) => (
+            <button type="button" onClick={openDialog}>
+              Open form
+            </button>
+          )}
         </CreateAnimationTrigger>,
       ),
     );
@@ -116,7 +124,11 @@ describe("CreateAnimationTrigger", () => {
           isGenerating
           onGenerate={onGenerate}
         >
-          {(openDialog) => <button onClick={openDialog}>Open form</button>}
+          {(openDialog) => (
+            <button type="button" onClick={openDialog}>
+              Open form
+            </button>
+          )}
         </CreateAnimationTrigger>,
       ),
     );

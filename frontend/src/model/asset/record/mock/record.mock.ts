@@ -4,8 +4,12 @@ import { projectApi } from "@/model/project";
 import { DataApiError } from "@/lib/data-api-error";
 import { createDefaultAssetRecord, mergeAssetRecord } from "./record-defaults";
 import { runMockRequest, type MockRequestOptions } from "@/lib/mock-request";
-import type { AssetRecord, AssetWorkspaceData } from "../types";
-import type { GetAssetRecordInput, SaveAssetRecordInput } from "../types";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  GetAssetRecordInput,
+  SaveAssetRecordInput,
+} from "../types";
 
 export function getMockAssetRecord(
   input: GetAssetRecordInput,

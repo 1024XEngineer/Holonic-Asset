@@ -90,8 +90,8 @@ export function useEditorSession({
       isActive: () =>
         activeStoreRef.current === store &&
         latestSaveTokenRef.current === saveToken,
-      saveRevision: (record) =>
-        saveRevision({
+      saveRevision: async (record) => {
+        await saveRevision({
           projectId: target.projectId,
           assetId: target.assetId,
           version: target.version,
@@ -101,7 +101,8 @@ export function useEditorSession({
               }
             : {}),
           record,
-        }).then(() => undefined),
+        });
+      },
     });
 
     if (result.status === "saved") {
@@ -113,7 +114,7 @@ export function useEditorSession({
       });
     }
     return result;
-  }, [saveRevision, store, target.assetId, target.projectId]);
+  }, [saveRevision, store, target.assetId, target.projectId, target.version]);
 
   return {
     snapshot: getEditorSessionSnapshot(store, saveState),
