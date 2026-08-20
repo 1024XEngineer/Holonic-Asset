@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -58,11 +60,11 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			return "", nil
 		}
 		if e.references == nil {
-			return reference, nil
+			return "", ErrReferenceStoreRequired
 		}
 		persisted, err := e.references.PersistReference(ctx, reference)
 		if err != nil {
-			return "", fmt.Errorf("generator: persist %s reference: %w", role, err)
+			return "", referencePersistenceError(role, err)
 		}
 		return persisted, nil
 	}
@@ -88,17 +90,6 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		}
 		return projectReference, userReference, nil
 	}
-	persistEditReference := func(reference string) (string, error) {
-		if reference == "" || e.references == nil {
-			return reference, nil
-		}
-		persisted, err := e.references.PersistReference(ctx, reference)
-		if err != nil {
-			return "", fmt.Errorf("generator: persist edit reference: %w", err)
-		}
-		return persisted, nil
-	}
-
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
@@ -130,11 +121,9 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		if strings.TrimSpace(value.Reference) == "" {
 			value.Reference = project.Reference
 		}
-		if e.references != nil && strings.TrimSpace(value.Reference) != "" {
-			value.Reference, err = e.references.PersistReference(ctx, value.Reference)
-			if err != nil {
-				return nil, fmt.Errorf("generator: persist reference: %w", err)
-			}
+		value.Reference, err = persistReference("scenery", value.Reference)
+		if err != nil {
+			return nil, err
 		}
 		if err := validateSceneryPayload(value); err != nil {
 			return nil, err
@@ -156,15 +145,27 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return value, nil
 	case EditTilesetItemPayload:
 		var err error
-		value.Reference, err = persistEditReference(value.Reference)
+		value.Reference, err = persistReference("edit", value.Reference)
 		return value, err
 	case EditTilesPayload:
 		var err error
-		value.Reference, err = persistEditReference(value.Reference)
+		value.Reference, err = persistReference("edit", value.Reference)
 		return value, err
 	default:
 		return payload, nil
 	}
+}
+
+func referencePersistenceError(role string, err error) error {
+	if errors.Is(err, upload.ErrUntrustedReference) ||
+		errors.Is(err, upload.ErrInvalidObjectData) ||
+		errors.Is(err, upload.ErrInvalidUploadRequest) {
+		return invalidTaskPayload(
+			"%s reference must be an object key, configured object-storage URL, or image data URL",
+			role,
+		)
+	}
+	return fmt.Errorf("generator: persist %s reference: %w", role, err)
 }
 
 func buildTaskPayload(request *Request) (any, error) {

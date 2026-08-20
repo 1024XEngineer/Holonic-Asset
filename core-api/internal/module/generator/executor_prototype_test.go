@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -434,11 +434,13 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 
 func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T) {
 	const downloaded = "small-pixel-reference"
-	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
-		response.Header().Set("Content-Type", "image/png")
-		_, _ = response.Write([]byte(downloaded))
-	}))
-	defer server.Close()
+	client := &http.Client{Transport: prototypeReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"image/png"}},
+			Body:       io.NopCloser(strings.NewReader(downloaded)),
+		}, nil
+	})}
 
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
@@ -451,14 +453,15 @@ func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T)
 		},
 	}
 	references := &executorReferenceStoreStub{resolveValues: map[string]string{
-		"projects/7/style.png": server.URL + "/project",
-		"uploads/user.png":     server.URL + "/user",
+		"projects/7/style.png": "https://references.example/project",
+		"uploads/user.png":     "https://references.example/user",
 	}}
-	executor := generator.NewExecutorWithDependencies(
+	executor := generator.NewExecutorWithPrototypeReferenceHTTPClientForTest(
 		images,
 		processor,
 		assets,
-		generator.ExecutorDependencies{References: references},
+		references,
+		client,
 	)
 	payload := json.RawMessage(`{
 		"asset_name":"sapling",
@@ -482,11 +485,83 @@ func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T)
 		}
 	}
 	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
-		server.URL + "/project",
+		"https://references.example/project",
 		"data:image/png;base64,user-upscaled",
 	}) {
 		t.Fatalf("unexpected normalized reference order: %+v", images.request)
 	}
+}
+
+func TestExecutorRejectsPrivatePrototypeReferenceBeforeDownload(t *testing.T) {
+	downloadAttempted := false
+	client := &http.Client{Transport: prototypeReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		downloadAttempted = true
+		return nil, errors.New("unexpected download")
+	})}
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	references := &executorReferenceStoreStub{resolveValues: map[string]string{
+		"uploads/user.png": "http://169.254.169.254/latest/meta-data",
+	}}
+	executor := generator.NewExecutorWithPrototypeReferenceHTTPClientForTest(
+		images,
+		processor,
+		&generationAssetWriterStub{events: &events},
+		references,
+		client,
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"reference":"uploads/user.png"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if err == nil || !strings.Contains(err.Error(), "not public") {
+		t.Fatalf("generate error = %v, want non-public reference rejection", err)
+	}
+	if downloadAttempted {
+		t.Fatal("private reference reached the HTTP transport")
+	}
+	if images.request != nil || len(processor.normalizeRequests) != 0 {
+		t.Fatalf("private reference reached generation: request=%+v normalization=%d", images.request, len(processor.normalizeRequests))
+	}
+}
+
+func TestExecutorRequiresReferenceStoreForPrototypeURL(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"reference":"https://attacker.example/reference.png"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if err == nil || !strings.Contains(err.Error(), "object-storage reference store is required") {
+		t.Fatalf("generate error = %v, want managed reference requirement", err)
+	}
+	if images.request != nil || len(processor.normalizeRequests) != 0 {
+		t.Fatalf("unmanaged URL reached generation: request=%+v normalization=%d", images.request, len(processor.normalizeRequests))
+	}
+}
+
+type prototypeReferenceRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function prototypeReferenceRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
 }
 
 func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {

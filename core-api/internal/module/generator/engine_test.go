@@ -11,6 +11,7 @@ import (
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -631,6 +632,26 @@ func TestCreateDoesNotPublishWhenReferencePersistenceFails(t *testing.T) {
 	}
 	if tasks.createdTask != nil {
 		t.Fatalf("task was published after persistence failure: %+v", tasks.createdTask)
+	}
+}
+
+func TestCreateRejectsExternalReferenceBeforePublishing(t *testing.T) {
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{persistErr: upload.ErrUntrustedReference}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{References: references})
+
+	_, err := engine.Create(context.Background(), &generator.Request{
+		Kind: generator.GenerateObjectProtoType,
+		Parameters: json.RawMessage(
+			`{"reference":"https://attacker.example/reference.png"}`,
+		),
+	})
+	if !errors.Is(err, generator.ErrInvalidTaskPayload) ||
+		!strings.Contains(err.Error(), "configured object-storage URL") {
+		t.Fatalf("create error = %v, want invalid managed reference", err)
+	}
+	if tasks.createdTask != nil {
+		t.Fatalf("task was published with an external reference: %+v", tasks.createdTask)
 	}
 }
 

@@ -6,6 +6,7 @@ var (
 	ErrInvalidUploadRequest = errors.New("upload: invalid upload request")
 	ErrInvalidStorageConfig = errors.New("upload: invalid storage config")
 	ErrInvalidObjectData    = errors.New("upload: invalid object data")
+	ErrUntrustedReference   = errors.New("upload: untrusted reference")
 )
 
 // CreateUploadTargetRequest is the use-case input for creating an upload target.

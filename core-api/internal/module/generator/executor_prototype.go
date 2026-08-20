@@ -335,6 +335,12 @@ func (e *executor) resolveReferences(
 			if err != nil {
 				return nil, fmt.Errorf("generator: resolve %s reference %d: %w", taskType, index+1, err)
 			}
+		} else if isHTTPReference(reference) {
+			return nil, fmt.Errorf(
+				"generator: resolve %s reference %d: object-storage reference store is required for URL references",
+				taskType,
+				index+1,
+			)
 		}
 		normalized, err := e.normalizePrototypeReference(ctx, value)
 		if err != nil {
@@ -345,6 +351,11 @@ func (e *executor) resolveReferences(
 	return resolved, nil
 }
 
+func isHTTPReference(reference string) bool {
+	reference = strings.ToLower(strings.TrimSpace(reference))
+	return strings.HasPrefix(reference, "http://") || strings.HasPrefix(reference, "https://")
+}
+
 func (e *executor) normalizePrototypeReference(ctx context.Context, reference string) (string, error) {
 	reference = strings.TrimSpace(reference)
 	if reference == "" {
@@ -352,12 +363,19 @@ func (e *executor) normalizePrototypeReference(ctx context.Context, reference st
 	}
 
 	imageBase64 := reference
-	if strings.HasPrefix(reference, "http://") || strings.HasPrefix(reference, "https://") {
+	if isHTTPReference(reference) {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, reference, nil)
 		if err != nil {
 			return "", fmt.Errorf("create reference download request: %w", err)
 		}
-		response, err := http.DefaultClient.Do(request)
+		if err := validatePrototypeReferenceURL(request.URL); err != nil {
+			return "", err
+		}
+		client := e.referenceHTTPClient
+		if client == nil {
+			client = newPrototypeReferenceHTTPClient()
+		}
+		response, err := client.Do(request)
 		if err != nil {
 			return "", fmt.Errorf("download reference: %w", err)
 		}
