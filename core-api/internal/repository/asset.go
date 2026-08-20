@@ -130,8 +130,9 @@ func (r *AssetRepositoryImpl) GetAssetsByProjectID(ctx context.Context, projectI
 func matchesAssetFilter(asset domain.Asset, filter domain.AssetListFilter) bool {
 	query := strings.TrimSpace(filter.Query)
 	if query != "" &&
-		!strings.Contains(asset.Name, query) &&
-		!strings.Contains(asset.Description, query) {
+		!containsFold(asset.Name, query) &&
+		!containsFold(asset.Description, query) &&
+		!matchesTagQuery(asset.Tags, query) {
 		return false
 	}
 
@@ -152,8 +153,29 @@ func containsAssetType(types []domain.AssetType, target domain.AssetType) bool {
 	return slices.Contains(types, target)
 }
 
-func containsTag(tags []string, target string) bool {
-	return slices.Contains(tags, target)
+func containsTag(tags []domain.Tag, target string) bool {
+	target = strings.TrimSpace(target)
+	for _, tag := range tags {
+		if strings.EqualFold(strings.TrimSpace(tag.Name), target) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesTagQuery(tags []domain.Tag, query string) bool {
+	for _, tag := range tags {
+		if containsFold(tag.Name, query) ||
+			containsFold(tag.Description, query) ||
+			containsFold(tag.Color, query) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsFold(value, query string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(query))
 }
 
 func (r *AssetRepositoryImpl) GetAssetDetail(ctx context.Context, id uint) (*domain.Asset, error) {
@@ -260,7 +282,7 @@ func convertAssetToDomain(asset dao.Asset) domain.Asset {
 		ProjectID:    asset.ProjectID,
 		Type:         domain.AssetType(asset.Type),
 		Description:  asset.Description,
-		Tags:         append([]string(nil), asset.Tags...),
+		Tags:         append([]domain.Tag(nil), asset.Tags...),
 		Perspective:  domain.Perspective(asset.Perspective),
 		Dimensions:   append([]byte(nil), asset.Dimensions...),
 		ThumbnailURL: asset.ThumbnailURL,
@@ -315,7 +337,7 @@ func convertAssetToDAO(asset *domain.Asset, assetType domain.AssetType) (*dao.As
 		ProjectID:    asset.ProjectID,
 		Type:         string(assetType),
 		Description:  asset.Description,
-		Tags:         append([]string(nil), asset.Tags...),
+		Tags:         append([]domain.Tag(nil), asset.Tags...),
 		Perspective:  string(perspective),
 		Dimensions:   datatypes.JSON(append([]byte(nil), dimensions...)),
 		ThumbnailURL: thumbnailURLFromContent(content),
@@ -710,7 +732,7 @@ func (r *AssetRepositoryImpl) copyAssetInTransaction(ctx context.Context, assetI
 		ProjectID:    asset.ProjectID,
 		Type:         asset.Type,
 		Description:  asset.Description,
-		Tags:         append([]string(nil), asset.Tags...),
+		Tags:         append([]domain.Tag(nil), asset.Tags...),
 		Perspective:  asset.Perspective,
 		Dimensions:   append(datatypes.JSON(nil), asset.Dimensions...),
 		ThumbnailURL: asset.ThumbnailURL,
