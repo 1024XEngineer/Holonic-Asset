@@ -35,12 +35,13 @@ export class AnimatedSpriteCanvasRuntime {
   private readonly scene: AnimatedSpriteScene;
   private destroyed = false;
   private readonly actions: AnimatedSpriteCanvasActions = {
-    onSelect: (node) => this.props.actions.onSelect(node),
-    onSelectFrame: (node, index) =>
-      this.props.actions.onSelectFrame(node, index),
-    onSelectFrames: (node, indexes) =>
-      this.props.actions.onSelectFrames(node, indexes),
-    onSelectNodes: (nodes) => this.props.actions.onSelectNodes(nodes),
+    onSelect: (node, additive) => this.props.actions.onSelect(node, additive),
+    onSelectFrame: (node, index, additive) =>
+      this.props.actions.onSelectFrame(node, index, additive),
+    onSelectFrames: (frames, additive) =>
+      this.props.actions.onSelectFrames(frames, additive),
+    onSelectNodes: (nodes, additive) =>
+      this.props.actions.onSelectNodes(nodes, additive),
     onClearSelection: () => this.props.actions.onClearSelection(),
     onNodePositionChange: (node, position) =>
       this.props.actions.onNodePositionChange(node, position),

@@ -31,7 +31,7 @@ export function AnimatedSpriteCanvas({
   const runtimeProps = useMemo(
     () => ({
       model,
-      actions: createAnimatedSpriteCanvasActions(onEvent),
+      actions: createAnimatedSpriteCanvasActions(onEvent, model.selection),
       onZoomChange: setZoom,
     }),
     [model, onEvent],
