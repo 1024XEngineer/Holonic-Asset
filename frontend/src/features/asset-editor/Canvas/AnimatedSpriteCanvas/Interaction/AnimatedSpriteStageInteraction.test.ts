@@ -94,7 +94,12 @@ function setup({
 
 function pointer(
   canvas: HTMLCanvasElement,
-  type: "pointerdown" | "pointermove" | "pointerup",
+  type:
+    | "pointerdown"
+    | "pointermove"
+    | "pointerup"
+    | "pointercancel"
+    | "lostpointercapture",
   x: number,
   y: number,
   options: PointerEventInit = {},
@@ -103,7 +108,12 @@ function pointer(
     new PointerEvent(type, {
       bubbles: true,
       button: 0,
-      buttons: type === "pointerup" ? 0 : 1,
+      buttons:
+        type === "pointerup" ||
+        type === "pointercancel" ||
+        type === "lostpointercapture"
+          ? 0
+          : 1,
       pointerId: 1,
       clientX: x,
       clientY: y,
@@ -230,6 +240,77 @@ describe("AnimatedSpriteStageInteraction", () => {
       y: 40,
     });
     interaction.destroy();
+  });
+
+  it("discards deferred clicks when the pointer is canceled", () => {
+    const { actions, canvas, interaction, setMarquee } = setup();
+
+    pointer(canvas, "pointerdown", 310, 80);
+    pointer(canvas, "pointercancel", 310, 80);
+    pointer(canvas, "pointerdown", 780, 580);
+    pointer(canvas, "pointercancel", 780, 580);
+
+    expect(actions.onSelectFrame).not.toHaveBeenCalled();
+    expect(actions.onClearSelection).not.toHaveBeenCalled();
+    expect(setMarquee).toHaveBeenLastCalledWith(null);
+    expect(canvas.hasPointerCapture(1)).toBe(false);
+    interaction.destroy();
+  });
+
+  it("discards a marquee selection when the pointer is canceled", () => {
+    const { actions, canvas, interaction, setMarquee } = setup();
+
+    pointer(canvas, "pointerdown", 310, 80);
+    pointer(canvas, "pointermove", 425, 100);
+    pointer(canvas, "pointercancel", 425, 100);
+
+    expect(actions.onSelectFrame).not.toHaveBeenCalled();
+    expect(actions.onSelectFrames).not.toHaveBeenCalled();
+    expect(actions.onSelectNodes).not.toHaveBeenCalled();
+    expect(actions.onClearSelection).not.toHaveBeenCalled();
+    expect(setMarquee).toHaveBeenLastCalledWith(null);
+    interaction.destroy();
+  });
+
+  it("rolls back a node drag when the pointer is canceled", () => {
+    const { actions, canvas, interaction, moveNode } = setup();
+
+    pointer(canvas, "pointerdown", 310, 45);
+    pointer(canvas, "pointermove", 320, 55);
+    pointer(canvas, "pointercancel", 320, 55);
+
+    expect(moveNode.mock.calls).toEqual([
+      ["idle", { x: 310, y: 40 }],
+      ["idle", { x: 300, y: 30 }],
+    ]);
+    expect(actions.onNodePositionChange).not.toHaveBeenCalled();
+    expect(canvas.hasPointerCapture(1)).toBe(false);
+    interaction.destroy();
+  });
+
+  it("cancels an active drag when pointer capture is lost", () => {
+    const { actions, canvas, interaction, moveNode } = setup();
+
+    pointer(canvas, "pointerdown", 310, 45);
+    pointer(canvas, "pointermove", 320, 55);
+    canvas.releasePointerCapture(1);
+    pointer(canvas, "lostpointercapture", 320, 55);
+
+    expect(moveNode).toHaveBeenLastCalledWith("idle", { x: 300, y: 30 });
+    expect(actions.onNodePositionChange).not.toHaveBeenCalled();
+    interaction.destroy();
+  });
+
+  it("cancels an active drag when the interaction is destroyed", () => {
+    const { actions, canvas, interaction, moveNode } = setup();
+
+    pointer(canvas, "pointerdown", 310, 45);
+    pointer(canvas, "pointermove", 320, 55);
+    interaction.destroy();
+
+    expect(moveNode).toHaveBeenLastCalledWith("idle", { x: 300, y: 30 });
+    expect(actions.onNodePositionChange).not.toHaveBeenCalled();
+    expect(canvas.hasPointerCapture(1)).toBe(false);
   });
 
   it("ignores non-primary clicks and prevents the context menu", () => {

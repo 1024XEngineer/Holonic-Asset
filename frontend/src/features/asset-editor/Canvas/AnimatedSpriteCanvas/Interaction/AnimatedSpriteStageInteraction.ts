@@ -46,17 +46,23 @@ export class AnimatedSpriteStageInteraction {
     this.context = context;
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointermove", this.onPointerMove);
-    canvas.addEventListener("pointerup", this.finishPointer);
-    canvas.addEventListener("pointercancel", this.finishPointer);
+    canvas.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("pointercancel", this.onPointerCancel);
+    canvas.addEventListener("lostpointercapture", this.onLostPointerCapture);
     canvas.addEventListener("contextmenu", this.onContextMenu);
   }
 
   destroy() {
     this.canvas.removeEventListener("pointerdown", this.onPointerDown);
     this.canvas.removeEventListener("pointermove", this.onPointerMove);
-    this.canvas.removeEventListener("pointerup", this.finishPointer);
-    this.canvas.removeEventListener("pointercancel", this.finishPointer);
+    this.canvas.removeEventListener("pointerup", this.onPointerUp);
+    this.canvas.removeEventListener("pointercancel", this.onPointerCancel);
+    this.canvas.removeEventListener(
+      "lostpointercapture",
+      this.onLostPointerCapture,
+    );
     this.canvas.removeEventListener("contextmenu", this.onContextMenu);
+    if (this.drag) this.cancelPointer(this.drag.pointerId);
   }
 
   private onPointerDown = (event: PointerEvent) => {
@@ -114,18 +120,28 @@ export class AnimatedSpriteStageInteraction {
     this.syncMarquee();
   };
 
-  private finishPointer = (event: PointerEvent) => {
+  private onPointerUp = (event: PointerEvent) => {
     if (!this.drag || this.drag.pointerId !== event.pointerId) return;
     const completed = this.drag;
+    const completedNodePosition =
+      completed.kind === "node"
+        ? { ...this.context.getScene().positions[completed.node] }
+        : null;
+    this.clearPointer(event.pointerId);
     if (completed.kind === "marquee") this.completeMarquee(completed);
-    if (completed.kind === "node")
-      this.context.actions.onNodePositionChange(completed.node, {
-        ...this.context.getScene().positions[completed.node],
-      });
-    this.drag = null;
-    if (this.canvas.hasPointerCapture(event.pointerId))
-      this.canvas.releasePointerCapture(event.pointerId);
-    this.syncMarquee();
+    if (completed.kind === "node" && completedNodePosition)
+      this.context.actions.onNodePositionChange(
+        completed.node,
+        completedNodePosition,
+      );
+  };
+
+  private onPointerCancel = (event: PointerEvent) => {
+    this.cancelPointer(event.pointerId);
+  };
+
+  private onLostPointerCapture = (event: PointerEvent) => {
+    this.cancelPointer(event.pointerId, false);
   };
 
   private onContextMenu = (event: MouseEvent) => event.preventDefault();
@@ -230,6 +246,20 @@ export class AnimatedSpriteStageInteraction {
         Math.abs(drag.end.y - drag.start.y),
       ) >= MARQUEE_DRAG_THRESHOLD
     );
+  }
+
+  private cancelPointer(pointerId: number, releaseCapture = true) {
+    if (!this.drag || this.drag.pointerId !== pointerId) return;
+    if (this.drag.kind === "node")
+      this.context.moveNode(this.drag.node, { ...this.drag.position });
+    this.clearPointer(pointerId, releaseCapture);
+  }
+
+  private clearPointer(pointerId: number, releaseCapture = true) {
+    this.drag = null;
+    if (releaseCapture && this.canvas.hasPointerCapture(pointerId))
+      this.canvas.releasePointerCapture(pointerId);
+    this.syncMarquee();
   }
 
   private syncMarquee() {
