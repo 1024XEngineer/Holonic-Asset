@@ -172,6 +172,212 @@ func TestTaskRepositoryDeleteFailedTaskRemovesTaskAndOutboxAtomically(t *testing
 	}
 }
 
+func TestTaskRepositoryRetryFailedTaskRollsBackFailures(t *testing.T) {
+	databaseErr := errors.New("database unavailable")
+	for _, test := range []struct {
+		name    string
+		arrange func(sqlmock.Sqlmock)
+		wantErr error
+		want    string
+	}{
+		{
+			name: "task lock",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLockError(mock, 17, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+		{
+			name: "task reset",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectFailedTaskReset(mock, 17, 0, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+		{
+			name: "stale reset",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectFailedTaskReset(mock, 17, 0, nil)
+			},
+			wantErr: taskdomain.ErrTaskNotFailed,
+		},
+		{
+			name: "invalid persisted payload",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, []byte(`{`))
+				expectFailedTaskReset(mock, 17, 1, nil)
+			},
+			want: "marshal retried task",
+		},
+		{
+			name: "retry outbox",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectFailedTaskReset(mock, 17, 1, nil)
+				expectRetryOutboxError(mock, 17, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			db, mock := newMockTaskRepositoryDatabase(t)
+			mock.ExpectBegin()
+			test.arrange(mock)
+			mock.ExpectRollback()
+
+			err := repository.NewTaskRepository(db).RetryFailedTask(
+				context.Background(),
+				17,
+				taskdomain.StatusAwaitingApplication,
+			)
+			assertTaskRepositoryError(t, err, test.wantErr, test.want)
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}
+
+func TestTaskRepositoryDeleteFailedTaskRollsBackFailures(t *testing.T) {
+	databaseErr := errors.New("database unavailable")
+	for _, test := range []struct {
+		name    string
+		arrange func(sqlmock.Sqlmock)
+		wantErr error
+	}{
+		{
+			name: "task lock",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLockError(mock, 17, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+		{
+			name: "non-failed task",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusProcessing, validTaskPayload)
+			},
+			wantErr: taskdomain.ErrTaskNotFailed,
+		},
+		{
+			name: "outbox delete",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectOutboxDelete(mock, 17, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+		{
+			name: "task delete",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectOutboxDelete(mock, 17, nil)
+				expectFailedTaskDelete(mock, 17, 0, databaseErr)
+			},
+			wantErr: databaseErr,
+		},
+		{
+			name: "stale delete",
+			arrange: func(mock sqlmock.Sqlmock) {
+				expectTaskLock(mock, 17, taskdomain.StatusFailed, validTaskPayload)
+				expectOutboxDelete(mock, 17, nil)
+				expectFailedTaskDelete(mock, 17, 0, nil)
+			},
+			wantErr: taskdomain.ErrTaskNotFailed,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			db, mock := newMockTaskRepositoryDatabase(t)
+			mock.ExpectBegin()
+			test.arrange(mock)
+			mock.ExpectRollback()
+
+			err := repository.NewTaskRepository(db).DeleteFailedTask(context.Background(), 17)
+			assertTaskRepositoryError(t, err, test.wantErr, "")
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}
+
+var validTaskPayload = []byte(`{"project_id":42,"asset_id":9}`)
+
+func expectTaskLock(
+	mock sqlmock.Sqlmock,
+	taskID uint,
+	status taskdomain.Status,
+	payload []byte,
+) {
+	mock.ExpectQuery(`SELECT \* FROM "tasks".*FOR UPDATE`).
+		WithArgs(taskID, 1).
+		WillReturnRows(taskRowsWithPayload(taskID, status, payload))
+}
+
+func expectTaskLockError(mock sqlmock.Sqlmock, taskID uint, queryErr error) {
+	mock.ExpectQuery(`SELECT \* FROM "tasks".*FOR UPDATE`).
+		WithArgs(taskID, 1).
+		WillReturnError(queryErr)
+}
+
+func expectFailedTaskReset(
+	mock sqlmock.Sqlmock,
+	taskID uint,
+	rowsAffected int64,
+	queryErr error,
+) {
+	expectation := mock.ExpectExec(regexp.QuoteMeta(`UPDATE "tasks" SET "error"=$1,"result"=$2,"status"=$3,"updated_at"=$4 WHERE id = $5 AND status = $6`)).
+		WithArgs("", nil, uint(taskdomain.StatusPending), sqlmock.AnyArg(), taskID, uint(taskdomain.StatusFailed))
+	if queryErr != nil {
+		expectation.WillReturnError(queryErr)
+		return
+	}
+	expectation.WillReturnResult(sqlmock.NewResult(0, rowsAffected))
+}
+
+func expectRetryOutboxError(mock sqlmock.Sqlmock, taskID uint, queryErr error) {
+	mock.ExpectQuery(`INSERT INTO "outboxes" .*RETURNING "id"`).
+		WithArgs(taskID, 0, string(generator.GenerateAnimation), sqlmock.AnyArg(), int64(0), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnError(queryErr)
+}
+
+func expectOutboxDelete(mock sqlmock.Sqlmock, taskID uint, queryErr error) {
+	expectation := mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "outboxes" WHERE task_id = $1`)).
+		WithArgs(taskID)
+	if queryErr != nil {
+		expectation.WillReturnError(queryErr)
+		return
+	}
+	expectation.WillReturnResult(sqlmock.NewResult(0, 2))
+}
+
+func expectFailedTaskDelete(
+	mock sqlmock.Sqlmock,
+	taskID uint,
+	rowsAffected int64,
+	queryErr error,
+) {
+	expectation := mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "tasks" WHERE id = $1 AND status = $2`)).
+		WithArgs(taskID, uint(taskdomain.StatusFailed))
+	if queryErr != nil {
+		expectation.WillReturnError(queryErr)
+		return
+	}
+	expectation.WillReturnResult(sqlmock.NewResult(0, rowsAffected))
+}
+
+func assertTaskRepositoryError(t *testing.T, err, wantErr error, want string) {
+	t.Helper()
+	if wantErr != nil && !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+	if want != "" && (err == nil || !strings.Contains(err.Error(), want)) {
+		t.Fatalf("expected error containing %q, got %v", want, err)
+	}
+}
+
 func newMockTaskRepositoryDatabase(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	t.Helper()
 	connection, mock, err := sqlmock.New()
@@ -190,13 +396,21 @@ func newMockTaskRepositoryDatabase(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 }
 
 func taskRows(taskID uint, status taskdomain.Status) *sqlmock.Rows {
+	return taskRowsWithPayload(taskID, status, validTaskPayload)
+}
+
+func taskRowsWithPayload(
+	taskID uint,
+	status taskdomain.Status,
+	payload []byte,
+) *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
 		"id", "type", "status", "payload", "result", "error", "created_at", "updated_at",
 	}).AddRow(
 		taskID,
 		string(generator.GenerateAnimation),
 		uint(status),
-		[]byte(`{"project_id":42,"asset_id":9}`),
+		payload,
 		nil,
 		"provider failed",
 		sql.NullTime{},

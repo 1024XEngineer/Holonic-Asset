@@ -915,6 +915,110 @@ func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
 	}
 }
 
+func TestRetryAndDeleteReturnTaskMutationErrors(t *testing.T) {
+	wantErr := errors.New("task mutation failed")
+	for _, operation := range []struct {
+		name    string
+		taskErr error
+		run     func(*generator.Engine) error
+		wantErr error
+	}{
+		{
+			name:    "retry stale status",
+			taskErr: taskdomain.ErrTaskNotFailed,
+			run: func(engine *generator.Engine) error {
+				_, err := engine.Retry(context.Background(), 17)
+				return err
+			},
+			wantErr: generator.ErrRunNotFailed,
+		},
+		{
+			name:    "retry persistence failure",
+			taskErr: wantErr,
+			run: func(engine *generator.Engine) error {
+				_, err := engine.Retry(context.Background(), 17)
+				return err
+			},
+			wantErr: wantErr,
+		},
+		{
+			name:    "delete stale status",
+			taskErr: taskdomain.ErrTaskNotFailed,
+			run: func(engine *generator.Engine) error {
+				return engine.Delete(context.Background(), 17)
+			},
+			wantErr: generator.ErrRunNotFailed,
+		},
+		{
+			name:    "delete persistence failure",
+			taskErr: wantErr,
+			run: func(engine *generator.Engine) error {
+				return engine.Delete(context.Background(), 17)
+			},
+			wantErr: wantErr,
+		},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			tasks := &taskManagerStub{detail: &taskdomain.Task{
+				ID:     17,
+				Type:   string(generator.GenerateScenery),
+				Status: taskdomain.StatusFailed,
+			}}
+			if strings.HasPrefix(operation.name, "retry") {
+				tasks.retryErr = operation.taskErr
+			} else {
+				tasks.deleteErr = operation.taskErr
+			}
+			if err := operation.run(generator.NewEngine(tasks, nil)); !errors.Is(err, operation.wantErr) {
+				t.Fatalf("expected %v, got %v", operation.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestRetryRejectsUnavailableGenerationTasks(t *testing.T) {
+	wantErr := errors.New("lookup failed")
+	for _, test := range []struct {
+		name    string
+		engine  *generator.Engine
+		wantErr error
+		want    string
+	}{
+		{
+			name:    "task manager required",
+			engine:  generator.NewEngine(nil, nil),
+			wantErr: generator.ErrTaskManagerRequired,
+		},
+		{
+			name:    "lookup failure",
+			engine:  generator.NewEngine(&taskManagerStub{detailErr: wantErr}, nil),
+			wantErr: wantErr,
+		},
+		{
+			name:   "empty task",
+			engine: generator.NewEngine(&taskManagerStub{}, nil),
+			want:   "has no task",
+		},
+		{
+			name: "non-generation task",
+			engine: generator.NewEngine(&taskManagerStub{detail: &taskdomain.Task{
+				ID: 17, Type: "other.task", Status: taskdomain.StatusFailed,
+			}}, nil),
+			wantErr: generator.ErrUnsupportedTaskType,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.engine.Retry(context.Background(), 17)
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("expected %v, got %v", test.wantErr, err)
+			}
+			if test.want != "" && (err == nil || !strings.Contains(err.Error(), test.want)) {
+				t.Fatalf("expected error containing %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
 func TestResolveApplicationCompletesAwaitingRun(t *testing.T) {
 	for _, applied := range []bool{true, false} {
 		t.Run(fmt.Sprintf("applied=%t", applied), func(t *testing.T) {
