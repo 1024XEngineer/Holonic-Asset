@@ -53,36 +53,38 @@ function reduceTilesetCanvasWithIndex(
       ? state
       : { modelKey: index.modelKey, selectedCellIndexes: [] };
 
-  if (event.type === "item.toggle") {
-    const item = index.itemsById.get(event.itemId);
-    const itemCells = item ? (index.itemCellIndexes.get(item) ?? []) : [];
-    if (itemCells.length === 0) return current;
+  switch (event.type) {
+    case "item.toggle": {
+      const item = index.itemsById.get(event.itemId);
+      const itemCells = item ? (index.itemCellIndexes.get(item) ?? []) : [];
+      if (itemCells.length === 0) return current;
 
-    const selected = new Set(current.selectedCellIndexes);
-    const itemSelected = itemCells.every((cellIndex) =>
-      selected.has(cellIndex),
-    );
-    for (const cellIndex of itemCells) {
-      if (itemSelected) selected.delete(cellIndex);
-      else selected.add(cellIndex);
+      const selected = new Set(current.selectedCellIndexes);
+      const itemSelected = itemCells.every((cellIndex) =>
+        selected.has(cellIndex),
+      );
+      for (const cellIndex of itemCells) {
+        if (itemSelected) selected.delete(cellIndex);
+        else selected.add(cellIndex);
+      }
+
+      return withSelectedCells(current, selected);
     }
+    case "item-cell.toggle": {
+      const item = index.itemsById.get(event.itemId);
+      const coordinate = item?.tiles[event.itemCellIndex];
+      const cellIndex = coordinate
+        ? getTilesetCellIndex(coordinate, index.gridSize)
+        : undefined;
+      if (cellIndex === undefined) return current;
 
-    return withSelectedCells(current, selected);
+      return toggleCell(current, cellIndex);
+    }
+    case "cell.selection.toggled":
+      if (!isTilesetCellIndex(event.gridCellIndex, index.gridSize))
+        return current;
+      return toggleCell(current, event.gridCellIndex);
   }
-
-  if (event.type === "item-cell.toggle") {
-    const item = index.itemsById.get(event.itemId);
-    const coordinate = item?.tiles[event.itemCellIndex];
-    const cellIndex = coordinate
-      ? getTilesetCellIndex(coordinate, index.gridSize)
-      : undefined;
-    if (cellIndex === undefined) return current;
-
-    return toggleCell(current, cellIndex);
-  }
-
-  if (!isTilesetCellIndex(event.gridCellIndex, index.gridSize)) return current;
-  return toggleCell(current, event.gridCellIndex);
 }
 
 export function getTilesetCanvasSelection(

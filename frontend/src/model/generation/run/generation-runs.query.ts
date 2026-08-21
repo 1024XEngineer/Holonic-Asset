@@ -98,38 +98,47 @@ export function useGenerationRunsQuery(
         reconciliationAttempts.current.set(run.id, attempt);
         try {
           const detail = await coreGenerationApi.detail(coreRunId(run.id));
-          if (detail.status === "completed") {
-            handledRunIds.current.add(run.id);
-            reconciliationAttempts.current.delete(run.id);
-            forgetGenerationRunMetadata(projectId, [run.id]);
-            removeRun(queryClient, queryKey, run.id);
-            await refreshSettledAssets(queryClient, userID, projectId, assetId);
-            return;
-          }
-          if (detail.status === "failed") {
-            handledRunIds.current.add(run.id);
-            reconciliationAttempts.current.delete(run.id);
-            queryClient.setQueryData<GenerationRun[]>(
-              queryKey,
-              (current = []) =>
-                current.map((currentRun) =>
-                  currentRun.id === run.id
-                    ? { ...currentRun, status: "failed", error: detail.error }
-                    : currentRun,
-                ),
-            );
-            return;
-          }
-          if (detail.status === "cancelled") {
-            forgetGenerationRunMetadata(projectId, [run.id]);
-            handledRunIds.current.add(run.id);
-            reconciliationAttempts.current.delete(run.id);
-            removeRun(queryClient, queryKey, run.id);
-            return;
-          }
-          if (attempt >= MAX_RECONCILIATION_ATTEMPTS) {
-            reconciliationAttempts.current.delete(run.id);
-            removeRun(queryClient, queryKey, run.id);
+          switch (detail.status) {
+            case "completed":
+              handledRunIds.current.add(run.id);
+              reconciliationAttempts.current.delete(run.id);
+              forgetGenerationRunMetadata(projectId, [run.id]);
+              removeRun(queryClient, queryKey, run.id);
+              await refreshSettledAssets(
+                queryClient,
+                userID,
+                projectId,
+                assetId,
+              );
+              return;
+            case "failed":
+              handledRunIds.current.add(run.id);
+              reconciliationAttempts.current.delete(run.id);
+              queryClient.setQueryData<GenerationRun[]>(
+                queryKey,
+                (current = []) =>
+                  current.map((currentRun) =>
+                    currentRun.id === run.id
+                      ? {
+                          ...currentRun,
+                          status: "failed",
+                          error: detail.error,
+                        }
+                      : currentRun,
+                  ),
+              );
+              return;
+            case "cancelled":
+              forgetGenerationRunMetadata(projectId, [run.id]);
+              handledRunIds.current.add(run.id);
+              reconciliationAttempts.current.delete(run.id);
+              removeRun(queryClient, queryKey, run.id);
+              return;
+            default:
+              if (attempt >= MAX_RECONCILIATION_ATTEMPTS) {
+                reconciliationAttempts.current.delete(run.id);
+                removeRun(queryClient, queryKey, run.id);
+              }
           }
         } catch {
           if (handledRunIds.current.has(run.id)) return;

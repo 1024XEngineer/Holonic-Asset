@@ -51,12 +51,16 @@ export function SpriteEditorMode({
     setSelection({ nodeIds: [nodeId], frames: [{ nodeId, index }] });
   };
   const handleCanvasEvent = (event: AnimatedSpriteCanvasEvent) => {
-    if (event.type === "selection.changed") setSelection(event.selection);
-    else if (event.type === "node-position.committed")
-      sprite.onPositionChange(event.nodeId, event.position);
-    else if (event.type === "generation-review.resolved") {
-      if (event.applied) generationReview?.onApply();
-      else generationReview?.onDeny();
+    switch (event.type) {
+      case "selection.changed":
+        setSelection(event.selection);
+        return;
+      case "node-position.committed":
+        sprite.onPositionChange(event.nodeId, event.position);
+        return;
+      case "generation-review.resolved":
+        if (event.applied) generationReview?.onApply();
+        else generationReview?.onDeny();
     }
   };
   const clearInspectorSelection = () => {
