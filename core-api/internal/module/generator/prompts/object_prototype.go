@@ -125,6 +125,20 @@ func SolidMatteBackground(matteColor string) string {
 - Do not use the exact background colour inside the subject unless it is essential to the user's explicit design.`, matteColor)
 }
 
+// AdaptiveMatteBackground lets the model choose a single high-contrast matte
+// colour. The processor samples that actual colour from the canvas boundary,
+// so the subject never needs to surrender a legitimate palette colour to a
+// globally fixed chroma key.
+func AdaptiveMatteBackground() string {
+	return `- Render the background as exactly one perfectly flat, uniform, solid matte colour, filling the entire canvas edge to edge.
+- Choose a matte colour with strong perceptual colour separation from every colour required by the subject.
+- The subject's correct colours always take precedence. Never avoid, mute, shift, replace, or omit a subject colour to accommodate the matte; choose a different high-contrast matte colour instead.
+- Use exactly the same matte colour in every grid cell and across the complete outer canvas boundary so the processor can detect it automatically.
+- The background must be fully opaque. Do not output transparency or a checkerboard transparency pattern.
+- Do not add gradients, textures, lighting variation, shadows, scenery, ground, glow, particles, or any other marks to the background.
+- Keep a crisp, clean boundary between the subject and the background, with no colour spill or background-coloured fringe.`
+}
+
 // TransparentBackground is used only when chroma-key removal is explicitly
 // disabled and the provider is expected to return native alpha.
 func TransparentBackground() string {

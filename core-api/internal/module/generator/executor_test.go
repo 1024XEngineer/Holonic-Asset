@@ -14,10 +14,12 @@ import (
 )
 
 type imageGenerationServiceStub struct {
-	events  *[]string
-	request *imageclient.GenerateRequest
-	result  *imageclient.GenerateResult
-	err     error
+	events   *[]string
+	request  *imageclient.GenerateRequest
+	requests []*imageclient.GenerateRequest
+	result   *imageclient.GenerateResult
+	results  []*imageclient.GenerateResult
+	err      error
 }
 
 type animationGenerationServiceStub struct {
@@ -53,6 +55,8 @@ type imageProcessorStub struct {
 	removeRequests    []*imageprocessor.RemoveBackgroundRequest
 	resizeRequests    []*imageprocessor.ResizeRequest
 	splitRequests     []*imageprocessor.SplitImageRequest
+	splitResults      []*imageprocessor.SplitImageResult
+	splitErrors       []error
 	err               error
 }
 
@@ -182,8 +186,15 @@ func (s *imageProcessorStub) SplitImage(
 	}
 	copy := *request
 	s.splitRequests = append(s.splitRequests, &copy)
+	call := len(s.splitRequests) - 1
+	if call < len(s.splitErrors) && s.splitErrors[call] != nil {
+		return nil, s.splitErrors[call]
+	}
 	if s.err != nil {
 		return nil, s.err
+	}
+	if call < len(s.splitResults) && s.splitResults[call] != nil {
+		return s.splitResults[call], nil
 	}
 	regionCount := request.Columns * request.Rows
 	regions := make([]imageprocessor.ImageRegion, regionCount)
@@ -209,6 +220,11 @@ func (s *imageGenerationServiceStub) Generate(
 		Size:            request.Size,
 		Params:          request.Params,
 		MaxAttempts:     request.MaxAttempts,
+	}
+	s.requests = append(s.requests, s.request)
+	call := len(s.requests) - 1
+	if call < len(s.results) {
+		return s.results[call], s.err
 	}
 	return s.result, s.err
 }
