@@ -228,13 +228,37 @@ The normalization engine is private to the processor. There is no second
 public animation endpoint: callers always use
 `SplitImage(ImageSplitModeAnimation)`.
 
-For generated object prototypes, `PrototypePixelResizeOptions` also enables two
+For generated object prototypes, `PrototypePixelResizeOptions` also enables
 conservative final-grid safeguards: `NormalizeNearRound` repairs a symmetric
 near-circular silhouette using its opaque area (rather than its longest axis),
 so a distorted direction is not made larger than the other views;
 `RemoveIsolatedComponents` removes only tiny disconnected alpha islands after
-hard-alpha cleanup. Character options leave both safeguards disabled so detached
-accessories and small facial marks are not treated as noise.
+hard-alpha cleanup, and preserves a detached part when the supersampled source
+has strong coverage at that location. `RegularizeContour` is enabled for both
+object and character prototypes: it removes only one-pixel convex teeth, concave
+notches, and isolated one-pixel scanline boundary jitter when the supersampled
+alpha supports the correction. It uses exterior-background connectivity to
+avoid filling enclosed holes and never runs a blur or a general majority filter.
+
+Objects and characters use the same palette budget at each target size. This is
+intentional: an object may have fewer semantic parts, but material boundaries,
+crystals, joints, handles, and highlights are still real pixels. The object
+pipeline no longer enables the former aggressive weak-edge deletion or second
+colour-island consolidation pass; those passes could erase source-supported
+prop features and damage the silhouette. Both pipelines choose replacement
+colours from existing source colours and never synthesize a new RGB value.
+Object options additionally enable `PreserveInternalEdges`. It detects only
+continuous one- or two-pixel colour ridges that remain surrounded by foreground
+on both sides in the untouched area-resampled source, thins doubled ridges, and
+snaps each supported line to one existing palette colour. Broad shading
+boundaries, isolated dots, alpha, and silhouette geometry are not changed.
+Object options also enable `AdaptiveSparsePalette`: when a final object has very
+few opaque pixels, the effective palette is reduced to four, six, or eight source
+colours according to the silhouette population. This prevents a tiny elongated
+prop from becoming a collection of unrelated one-pixel colour islands while
+leaving normal-sized objects on the regular palette budget.
+Character options enable `PreserveColourAccents`, so detached accessories and
+small facial marks are not swallowed by palette mapping.
 
 ### Static images and structural extraction
 

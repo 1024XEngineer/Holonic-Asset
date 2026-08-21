@@ -38,6 +38,7 @@ type normalizeAnimationRequest struct {
 	FrameCount               int
 	FrameWidth               int
 	FrameHeight              int
+	RenderScale              int
 	Margin                   int
 	CropPadding              int
 	AlphaThreshold           uint8
@@ -206,10 +207,20 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	if frameWidth <= 0 || frameHeight <= 0 {
 		return nil, fmt.Errorf("frame width and height must both be positive or both be omitted")
 	}
+	renderScale := request.RenderScale
+	if renderScale == 0 {
+		renderScale = 1
+	}
+	if renderScale < 1 {
+		return nil, fmt.Errorf("render scale must be positive")
+	}
 	margin := request.Margin
 	if margin == 0 {
 		margin = defaultAssetMargin(frameWidth, frameHeight)
 	}
+	frameWidth *= renderScale
+	frameHeight *= renderScale
+	margin *= renderScale
 	if margin*2 >= frameWidth || margin*2 >= frameHeight {
 		return nil, fmt.Errorf("animation margin must be less than half the frame dimensions")
 	}

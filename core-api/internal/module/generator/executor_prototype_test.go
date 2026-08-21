@@ -299,6 +299,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		!splitRequest.ForceProportionalGrid ||
 		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
 		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
+		splitRequest.RenderScale != imageprocessor.PrototypeRenderScale ||
 		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
 		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
 		!splitRequest.NormalizeContentScale || splitRequest.CropToContent ||
@@ -670,7 +671,8 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	for index, request := range processor.resizeRequests {
 		if request.Options.Width != 128 || request.Options.Height != 128 ||
 			request.Options.Margin != 0 || request.Options.CropContent ||
-			request.Options.PaletteSize != 16 || !request.Options.NormalizeNearRound {
+			request.Options.PaletteSize != 18 || !request.Options.NormalizeNearRound ||
+			request.Options.RemoveWeakEdgePixels || request.Options.ConsolidateColourIslands {
 			t.Fatalf("object direction %d did not preserve canonical geometry with object pixel options: %+v", index, request.Options)
 		}
 	}

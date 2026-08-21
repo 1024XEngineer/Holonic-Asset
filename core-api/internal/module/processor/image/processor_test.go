@@ -658,7 +658,7 @@ func TestRepairPixelColourBlocksMergesAmbiguousSingleton(t *testing.T) {
 	// either palette colour is plausible, so spatial coherence should win.
 	reference.SetNRGBA(1, 1, color.NRGBA{R: 95, G: 95, B: 95, A: 255})
 
-	repairPixelColourBlocks(quantized, reference)
+	repairPixelColourBlocks(quantized, reference, false)
 	if got := quantized.NRGBAAt(1, 1); got != base {
 		t.Fatalf("ambiguous singleton was not merged into its colour block: %+v", got)
 	}
@@ -680,7 +680,7 @@ func TestRepairPixelColourBlocksPreservesTrueHighContrastDetail(t *testing.T) {
 	quantized.SetNRGBA(1, 1, detail)
 	reference.SetNRGBA(1, 1, color.NRGBA{R: 20, G: 16, B: 13, A: 255})
 
-	repairPixelColourBlocks(quantized, reference)
+	repairPixelColourBlocks(quantized, reference, false)
 	if got := quantized.NRGBAAt(1, 1); got != detail {
 		t.Fatalf("real high-contrast detail was erased: %+v", got)
 	}
@@ -707,11 +707,61 @@ func TestRepairPixelColourBlocksPreservesTwoBlendedSinglePixelEyes(t *testing.T)
 		reference.SetNRGBA(point.X, point.Y, color.NRGBA{R: 92, G: 64, B: 55, A: 255})
 	}
 
-	repairPixelColourBlocks(quantized, reference)
+	repairPixelColourBlocks(quantized, reference, false)
 	for _, point := range []image.Point{{2, 2}, {5, 2}} {
 		if got := quantized.NRGBAAt(point.X, point.Y); got != eye {
 			t.Fatalf("eye at %v was erased: %+v", point, got)
 		}
+	}
+}
+
+func TestRepairPixelColourBlocksConsolidatesObjectNoiseWhenSmoothSourceSupportsFill(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 220, G: 130, B: 55, A: 255}
+	noise := color.NRGBA{R: 18, G: 14, B: 12, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	reference := image.NewNRGBA(quantized.Bounds())
+	for y := range 4 {
+		for x := range 4 {
+			quantized.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	for _, point := range []image.Point{{X: 1, Y: 1}, {X: 1, Y: 2}} {
+		quantized.SetNRGBA(point.X, point.Y, noise)
+		// The high-resolution reduction does not support a truly dark mark at
+		// either pixel; this is a palette island rather than a real prop detail.
+		reference.SetNRGBA(point.X, point.Y, color.NRGBA{R: 150, G: 95, B: 42, A: 255})
+	}
+
+	repairPixelColourBlocks(quantized, reference, true)
+	for _, point := range []image.Point{{X: 1, Y: 1}, {X: 1, Y: 2}} {
+		if got := quantized.NRGBAAt(point.X, point.Y); got != base {
+			t.Fatalf("object colour noise at %v was not consolidated: %+v", point, got)
+		}
+	}
+}
+
+func TestRepairPixelColourBlocksObjectModeKeepsSourceSupportedDetail(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 220, G: 130, B: 55, A: 255}
+	detail := color.NRGBA{R: 18, G: 14, B: 12, A: 255}
+	quantized := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+	reference := image.NewNRGBA(quantized.Bounds())
+	for y := range 3 {
+		for x := range 3 {
+			quantized.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	quantized.SetNRGBA(1, 1, detail)
+	reference.SetNRGBA(1, 1, color.NRGBA{R: 20, G: 16, B: 13, A: 255})
+
+	repairPixelColourBlocks(quantized, reference, true)
+	if got := quantized.NRGBAAt(1, 1); got != detail {
+		t.Fatalf("source-supported object detail was erased: %+v", got)
 	}
 }
 
@@ -753,6 +803,25 @@ func TestRepairPixelAlphaGapsFillsCoveredBridgeOnly(t *testing.T) {
 	}
 	if got := quantized.NRGBAAt(1, 0); got.A != 0 {
 		t.Fatalf("low-coverage background was incorrectly filled: %+v", got)
+	}
+}
+
+func TestRepairPixelAlphaGapsFillsCoveredEnclosedHoleAcrossColours(t *testing.T) {
+	t.Parallel()
+
+	red := color.NRGBA{R: 190, G: 55, B: 35, A: 255}
+	blue := color.NRGBA{R: 35, G: 70, B: 180, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+	reference := image.NewNRGBA(img.Bounds())
+	img.SetNRGBA(0, 1, red)
+	img.SetNRGBA(2, 1, blue)
+	img.SetNRGBA(1, 0, red)
+	img.SetNRGBA(1, 2, blue)
+	reference.SetNRGBA(1, 1, color.NRGBA{R: 42, G: 72, B: 170, A: 80})
+
+	repairPixelAlphaGaps(img, reference, pixelAlphaRepairFloor)
+	if got := img.NRGBAAt(1, 1); got != blue {
+		t.Fatalf("covered enclosed hole was not filled from the nearest existing colour: %+v", got)
 	}
 }
 
@@ -1196,18 +1265,21 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 		width, height int
 		palette       int
 	}{
-		{width: 32, height: 32, palette: 8},
-		{width: 48, height: 64, palette: 12},
-		{width: 64, height: 64, palette: 12},
-		{width: 128, height: 128, palette: 16},
-		{width: 256, height: 256, palette: 20},
+		{width: 32, height: 32, palette: 10},
+		{width: 48, height: 64, palette: 14},
+		{width: 64, height: 64, palette: 14},
+		{width: 128, height: 128, palette: 18},
+		{width: 256, height: 256, palette: 24},
 	}
 	for _, test := range tests {
 		options := PrototypePixelResizeOptions(test.width, test.height)
 		if options.Margin != AnimationFrameMargin(test.width, test.height) {
 			t.Fatalf("%dx%d margin = %d, want canonical margin %d", test.width, test.height, options.Margin, AnimationFrameMargin(test.width, test.height))
 		}
-		if options.Mode != RasterModePixel || !options.HardAlpha || options.PaletteSize != test.palette || !options.NormalizeNearRound {
+		if options.Mode != RasterModePixel || !options.HardAlpha || options.PaletteSize != test.palette ||
+			!options.NormalizeNearRound || !options.RemoveIsolatedComponents ||
+			options.RemoveWeakEdgePixels || options.ConsolidateColourIslands || options.PreserveColourAccents ||
+			!options.PreserveInternalEdges || !options.RegularizeContour {
 			t.Fatalf("unexpected %dx%d prototype options: %+v", test.width, test.height, options)
 		}
 	}
@@ -1216,11 +1288,14 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 	for dimension, wantPalette := range characterPalettes {
 		character := CharacterPrototypePixelResizeOptions(dimension, dimension)
 		object := PrototypePixelResizeOptions(dimension, dimension)
-		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha || character.NormalizeNearRound {
+		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha ||
+			character.NormalizeNearRound || character.RemoveIsolatedComponents ||
+			character.RemoveWeakEdgePixels || character.ConsolidateColourIslands || !character.PreserveColourAccents ||
+			character.PreserveInternalEdges {
 			t.Fatalf("character %dx%d changed canonical geometry or enabled object-only rounding: character=%+v object=%+v", dimension, dimension, character, object)
 		}
-		if character.PaletteSize != wantPalette || character.PaletteSize <= object.PaletteSize {
-			t.Fatalf("character %dx%d palette = %d, want %d and greater than object %d", dimension, dimension, character.PaletteSize, wantPalette, object.PaletteSize)
+		if character.PaletteSize != wantPalette || character.PaletteSize != object.PaletteSize {
+			t.Fatalf("%dx%d palette budgets diverged: character=%d object=%d, want both %d", dimension, dimension, character.PaletteSize, object.PaletteSize, wantPalette)
 		}
 	}
 
@@ -1306,5 +1381,349 @@ func TestRemoveIsolatedAlphaComponentsRemovesSmallObjectSpecks(t *testing.T) {
 	}
 	if img.NRGBAAt(7, 7).A == 0 {
 		t.Fatal("main object component was removed")
+	}
+}
+
+func TestRemoveIsolatedAlphaComponentsPreservesSourceSupportedDetachedDetail(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 118, G: 79, B: 42, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	reference := image.NewNRGBA(img.Bounds())
+	for y := 2; y < 6; y++ {
+		for x := 2; x < 6; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// This detached two-pixel part is small, but its supersampled source
+	// coverage is strong enough to be an intentional prop attachment rather
+	// than a thresholding speck.
+	for _, point := range []image.Point{{X: 0, Y: 0}, {X: 0, Y: 1}} {
+		img.SetNRGBA(point.X, point.Y, fill)
+		reference.SetNRGBA(point.X, point.Y, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 220})
+	}
+
+	removeIsolatedAlphaComponents(img, 2, reference)
+	for _, point := range []image.Point{{X: 0, Y: 0}, {X: 0, Y: 1}} {
+		if got := img.NRGBAAt(point.X, point.Y); got != fill {
+			t.Fatalf("source-supported detached detail at %v was removed: %+v", point, got)
+		}
+	}
+}
+
+func TestRemoveWeakAlphaEdgePixelsRemovesOnlyWeakTerminalTips(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 105, G: 75, B: 42, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 7, 5))
+	reference := image.NewNRGBA(img.Bounds())
+	for y := 1; y <= 3; y++ {
+		for x := 1; x <= 3; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// Two equally shaped protrusions differ only in source coverage.
+	img.SetNRGBA(4, 1, fill)
+	reference.SetNRGBA(4, 1, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 120})
+	img.SetNRGBA(4, 3, fill)
+	reference.SetNRGBA(4, 3, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 220})
+
+	removeWeakAlphaEdgePixels(img, reference)
+
+	if got := img.NRGBAAt(4, 1); got.A != 0 {
+		t.Fatalf("weak terminal antialias tip was retained: %+v", got)
+	}
+	if got := img.NRGBAAt(4, 3); got != fill {
+		t.Fatalf("strong source-supported tip was removed: %+v", got)
+	}
+	if got := img.NRGBAAt(2, 2); got != fill {
+		t.Fatalf("main silhouette was changed: %+v", got)
+	}
+}
+
+func TestRegularizePixelContourRepairsEvidenceSupportedCornerNotch(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 150, G: 90, B: 45, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 7, 7))
+	reference := image.NewNRGBA(img.Bounds())
+	palette := []color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}}
+	for y := 2; y <= 4; y++ {
+		for x := 2; x <= 4; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// A transparent corner notch with three cardinal foreground neighbours.
+	reference.SetNRGBA(3, 2, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 100})
+	img.SetNRGBA(3, 2, color.NRGBA{})
+
+	regularizePixelContour(img, reference, palette)
+
+	if got := img.NRGBAAt(3, 2); got != fill {
+		t.Fatalf("supported contour notch was not filled: %+v", got)
+	}
+}
+
+func TestRegularizePixelContourRemovesWeakContourTooth(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 90, G: 120, B: 170, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 7, 7))
+	reference := image.NewNRGBA(img.Bounds())
+	palette := []color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}}
+	for y := 2; y <= 4; y++ {
+		for x := 2; x <= 3; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// The pixel is cardinally attached to the body but has only weak source
+	// coverage, which is the signature of a one-pixel antialias tooth.
+	img.SetNRGBA(4, 2, fill)
+	reference.SetNRGBA(4, 2, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 150})
+
+	regularizePixelContour(img, reference, palette)
+
+	if got := img.NRGBAAt(4, 2); got.A != 0 {
+		t.Fatalf("weak contour tooth was retained: %+v", got)
+	}
+}
+
+func TestRegularizePixelContourPreservesEnclosedHoleAndStrongTip(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 180, G: 70, B: 100, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	reference := image.NewNRGBA(img.Bounds())
+	palette := []color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}}
+	for y := 2; y <= 5; y++ {
+		for x := 2; x <= 5; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// This hole is not connected to the exterior background, so local three-
+	// neighbour evidence must not fill it.
+	img.SetNRGBA(3, 3, color.NRGBA{})
+	reference.SetNRGBA(3, 3, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 100})
+	// Strong source evidence protects a small deliberate terminal detail.
+	img.SetNRGBA(6, 2, fill)
+	reference.SetNRGBA(6, 2, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 230})
+
+	regularizePixelContour(img, reference, palette)
+
+	if got := img.NRGBAAt(3, 3); got.A != 0 {
+		t.Fatalf("enclosed hole was filled: %+v", got)
+	}
+	if got := img.NRGBAAt(6, 2); got != fill {
+		t.Fatalf("strong contour detail was removed: %+v", got)
+	}
+}
+
+func TestRegularizeBoundaryRunsRemovesOnePixelBoundaryJitter(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 120, G: 130, B: 80, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 9, 7))
+	reference := image.NewNRGBA(img.Bounds())
+	palette := []color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}}
+	for y := 1; y <= 5; y++ {
+		left, right := 2, 6
+		if y == 3 {
+			left = 3
+		}
+		for x := left; x <= right; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// The missing boundary pixel is still supported by the supersampled source.
+	reference.SetNRGBA(2, 3, color.NRGBA{R: fill.R, G: fill.G, B: fill.B, A: 100})
+
+	regularizeBoundaryRuns(img, reference, palette)
+
+	if got := img.NRGBAAt(2, 3); got != fill {
+		t.Fatalf("one-pixel boundary jitter was not filled: %+v", got)
+	}
+}
+
+func TestRegularizeBoundaryRunsPreservesLargeBoundaryChange(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 70, G: 150, B: 120, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 10, 7))
+	reference := image.NewNRGBA(img.Bounds())
+	palette := []color.RGBA{{R: fill.R, G: fill.G, B: fill.B, A: 255}}
+	for y := 1; y <= 5; y++ {
+		left, right := 2, 7
+		if y == 3 {
+			left = 4
+		}
+		for x := left; x <= right; x++ {
+			img.SetNRGBA(x, y, fill)
+			reference.SetNRGBA(x, y, fill)
+		}
+	}
+	// A two-pixel change is a structural feature, not a one-pixel contour tooth.
+
+	regularizeBoundaryRuns(img, reference, palette)
+
+	if got := img.NRGBAAt(4, 3); got != fill || img.NRGBAAt(3, 3).A != 0 {
+		t.Fatalf("large boundary change was altered: edge=%+v preceding=%+v", got, img.NRGBAAt(3, 3))
+	}
+}
+
+func TestStabilizeInternalHardEdgesMakesThinSourceLineCoherent(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 226, G: 104, B: 31, A: 255}
+	blendA := color.NRGBA{R: 151, G: 70, B: 27, A: 255}
+	blendB := color.NRGBA{R: 111, G: 52, B: 24, A: 255}
+	line := color.RGBA{R: 42, G: 27, B: 22, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 11, 11))
+	reference := image.NewNRGBA(img.Bounds())
+	for y := range 11 {
+		for x := range 11 {
+			img.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	for y := 2; y <= 8; y++ {
+		quantized := blendA
+		if y%2 == 0 {
+			quantized = blendB
+		}
+		img.SetNRGBA(5, y, quantized)
+		reference.SetNRGBA(5, y, color.NRGBA{R: 73, G: 38, B: 24, A: 255})
+	}
+
+	stabilizeInternalHardEdges(img, reference, []color.RGBA{
+		{R: base.R, G: base.G, B: base.B, A: 255},
+		line,
+	})
+
+	for y := 2; y <= 8; y++ {
+		if got := img.NRGBAAt(5, y); got != (color.NRGBA{R: line.R, G: line.G, B: line.B, A: 255}) {
+			t.Fatalf("internal line pixel at y=%d remained inconsistent: %+v", y, got)
+		}
+	}
+	if got := img.NRGBAAt(4, 5); got != base {
+		t.Fatalf("line stabilization changed surrounding fill: %+v", got)
+	}
+}
+
+func TestStabilizeInternalHardEdgesDoesNotTraceBroadShadingBoundary(t *testing.T) {
+	t.Parallel()
+
+	light := color.NRGBA{R: 220, G: 130, B: 70, A: 255}
+	shadow := color.NRGBA{R: 132, G: 76, B: 43, A: 255}
+	line := color.RGBA{R: 31, G: 24, B: 20, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 12, 10))
+	reference := image.NewNRGBA(img.Bounds())
+	for y := range 10 {
+		for x := range 12 {
+			pixel := light
+			if x >= 6 {
+				pixel = shadow
+			}
+			img.SetNRGBA(x, y, pixel)
+			reference.SetNRGBA(x, y, pixel)
+		}
+	}
+
+	stabilizeInternalHardEdges(img, reference, []color.RGBA{
+		{R: light.R, G: light.G, B: light.B, A: 255},
+		{R: shadow.R, G: shadow.G, B: shadow.B, A: 255},
+		line,
+	})
+
+	for y := range 10 {
+		for x := range 12 {
+			want := light
+			if x >= 6 {
+				want = shadow
+			}
+			if got := img.NRGBAAt(x, y); got != want {
+				t.Fatalf("broad shading boundary was incorrectly outlined at (%d,%d): %+v", x, y, got)
+			}
+		}
+	}
+}
+
+func TestStabilizeInternalHardEdgesThinsDoubledInternalStripe(t *testing.T) {
+	t.Parallel()
+
+	base := color.NRGBA{R: 225, G: 108, B: 34, A: 255}
+	blendedLine := color.NRGBA{R: 79, G: 42, B: 25, A: 255}
+	line := color.RGBA{R: 38, G: 26, B: 21, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 12, 12))
+	reference := image.NewNRGBA(img.Bounds())
+	for y := range 12 {
+		for x := range 12 {
+			img.SetNRGBA(x, y, base)
+			reference.SetNRGBA(x, y, base)
+		}
+	}
+	for y := 2; y <= 9; y++ {
+		for x := 5; x <= 6; x++ {
+			img.SetNRGBA(x, y, blendedLine)
+			reference.SetNRGBA(x, y, blendedLine)
+		}
+	}
+
+	stabilizeInternalHardEdges(img, reference, []color.RGBA{
+		{R: base.R, G: base.G, B: base.B, A: 255},
+		line,
+	})
+
+	for y := 2; y <= 9; y++ {
+		left := img.NRGBAAt(5, y)
+		right := img.NRGBAAt(6, y)
+		linePixels := 0
+		if left.R == line.R && left.G == line.G && left.B == line.B {
+			linePixels++
+		}
+		if right.R == line.R && right.G == line.G && right.B == line.B {
+			linePixels++
+		}
+		if linePixels != 1 {
+			t.Fatalf("doubled stripe row %d retained %d stabilized line pixels: left=%+v right=%+v", y, linePixels, left, right)
+		}
+		if left.A != 255 || right.A != 255 {
+			t.Fatalf("line thinning changed alpha at row %d: left=%+v right=%+v", y, left, right)
+		}
+	}
+}
+
+func TestPrototypeObjectUsesSparsePaletteForTinySilhouettes(t *testing.T) {
+	t.Parallel()
+
+	object := PrototypePixelResizeOptions(32, 32)
+	if !object.AdaptiveSparsePalette {
+		t.Fatal("object prototype should enable sparse palette adaptation")
+	}
+	character := CharacterPrototypePixelResizeOptions(32, 32)
+	if character.AdaptiveSparsePalette {
+		t.Fatal("character prototype should not enable sparse palette adaptation")
+	}
+
+	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for i := range 29 {
+		x, y := i%5, i/5
+		img.SetNRGBA(x, y, color.NRGBA{R: uint8(20 + i*7), G: uint8(40 + i*3), B: uint8(80 + i*2), A: 255})
+	}
+	if got := sparseSilhouettePaletteSize(img, 10); got != 4 {
+		t.Fatalf("sparse palette size for 29 visible pixels = %d, want 4", got)
+	}
+	img = image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for i := range 40 {
+		x, y := 10+i%8, 10+i/8
+		img.SetNRGBA(x, y, color.NRGBA{R: 90, G: 100, B: 110, A: 255})
+	}
+	if got := sparseSilhouettePaletteSize(img, 10); got != 6 {
+		t.Fatalf("sparse palette size for 40 visible pixels = %d, want 6", got)
 	}
 }
