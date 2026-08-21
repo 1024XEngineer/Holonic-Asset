@@ -66,7 +66,7 @@ export function AssetPreview({
   return (
     <div
       className={cn(
-        "relative grid aspect-[4/3] place-items-center overflow-hidden bg-muted/70",
+        "pointer-events-none relative grid aspect-[4/3] place-items-center overflow-hidden bg-muted/70",
         className,
       )}
     >

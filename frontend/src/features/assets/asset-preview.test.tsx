@@ -250,6 +250,18 @@ describe("AssetPreview scenery", () => {
 });
 
 describe("AssetPreview tileset", () => {
+  it("does not intercept the asset card navigation layer", () => {
+    mockRecordReady({
+      mode: "tileset",
+      prompt: "Forest floor",
+      tileset: { gridSize: 1, items: [] },
+    });
+
+    const html = renderPreview({ kind: "tileset" }, "42");
+
+    expect(html).toMatch(/^<div class="[^"]*pointer-events-none/);
+  });
+
   it("renders individual tiles and complete item images", () => {
     mockRecordReady({
       mode: "tileset",
