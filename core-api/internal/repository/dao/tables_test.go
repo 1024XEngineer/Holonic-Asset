@@ -144,6 +144,88 @@ func TestSeedTagTemplatesCopiesNewTemplatesToProjects(t *testing.T) {
 	}
 }
 
+func TestTagSchemaInitializationPropagatesErrors(t *testing.T) {
+	t.Run("cleanup legacy columns", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("cleanup failed")
+		mock.ExpectExec(regexp.QuoteMeta(`DROP INDEX IF EXISTS idx_tags_project_normalized_name`)).
+			WillReturnError(wantErr)
+
+		if err := cleanupLegacyTagColumns(db); !errors.Is(err, wantErr) {
+			t.Fatalf("expected cleanup error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("bootstrap template links", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("link failed")
+		mock.ExpectExec(`UPDATE project_tags .*FROM tag_templates`).WillReturnError(wantErr)
+
+		if err := bootstrapProjectTagsFromTemplates(db); !errors.Is(err, wantErr) {
+			t.Fatalf("expected bootstrap link error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("bootstrap template copies", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("copy failed")
+		mock.ExpectExec(`UPDATE project_tags .*FROM tag_templates`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(`INSERT INTO project_tags .*CROSS JOIN tag_templates`).
+			WillReturnError(wantErr)
+
+		if err := bootstrapProjectTagsFromTemplates(db); !errors.Is(err, wantErr) {
+			t.Fatalf("expected bootstrap copy error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("create project tag indexes", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("index failed")
+		mock.ExpectExec(`CREATE UNIQUE INDEX`).WillReturnError(wantErr)
+
+		if err := ensureProjectTagIndexes(db); !errors.Is(err, wantErr) {
+			t.Fatalf("expected index error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("query system template", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("template query failed")
+		mock.ExpectBegin()
+		mock.ExpectQuery(`SELECT \* FROM "tag_templates"`).WillReturnError(wantErr)
+		mock.ExpectRollback()
+
+		if err := seedTagTemplates(db); !errors.Is(err, wantErr) {
+			t.Fatalf("expected template query error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("link new template", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("template link failed")
+		mock.ExpectExec(`UPDATE project_tags .*SET template_id`).WillReturnError(wantErr)
+
+		err := copyTagTemplateToProjects(db, TagTemplate{ID: 7, Name: "type:test"})
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected template link error %v, got %v", wantErr, err)
+		}
+	})
+
+	t.Run("copy new template", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		wantErr := errors.New("template copy failed")
+		mock.ExpectExec(`UPDATE project_tags .*SET template_id`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(`INSERT INTO project_tags`).WillReturnError(wantErr)
+
+		err := copyTagTemplateToProjects(db, TagTemplate{ID: 7, Name: "type:test"})
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected template copy error %v, got %v", wantErr, err)
+		}
+	})
+}
+
 func TestMigrateAssetTagsToTablesBackfillsReusableTagsAndDropsLegacyColumn(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	expectLegacyTagColumn(mock)
@@ -213,6 +295,79 @@ func TestMigrateAssetTagsToTablesPropagatesLegacyReadError(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestMigrateAssetTagsToTablesRollsBackProcessingFailures(t *testing.T) {
+	tests := []struct {
+		name   string
+		rows   *sqlmock.Rows
+		finish func(sqlmock.Sqlmock, error)
+	}{
+		{
+			name: "scan legacy row",
+			rows: sqlmock.NewRows([]string{"asset_id", "project_id", "tags"}).
+				AddRow("invalid-id", 42, `[]`),
+		},
+		{
+			name: "iterate legacy rows",
+			rows: sqlmock.NewRows([]string{"asset_id", "project_id", "tags"}).
+				AddRow(7, 42, `[]`).
+				RowError(0, errors.New("row failed")),
+		},
+		{
+			name: "replace asset tags",
+			rows: sqlmock.NewRows([]string{"asset_id", "project_id", "tags"}).
+				AddRow(7, 42, `[{"name":"chair","color":"#123456"}]`),
+			finish: func(mock sqlmock.Sqlmock, wantErr error) {
+				mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "asset_tags" WHERE asset_id = $1`)).
+					WithArgs(uint(7)).
+					WillReturnError(wantErr)
+			},
+		},
+		{
+			name: "drop legacy index",
+			rows: sqlmock.NewRows([]string{"asset_id", "project_id", "tags"}),
+			finish: func(mock sqlmock.Sqlmock, wantErr error) {
+				mock.ExpectExec(regexp.QuoteMeta(`DROP INDEX IF EXISTS idx_assets_tags_gin`)).
+					WillReturnError(wantErr)
+			},
+		},
+		{
+			name: "drop legacy column",
+			rows: sqlmock.NewRows([]string{"asset_id", "project_id", "tags"}),
+			finish: func(mock sqlmock.Sqlmock, wantErr error) {
+				mock.ExpectExec(regexp.QuoteMeta(`DROP INDEX IF EXISTS idx_assets_tags_gin`)).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+				mock.ExpectExec(regexp.QuoteMeta(`ALTER TABLE assets DROP COLUMN tags`)).
+					WillReturnError(wantErr)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock := newMockTableDatabase(t)
+			expectLegacyTagColumn(mock)
+			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta(`SELECT id AS asset_id, project_id, tags::text AS tags
+				FROM assets
+				WHERE tags IS NOT NULL
+				ORDER BY id ASC`)).
+				WillReturnRows(tt.rows)
+			wantErr := errors.New(tt.name + " failed")
+			if tt.finish != nil {
+				tt.finish(mock, wantErr)
+			}
+			mock.ExpectRollback()
+
+			if err := migrateAssetTagsToTables(db); err == nil {
+				t.Fatalf("expected %s to fail", tt.name)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet expectations: %v", err)
+			}
+		})
 	}
 }
 
