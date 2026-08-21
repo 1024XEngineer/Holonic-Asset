@@ -27,7 +27,6 @@ vi.mock("../../project", async (importOriginal) => ({
 import {
   loadCoreAssetWorkspace,
   saveCoreAssetRevision,
-  toCoreAudioAssetWorkspace,
   toCoreSceneryAssetWorkspace,
   toCoreTilesetAssetWorkspace,
   toCoreUISetAssetWorkspace,
@@ -108,20 +107,12 @@ describe("loadCoreAssetWorkspace", () => {
     },
   );
 
-  it("loads audio metadata through the Core adapter", async () => {
+  it("rejects audio assets because they do not have editable records", async () => {
     mocks.assetDetail.mockResolvedValue(audioDetail());
 
     await expect(
       loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
-    ).resolves.toMatchObject({
-      projectName: "Demo",
-      asset: { id: "9", kind: "audio", version: "v1" },
-      record: {
-        mode: "audio",
-        prompt: "A quiet forest ambience",
-        audio: {},
-      },
-    });
+    ).rejects.toThrow("Audio assets do not have editable records.");
   });
 
   it.each(["character", "object"] as const)(
@@ -371,7 +362,7 @@ describe("saveCoreAssetRevision", () => {
     });
   });
 
-  it("persists character, object, and audio revisions through their Core payloads", async () => {
+  it("persists character and object revisions through their Core payloads", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 2 });
     const sprite = {
       prototype: {
@@ -396,15 +387,13 @@ describe("saveCoreAssetRevision", () => {
       assetId: "9",
       record: { mode: "object", prompt: "Chest", object: sprite },
     });
-    await saveCoreAssetRevision({
-      projectId: "11",
-      assetId: "9",
-      record: { mode: "audio", prompt: "Theme", audio: {} },
-    });
-
     expect(mocks.assetRecord).toHaveBeenLastCalledWith({
       assetId: 9,
-      content: {},
+      content: {
+        directionCount: 1,
+        prototype: [{ id: 1, url: "sprite.png" }],
+        animations: [],
+      },
     });
   });
 });
@@ -626,21 +615,6 @@ describe("non-image Core asset workspaces", () => {
       mode: "uiset",
       prompt: "Main menu controls",
       uiset: { components: [{ id: "7", label: "Start", kind: "button" }] },
-    });
-  });
-
-  it("maps audio metadata without mock defaults", () => {
-    const workspace = toCoreAudioAssetWorkspace({
-      projectId: "11",
-      projectName: "Demo",
-      detail: audioDetail(),
-      records: [],
-    });
-
-    expect(workspace.record).toEqual({
-      mode: "audio",
-      prompt: "A quiet forest ambience",
-      audio: {},
     });
   });
 

@@ -45,7 +45,7 @@ export async function loadCoreAssetWorkspace(
     case "uiset":
       return toCoreUISetAssetWorkspace({ ...workspaceInput, detail });
     case "audio":
-      return toCoreAudioAssetWorkspace({ ...workspaceInput, detail });
+      throw new Error("Audio assets do not have editable records.");
   }
 }
 
@@ -190,33 +190,6 @@ export function toCoreUISetAssetWorkspace({
   });
 }
 
-export function toCoreAudioAssetWorkspace({
-  projectId,
-  projectName,
-  detail,
-  records,
-}: {
-  projectId: string;
-  projectName: string;
-  detail: Extract<AssetDetailResponse, { type: "audio" }>;
-  records: AssetRecordResponse[];
-}): AssetWorkspaceData {
-  const record: AssetRecord = {
-    mode: "audio",
-    prompt: detail.description,
-    audio: {},
-  };
-
-  return createWorkspace({
-    projectId,
-    projectName,
-    detail,
-    kind: "audio",
-    record,
-    records,
-  });
-}
-
 function createWorkspace({
   projectId,
   projectName,
@@ -280,8 +253,6 @@ function toCoreAssetContent(record: AssetRecord) {
           ),
         ),
       };
-    case "audio":
-      return {};
   }
 }
 

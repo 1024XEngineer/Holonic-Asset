@@ -158,7 +158,11 @@ describe("saveCoreSpriteAssetRevision", () => {
       input: {
         projectId: "11",
         assetId: "draft",
-        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+        record: {
+          mode: "uiset" as const,
+          prompt: "Inventory",
+          uiset: { components: [] },
+        },
       },
     },
     {
@@ -166,7 +170,11 @@ describe("saveCoreSpriteAssetRevision", () => {
       input: {
         projectId: "11",
         assetId: "9",
-        record: { mode: "audio" as const, prompt: "Theme", audio: {} },
+        record: {
+          mode: "uiset" as const,
+          prompt: "Inventory",
+          uiset: { components: [] },
+        },
       },
     },
   ])("skips $name saves", async ({ input }) => {

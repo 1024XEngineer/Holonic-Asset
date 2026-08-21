@@ -31,11 +31,11 @@ type ObjectAssetKind = "object";
 export type SceneryAssetKind = "scenery";
 export type TilesetAssetKind = "tileset";
 export type UISetAssetKind = "uiset";
-export type AudioAssetKind = "audio";
+export type AssetRecordKind = Exclude<AssetKind, "audio">;
 
 export type SceneryCanvasDimensions = { width: number; height: number };
 
-type AssetRecordBase<K extends AssetKind> = {
+type AssetRecordBase<K extends AssetRecordKind> = {
   mode: K;
   prompt: string;
 };
@@ -72,19 +72,15 @@ export type UISetAssetRecord = AssetRecordBase<UISetAssetKind> & {
   };
 };
 
-export type AudioAssetRecord = AssetRecordBase<AudioAssetKind> & {
-  audio: Record<string, never>;
-};
-
 type AssetRecordByKind = {
   character: CharacterAssetRecord;
   object: ObjectAssetRecord;
   scenery: SceneryAssetRecord;
   tileset: TilesetAssetRecord;
   uiset: UISetAssetRecord;
-  audio: AudioAssetRecord;
 };
 
-export type AssetRecord = AssetRecordByKind[AssetKind];
+export type AssetRecord = AssetRecordByKind[AssetRecordKind];
 
-export type AssetRecordForKind<K extends AssetKind> = AssetRecordByKind[K];
+export type AssetRecordForKind<K extends AssetRecordKind> =
+  AssetRecordByKind[K];
