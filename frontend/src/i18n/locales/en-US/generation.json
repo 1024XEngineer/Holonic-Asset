@@ -77,6 +77,13 @@
   "queue": "Generation queue",
   "task_one": "task",
   "task_other": "tasks",
+  "retry": "Retry",
+  "delete": "Delete",
+  "retryTask": "Retry {{name}}",
+  "deleteTask": "Delete {{name}}",
+  "deleteTaskConfirm": "Delete failed task “{{name}}”?",
+  "deleteTaskDescription": "This removes the failed task from the generation queue. This action cannot be undone.",
+  "taskActionError": "Unable to update this task. Please try again.",
   "status": {
     "pending": "Pending",
     "processing": "Processing",

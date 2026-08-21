@@ -2,9 +2,11 @@ export {
   generationKeys,
   isGenerationRunActive,
   rememberGenerationRunMetadata,
+  useDeleteGenerationRunMutation,
   useEnqueueGenerationMutation,
   useGenerationCandidateQuery,
   useGenerationRunsQuery,
+  useRetryGenerationRunMutation,
   useResolveGenerationApplicationMutation,
 } from "./run";
 export type { CreationRequest, GenerationRun } from "./run";
