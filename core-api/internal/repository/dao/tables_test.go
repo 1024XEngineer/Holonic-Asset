@@ -48,6 +48,102 @@ func TestBootstrapProjectTagsFromTemplatesIsConflictSafe(t *testing.T) {
 	}
 }
 
+func TestCleanupLegacyTagColumnsRemovesFormerSchemaFields(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	for _, statement := range []string{
+		`DROP INDEX IF EXISTS idx_tags_project_normalized_name`,
+		`DROP INDEX IF EXISTS idx_project_tags_project_normalized_name`,
+		`DROP INDEX IF EXISTS idx_project_tags_template`,
+		`ALTER TABLE project_tags DROP COLUMN IF EXISTS normalized_name`,
+		`ALTER TABLE asset_tags DROP COLUMN IF EXISTS position`,
+	} {
+		mock.ExpectExec(regexp.QuoteMeta(statement)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+	}
+
+	if err := cleanupLegacyTagColumns(db); err != nil {
+		t.Fatalf("cleanup legacy tag columns: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestMigrateLegacyTagTableName(t *testing.T) {
+	t.Run("rename legacy table", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		expectTableExists(mock, "project_tags", 0)
+		expectTableExists(mock, "tags", 1)
+		mock.ExpectExec(regexp.QuoteMeta(`ALTER TABLE tags RENAME TO project_tags`)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+
+		if err := migrateLegacyTagTableName(db); err != nil {
+			t.Fatalf("rename legacy tag table: %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("unmet expectations: %v", err)
+		}
+	})
+
+	t.Run("keep current table", func(t *testing.T) {
+		db, mock := newMockTableDatabase(t)
+		expectTableExists(mock, "project_tags", 1)
+
+		if err := migrateLegacyTagTableName(db); err != nil {
+			t.Fatalf("keep current project tag table: %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("unmet expectations: %v", err)
+		}
+	})
+}
+
+func TestEnsureProjectTagIndexesCreatesCurrentIndexes(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	for _, statement := range []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_tags_project_name_ci ON project_tags (project_id, lower(trim(name)))`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_tags_project_template ON project_tags (project_id, template_id) WHERE template_id IS NOT NULL`,
+	} {
+		mock.ExpectExec(regexp.QuoteMeta(statement)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+	}
+
+	if err := ensureProjectTagIndexes(db); err != nil {
+		t.Fatalf("ensure project tag indexes: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSeedTagTemplatesCopiesNewTemplatesToProjects(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	for index, template := range defaultTagTemplates {
+		id := uint(index + 1)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`SELECT \* FROM "tag_templates" WHERE name = \$1 ORDER BY "tag_templates"\."id" LIMIT \$2`).
+			WithArgs(template.Name, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "description", "color"}))
+		mock.ExpectQuery(`INSERT INTO "tag_templates" .* RETURNING "id"`).
+			WithArgs(template.Name, template.Description, template.Color).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(id))
+		mock.ExpectExec(`UPDATE project_tags .*SET template_id = \$1`).
+			WithArgs(id, template.Name, id).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(`INSERT INTO project_tags .*SELECT projects\.id, \$1, \$2, \$3, \$4`).
+			WithArgs(id, template.Name, template.Description, template.Color, id, template.Name).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectCommit()
+	}
+
+	if err := seedTagTemplates(db); err != nil {
+		t.Fatalf("seed tag templates: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestMigrateAssetTagsToTablesBackfillsReusableTagsAndDropsLegacyColumn(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	expectLegacyTagColumn(mock)
@@ -121,12 +217,16 @@ func TestMigrateAssetTagsToTablesPropagatesLegacyReadError(t *testing.T) {
 }
 
 func expectLegacyTagColumn(mock sqlmock.Sqlmock) {
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = $1 AND table_type = $2`)).
-		WithArgs("assets", "BASE TABLE").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	expectTableExists(mock, "assets", 1)
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_schema = CURRENT_SCHEMA() AND table_name = $1 AND column_name = $2`)).
 		WithArgs("assets", "tags").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+}
+
+func expectTableExists(mock sqlmock.Sqlmock, table string, count int) {
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = $1 AND table_type = $2`)).
+		WithArgs(table, "BASE TABLE").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(count))
 }
 
 func expectTagLookup(mock sqlmock.Sqlmock, projectID uint, name string, id uint) {
