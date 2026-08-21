@@ -112,6 +112,7 @@ func TestInitRouterRegistersApplicationRoutes(t *testing.T) {
 	handlers := InitHandlers(
 		workspaceModule,
 		generator.NewEngine(nil, nil),
+		nil,
 		upload.NewManager(nil),
 	)
 	engine := InitRouter(handlers)

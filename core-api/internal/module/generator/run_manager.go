@@ -25,8 +25,6 @@ type RunManager interface {
 	Create(ctx context.Context, request *Request) (RunID, error)
 	List(ctx context.Context, query *RunListQuery) (*RunListPage, error)
 	Get(ctx context.Context, runID RunID) (*Run, error)
-	Retry(ctx context.Context, runID RunID) (RunID, error)
-	Delete(ctx context.Context, runID RunID) error
 	Cancel(ctx context.Context, runID RunID) error
 	ResolveApplication(ctx context.Context, runID RunID, applied bool) error
 }
@@ -619,68 +617,6 @@ func (e *Engine) Get(ctx context.Context, runID RunID) (*Run, error) {
 		return nil, err
 	}
 	return &run, nil
-}
-
-func (e *Engine) Retry(ctx context.Context, runID RunID) (RunID, error) {
-	message, kind, err := e.failedRunTask(ctx, runID)
-	if err != nil {
-		return 0, err
-	}
-
-	var completionStatus taskdomain.Status
-	if kind.AwaitsApplication() {
-		completionStatus = taskdomain.StatusAwaitingApplication
-	}
-	if err := e.tasks.RetryFailed(ctx, message.ID, completionStatus); err != nil {
-		if errors.Is(err, taskdomain.ErrTaskNotFailed) {
-			return 0, fmt.Errorf("%w: run %d changed status", ErrRunNotFailed, runID)
-		}
-		return 0, err
-	}
-	return runID, nil
-}
-
-func (e *Engine) Delete(ctx context.Context, runID RunID) error {
-	message, _, err := e.failedRunTask(ctx, runID)
-	if err != nil {
-		return err
-	}
-	if err := e.tasks.DeleteFailed(ctx, message.ID); err != nil {
-		if errors.Is(err, taskdomain.ErrTaskNotFailed) {
-			return fmt.Errorf("%w: run %d changed status", ErrRunNotFailed, runID)
-		}
-		return err
-	}
-	return nil
-}
-
-func (e *Engine) failedRunTask(
-	ctx context.Context,
-	runID RunID,
-) (*taskdomain.Task, TaskType, error) {
-	if e.tasks == nil {
-		return nil, "", ErrTaskManagerRequired
-	}
-	message, err := e.tasks.GetDetail(ctx, uint(runID))
-	if err != nil {
-		return nil, "", err
-	}
-	if message == nil {
-		return nil, "", fmt.Errorf("generator: run %d has no task", runID)
-	}
-	kind := TaskType(message.Type)
-	if !kind.Valid() {
-		return nil, "", fmt.Errorf("%w: %q", ErrUnsupportedTaskType, message.Type)
-	}
-	if message.Status != taskdomain.StatusFailed {
-		return nil, "", fmt.Errorf(
-			"%w: run %d has status %s",
-			ErrRunNotFailed,
-			runID,
-			message.Status,
-		)
-	}
-	return message, kind, nil
 }
 
 func (e *Engine) Cancel(ctx context.Context, runID RunID) error {
