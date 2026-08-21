@@ -252,7 +252,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"pixel knight",
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
-		"reference":"reference.png",
+		"creating_reference":"reference.png",
 		"project_id":11
 	}`)
 
@@ -367,7 +367,7 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 		"perspective":"Top-Down",
 		"direction_count":"4",
 		"project_reference":"projects/7/style.png",
-		"reference":"uploads/user-concept.png",
+		"creating_reference":"uploads/user-concept.png",
 		"project_id":11
 	}`)
 
@@ -455,7 +455,7 @@ func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T)
 		"dimensions":{"width":48,"height":48},
 		"perspective":"Side-On",
 		"project_reference":"projects/7/style.png",
-		"reference":"uploads/user.png"
+		"creating_reference":"uploads/user.png"
 	}`)
 
 	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
@@ -502,7 +502,7 @@ func TestExecutorRejectsPrivatePrototypeReferenceBeforeDownload(t *testing.T) {
 		"creative_brief":"a sapling",
 		"dimensions":{"width":48,"height":48},
 		"perspective":"Side-On",
-		"reference":"uploads/user.png"
+		"creating_reference":"uploads/user.png"
 	}`)
 
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
@@ -532,7 +532,7 @@ func TestExecutorRequiresReferenceStoreForPrototypeURL(t *testing.T) {
 		"creative_brief":"a sapling",
 		"dimensions":{"width":48,"height":48},
 		"perspective":"Side-On",
-		"reference":"https://attacker.example/reference.png"
+		"creating_reference":"https://attacker.example/reference.png"
 	}`)
 
 	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)

@@ -33,11 +33,11 @@ func (e *executor) generateCharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
-			prototypeReferenceState(payload.ProjectReference, payload.Reference),
+			prototypeReferenceState(payload.ProjectReference, payload.CreatingReference),
 		),
 		payload.Dimensions,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.Reference),
+		referenceImages(payload.ProjectReference, payload.CreatingReference),
 	)
 	if err != nil {
 		return nil, err
@@ -149,11 +149,11 @@ func (e *executor) generateObjectPrototype(
 			payload.Perspective,
 			payload.Dimensions,
 			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
-			prototypeReferenceState(payload.ProjectReference, payload.Reference),
+			prototypeReferenceState(payload.ProjectReference, payload.CreatingReference),
 		),
 		payload.Dimensions,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.Reference),
+		referenceImages(payload.ProjectReference, payload.CreatingReference),
 	)
 	if err != nil {
 		return nil, err
@@ -423,10 +423,10 @@ func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {
 	return references, nil
 }
 
-func prototypeReferenceState(projectReference, userReference string) prompts.PrototypeReferenceState {
+func prototypeReferenceState(projectReference, creatingReference string) prompts.PrototypeReferenceState {
 	return prompts.PrototypeReferenceState{
-		HasProjectReference: strings.TrimSpace(projectReference) != "",
-		HasUserReference:    strings.TrimSpace(userReference) != "",
+		HasProjectReference:  strings.TrimSpace(projectReference) != "",
+		HasCreatingReference: strings.TrimSpace(creatingReference) != "",
 	}
 }
 

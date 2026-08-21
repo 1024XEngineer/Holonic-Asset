@@ -427,7 +427,7 @@ func TestCreateBuildsCharacterPrototypePayload(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if payload.ProjectID != 42 || payload.AssetName != "knight" ||
-		payload.CreativeBrief != "hero" || payload.Reference != "" || payload.ProjectReference != "" ||
+		payload.CreativeBrief != "hero" || payload.CreatingReference != "" || payload.ProjectReference != "" ||
 		payload.Dimensions.Width != 64 || payload.Dimensions.Height != 64 || payload.Perspective != "Top-Down" {
 		t.Fatalf("unexpected character prototype payload: %+v", payload)
 	}
@@ -569,7 +569,7 @@ func TestCreateEditObjectPrototypeRequiresAssetID(t *testing.T) {
 	}
 }
 
-func TestCreatePersistsProjectAndUserReferencesBeforePublishing(t *testing.T) {
+func TestCreatePersistsProjectAndCreatingReferencesBeforePublishing(t *testing.T) {
 	tasks := &taskManagerStub{createID: 17}
 	projects := &projectReaderStub{project: &projectdomain.Project{Reference: "projects/42/style.png"}}
 	references := &referenceStoreStub{}
@@ -581,7 +581,7 @@ func TestCreatePersistsProjectAndUserReferencesBeforePublishing(t *testing.T) {
 		ProjectID: 42,
 		Kind:      generator.GenerateObjectProtoType,
 		Parameters: json.RawMessage(`{
-			"reference":"https://cdn.example.com/user/object.png"
+			"creating_reference":"https://cdn.example.com/user/object.png"
 		}`),
 	})
 	if err != nil {
@@ -592,7 +592,7 @@ func TestCreatePersistsProjectAndUserReferencesBeforePublishing(t *testing.T) {
 		t.Fatalf("decode task payload: %v", err)
 	}
 	if projects.calls != 1 || payload.ProjectReference != "uploads/generated-1.png" ||
-		payload.Reference != "uploads/generated-2.png" ||
+		payload.CreatingReference != "uploads/generated-2.png" ||
 		!reflect.DeepEqual(references.persisted, []string{
 			"projects/42/style.png",
 			"https://cdn.example.com/user/object.png",
@@ -625,7 +625,7 @@ func TestCreateUsesProjectReferenceWhenPayloadOmitsIt(t *testing.T) {
 	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 		t.Fatalf("decode task payload: %v", err)
 	}
-	if projects.calls != 1 || payload.Reference != "" || payload.ProjectReference != "uploads/generated-1.png" ||
+	if projects.calls != 1 || payload.CreatingReference != "" || payload.ProjectReference != "uploads/generated-1.png" ||
 		len(references.persisted) != 1 || references.persisted[0] != "projects/42/reference.png" {
 		t.Fatalf("project reference was not used: calls=%d payload=%+v persisted=%v", projects.calls, payload, references.persisted)
 	}
@@ -639,7 +639,7 @@ func TestCreateDoesNotPublishWhenReferencePersistenceFails(t *testing.T) {
 
 	_, err := engine.Create(context.Background(), &generator.Request{
 		Kind:       generator.GenerateObjectProtoType,
-		Parameters: json.RawMessage(`{"reference":"https://cdn.example.com/reference.png"}`),
+		Parameters: json.RawMessage(`{"creating_reference":"https://cdn.example.com/reference.png"}`),
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected persistence error, got %v", err)
@@ -657,7 +657,7 @@ func TestCreateRejectsExternalReferenceBeforePublishing(t *testing.T) {
 	_, err := engine.Create(context.Background(), &generator.Request{
 		Kind: generator.GenerateObjectProtoType,
 		Parameters: json.RawMessage(
-			`{"reference":"https://attacker.example/reference.png"}`,
+			`{"creating_reference":"https://attacker.example/reference.png"}`,
 		),
 	})
 	if !errors.Is(err, generator.ErrInvalidTaskPayload) ||
@@ -953,7 +953,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 	}{
 		{
 			taskType: generator.GenerateCharacterProtoType,
-			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","creating_reference":"media-1","project_id":11}`),
 		},
 		{
 			taskType: generator.EditCharacterProtoType,
@@ -965,7 +965,7 @@ func TestRegisteredGeneratorTaskHandlersDecodeTheirPayloads(t *testing.T) {
 		},
 		{
 			taskType: generator.GenerateObjectProtoType,
-			payload:  json.RawMessage(`{"asset_name":"chest","creative_brief":"wooden chest","dimensions":{"width":64,"height":64},"perspective":"Isometric","reference":"media-2","project_id":11}`),
+			payload:  json.RawMessage(`{"asset_name":"chest","creative_brief":"wooden chest","dimensions":{"width":64,"height":64},"perspective":"Isometric","creating_reference":"media-2","project_id":11}`),
 		},
 		{
 			taskType: generator.EditObjectProtoType,
@@ -1115,7 +1115,7 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 }
 
 func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
-	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","reference":"media-1","project_id":42}`)
+	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","creating_reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
 	executor := &executorStub{result: json.RawMessage(`{"asset_id":23}`)}
 	generator.NewEngine(tasks, executor)
@@ -1192,9 +1192,9 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 		decodeAsset func(*testing.T, json.RawMessage) (uint, uint, string, int, int, string)
 	}{
 		{
-			name:       "complete Item with edit reference",
+			name:       "complete Item with creating reference",
 			kind:       generator.EditTilesetItem,
-			parameters: json.RawMessage(`{"target":{"position":{"x":2,"y":3}},"reference":"https://cdn.example/edit.png"}`),
+			parameters: json.RawMessage(`{"target":{"position":{"x":2,"y":3}},"creating_reference":"https://cdn.example/edit.png"}`),
 			wantX:      2,
 			wantY:      3,
 			wantRef:    "uploads/generated-1.png",
@@ -1205,11 +1205,11 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 					t.Fatalf("decode Item edit payload: %v", err)
 				}
 				return payload.ProjectID, payload.AssetID, payload.CreativeBrief,
-					*payload.Target.Position.X, *payload.Target.Position.Y, payload.Reference
+					*payload.Target.Position.X, *payload.Target.Position.Y, payload.CreatingReference
 			},
 		},
 		{
-			name:       "Tile batch without edit reference",
+			name:       "Tile batch without creating reference",
 			kind:       generator.EditTiles,
 			parameters: json.RawMessage(`{"targets":[{"position":{"x":4,"y":5}}]}`),
 			wantX:      4,
@@ -1221,7 +1221,7 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 					t.Fatalf("decode Tile edit payload: %v", err)
 				}
 				return payload.ProjectID, payload.AssetID, payload.CreativeBrief,
-					*payload.Targets[0].Position.X, *payload.Targets[0].Position.Y, payload.Reference
+					*payload.Targets[0].Position.X, *payload.Targets[0].Position.Y, payload.CreatingReference
 			},
 		},
 	}
@@ -1253,14 +1253,14 @@ func TestCreateBuildsCompleteTilesetEditingPayloads(t *testing.T) {
 					projectID, gotAssetID, brief, x, y, reference)
 			}
 			if projects.calls != 0 {
-				t.Fatalf("edit reference preparation loaded the Project: calls=%d", projects.calls)
+				t.Fatalf("creating reference preparation loaded the Project: calls=%d", projects.calls)
 			}
 			wantPersisted := []string(nil)
 			if test.wantRef != "" {
 				wantPersisted = []string{"https://cdn.example/edit.png"}
 			}
 			if !reflect.DeepEqual(references.persisted, wantPersisted) {
-				t.Fatalf("unexpected persisted edit references: got=%v want=%v", references.persisted, wantPersisted)
+				t.Fatalf("unexpected persisted creating references: got=%v want=%v", references.persisted, wantPersisted)
 			}
 		})
 	}
@@ -1278,13 +1278,13 @@ func TestCreateDoesNotPublishTilesetEditWhenReferencePersistenceFails(t *testing
 		AssetID:       &assetID,
 		Kind:          generator.EditTiles,
 		CreativeBrief: "Make the target brighter",
-		Parameters:    json.RawMessage(`{"targets":[{"position":{"x":2,"y":3}}],"reference":"https://cdn.example/edit.png"}`),
+		Parameters:    json.RawMessage(`{"targets":[{"position":{"x":2,"y":3}}],"creating_reference":"https://cdn.example/edit.png"}`),
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected persistence failure, got %v", err)
 	}
 	if tasks.createdTask != nil {
-		t.Fatalf("task was published after edit reference persistence failure: %+v", tasks.createdTask)
+		t.Fatalf("task was published after creating reference persistence failure: %+v", tasks.createdTask)
 	}
 }
 
@@ -1322,8 +1322,8 @@ func TestCreateRejectsInvalidTileSetRequestsBeforePublishing(t *testing.T) {
 			"dimensions":{"tileSize":{"width":1024,"height":16},"tileAmount":{"columns":5,"rows":1}},
 			"items":[{"name":"edge","description":"edge","shape":[[0,0],[4,0]]}]
 		}`)},
-		{"project reference", tileSetRequestWithParameters(validTileSetParametersWith("reference", "https://cdn.example/project.png"))},
-		{"Item reference", tileSetRequestWithParameters(validTileSetParametersWith("items", json.RawMessage(`[{"name":"edge","description":"edge","shape":[[0,0]],"reference":"https://cdn.example/item.png"}]`)))},
+		{"project reference", tileSetRequestWithParameters(validTileSetParametersWith("project_reference", "https://cdn.example/project.png"))},
+		{"Item creating reference", tileSetRequestWithParameters(validTileSetParametersWith("items", json.RawMessage(`[{"name":"edge","description":"edge","shape":[[0,0]],"creating_reference":"https://cdn.example/item.png"}]`)))},
 		{"trailing JSON", tileSetRequestWithParameters(validTileSetParameters() + `{}`)},
 	}
 
@@ -1364,9 +1364,9 @@ func TestCreateRejectsInvalidTilesetEditingTargetsBeforePublishing(t *testing.T)
 		{name: "duplicate Tile position", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}},{"position":{"x":1,"y":2}}]}`)},
 		{name: "Tile edit with target", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"target":{"position":{"x":1,"y":2}}}`)},
 		{name: "Tile edit with legacy path", kind: generator.EditTiles, assetID: &assetID, paths: []string{"items.0.tiles.0"}},
-		{name: "blank edit reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"reference":" "}`)},
-		{name: "control character in edit reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"reference":"bad\u0000reference"}`)},
-		{name: "oversized edit reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"reference":"` + strings.Repeat("x", (8<<20)+1) + `"}`)},
+		{name: "blank creating reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"creating_reference":" "}`)},
+		{name: "control character in creating reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"creating_reference":"bad\u0000reference"}`)},
+		{name: "oversized creating reference", kind: generator.EditTiles, assetID: &assetID, parameters: json.RawMessage(`{"targets":[{"position":{"x":1,"y":2}}],"creating_reference":"` + strings.Repeat("x", (8<<20)+1) + `"}`)},
 	}
 
 	for _, test := range tests {
