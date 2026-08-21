@@ -1,6 +1,5 @@
 export type {
-  AudioAssetKind,
-  AudioAssetRecord,
+  AssetRecordKind,
   CharacterAssetKind,
   CharacterAssetRecord,
   AssetCanvasPosition,

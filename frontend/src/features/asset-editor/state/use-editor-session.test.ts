@@ -65,9 +65,9 @@ vi.mock("./editor-session-store", () => ({
 import { useEditorSession } from "./use-editor-session";
 
 const record = {
-  mode: "audio" as const,
-  prompt: "Theme",
-  audio: {},
+  mode: "uiset" as const,
+  prompt: "Inventory",
+  uiset: { components: [] },
 };
 
 beforeEach(() => {

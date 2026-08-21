@@ -234,7 +234,9 @@ function readURLs(resources: Array<{ url?: string }> | undefined) {
   );
 }
 
-function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
+export function toCoreSpriteAssetContent(
+  record: AssetRecord,
+): CoreSpriteAssetContent {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error("Core sprite records require a Character or Object asset.");
   }
