@@ -1009,12 +1009,12 @@ func TestResizeImageObjectPipelineExpandsSquashedRoundObjectInsideCanonicalMargi
 		t.Fatalf("resize squashed round object: %v", err)
 	}
 	bounds, ok := alphaBounds(toNRGBA(result), TransparentAlphaMax)
-	if !ok || bounds != image.Rect(6, 6, 26, 26) {
-		t.Fatalf("round object bounds = %v, want canonical 20x20 drawable area", bounds)
+	if !ok || bounds != image.Rect(6, 8, 26, 25) {
+		t.Fatalf("round object bounds = %v, want aspect-preserving 20x18 content", bounds)
 	}
-	assertOpaqueRowWidths(t, toNRGBA(result).SubImage(bounds).(*image.NRGBA), []int{
-		6, 10, 14, 16, 16, 18, 18, 20, 20, 20, 20, 20, 20, 18, 18, 16, 16, 14, 10, 6,
-	})
+	if bounds.Dx() == bounds.Dy() {
+		t.Fatal("sprite pipeline unexpectedly regularized the source ellipse into a square")
+	}
 }
 
 func TestRegularizeNearCircularObjectSilhouettePreservesSquareObject(t *testing.T) {
@@ -1206,8 +1206,8 @@ func TestCharacterPrototypePixelPipelinePreservesSourceColoursAndBothEyes(t *tes
 	if err != nil {
 		t.Fatalf("resize character prototype: %v", err)
 	}
-	if report.Sampling != resizeSamplingPixelArea {
-		t.Fatalf("character fixture did not exercise area reduction: %+v", report)
+	if report.Sampling != resizeSamplingNearest {
+		t.Fatalf("character fixture did not recover the logical grid: %+v", report)
 	}
 	margin := AnimationFrameMargin(32, 32)
 	for _, point := range eyes {
@@ -1265,10 +1265,10 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 		width, height int
 		palette       int
 	}{
-		{width: 32, height: 32, palette: 10},
-		{width: 48, height: 64, palette: 14},
-		{width: 64, height: 64, palette: 14},
-		{width: 128, height: 128, palette: 18},
+		{width: 32, height: 32, palette: 16},
+		{width: 48, height: 64, palette: 16},
+		{width: 64, height: 64, palette: 16},
+		{width: 128, height: 128, palette: 24},
 		{width: 256, height: 256, palette: 24},
 	}
 	for _, test := range tests {
@@ -1276,22 +1276,22 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 		if options.Margin != AnimationFrameMargin(test.width, test.height) {
 			t.Fatalf("%dx%d margin = %d, want canonical margin %d", test.width, test.height, options.Margin, AnimationFrameMargin(test.width, test.height))
 		}
-		if options.Mode != RasterModePixel || !options.HardAlpha || options.PaletteSize != test.palette ||
-			!options.NormalizeNearRound || !options.RemoveIsolatedComponents ||
+		if options.Mode != RasterModePixel || !options.HardAlpha || !options.RecoverPixelGrid || options.PaletteSize != test.palette ||
+			options.NormalizeNearRound || options.RemoveIsolatedComponents ||
 			options.RemoveWeakEdgePixels || options.ConsolidateColourIslands || options.PreserveColourAccents ||
-			!options.PreserveInternalEdges || !options.RegularizeContour {
+			options.PreserveInternalEdges || options.RegularizeContour || !options.SpritePixelPipeline {
 			t.Fatalf("unexpected %dx%d prototype options: %+v", test.width, test.height, options)
 		}
 	}
 
-	characterPalettes := map[int]int{32: 10, 64: 14, 128: 18, 256: 24}
+	characterPalettes := map[int]int{32: 16, 64: 16, 128: 24, 256: 24}
 	for dimension, wantPalette := range characterPalettes {
 		character := CharacterPrototypePixelResizeOptions(dimension, dimension)
 		object := PrototypePixelResizeOptions(dimension, dimension)
-		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha ||
+		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha || !character.RecoverPixelGrid ||
 			character.NormalizeNearRound || character.RemoveIsolatedComponents ||
-			character.RemoveWeakEdgePixels || character.ConsolidateColourIslands || !character.PreserveColourAccents ||
-			character.PreserveInternalEdges {
+			character.RemoveWeakEdgePixels || character.ConsolidateColourIslands || character.PreserveColourAccents ||
+			character.PreserveInternalEdges || character.RegularizeContour || !character.SpritePixelPipeline {
 			t.Fatalf("character %dx%d changed canonical geometry or enabled object-only rounding: character=%+v object=%+v", dimension, dimension, character, object)
 		}
 		if character.PaletteSize != wantPalette || character.PaletteSize != object.PaletteSize {
@@ -1313,7 +1313,7 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 	if err != nil {
 		t.Fatalf("resize prototype: %v", err)
 	}
-	if report.Mode != RasterModePixel || report.Sampling != resizeSamplingPixelArea || !report.HardAlpha {
+	if report.Mode != RasterModePixel || report.Sampling != resizeSamplingNearest || !report.HardAlpha {
 		t.Fatalf("unexpected prototype report: %+v", report)
 	}
 	colours := map[color.RGBA]struct{}{}
@@ -1698,16 +1698,15 @@ func TestStabilizeInternalHardEdgesThinsDoubledInternalStripe(t *testing.T) {
 	}
 }
 
-func TestPrototypeObjectUsesSparsePaletteForTinySilhouettes(t *testing.T) {
+func TestPrototypePixelOptionsAvoidGeometryRepairHeuristics(t *testing.T) {
 	t.Parallel()
 
 	object := PrototypePixelResizeOptions(32, 32)
-	if !object.AdaptiveSparsePalette {
-		t.Fatal("object prototype should enable sparse palette adaptation")
-	}
 	character := CharacterPrototypePixelResizeOptions(32, 32)
-	if character.AdaptiveSparsePalette {
-		t.Fatal("character prototype should not enable sparse palette adaptation")
+	for name, options := range map[string]ResizeOptions{"object": object, "character": character} {
+		if !options.SpritePixelPipeline || options.AdaptiveSparsePalette || options.NormalizeNearRound || options.RemoveIsolatedComponents || options.RegularizeContour {
+			t.Fatalf("%s prototype still enables geometry/palette heuristics: %+v", name, options)
+		}
 	}
 
 	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
@@ -1725,5 +1724,46 @@ func TestPrototypeObjectUsesSparsePaletteForTinySilhouettes(t *testing.T) {
 	}
 	if got := sparseSilhouettePaletteSize(img, 10); got != 6 {
 		t.Fatalf("sparse palette size for 40 visible pixels = %d, want 6", got)
+	}
+}
+
+func TestResizeImagePrototypeRecoversSupersampledLogicalGrid(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	red := color.NRGBA{R: 220, G: 40, B: 40, A: 255}
+	blue := color.NRGBA{R: 40, G: 80, B: 220, A: 255}
+	for y := range 8 {
+		for x := range 8 {
+			pixel := red
+			if x >= 4 {
+				pixel = blue
+			}
+			source.SetNRGBA(x, y, pixel)
+		}
+	}
+
+	options := DefaultResizeOptions(2, 2)
+	options.Margin = 0
+	options.CropContent = false
+	options.Mode = RasterModePixel
+	options.RecoverPixelGrid = true
+	result, report, err := ResizeImage(source, options)
+	if err != nil {
+		t.Fatalf("resize prototype: %v", err)
+	}
+	if report.Sampling != pixelGridSamplingRecovered {
+		t.Fatalf("sampling = %q, want %q", report.Sampling, pixelGridSamplingRecovered)
+	}
+	for y := range 2 {
+		for x := range 2 {
+			want := red
+			if x == 1 {
+				want = blue
+			}
+			if got := result.RGBAAt(x, y); got != color.RGBA(want) {
+				t.Fatalf("pixel at (%d,%d) = %+v, want %+v", x, y, got, want)
+			}
+		}
 	}
 }

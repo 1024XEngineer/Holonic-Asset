@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"math"
 	"net/http"
@@ -275,6 +276,7 @@ func (e *executor) generatePrototypeResources(
 			Anchor:                    imageprocessor.AnimationAnchorCenter,
 			NormalizeContentScale:     !isObjectPrototypeTask(taskType),
 			NormalizeContentArea:      isObjectPrototypeTask(taskType),
+			CenterContent:             isObjectPrototypeTask(taskType),
 			RejectGridBoundaryContent: true,
 			GridBoundaryMargin:        sheet.GridBoundaryMargin,
 		})
@@ -293,6 +295,7 @@ func (e *executor) generatePrototypeResources(
 			)
 		}
 	}
+
 	if split == nil || len(split.Regions) != int(directionCount) {
 		got := 0
 		if split != nil {
@@ -312,37 +315,42 @@ func (e *executor) generatePrototypeResources(
 			return nil, fmt.Errorf("generator: allocate %s image key: %w", taskType, err)
 		}
 	}
-	resources := make([]assetdomain.ImageResource, 0, len(regions))
+	options := prototypePixelPostProcessOptions(
+		taskType,
+		int(dimensions.Width),
+		int(dimensions.Height),
+	)
+	processedFrames := make([]image.Image, 0, len(regions))
+	finalKeys := make([]string, len(regions))
 	for index, region := range regions {
 		if region.ImageBase64 == "" {
 			return nil, fmt.Errorf("generator: split %s direction %d is empty", taskType, index)
 		}
-		unprocessedURL := generatedImageDataURL(imageclient.GeneratedImage{
+		unprocessedImage := imageclient.GeneratedImage{
 			Base64:    region.ImageBase64,
 			MediaType: region.MIMEType,
-		})
-		finalKey := ""
+		}
+		unprocessedURL := generatedImageDataURL(unprocessedImage)
 		if e.references != nil {
-			finalKey = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
+			finalKeys[index] = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
 			if err := e.references.PersistReferenceAt(
 				ctx,
-				addObjectKeySuffix(finalKey, "-unprocessed"),
+				addObjectKeySuffix(finalKeys[index], "-unprocessed"),
 				unprocessedURL,
 			); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d unprocessed image: %w", taskType, index, err)
 			}
 		}
+	}
 
-		// Animation-mode splitting has already fixed the final frame geometry,
-		// shared scale, and centre anchor. Run pixel cleanup on that exact canvas
-		// without cropping, adding another margin, or changing pixel positions.
+	for index, region := range regions {
+		// Each direction is quantized independently inside Resize. This mirrors
+		// uploading one source image to the browser converter: every frame gets
+		// the complete palette budget, so a thin seam or accent in one direction
+		// cannot be displaced by colours that only occur in another direction.
 		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: region.ImageBase64,
-			Options: prototypePixelPostProcessOptions(
-				taskType,
-				int(dimensions.Width),
-				int(dimensions.Height),
-			),
+			Options:     options,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: %w", taskType, index, err)
@@ -350,15 +358,42 @@ func (e *executor) generatePrototypeResources(
 		if resized == nil || resized.ImageBase64 == "" {
 			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: empty result", taskType, index)
 		}
+		decoded, err := imageprocessor.DecodeBase64Image(resized.ImageBase64)
+		if err != nil {
+			return nil, fmt.Errorf("generator: decode %s direction %d processed image: %w", taskType, index, err)
+		}
+		processedFrames = append(processedFrames, decoded)
+	}
+
+	// The browser-equivalent conversion above keeps a full palette budget per
+	// frame. This final pass only collapses very close representatives across
+	// directions; it does not run another shared palette reduction.
+	harmonized, err := imageprocessor.HarmonizePrototypeDirectionColours(
+		processedFrames,
+		imageprocessor.PrototypeDirectionPaletteOptions{
+			PaletteSize:           options.PaletteSize,
+			AdaptiveSparsePalette: options.AdaptiveSparsePalette,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("generator: harmonize %s direction colours: %w", taskType, err)
+	}
+
+	resources := make([]assetdomain.ImageResource, 0, len(harmonized))
+	for index, frame := range harmonized {
+		encoded, err := imageprocessor.EncodePNGBase64(frame)
+		if err != nil {
+			return nil, fmt.Errorf("generator: encode %s direction %d image: %w", taskType, index, err)
+		}
 		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
-			Base64:    resized.ImageBase64,
-			MediaType: resized.MIMEType,
+			Base64:    encoded,
+			MediaType: "image/png",
 		})
 		if e.references != nil {
-			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
+			if err := e.references.PersistReferenceAt(ctx, finalKeys[index], finalURL); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
 			}
-			finalURL = finalKey
+			finalURL = finalKeys[index]
 		}
 		resources = append(resources, assetdomain.ImageResource{
 			ID:  uint(index + 1),
@@ -419,11 +454,24 @@ func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imag
 	default:
 		options = imageprocessor.PrototypePixelResizeOptions(width, height)
 	}
-	// SplitImage already produced a canonical target-size frame with the shared
-	// prototype/animation margin. Preserve that canvas exactly while applying
-	// hard alpha, source-colour palette reduction, and block repair.
+	if isObjectPrototypeTask(taskType) {
+		// Objects need animation room too, but preserving the complete supersampled
+		// split frame makes the visible object much smaller than the intended
+		// drawable area. Refit the alpha content into the target canvas minus the
+		// canonical safety margin, matching the browser converter's content-fit
+		// geometry without allowing the object to touch the canvas edge.
+		options.Margin = imageprocessor.AnimationFrameMargin(width, height)
+		options.CropContent = true
+		options.PreserveCanvasGeometry = false
+		return options
+	}
+
+	// Character prototype frames already encode the shared pose scale and the
+	// action/safety margin expected by animation generation. Preserve the whole
+	// frame rather than fitting each pose independently.
 	options.Margin = 0
 	options.CropContent = false
+	options.PreserveCanvasGeometry = true
 	return options
 }
 

@@ -225,6 +225,57 @@ func TestNormalizeAnimationImageCanNormalizeStaticDirectionContentScale(t *testi
 	}
 }
 
+func TestNormalizeAnimationImageCentersStaticObjectFramesAfterSharedCrop(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 128, 128))
+	value := color.NRGBA{R: 220, G: 80, B: 30, A: 255}
+	// Deliberately put equal-sized views at unrelated positions inside the
+	// source cells. This mirrors a model-generated 2x2 prototype sheet and
+	// catches the old failure where each returned 128x128 frame inherited the
+	// source cell's off-centre placement.
+	localBounds := []image.Rectangle{
+		image.Rect(29, 20, 53, 43),
+		image.Rect(26, 20, 50, 46),
+		image.Rect(29, 5, 53, 28),
+		image.Rect(15, 18, 39, 41),
+	}
+	for index, bounds := range localBounds {
+		offset := image.Pt((index%2)*64, (index/2)*64)
+		fillRect(src, bounds.Add(offset), value)
+	}
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 2, FrameCount: 4,
+		FrameWidth: 32, FrameHeight: 32, RenderScale: 4,
+		Margin: AnimationFrameMargin(32, 32),
+		Anchor: AnimationAnchorCenter, NormalizeContentArea: true,
+		CenterContent: true, AlphaThreshold: PixelAlphaThreshold,
+	})
+	if err != nil {
+		t.Fatalf("normalize static object frames: %v", err)
+	}
+	wantCenter := image.Point{X: 64, Y: 64}
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		bounds, ok := alphaBoundsNRGBA(toNRGBA(decoded), PixelAlphaThreshold)
+		if !ok {
+			t.Fatalf("frame %d has no visible content", index)
+		}
+		gotCenter := image.Point{
+			X: (bounds.Min.X + bounds.Max.X) / 2,
+			Y: (bounds.Min.Y + bounds.Max.Y) / 2,
+		}
+		if gotCenter != wantCenter {
+			t.Fatalf("frame %d bbox=%v center=%v, want center=%v", index, bounds, gotCenter, wantCenter)
+		}
+	}
+	if result.Report.OutputAnchorRange.X > 1 || result.Report.OutputAnchorRange.Y > 1 {
+		t.Fatalf("center postcondition left excessive anchor drift: %+v", result.Report.OutputAnchorRange)
+	}
+}
+
 func TestNormalizeAnimationImageCanNormalizeStaticObjectContentArea(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
 	value := color.NRGBA{R: 180, G: 100, B: 40, A: 255}
@@ -236,7 +287,7 @@ func TestNormalizeAnimationImageCanNormalizeStaticObjectContentArea(t *testing.T
 
 	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
 		Columns: 2, Rows: 1, FrameWidth: 64, FrameHeight: 64,
-		Anchor: AnimationAnchorCenter, NormalizeContentArea: true,
+		Anchor: AnimationAnchorCenter, NormalizeContentArea: true, CenterContent: true,
 	})
 	if err != nil {
 		t.Fatalf("normalize object content area: %v", err)
@@ -244,7 +295,7 @@ func TestNormalizeAnimationImageCanNormalizeStaticObjectContentArea(t *testing.T
 	if !result.Report.ContentAreaNormalized || result.Report.ContentAreaMedian != 200 {
 		t.Fatalf("unexpected area normalization report: %+v", result.Report)
 	}
-	if result.Report.RegistrationPolicy != "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop" {
+	if result.Report.RegistrationPolicy != "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop_per_frame_center_postcondition" {
 		t.Fatalf("registration policy = %q", result.Report.RegistrationPolicy)
 	}
 

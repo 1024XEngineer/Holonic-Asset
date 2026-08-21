@@ -201,7 +201,12 @@ intended for action frames, where silhouette changes can be part of the motion.
 `NormalizeContentScale`, `NormalizeContentArea`, and `PreserveSourceCellScale`
 are mutually exclusive. Use `NormalizeContentScale` for characters and
 `NormalizeContentArea` for static objects whose directional views can have
-different aspect ratios but should occupy the same visual footprint.
+different aspect ratios but should occupy the same visual footprint. For a
+static object sheet, also set `CenterContent: true`: anchor registration alone
+can leave a direction's silhouette bbox off-centre when the generated views have
+different internal geometry. `CenterContent` only translates each final frame;
+it does not crop, rescale, recolour, or remove pixels, and must not be used for
+frames whose intentional action displacement needs to be preserved.
 
 The animation pipeline:
 
@@ -228,52 +233,62 @@ The normalization engine is private to the processor. There is no second
 public animation endpoint: callers always use
 `SplitImage(ImageSplitModeAnimation)`.
 
-For generated object prototypes, `PrototypePixelResizeOptions` also enables
-conservative final-grid safeguards: `NormalizeNearRound` repairs a symmetric
-near-circular silhouette using its opaque area (rather than its longest axis),
-so a distorted direction is not made larger than the other views;
-`RemoveIsolatedComponents` removes only tiny disconnected alpha islands after
-hard-alpha cleanup, and preserves a detached part when the supersampled source
-has strong coverage at that location. `RegularizeContour` is enabled for both
-object and character prototypes: it removes only one-pixel convex teeth, concave
-notches, and isolated one-pixel scanline boundary jitter when the supersampled
-alpha supports the correction. It uses exterior-background connectivity to
-avoid filling enclosed holes and never runs a blur or a general majority filter.
+For generated prototypes, `PrototypePixelResizeOptions` and
+`CharacterPrototypePixelResizeOptions` use the same target-size palette budget
+and enable the dedicated `SpritePixelPipeline`. This profile intentionally does
+not run generic object contour repair, round-shape regularization, isolated
+component deletion, or colour-island consolidation. Those heuristics can make a
+basketball oval, erase a thin blade joint, or turn a valid internal line into a
+random colour block. Instead it follows the safer ordering used by dedicated
+pixel-art converters:
 
-Objects and characters use the same palette budget at each target size. This is
-intentional: an object may have fewer semantic parts, but material boundaries,
-crystals, joints, handles, and highlights are still real pixels. The object
-pipeline no longer enables the former aggressive weak-edge deletion or second
-colour-island consolidation pass; those passes could erase source-supported
-prop features and damage the silhouette. Both pipelines choose replacement
-colours from existing source colours and never synthesize a new RGB value.
-Object options additionally enable `PreserveInternalEdges`. It detects only
-continuous one- or two-pixel colour ridges that remain surrounded by foreground
-on both sides in the untouched area-resampled source, thins doubled ridges, and
-snaps each supported line to one existing palette colour. Broad shading
-boundaries, isolated dots, alpha, and silhouette geometry are not changed.
-Object options also enable `AdaptiveSparsePalette`: when a final object has very
-few opaque pixels, the effective palette is reduced to four, six, or eight source
-colours according to the silhouette population. This prevents a tiny elongated
-prop from becoming a collection of unrelated one-pixel colour islands while
-leaving normal-sized objects on the regular palette budget.
-Character options enable `PreserveColourAccents`, so detached accessories and
-small facial marks are not swallowed by palette mapping.
+1. hard-threshold the alpha channel at the converter's 128 cutoff;
+2. quantize the source colours with the same weighted median-cut and eight-pass
+   centroid refinement structure used by the browser converter;
+3. for standalone content conversion, crop to visible content and fit it on a
+   4x intermediate canvas; for a pre-padded prototype frame, preserve the
+   complete canvas geometry instead of refitting its alpha bounds;
+4. centre the intermediate result and reduce it with floor-based nearest
+   sampling; and
+5. scrub transparent RGB without inventing geometry.
 
-### Static images and structural extraction
+The generator uses two geometry contracts. Character frames already contain a
+shared pose canvas with action/safety space, so their final pixel pass sets
+`PreserveCanvasGeometry` and does not refit the alpha bounds. Object frames also
+need animation safety space, but their generated direction cells can contain
+large, inconsistent transparent borders. They therefore crop to the visible
+alpha bounds, fill the inner canvas (`target - 2*margin`) with the Sprite-like
+content-fit pass, and finally place that result on the complete 32/64px canvas
+with a transparent outer safety margin. Neither contract permits the subject to
+touch the final canvas edge.
 
-The other modes intentionally do not change placement inside a source cell:
+Direction frames receive a final conservative colour canonicalization pass that
+merges only near-duplicate colours and never moves pixels or changes silhouette
+geometry.
 
-- `ImageSplitModeGrid`: fixed grid cells for independent tiles, icons, cards,
-  or other static assets.
-- `ImageSplitModeComponents`: one tight image per 8-connected visible region.
-- `ImageSplitModeProjection`: starts with alpha-connected components, expands
-  their bounds by `ProjectionMergeGap`, and uses union-find to merge nearby
-  body, weapon, shadow, or effect pieces. A zero gap selects a size-based
-  default; set it explicitly when generated object groups are densely packed.
+### Prototype Sprite-AI-compatible fitting
 
-These modes are not animation stabilizers. `CropToContent` is valid for
-independent static assets, where each output does not need to share a playback
-coordinate system. If `mode` is omitted, the processor uses components mode
-unless `columns` or `rows` is provided, in which case it defaults to animation
-mode. Static grid callers must explicitly set `Mode: ImageSplitModeGrid`.
+The prototype profile now uses a dedicated `SpritePixelPipeline` rather than
+trying to repair the final image with object-specific contour heuristics. Its
+geometry stage is intentionally compatible with the public browser converter
+used as the reference implementation:
+
+- source alpha is made binary before palette reduction;
+- each direction is quantized independently, so every frame receives the full
+  palette budget and a thin direction-specific seam cannot be displaced by
+  colours from another frame;
+- visible content is fitted into a 4x intermediate canvas before final reduction;
+- nearest sampling uses the source-cell floor rule instead of the processor's
+  centre-sampling nearest rule; and
+- no isolated-component deletion, round-shape forcing, colour-island merging, or
+  contour regularization runs afterward.
+
+`RecoverPixelGrid` remains available for generic pixel callers and tests, but it
+is not the active geometry path when `SpritePixelPipeline` is enabled. This is
+deliberate: the browser converter does not infer a hidden logical grid from
+edge energy; it quantizes, fits, and nearest-resamples the visible image.
+
+This pass is intentionally limited to prototype pixel options. General image
+resizing and non-integral inputs retain the prior area behaviour. The sprite
+profile stops after quantization, grid/nearest sampling, and hard-alpha cleanup;
+it does not run shape-repair heuristics after sampling.

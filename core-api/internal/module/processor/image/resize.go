@@ -1,3 +1,4 @@
+//nolint:revive // resize keeps the legacy and Sprite-compatible strategies together for now
 package image
 
 import (
@@ -11,10 +12,11 @@ import (
 type RasterMode string
 
 const (
-	resizeSamplingArea      = "alpha-aware-area"
-	resizeSamplingBilinear  = "alpha-aware-bilinear"
-	resizeSamplingPixelArea = "alpha-aware-area-then-block-recolour"
-	resizeSamplingNearest   = "nearest-neighbour"
+	resizeSamplingArea               = "alpha-aware-area"
+	resizeSamplingBilinear           = "alpha-aware-bilinear"
+	resizeSamplingPixelArea          = "alpha-aware-area-then-block-recolour"
+	resizeSamplingNearest            = "nearest-neighbour"
+	pixelGridSamplingNearestFallback = "recovered-pixel-grid-nearest"
 	// PixelAlphaThreshold is the coverage cutoff shared by prototype splitting
 	// and final pixel cleanup. Keeping the two stages on the same cutoff avoids
 	// normalizing faint antialias pixels that are removed immediately after.
@@ -57,6 +59,11 @@ type ResizeOptions struct {
 	PreserveInternalEdges    bool       `json:"preserve_internal_edges"`    // Stabilizes continuous source-supported internal seams and linework.
 	AdaptiveSparsePalette    bool       `json:"adaptive_sparse_palette"`    // Reduces palette size for tiny, sparse object silhouettes.
 	RegularizeContour        bool       `json:"regularize_contour"`         // Removes evidence-supported one-pixel contour teeth and notches.
+	RecoverPixelGrid         bool       `json:"recover_pixel_grid"`         // Samples supersampled prototype frames on their recovered logical grid.
+	PrequantizeBeforeResize  bool       `json:"prequantize_before_resize"`  // Quantizes source colours before geometry reduction, like a pixel-art converter.
+	PreferNearestReduction   bool       `json:"prefer_nearest_reduction"`   // Uses nearest-neighbour for pixel-art reduction when no integral grid is available.
+	SpritePixelPipeline      bool       `json:"sprite_pixel_pipeline"`      // Uses quantize-before-nearest conversion with no shape-repair heuristics.
+	PreserveCanvasGeometry   bool       `json:"preserve_canvas_geometry"`   // Keeps a pre-padded fixed frame from being refit to visible content.
 }
 
 // DefaultResizeOptions returns non-destructive defaults for regular 2D game
@@ -106,32 +113,26 @@ func AnimationFrameResizeOptions(width, height int) ResizeOptions {
 // the full transparent canvas.
 func PrototypePixelResizeOptions(width, height int) ResizeOptions {
 	options := prototypePixelResizeOptions(width, height)
-	innerShortEdge := min(
-		width-2*options.Margin,
-		height-2*options.Margin,
-	)
+	targetShortEdge := min(width, height)
 	switch {
-	case innerShortEdge <= 24:
-		options.PaletteSize = 10
-	case innerShortEdge <= 40:
-		options.PaletteSize = 14
-	case innerShortEdge <= 80:
-		options.PaletteSize = 18
+	case targetShortEdge <= 16:
+		options.PaletteSize = 8
+	case targetShortEdge <= 64:
+		options.PaletteSize = 16
 	default:
 		options.PaletteSize = 24
 	}
-	// Objects are simpler semantically, but their material boundaries are not
-	// disposable. Keep the same conservative colour budget as characters and
-	// remove only final-grid alpha specks. The previous object-only second
-	// colour-consolidation pass and weak-edge deletion could erase crystals,
-	// chair joints, and other small but intentional prop features.
-	options.NormalizeNearRound = true
-	options.RemoveIsolatedComponents = true
+	// The sprite profile deliberately does not apply object-specific contour
+	// repairs. A round object must remain round because the source evidence says
+	// so, and an object with an internal seam must not be treated as a sparse
+	// silhouette. Quantize-before-nearest conversion is the only geometry pass.
+	options.NormalizeNearRound = false
+	options.RemoveIsolatedComponents = false
 	options.RemoveWeakEdgePixels = false
 	options.ConsolidateColourIslands = false
-	options.PreserveInternalEdges = true
-	options.AdaptiveSparsePalette = true
-	options.RegularizeContour = true
+	options.PreserveInternalEdges = false
+	options.AdaptiveSparsePalette = false
+	options.RegularizeContour = false
 	return options
 }
 
@@ -141,22 +142,17 @@ func PrototypePixelResizeOptions(width, height int) ResizeOptions {
 // preserve isolated high-contrast accents during palette mapping.
 func CharacterPrototypePixelResizeOptions(width, height int) ResizeOptions {
 	options := prototypePixelResizeOptions(width, height)
-	innerShortEdge := min(
-		width-2*options.Margin,
-		height-2*options.Margin,
-	)
+	targetShortEdge := min(width, height)
 	switch {
-	case innerShortEdge <= 24:
-		options.PaletteSize = 10
-	case innerShortEdge <= 40:
-		options.PaletteSize = 14
-	case innerShortEdge <= 80:
-		options.PaletteSize = 18
+	case targetShortEdge <= 16:
+		options.PaletteSize = 8
+	case targetShortEdge <= 64:
+		options.PaletteSize = 16
 	default:
 		options.PaletteSize = 24
 	}
-	options.PreserveColourAccents = true
-	options.RegularizeContour = true
+	options.PreserveColourAccents = false
+	options.RegularizeContour = false
 	return options
 }
 
@@ -164,6 +160,10 @@ func prototypePixelResizeOptions(width, height int) ResizeOptions {
 	options := AnimationFrameResizeOptions(width, height)
 	options.Mode = RasterModePixel
 	options.HardAlpha = true
+	options.RecoverPixelGrid = true
+	options.PrequantizeBeforeResize = true
+	options.PreferNearestReduction = true
+	options.SpritePixelPipeline = true
 	return options
 }
 
@@ -183,8 +183,9 @@ type ResizeReport struct {
 
 // ResizeImage optionally crops transparent padding and returns a final-size
 // PNG-ready canvas. Smooth mode uses alpha-aware area or bilinear filtering.
-// Pixel mode uses the same geometry-preserving area reduction, then performs
-// palette and block repair only on the final logical pixel grid.
+// Pixel mode uses either the legacy area reduction or, when RecoverPixelGrid is
+// enabled, a guarded hard-grid sample for supersampled prototype frames. Palette
+// and block repair then run only on the final logical pixel grid.
 func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeReport, error) {
 	if input == nil {
 		return nil, ResizeReport{}, fmt.Errorf("input image is required")
@@ -214,6 +215,9 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	}
 
 	img := toNRGBA(input)
+	if mode == RasterModePixel && opts.PrequantizeBeforeResize && opts.PaletteSize > 0 {
+		img = prequantizePixelArtSource(img, opts)
+	}
 	inW, inH := img.Bounds().Dx(), img.Bounds().Dy()
 	if inW <= 0 || inH <= 0 {
 		return nil, ResizeReport{}, fmt.Errorf("resize source must not be empty")
@@ -224,6 +228,9 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 		alphaThreshold := TransparentAlphaMax
 		if opts.HardAlpha {
 			alphaThreshold = hardAlphaThreshold - 1
+			if opts.SpritePixelPipeline {
+				alphaThreshold = spriteAIAlphaThreshold
+			}
 		}
 		if bounds, ok := alphaBounds(img, alphaThreshold); ok {
 			crop = bounds
@@ -237,65 +244,84 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 	var sampling string
 	if opts.CoverCanvas {
 		crop = coverCrop(crop, innerW, innerH)
-		out, sampling = qualityResize(img, crop, innerW, innerH, mode)
+		out, sampling = resizeForMode(img, crop, innerW, innerH, mode, opts.RecoverPixelGrid, opts.PreferNearestReduction, opts.SpritePixelPipeline, opts.PreserveCanvasGeometry)
+	} else if mode == RasterModePixel && opts.SpritePixelPipeline && !opts.PreserveCanvasGeometry {
+		// The browser converter owns contain geometry itself: it fits the cropped
+		// alpha content into a target-sized 4x intermediate canvas, centres it,
+		// then performs the final nearest reduction. Passing a pre-contained
+		// rectangle here applies contain twice and changes rounding at 32/64 px.
+		out, sampling = resizeForMode(img, crop, innerW, innerH, mode, opts.RecoverPixelGrid, opts.PreferNearestReduction, opts.SpritePixelPipeline, false)
 	} else {
-		out, placement, sampling = resizeContain(img, crop, innerW, innerH, mode)
+		scaledW, scaledH := containDimensions(crop.Dx(), crop.Dy(), innerW, innerH)
+		placement = image.Pt((innerW-scaledW)/2, (innerH-scaledH)/2)
+		out, sampling = resizeForMode(img, crop, scaledW, scaledH, mode, opts.RecoverPixelGrid, opts.PreferNearestReduction, opts.SpritePixelPipeline, opts.PreserveCanvasGeometry)
 	}
 
 	if mode == RasterModePixel {
-		// Keep the untouched area-resampled pixels as evidence for every later
-		// decision. Pixel post-processing may recolour an existing logical pixel
-		// or repair a covered one-pixel gap, but it never resamples or moves it.
-		smoothReference := cloneNRGBA(out)
-		if opts.HardAlpha {
-			applyHardAlpha(out, hardAlphaThreshold)
-		}
-		var pixelPalette []color.RGBA
-		if opts.PaletteSize > 0 {
-			// Every palette entry is an exact colour selected from the reduced
-			// source. Perceptual distance is used only to choose among those
-			// colours; the pixel pipeline never synthesizes a new RGB value.
-			paletteSize := opts.PaletteSize
-			if opts.AdaptiveSparsePalette {
-				paletteSize = sparseSilhouettePaletteSize(out, paletteSize)
+		// Sprite conversion intentionally stops after source quantization and
+		// nearest/grid sampling. The old contour, island, and isolated-pixel
+		// repairs are useful for generic pixel resizing, but they can destroy
+		// thin internal lines or reshape a valid generated silhouette.
+		if opts.SpritePixelPipeline {
+			if opts.HardAlpha {
+				applySpriteAIHardAlpha(out)
 			}
-			pixelPalette = buildPalette(out, out.Bounds(), paletteSize, TransparentAlphaMax)
-			if opts.PreserveColourAccents {
-				remapToPalettePreservingAccents(out, out.Bounds(), pixelPalette)
-			} else {
-				remapToPalette(out, out.Bounds(), pixelPalette)
+			scrubTransparentNRGBA(out)
+		} else {
+			// Keep the untouched area-resampled pixels as evidence for every later
+			// decision. Pixel post-processing may recolour an existing logical pixel
+			// or repair a covered one-pixel gap, but it never resamples or moves it.
+			smoothReference := cloneNRGBA(out)
+			if opts.HardAlpha {
+				applyHardAlpha(out, hardAlphaThreshold)
 			}
-			repairPixelColourBlocks(out, smoothReference, opts.ConsolidateColourIslands)
-			if opts.PreserveInternalEdges {
-				stabilizeInternalHardEdges(out, smoothReference, pixelPalette)
+			var pixelPalette []color.RGBA
+			if opts.PaletteSize > 0 {
+				// Every palette entry is an exact colour selected from the reduced
+				// source. Perceptual distance is used only to choose among those
+				// colours; the pixel pipeline never synthesizes a new RGB value.
+				paletteSize := opts.PaletteSize
+				if opts.AdaptiveSparsePalette {
+					paletteSize = sparseSilhouettePaletteSize(out, paletteSize)
+				}
+				pixelPalette = buildPalette(out, out.Bounds(), paletteSize, TransparentAlphaMax)
+				if opts.PreserveColourAccents {
+					remapToPalettePreservingAccents(out, out.Bounds(), pixelPalette)
+				} else {
+					remapToPalette(out, out.Bounds(), pixelPalette)
+				}
+				repairPixelColourBlocks(out, smoothReference, opts.ConsolidateColourIslands)
+				if opts.PreserveInternalEdges {
+					stabilizeInternalHardEdges(out, smoothReference, pixelPalette)
+				}
 			}
-		}
-		if opts.HardAlpha {
-			repairPixelAlphaGaps(out, smoothReference, pixelAlphaRepairFloor)
-			applyHardAlpha(out, hardAlphaThreshold)
-			if opts.RemoveWeakEdgePixels {
-				removeWeakAlphaEdgePixels(out, smoothReference)
+			if opts.HardAlpha {
+				repairPixelAlphaGaps(out, smoothReference, pixelAlphaRepairFloor)
+				applyHardAlpha(out, hardAlphaThreshold)
+				if opts.RemoveWeakEdgePixels {
+					removeWeakAlphaEdgePixels(out, smoothReference)
+				}
 			}
-		}
-		if len(pixelPalette) > 0 {
-			if opts.NormalizeNearRound {
-				// Contain resize returns only the fitted content rectangle. Stage
-				// object pixels on the complete drawable area before round-shape
-				// repair so a slightly squashed circle can grow along its short
-				// axis without changing the canonical outer margin or position.
-				out = placeNRGBAOnCanvas(out, innerW, innerH, placement)
-				smoothReference = placeNRGBAOnCanvas(smoothReference, innerW, innerH, placement)
-				placement = image.Point{}
-				regularizeNearCircularObjectSilhouette(out, smoothReference, pixelPalette)
-			} else {
-				regularizeNearEllipticalSilhouette(out, smoothReference, pixelPalette)
+			if len(pixelPalette) > 0 {
+				if opts.NormalizeNearRound {
+					// Contain resize returns only the fitted content rectangle. Stage
+					// object pixels on the complete drawable area before round-shape
+					// repair so a slightly squashed circle can grow along its short
+					// axis without changing the canonical outer margin or position.
+					out = placeNRGBAOnCanvas(out, innerW, innerH, placement)
+					smoothReference = placeNRGBAOnCanvas(smoothReference, innerW, innerH, placement)
+					placement = image.Point{}
+					regularizeNearCircularObjectSilhouette(out, smoothReference, pixelPalette)
+				} else {
+					regularizeNearEllipticalSilhouette(out, smoothReference, pixelPalette)
+				}
 			}
-		}
-		if opts.RegularizeContour && opts.HardAlpha && len(pixelPalette) > 0 {
-			regularizePixelContour(out, smoothReference, pixelPalette)
-		}
-		if opts.RemoveIsolatedComponents && opts.HardAlpha {
-			removeIsolatedAlphaComponents(out, maxIsolatedComponentPixels(out.Bounds()), smoothReference)
+			if opts.RegularizeContour && opts.HardAlpha && len(pixelPalette) > 0 {
+				regularizePixelContour(out, smoothReference, pixelPalette)
+			}
+			if opts.RemoveIsolatedComponents && opts.HardAlpha {
+				removeIsolatedAlphaComponents(out, maxIsolatedComponentPixels(out.Bounds()), smoothReference)
+			}
 		}
 	} else {
 		if opts.PaletteSize > 0 {
@@ -405,18 +431,23 @@ func alphaBounds(img image.Image, threshold uint8) (image.Rectangle, bool) {
 	return image.Rect(minX-b.Min.X, minY-b.Min.Y, maxX-b.Min.X, maxY-b.Min.Y), true
 }
 
-// resizeContain preserves the selected source rectangle's aspect ratio and
-// centres the scaled result inside the available destination area.
-func resizeContain(
+func resizeForMode(
 	src *image.NRGBA,
 	crop image.Rectangle,
 	dstW, dstH int,
 	mode RasterMode,
-) (*image.NRGBA, image.Point, string) {
-	scaledW, scaledH := containDimensions(crop.Dx(), crop.Dy(), dstW, dstH)
-	placement := image.Pt((dstW-scaledW)/2, (dstH-scaledH)/2)
-	resized, sampling := qualityResize(src, crop, scaledW, scaledH, mode)
-	return resized, placement, sampling
+	recoverGrid, preferNearest, spritePipeline, preserveCanvasGeometry bool,
+) (*image.NRGBA, string) {
+	if mode == RasterModePixel && spritePipeline {
+		return spriteAIResizeWithGeometry(src, crop, dstW, dstH, preserveCanvasGeometry), resizeSamplingNearest
+	}
+	if mode == RasterModePixel && recoverGrid {
+		return recoverPixelGridResize(src, crop, dstW, dstH, preferNearest, spritePipeline)
+	}
+	if mode == RasterModePixel && preferNearest && (crop.Dx() > dstW || crop.Dy() > dstH) {
+		return nearestResize(src, crop, dstW, dstH), resizeSamplingNearest
+	}
+	return qualityResize(src, crop, dstW, dstH, mode)
 }
 
 func containDimensions(srcW, srcH, dstW, dstH int) (int, int) {
@@ -607,6 +638,23 @@ func applyHardAlpha(img *image.NRGBA, threshold uint8) {
 		for x := range img.Bounds().Dx() {
 			p := img.NRGBAAt(x, y)
 			if p.A < threshold {
+				img.SetNRGBA(x, y, color.NRGBA{})
+				continue
+			}
+			p.A = 255
+			img.SetNRGBA(x, y, p)
+		}
+	}
+}
+
+// applySpriteAIHardAlpha mirrors the browser converter's strict comparison:
+// alpha values must be greater than 128 to survive. The generic hard-alpha
+// helper intentionally retains its historical inclusive threshold semantics.
+func applySpriteAIHardAlpha(img *image.NRGBA) {
+	for y := range img.Bounds().Dy() {
+		for x := range img.Bounds().Dx() {
+			p := img.NRGBAAt(x, y)
+			if p.A <= spriteAIAlphaThreshold {
 				img.SetNRGBA(x, y, color.NRGBA{})
 				continue
 			}
@@ -942,4 +990,22 @@ func scrubTransparentNRGBA(img *image.NRGBA) {
 			}
 		}
 	}
+}
+
+// prequantizePixelArtSource follows the stable ordering used by dedicated
+// image-to-pixel-art converters: remove translucent fringe and collapse the
+// source colour field before reducing its geometry. If quantization happens
+// after area reduction, neighbouring mixel blocks are averaged first and a
+// new colour is created at every boundary; the palette pass can no longer
+// recover the original seam or highlight.
+func prequantizePixelArtSource(img *image.NRGBA, opts ResizeOptions) *image.NRGBA {
+	prepared := cloneNRGBA(img)
+	if opts.SpritePixelPipeline {
+		applySpriteAIHardAlpha(prepared)
+	} else {
+		applyHardAlpha(prepared, hardAlphaThreshold)
+	}
+
+	quantizePixelArtSource(prepared, opts.PaletteSize)
+	return prepared
 }
