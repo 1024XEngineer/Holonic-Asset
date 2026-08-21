@@ -58,6 +58,7 @@ type imageProcessorStub struct {
 	splitResults      []*imageprocessor.SplitImageResult
 	splitErrors       []error
 	err               error
+	flipErr           error
 }
 
 type referenceUpload struct {
@@ -155,6 +156,23 @@ func (s *imageProcessorStub) NormalizeReference(
 		ImageBase64: request.ImageBase64,
 		MIMEType:    "image/png",
 		Report:      imageprocessor.ReferenceNormalizationReport{Scale: 1},
+	}, nil
+}
+
+func (s *imageProcessorStub) FlipHorizontal(
+	_ context.Context,
+	request *imageprocessor.FlipHorizontalRequest,
+) (*imageprocessor.FlipHorizontalResult, error) {
+	*s.events = append(*s.events, "flip_horizontal")
+	if s.flipErr != nil {
+		return nil, s.flipErr
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.FlipHorizontalResult{
+		ImageBase64: "mirrored:" + request.ImageBase64,
+		MIMEType:    "image/png",
 	}, nil
 }
 

@@ -221,6 +221,17 @@ type ResizeResult struct {
 	Report      ResizeReport `json:"report"`
 }
 
+// FlipHorizontalRequest mirrors an image around its vertical centre line.
+type FlipHorizontalRequest struct {
+	ImageBase64 string `json:"image_base64"`
+}
+
+// FlipHorizontalResult contains the mirrored PNG image.
+type FlipHorizontalResult struct {
+	ImageBase64 string `json:"image_base64"`
+	MIMEType    string `json:"mime_type"`
+}
+
 // VerifyRequest validates a Base64 image without modifying it.
 type VerifyRequest struct {
 	ImageBase64        string  `json:"image_base64"`

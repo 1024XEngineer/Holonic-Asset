@@ -32,6 +32,7 @@ func TestCharacterPrototypeIncludesFullBodyStyleAndDirectionLayout(t *testing.T)
 		"reading-order indexes",
 		"zero-based array index is the direction identity",
 		"index 0 = left, index 1 = right",
+		"never render both cells facing the same way",
 		"equal gutters and equal margins",
 		"one regular output sheet",
 		"silver-armored dragon-born interstellar soldier",
