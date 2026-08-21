@@ -20,8 +20,8 @@ const mocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   session: {
-    chooseReference: vi.fn(),
-    clearReference: vi.fn(),
+    chooseCreatingReference: vi.fn(),
+    clearCreatingReference: vi.fn(),
     dispose: vi.fn(),
     getSnapshot: vi.fn(),
     prepareDeletion: vi.fn(),

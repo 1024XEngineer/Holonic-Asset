@@ -70,8 +70,8 @@ export function useQuickGeneration() {
       status,
     },
     actions: {
-      chooseReference: session.chooseReference,
-      clearReference: session.clearReference,
+      chooseCreatingReference: session.chooseCreatingReference,
+      clearCreatingReference: session.clearCreatingReference,
       deleteCurrentAsset,
       generate,
       reload: assetsQuery.refetch,

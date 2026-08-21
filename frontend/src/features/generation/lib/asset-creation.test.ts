@@ -30,12 +30,13 @@ describe("asset creation", () => {
   });
 
   it("creates kind-specific request payloads", () => {
-    const reference = { id: "reference" };
+    const creatingReference = { id: "creating-reference" };
     const drafts = kinds.map((kind) => {
-      const draft = createAssetCreationDraft<typeof reference>(kind);
+      const draft = createAssetCreationDraft<typeof creatingReference>(kind);
       draft.name = "  Asset name  ";
       draft.prompt = "  Asset prompt  ";
-      if ("reference" in draft) draft.reference = reference;
+      if ("creatingReference" in draft)
+        draft.creatingReference = creatingReference;
       return draft;
     });
 
@@ -47,12 +48,12 @@ describe("asset creation", () => {
         name: "Asset name",
         prompt: "Asset prompt",
         perspective: "Top-Down",
-        reference,
+        creatingReference,
       }),
       expect.objectContaining({
         kind: "object",
         perspective: "Top-Down",
-        reference,
+        creatingReference,
       }),
       expect.objectContaining({
         kind: "scenery",
@@ -65,7 +66,7 @@ describe("asset creation", () => {
       }),
       expect.objectContaining({
         kind: "uiset",
-        reference,
+        creatingReference,
         canvasSize: "1024 x 768 px",
         dimensions: { width: 1024, height: 768 },
         components: [{ name: "", description: "" }],

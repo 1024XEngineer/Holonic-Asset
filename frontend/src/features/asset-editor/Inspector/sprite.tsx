@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import type {
-  InspectorReference,
+  InspectorCreatingReference,
   SpriteInspectorContentProps,
 } from "./inspector.types";
 import { useInspectorEdit } from "./use-inspector-edit";
@@ -90,10 +90,10 @@ export function SpriteInspectorContent(props: SpriteInspectorContentProps) {
           onKeyDown={controller.handlePromptKeyDown}
         />
 
-        {controller.reference ? (
-          <ReferencePreview
-            reference={controller.reference}
-            onClear={controller.clearReference}
+        {controller.creatingReference ? (
+          <CreatingReferencePreview
+            creatingReference={controller.creatingReference}
+            onClear={controller.clearCreatingReference}
           />
         ) : null}
         {isDragActive ? (
@@ -103,9 +103,9 @@ export function SpriteInspectorContent(props: SpriteInspectorContentProps) {
         ) : null}
       </div>
 
-      {controller.referenceError || controller.submitError ? (
+      {controller.creatingReferenceError || controller.submitError ? (
         <p className="border-t px-3 py-2 text-xs text-destructive" role="alert">
-          {controller.referenceError ?? controller.submitError}
+          {controller.creatingReferenceError ?? controller.submitError}
         </p>
       ) : null}
 
@@ -127,10 +127,10 @@ export function SpriteInspectorContent(props: SpriteInspectorContentProps) {
           <TooltipContent>{t("attachImage")}</TooltipContent>
         </Tooltip>
         <div className="flex items-center gap-2">
-          {controller.isReadingReference ? (
+          {controller.isUploadingCreatingReference ? (
             <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <LoaderCircle className="size-3 animate-spin" />
-              {t("readingImage")}
+              {t("uploadingImage")}
             </span>
           ) : null}
           <Tooltip>
@@ -185,23 +185,23 @@ function TargetThumbnail({
   );
 }
 
-function ReferencePreview({
-  reference,
+function CreatingReferencePreview({
+  creatingReference,
   onClear,
 }: {
-  reference: InspectorReference;
+  creatingReference: InspectorCreatingReference;
   onClear: () => void;
 }) {
   const { t } = useTranslation("editor");
   return (
     <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 p-1.5">
       <img
-        src={reference.dataUrl}
-        alt={reference.fileName}
+        src={creatingReference.previewUrl}
+        alt={creatingReference.fileName}
         className="size-10 rounded-md border object-cover"
       />
       <p className="min-w-0 flex-1 truncate text-xs font-medium">
-        {reference.fileName}
+        {creatingReference.fileName}
       </p>
       <Tooltip>
         <TooltipTrigger

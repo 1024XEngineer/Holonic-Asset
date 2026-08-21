@@ -10,17 +10,19 @@ type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   canvasSize: string;
 };
 
-export type VisualAssetCreationDraft<Reference = unknown> =
+export type VisualAssetCreationDraft<CreatingReference = unknown> =
   CommonAssetCreationDraft<
     Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "uiset">
   > & {
     perspective: Perspective;
-    reference: Reference | undefined;
+    creatingReference: CreatingReference | undefined;
   };
 
-export type SceneryAssetCreationDraft = CommonAssetCreationDraft<"scenery"> & {
-  aspectRatio: SceneryAspectRatio;
-};
+export type SceneryAssetCreationDraft<CreatingReference = unknown> =
+  CommonAssetCreationDraft<"scenery"> & {
+    aspectRatio: SceneryAspectRatio;
+    creatingReference: CreatingReference | undefined;
+  };
 
 export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
   tiles: {
@@ -30,19 +32,19 @@ export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
   }[];
 };
 
-export type UISetAssetCreationDraft<Reference = unknown> =
+export type UISetAssetCreationDraft<CreatingReference = unknown> =
   CommonAssetCreationDraft<"uiset"> & {
     dimensions: { width: number; height: number };
     style: string;
-    reference: Reference | undefined;
+    creatingReference: CreatingReference | undefined;
     components: { id: string; name: string; description: string }[];
   };
 
 export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
 
-export type AssetCreationDraft<Reference = unknown> =
-  | VisualAssetCreationDraft<Reference>
-  | SceneryAssetCreationDraft
+export type AssetCreationDraft<CreatingReference = unknown> =
+  | VisualAssetCreationDraft<CreatingReference>
+  | SceneryAssetCreationDraft<CreatingReference>
   | TilesetAssetCreationDraft
-  | UISetAssetCreationDraft<Reference>
+  | UISetAssetCreationDraft<CreatingReference>
   | AudioAssetCreationDraft;
