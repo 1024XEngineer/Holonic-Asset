@@ -27,7 +27,7 @@ func TestAssetListLoadsStoredThumbnailAndReusableTags(t *testing.T) {
 		3,
 	))
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT asset_tags.asset_id, tags.name, tags.description, tags.color FROM "asset_tags" JOIN tags ON tags.id = asset_tags.tag_id WHERE asset_tags.asset_id IN ($1) ORDER BY asset_tags.asset_id ASC, asset_tags.position ASC, asset_tags.tag_id ASC`,
+		`SELECT asset_tags.asset_id, project_tags.name, project_tags.description, project_tags.color FROM "asset_tags" JOIN project_tags ON project_tags.id = asset_tags.tag_id WHERE asset_tags.asset_id IN ($1) ORDER BY asset_tags.asset_id ASC, project_tags.name ASC, project_tags.id ASC`,
 	)).WithArgs(uint(7)).WillReturnRows(sqlmock.NewRows([]string{
 		"asset_id", "name", "description", "color",
 	}).AddRow(7, "hero", "main role", "#123456").AddRow(
@@ -58,7 +58,7 @@ func TestAssetListPropagatesTagLoadFailure(t *testing.T) {
 	mock.ExpectQuery(`SELECT id, name, project_id, type, description, perspective, dimensions, thumbnail_url, version FROM "assets"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "project_id"}).AddRow(7, 42))
 	wantErr := errors.New("tag query failed")
-	mock.ExpectQuery(`SELECT asset_tags\.asset_id, tags\.name, tags\.description, tags\.color FROM "asset_tags"`).
+	mock.ExpectQuery(`SELECT asset_tags\.asset_id, project_tags\.name, project_tags\.description, project_tags\.color FROM "asset_tags"`).
 		WillReturnError(wantErr)
 
 	_, err := (&AssetDaoImpl{DB: db}).GetAssetsByProjectID(context.Background(), 42)
@@ -119,16 +119,13 @@ func TestAssetDaoUpdateAssetReusesProjectTagAndDeduplicatesNames(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "asset_tags" WHERE asset_id = $1`)).
 		WithArgs(uint(32)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`INSERT INTO "tags" .*ON CONFLICT \("project_id","normalized_name"\) DO NOTHING RETURNING "id"`).
-		WithArgs(uint(1), "Knight", "knight", "request metadata", "#ABCDEF").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	mock.ExpectQuery(`SELECT \* FROM "tags" WHERE project_id = \$1 AND normalized_name = \$2 ORDER BY "tags"\."id" LIMIT \$3`).
-		WithArgs(uint(1), "knight", 1).
+	mock.ExpectQuery(`SELECT \* FROM "project_tags" WHERE project_id = \$1 AND lower\(trim\(name\)\) = lower\(trim\(\$2\)\) ORDER BY "project_tags"\."id" LIMIT \$3`).
+		WithArgs(uint(1), "Knight", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "project_id", "name", "normalized_name", "description", "color",
-		}).AddRow(9, 1, "knight", "knight", "canonical metadata", "#123456"))
+			"id", "project_id", "name", "description", "color",
+		}).AddRow(9, 1, "knight", "canonical metadata", "#123456"))
 	mock.ExpectExec(`INSERT INTO "asset_tags"`).
-		WithArgs(uint(32), uint(9), uint(0)).
+		WithArgs(uint(32), uint(9)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -145,11 +142,35 @@ func TestAssetDaoUpdateAssetReusesProjectTagAndDeduplicatesNames(t *testing.T) {
 	}
 }
 
+func TestResolveProjectTagCreatesMissingTagWithoutRaceFailure(t *testing.T) {
+	db, mock := newMockAssetDatabase(t)
+	mock.ExpectQuery(`SELECT \* FROM "project_tags" WHERE project_id = \$1 AND lower\(trim\(name\)\) = lower\(trim\(\$2\)\) ORDER BY "project_tags"\."id" LIMIT \$3`).
+		WithArgs(uint(42), "knight", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO "project_tags" .*ON CONFLICT DO NOTHING RETURNING "id"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
+	mock.ExpectCommit()
+
+	tag, err := (&AssetDaoImpl{DB: db}).resolveProjectTag(context.Background(), 42, assetdomain.Tag{
+		Name: "knight", Description: "armored", Color: "#123456",
+	})
+	if err != nil {
+		t.Fatalf("resolve project tag: %v", err)
+	}
+	if tag.ID != 9 || tag.ProjectID != 42 || tag.Name != "knight" {
+		t.Fatalf("unexpected project tag: %+v", tag)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestAssetDaoUpdateAssetWithoutFieldsReloadsTags(t *testing.T) {
 	db, mock := newMockAssetDatabase(t)
 	mock.ExpectBegin()
 	expectAssetRow(mock, 32, 1)
-	mock.ExpectQuery(`SELECT asset_tags\.asset_id, tags\.name, tags\.description, tags\.color FROM "asset_tags"`).
+	mock.ExpectQuery(`SELECT asset_tags\.asset_id, project_tags\.name, project_tags\.description, project_tags\.color FROM "asset_tags"`).
 		WithArgs(uint(32)).
 		WillReturnRows(sqlmock.NewRows([]string{"asset_id", "name", "description", "color"}).
 			AddRow(32, "pixel-art", "", assetdomain.DefaultTagColor))

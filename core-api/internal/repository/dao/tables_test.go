@@ -33,6 +33,21 @@ func TestMigrateAssetTagsToTablesSkipsWhenLegacyColumnIsMissing(t *testing.T) {
 	}
 }
 
+func TestBootstrapProjectTagsFromTemplatesIsConflictSafe(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	mock.ExpectExec(`UPDATE project_tags .*FROM tag_templates.*linked\.template_id = tag_templates\.id`).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(`INSERT INTO project_tags .*CROSS JOIN tag_templates.*ON CONFLICT DO NOTHING`).
+		WillReturnResult(sqlmock.NewResult(0, 6))
+
+	if err := bootstrapProjectTagsFromTemplates(db); err != nil {
+		t.Fatalf("bootstrap project tags: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestMigrateAssetTagsToTablesBackfillsReusableTagsAndDropsLegacyColumn(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	expectLegacyTagColumn(mock)
@@ -46,9 +61,9 @@ func TestMigrateAssetTagsToTablesBackfillsReusableTagsAndDropsLegacyColumn(t *te
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "asset_tags" WHERE asset_id = $1`)).
 		WithArgs(uint(7)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
-	expectTagInsertAndLookup(mock, 42, "hero", "hero", 101)
+	expectTagLookup(mock, 42, "hero", 101)
 	expectAssetTagInsert(mock, 7, 101, 0)
-	expectTagInsertAndLookup(mock, 42, "pixel-art", "pixel-art", 102)
+	expectTagLookup(mock, 42, "pixel-art", 102)
 	expectAssetTagInsert(mock, 7, 102, 1)
 	mock.ExpectExec(regexp.QuoteMeta(`DROP INDEX IF EXISTS idx_assets_tags_gin`)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -114,20 +129,17 @@ func expectLegacyTagColumn(mock sqlmock.Sqlmock) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 }
 
-func expectTagInsertAndLookup(mock sqlmock.Sqlmock, projectID uint, name, normalized string, id uint) {
-	mock.ExpectQuery(`INSERT INTO "tags" .*ON CONFLICT \("project_id","normalized_name"\) DO NOTHING RETURNING "id"`).
-		WithArgs(projectID, name, normalized, "", "#4F46E5").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	mock.ExpectQuery(`SELECT \* FROM "tags" WHERE project_id = \$1 AND normalized_name = \$2 ORDER BY "tags"\."id" LIMIT \$3`).
-		WithArgs(projectID, normalized, 1).
+func expectTagLookup(mock sqlmock.Sqlmock, projectID uint, name string, id uint) {
+	mock.ExpectQuery(`SELECT \* FROM "project_tags" WHERE project_id = \$1 AND lower\(trim\(name\)\) = lower\(trim\(\$2\)\) ORDER BY "project_tags"\."id" LIMIT \$3`).
+		WithArgs(projectID, name, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "project_id", "name", "normalized_name", "description", "color",
-		}).AddRow(id, projectID, name, normalized, "", "#4F46E5"))
+			"id", "project_id", "name", "description", "color",
+		}).AddRow(id, projectID, name, "", "#4F46E5"))
 }
 
-func expectAssetTagInsert(mock sqlmock.Sqlmock, assetID, tagID, position uint) {
+func expectAssetTagInsert(mock sqlmock.Sqlmock, assetID, tagID, _ uint) {
 	mock.ExpectExec(`INSERT INTO "asset_tags"`).
-		WithArgs(assetID, tagID, position).
+		WithArgs(assetID, tagID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 }
 
