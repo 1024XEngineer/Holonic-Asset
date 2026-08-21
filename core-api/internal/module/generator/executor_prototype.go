@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 
@@ -15,7 +17,20 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-const maxPrototypeReferenceBytes = 32 << 20
+const (
+	minimumPrototypeSheetPixels    uint64 = 655_360
+	maximumPrototypeSheetPixels    uint64 = 8_294_400
+	maximumPrototypeSheetDimension uint64 = 3840
+	prototypeSheetAlignment        uint64 = 16
+	maximumPrototypeSheetAspect    uint64 = 3
+	maximumPrototypeCandidates            = 3
+	maxPrototypeReferenceBytes            = 32 << 20
+)
+
+type prototypeSheetSpec struct {
+	Size               string
+	GridBoundaryMargin int
+}
 
 func (e *executor) generateCharacterPrototype(
 	ctx context.Context,
@@ -32,7 +47,7 @@ func (e *executor) generateCharacterPrototype(
 		prompts.CharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
@@ -106,7 +121,7 @@ func (e *executor) editCharacterPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
 		directionCount,
@@ -148,7 +163,7 @@ func (e *executor) generateObjectPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
 			payload.Dimensions,
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
@@ -199,55 +214,72 @@ func (e *executor) generatePrototypeResources(
 	if err != nil {
 		return nil, err
 	}
+	sheet, err := derivePrototypeSheetSpec(dimensions, columns, rows)
+	if err != nil {
+		return nil, fmt.Errorf("generator: derive %s direction sheet size: %w", taskType, err)
+	}
 	resolvedReferences, err := e.resolveReferences(ctx, taskType, references)
 	if err != nil {
 		return nil, err
 	}
-	result, err := e.images.Generate(ctx, &imageclient.GenerateRequest{
-		Prompt:          prompt,
-		ReferenceImages: resolvedReferences,
-		MaxAttempts:     3,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, err)
-	}
-	if result == nil || len(result.Images) == 0 {
-		return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
-	}
-	if len(result.Images) != 1 {
-		return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
-	}
-
-	backgroundRemoved, err := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-		ImageBase64:               result.Images[0].Base64,
-		MatteColor:                imageprocessor.DefaultMatteColor,
-		AllowSampledMatteFallback: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: remove %s background: %w", taskType, err)
-	}
-	if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
-		return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
-	}
-	// Prototype directions are static views of one subject, not independent
-	// component crops. Normalize the known grid as an animation sequence so
-	// every direction shares one content scale and one centre anchor. Cropping
-	// each cell independently makes a model-generated subject appear at a
-	// different size (and preserves any off-centre placement) in each direction.
-	split, err := e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
-		ImageBase64:           backgroundRemoved.ImageBase64,
-		Mode:                  imageprocessor.ImageSplitModeAnimation,
-		Columns:               columns,
-		Rows:                  rows,
-		ForceProportionalGrid: true,
-		FrameWidth:            int(dimensions.Width),
-		FrameHeight:           int(dimensions.Height),
-		Margin:                imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
-		Anchor:                imageprocessor.AnimationAnchorCenter,
-		NormalizeContentScale: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("generator: split %s direction sheet: %w", taskType, err)
+	var split *imageprocessor.SplitImageResult
+	for candidate := 1; candidate <= maximumPrototypeCandidates; candidate++ {
+		result, generateErr := e.images.Generate(ctx, &imageclient.GenerateRequest{
+			Prompt:          prompt,
+			ReferenceImages: resolvedReferences,
+			Size:            sheet.Size,
+			MaxAttempts:     3,
+		})
+		if generateErr != nil {
+			return nil, fmt.Errorf("generator: generate %s images: %w", taskType, generateErr)
+		}
+		if result == nil || len(result.Images) == 0 {
+			return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
+		}
+		if len(result.Images) != 1 {
+			return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
+		}
+		backgroundRemoved, removeErr := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
+			ImageBase64: result.Images[0].Base64,
+			MatteColor:  "auto",
+		})
+		if removeErr != nil {
+			return nil, fmt.Errorf("generator: remove %s background: %w", taskType, removeErr)
+		}
+		if backgroundRemoved == nil || backgroundRemoved.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: remove %s background: empty result", taskType)
+		}
+		// Prototype directions are static views of one subject, not independent
+		// component crops. Animation mode keeps one content scale and centre anchor
+		// while boundary validation still rejects unsafe generated sheets.
+		split, err = e.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
+			ImageBase64:               backgroundRemoved.ImageBase64,
+			Mode:                      imageprocessor.ImageSplitModeAnimation,
+			Columns:                   columns,
+			Rows:                      rows,
+			ForceProportionalGrid:     true,
+			FrameWidth:                int(dimensions.Width),
+			FrameHeight:               int(dimensions.Height),
+			Margin:                    imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			Anchor:                    imageprocessor.AnimationAnchorCenter,
+			NormalizeContentScale:     true,
+			RejectGridBoundaryContent: true,
+			GridBoundaryMargin:        sheet.GridBoundaryMargin,
+		})
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, imageprocessor.ErrGridBoundaryContent) {
+			return nil, fmt.Errorf("generator: split %s direction sheet: %w", taskType, err)
+		}
+		if candidate == maximumPrototypeCandidates {
+			return nil, fmt.Errorf(
+				"generator: split %s direction sheet: all %d generated candidates crossed an internal grid boundary: %w",
+				taskType,
+				maximumPrototypeCandidates,
+				err,
+			)
+		}
 	}
 	if split == nil || len(split.Regions) != int(directionCount) {
 		got := 0
@@ -452,6 +484,150 @@ func directionGrid(directionCount uint) (int, int, error) {
 		return 0, 0, fmt.Errorf("generator: unsupported prototype direction count %d", directionCount)
 	}
 }
+
+func derivePrototypeSheetSpec(dimensions assetdomain.Size, columns, rows int) (prototypeSheetSpec, error) {
+	if dimensions.Width == 0 || dimensions.Height == 0 {
+		return prototypeSheetSpec{}, fmt.Errorf("dimensions must be positive")
+	}
+	if columns <= 0 || rows <= 0 {
+		return prototypeSheetSpec{}, fmt.Errorf("grid dimensions must be positive")
+	}
+
+	targetWidth, targetHeight := uint64(dimensions.Width), uint64(dimensions.Height)
+	columnCount, rowCount := uint64(columns), uint64(rows)
+	if targetWidth > math.MaxUint64/columnCount || targetHeight > math.MaxUint64/rowCount {
+		return prototypeSheetSpec{}, fmt.Errorf(
+			"target dimensions %dx%d with grid %dx%d overflow sheet dimensions",
+			dimensions.Width,
+			dimensions.Height,
+			columns,
+			rows,
+		)
+	}
+
+	baseWidth, baseHeight := targetWidth*columnCount, targetHeight*rowCount
+	longEdge, shortEdge := max(baseWidth, baseHeight), min(baseWidth, baseHeight)
+	if longEdge/shortEdge > maximumPrototypeSheetAspect ||
+		(longEdge/shortEdge == maximumPrototypeSheetAspect && longEdge%shortEdge != 0) {
+		return prototypeSheetSpec{}, fmt.Errorf(
+			"target dimensions %dx%d with grid %dx%d require sheet aspect ratio %d:%d, exceeding %d:1",
+			dimensions.Width,
+			dimensions.Height,
+			columns,
+			rows,
+			longEdge,
+			shortEdge,
+			maximumPrototypeSheetAspect,
+		)
+	}
+
+	widthScale := prototypeSheetAlignment / prototypeGCD(baseWidth, prototypeSheetAlignment)
+	heightScale := prototypeSheetAlignment / prototypeGCD(baseHeight, prototypeSheetAlignment)
+	scaleStep := prototypeLCM(widthScale, heightScale)
+	if baseWidth <= maximumPrototypeSheetDimension && baseHeight <= maximumPrototypeSheetDimension {
+		maxScale := min(maximumPrototypeSheetDimension/baseWidth, maximumPrototypeSheetDimension/baseHeight)
+		for scale := scaleStep; scale <= maxScale; scale += scaleStep {
+			width, height := baseWidth*scale, baseHeight*scale
+			pixels := width * height
+			if pixels < minimumPrototypeSheetPixels {
+				continue
+			}
+			if pixels > maximumPrototypeSheetPixels {
+				break
+			}
+			return newPrototypeSheetSpec(width, height, columnCount, rowCount), nil
+		}
+	}
+
+	if fallback, ok := closestLegalPrototypeSheet(baseWidth, baseHeight, columnCount, rowCount); ok {
+		return fallback, nil
+	}
+
+	return prototypeSheetSpec{}, fmt.Errorf(
+		"no legal sheet for target dimensions %dx%d and grid %dx%d satisfies provider constraints",
+		dimensions.Width,
+		dimensions.Height,
+		columns,
+		rows,
+	)
+}
+
+func closestLegalPrototypeSheet(baseWidth, baseHeight, columns, rows uint64) (prototypeSheetSpec, bool) {
+	basePixels := float64(baseWidth) * float64(baseHeight)
+	desiredScale := 1.0
+	if basePixels < float64(minimumPrototypeSheetPixels) {
+		desiredScale = math.Sqrt(float64(minimumPrototypeSheetPixels) / basePixels)
+	} else if basePixels > float64(maximumPrototypeSheetPixels) {
+		desiredScale = math.Sqrt(float64(maximumPrototypeSheetPixels) / basePixels)
+	}
+	desiredScale = min(
+		desiredScale,
+		float64(maximumPrototypeSheetDimension)/float64(baseWidth),
+		float64(maximumPrototypeSheetDimension)/float64(baseHeight),
+	)
+	desiredPixels := basePixels * desiredScale * desiredScale
+
+	bestScore := math.Inf(1)
+	var bestWidth, bestHeight uint64
+	for width := prototypeSheetAlignment; width <= maximumPrototypeSheetDimension; width += prototypeSheetAlignment {
+		idealHeight := float64(width) * float64(baseHeight) / float64(baseWidth)
+		alignedHeight := uint64(math.Round(idealHeight/float64(prototypeSheetAlignment))) * prototypeSheetAlignment
+		for _, height := range []uint64{
+			alignedHeight - min(alignedHeight, prototypeSheetAlignment),
+			alignedHeight,
+			alignedHeight + prototypeSheetAlignment,
+		} {
+			if height == 0 || height > maximumPrototypeSheetDimension {
+				continue
+			}
+			pixels := width * height
+			if pixels < minimumPrototypeSheetPixels || pixels > maximumPrototypeSheetPixels {
+				continue
+			}
+			longEdge, shortEdge := max(width, height), min(width, height)
+			if longEdge > shortEdge*maximumPrototypeSheetAspect {
+				continue
+			}
+
+			aspectError := math.Abs(math.Log(
+				(float64(width) / float64(height)) / (float64(baseWidth) / float64(baseHeight)),
+			))
+			areaError := math.Abs(math.Log(float64(pixels) / desiredPixels))
+			score := aspectError*1000 + areaError
+			if score < bestScore {
+				bestScore, bestWidth, bestHeight = score, width, height
+			}
+		}
+	}
+	if bestWidth == 0 || bestHeight == 0 {
+		return prototypeSheetSpec{}, false
+	}
+	return newPrototypeSheetSpec(bestWidth, bestHeight, columns, rows), true
+}
+
+func newPrototypeSheetSpec(width, height, columns, rows uint64) prototypeSheetSpec {
+	shortCellEdge := min(width/columns, height/rows)
+	margin := shortCellEdge / 32
+	if margin == 0 {
+		margin = 1
+	}
+	return prototypeSheetSpec{
+		Size:               fmt.Sprintf("%dx%d", width, height),
+		GridBoundaryMargin: int(margin),
+	}
+}
+
+func prototypeGCD(left, right uint64) uint64 {
+	for right != 0 {
+		left, right = right, left%right
+	}
+	return left
+}
+
+func prototypeLCM(left, right uint64) uint64 {
+	return left / prototypeGCD(left, right) * right
+}
+
 func addObjectKeySuffix(objectKey, suffix string) string {
 	lastSlash := strings.LastIndex(objectKey, "/")
 	lastDot := strings.LastIndex(objectKey, ".")
@@ -534,7 +710,7 @@ func (e *executor) editObjectPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
-			prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor),
+			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
 		directionCount,
