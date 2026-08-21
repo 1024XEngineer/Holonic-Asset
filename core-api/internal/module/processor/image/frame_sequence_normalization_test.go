@@ -224,3 +224,53 @@ func TestNormalizeAnimationImageCanNormalizeStaticDirectionContentScale(t *testi
 		t.Fatalf("normalized baselines differ: %v", bottoms)
 	}
 }
+
+func TestNormalizeAnimationImageCanNormalizeStaticObjectContentArea(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	value := color.NRGBA{R: 180, G: 100, B: 40, A: 255}
+	// Equal-area views with deliberately different aspect ratios. Height-based
+	// normalization would make the 10x20 view visibly larger than the 20x10
+	// view; object normalization should preserve their visual footprint instead.
+	fillRect(src, image.Rect(15, 10, 25, 30), value)
+	fillRect(src, image.Rect(50, 15, 70, 25), value)
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 64, FrameHeight: 64,
+		Anchor: AnimationAnchorCenter, NormalizeContentArea: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize object content area: %v", err)
+	}
+	if !result.Report.ContentAreaNormalized || result.Report.ContentAreaMedian != 200 {
+		t.Fatalf("unexpected area normalization report: %+v", result.Report)
+	}
+	if result.Report.RegistrationPolicy != "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop" {
+		t.Fatalf("registration policy = %q", result.Report.RegistrationPolicy)
+	}
+
+	areas := make([]int, 0, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		areas = append(areas, animationOpaqueArea(toNRGBA(decoded), defaultImageSplitAlphaThreshold))
+	}
+	if len(areas) != 2 || absInt(areas[0]-areas[1]) > max(areas[0], areas[1])/10 {
+		t.Fatalf("normalized object areas differ too much: %v", areas)
+	}
+}
+
+func TestNormalizeAnimationImageRejectsTwoContentNormalizationPolicies(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 10))
+	fillRect(src, image.Rect(1, 1, 9, 9), color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	fillRect(src, image.Rect(11, 1, 19, 9), color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	_, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 32, FrameHeight: 32,
+		Anchor: AnimationAnchorCenter, NormalizeContentScale: true,
+		NormalizeContentArea: true,
+	})
+	if err == nil {
+		t.Fatal("expected mutually exclusive content normalization policies to fail")
+	}
+}

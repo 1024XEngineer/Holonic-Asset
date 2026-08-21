@@ -15,8 +15,12 @@ const (
 	resizeSamplingBilinear  = "alpha-aware-bilinear"
 	resizeSamplingPixelArea = "alpha-aware-area-then-block-recolour"
 	resizeSamplingNearest   = "nearest-neighbour"
-	hardAlphaThreshold      = uint8(112)
-	pixelAlphaRepairFloor   = uint8(48)
+	// PixelAlphaThreshold is the coverage cutoff shared by prototype splitting
+	// and final pixel cleanup. Keeping the two stages on the same cutoff avoids
+	// normalizing faint antialias pixels that are removed immediately after.
+	PixelAlphaThreshold   = uint8(112)
+	hardAlphaThreshold    = PixelAlphaThreshold
+	pixelAlphaRepairFloor = uint8(64)
 
 	// RasterModeSmooth is intended for regular 2D game art. It uses alpha-aware
 	// area resampling and preserves semi-transparent edge coverage.
@@ -31,15 +35,16 @@ const (
 // illustration to a final game-asset canvas. Mode determines whether the
 // result is smooth 2D art or deliberate pixel art.
 type ResizeOptions struct {
-	Width              int        `json:"width"`
-	Height             int        `json:"height"`
-	Margin             int        `json:"margin"`       // -1 chooses a proportional margin (about 6.25%).
-	PaletteSize        int        `json:"palette_size"` // 0 preserves the source colours.
-	CropContent        bool       `json:"crop_content"`
-	CoverCanvas        bool       `json:"cover_canvas"` // Crops to fill the full target and requires Margin 0.
-	HardAlpha          bool       `json:"hard_alpha"`
-	Mode               RasterMode `json:"mode"`
-	NormalizeNearRound bool       `json:"normalize_near_round"` // Object-only repair for already near-circular silhouettes.
+	Width                    int        `json:"width"`
+	Height                   int        `json:"height"`
+	Margin                   int        `json:"margin"`       // -1 chooses a proportional margin (about 6.25%).
+	PaletteSize              int        `json:"palette_size"` // 0 preserves the source colours.
+	CropContent              bool       `json:"crop_content"`
+	CoverCanvas              bool       `json:"cover_canvas"` // Crops to fill the full target and requires Margin 0.
+	HardAlpha                bool       `json:"hard_alpha"`
+	Mode                     RasterMode `json:"mode"`
+	NormalizeNearRound       bool       `json:"normalize_near_round"`       // Object-only repair for already near-circular silhouettes.
+	RemoveIsolatedComponents bool       `json:"remove_isolated_components"` // Object-only cleanup for detached quantization specks.
 }
 
 // DefaultResizeOptions returns non-destructive defaults for regular 2D game
@@ -104,6 +109,7 @@ func PrototypePixelResizeOptions(width, height int) ResizeOptions {
 		options.PaletteSize = 20
 	}
 	options.NormalizeNearRound = true
+	options.RemoveIsolatedComponents = true
 	return options
 }
 
@@ -226,7 +232,7 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 			// source. Perceptual distance is used only to choose among those
 			// colours; the pixel pipeline never synthesizes a new RGB value.
 			pixelPalette = buildPalette(out, out.Bounds(), opts.PaletteSize, TransparentAlphaMax)
-			remapToPalette(out, out.Bounds(), pixelPalette)
+			remapToPalettePreservingAccents(out, out.Bounds(), pixelPalette)
 			repairPixelColourBlocks(out, smoothReference)
 		}
 		if opts.HardAlpha {
@@ -246,6 +252,9 @@ func ResizeImage(input image.Image, opts ResizeOptions) (*image.RGBA, ResizeRepo
 			} else {
 				regularizeNearEllipticalSilhouette(out, smoothReference, pixelPalette)
 			}
+		}
+		if opts.RemoveIsolatedComponents && opts.HardAlpha {
+			removeIsolatedAlphaComponents(out, maxIsolatedComponentPixels(out.Bounds()))
 		}
 	} else {
 		if opts.PaletteSize > 0 {
@@ -674,9 +683,10 @@ func dominantBoundaryColour(counts map[pixelColourKey]int) (pixelColourKey, int)
 }
 
 // repairPixelAlphaGaps fills only one-pixel gaps for which the area-resampled
-// alpha still records meaningful foreground coverage. A matching horizontal or
-// vertical bridge is strongest evidence; otherwise at least three surrounding
-// pixels must agree on one existing palette colour. Decisions are made from a
+// alpha still records meaningful foreground coverage and an exact horizontal
+// or vertical colour bridge exists. Neighbourhood majority alone is not enough:
+// at sprite scale it frequently turns antialias remnants into extra opaque
+// blocks at silhouettes and between facial details. Decisions are made from a
 // snapshot, so a repair cannot grow recursively into transparent background.
 func repairPixelAlphaGaps(img, smoothReference *image.NRGBA, alphaFloor uint8) {
 	bounds := img.Bounds().Intersect(smoothReference.Bounds())
@@ -755,7 +765,11 @@ func chooseAlphaRepairColour(
 	found := false
 	for key, count := range counts {
 		bridge := bridges[key]
-		if !bridge && (count < 3 || count*2 < opaqueNeighbors) {
+		// Do not infer a foreground pixel from a loose neighbourhood majority.
+		// Only a same-colour cardinal bridge is deterministic evidence that the
+		// transparent pixel is a missing logical pixel rather than a deliberate
+		// hole or a one-pixel separation between details.
+		if !bridge {
 			continue
 		}
 		distance := weightedColourDistance(reference, colourFromKey(key))

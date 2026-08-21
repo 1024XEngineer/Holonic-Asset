@@ -198,7 +198,10 @@ NormalizeContentScale: true,
 This rescales each visible cell to the median source content height before
 anchor registration, then returns the requested fixed-size canvases. It is not
 intended for action frames, where silhouette changes can be part of the motion.
-`NormalizeContentScale` and `PreserveSourceCellScale` are mutually exclusive.
+`NormalizeContentScale`, `NormalizeContentArea`, and `PreserveSourceCellScale`
+are mutually exclusive. Use `NormalizeContentScale` for characters and
+`NormalizeContentArea` for static objects whose directional views can have
+different aspect ratios but should occupy the same visual footprint.
 
 The animation pipeline:
 
@@ -224,6 +227,14 @@ opt-in because pose silhouettes are not reliable cell separators.
 The normalization engine is private to the processor. There is no second
 public animation endpoint: callers always use
 `SplitImage(ImageSplitModeAnimation)`.
+
+For generated object prototypes, `PrototypePixelResizeOptions` also enables two
+conservative final-grid safeguards: `NormalizeNearRound` repairs a symmetric
+near-circular silhouette using its opaque area (rather than its longest axis),
+so a distorted direction is not made larger than the other views;
+`RemoveIsolatedComponents` removes only tiny disconnected alpha islands after
+hard-alpha cleanup. Character options leave both safeguards disabled so detached
+accessories and small facial marks are not treated as noise.
 
 ### Static images and structural extraction
 

@@ -270,8 +270,10 @@ func (e *executor) generatePrototypeResources(
 			FrameWidth:                int(dimensions.Width),
 			FrameHeight:               int(dimensions.Height),
 			Margin:                    imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			AlphaThreshold:            imageprocessor.PixelAlphaThreshold,
 			Anchor:                    imageprocessor.AnimationAnchorCenter,
-			NormalizeContentScale:     true,
+			NormalizeContentScale:     !isObjectPrototypeTask(taskType),
+			NormalizeContentArea:      isObjectPrototypeTask(taskType),
 			RejectGridBoundaryContent: true,
 			GridBoundaryMargin:        sheet.GridBoundaryMargin,
 		})
@@ -422,6 +424,10 @@ func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imag
 	options.Margin = 0
 	options.CropContent = false
 	return options
+}
+
+func isObjectPrototypeTask(taskType TaskType) bool {
+	return taskType != GenerateCharacterProtoType && taskType != EditCharacterProtoType
 }
 
 func singlePrototypeSheet(

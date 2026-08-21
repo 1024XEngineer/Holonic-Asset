@@ -736,8 +736,8 @@ func TestExecutorUsesTargetAspectRatioAndRetriesGridBoundaryCandidates(t *testin
 			request.Columns != 2 || request.Rows != 2 ||
 			request.FrameWidth != 188 || request.FrameHeight != 128 ||
 			request.Anchor != imageprocessor.AnimationAnchorCenter ||
-			!request.NormalizeContentScale || !request.RejectGridBoundaryContent ||
-			request.GridBoundaryMargin != 16 {
+			request.NormalizeContentScale || !request.NormalizeContentArea ||
+			!request.RejectGridBoundaryContent || request.GridBoundaryMargin != 16 {
 			t.Fatalf("unexpected split request %d: %+v", index, request)
 		}
 	}
