@@ -210,7 +210,7 @@ export function ProjectSettingsDialog({
                                 controller.signal,
                               );
                               if (controller.signal.aborted) return;
-                              field.handleChange(target.objectKey);
+                              field.handleChange(target.objectURL);
                               setReferencePreview(target.objectURL);
                             } catch {
                               if (controller.signal.aborted) return;
