@@ -39,13 +39,13 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		forbidden []string
 	}{
 		{
-			name:  "project and user references",
-			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true},
+			name:  "project and creating references",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasCreatingReference: true},
 			expected: []string{
 				"Exactly two reference images are supplied in an authoritative order",
-				"Reference image 1 is the project prototype image and is the Style Reference",
-				"Reference image 2 is the user-supplied reference image",
-				"user-supplied reference image is always a strong reference",
+				"Reference image 1 is the Project Reference (the project prototype image)",
+				"Reference image 2 is the Creating Reference (the user's subject or concept reference)",
+				"The Creating Reference is the user's reference for the object or subject being created",
 				"preserve every unmentioned visual attribute",
 				"make only the changes explicitly requested in the user creative brief",
 			},
@@ -56,18 +56,18 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 			state: prompts.PrototypeReferenceState{HasProjectReference: true},
 			expected: []string{
 				"Exactly one reference image is supplied",
-				"Reference image 1 is the project prototype image and is the Style Reference",
-				"No user-supplied reference image is supplied",
+				"Reference image 1 is the Project Reference (the project prototype image)",
+				"No Creating Reference is supplied",
 			},
 			forbidden: []string{"Reference image 1 is the user-supplied image"},
 		},
 		{
-			name:  "user reference only",
-			state: prompts.PrototypeReferenceState{HasUserReference: true},
+			name:  "creating reference only",
+			state: prompts.PrototypeReferenceState{HasCreatingReference: true},
 			expected: []string{
 				"Exactly one reference image is supplied",
-				"Reference image 1 is the user-supplied reference image",
-				"user-supplied reference image is always a strong reference",
+				"Reference image 1 is the Creating Reference (the user's subject or concept reference)",
+				"The Creating Reference is the user's reference for the object or subject being created",
 				"preserve every unmentioned visual attribute",
 				"make only the changes explicitly requested in the user creative brief",
 				"No project Style Reference is supplied",
@@ -84,7 +84,7 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 			state: prompts.PrototypeReferenceState{},
 			expected: []string{
 				"No reference images are supplied",
-				"Do not assume that any unstated project or user reference is available",
+				"Do not assume that any unstated Project Reference, Creating Reference, or Nexus Reference is available",
 			},
 			forbidden: []string{"Exactly one reference image", "Exactly two reference images"},
 		},
@@ -113,7 +113,7 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 	}
 }
 
-func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
+func TestPrototypePromptsDescribeNexusReferenceRoles(t *testing.T) {
 	tests := []struct {
 		name      string
 		state     prompts.PrototypeReferenceState
@@ -121,49 +121,52 @@ func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
 		forbidden []string
 	}{
 		{
-			name:  "project user and tag assets",
-			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true, TagReferenceCount: 2},
+			name:  "project creating and nexus references",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasCreatingReference: true, NexusReferenceCount: 2},
 			expected: []string{
 				"Exactly 4 reference images",
-				"Reference image 1 is the project prototype image",
-				"Reference image 2 is the user-supplied reference image",
-				"Reference image 3 is a same-project Tag asset",
-				"Reference image 4 is a same-project Tag asset",
+				"Reference image 1 is the Project Reference",
+				"Reference image 2 is the Creating Reference (the user's subject or concept reference)",
+				"Reference image 3 is a Nexus Reference selected by matching Tags within the current Project",
+				"Reference image 4 is a Nexus Reference selected by matching Tags within the current Project",
 			},
-			forbidden: []string{"Reference image 3 is the highest-ranked"},
+			forbidden: []string{"promoted to the Style Reference", "never treat it as the object the user asked to create.\n- Reference image 4 is the Creating Reference"},
 		},
 		{
-			name:  "user and tag assets",
-			state: prompts.PrototypeReferenceState{HasUserReference: true, TagReferenceCount: 2},
+			name:  "creating and nexus references",
+			state: prompts.PrototypeReferenceState{HasCreatingReference: true, NexusReferenceCount: 2},
 			expected: []string{
 				"Exactly 3 reference images",
-				"Reference image 1 is the user-supplied reference image",
-				"Reference image 2 is the highest-ranked same-project Tag asset and is promoted to the Style Reference",
-				"Reference image 3 is a same-project Tag asset",
+				"Reference image 1 is the Creating Reference (the user's subject or concept reference)",
+				"Reference image 2 is a Nexus Reference selected by matching Tags within the current Project",
+				"Reference image 3 is a Nexus Reference selected by matching Tags within the current Project",
+				"No Project Reference is supplied",
 			},
+			forbidden: []string{"promoted to the Style Reference"},
 		},
 		{
-			name:  "project and tag assets without user reference",
-			state: prompts.PrototypeReferenceState{HasProjectReference: true, TagReferenceCount: 2},
+			name:  "project and nexus references without creating reference",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, NexusReferenceCount: 2},
 			expected: []string{
 				"Exactly 3 reference images",
-				"Reference image 1 is the project prototype image",
-				"Reference image 2 is a same-project Tag asset",
-				"Reference image 3 is a same-project Tag asset",
-				"Apply the project Style Reference's visual language to the requested character",
+				"Reference image 1 is the Project Reference",
+				"Reference image 2 is a Nexus Reference selected by matching Tags within the current Project",
+				"Reference image 3 is a Nexus Reference selected by matching Tags within the current Project",
+				"Apply the Project Reference's visual language to the requested character",
 			},
-			forbidden: []string{"Reference image 2 is the highest-ranked"},
+			forbidden: []string{"promoted to the Style Reference"},
 		},
 		{
-			name:  "tag assets only",
-			state: prompts.PrototypeReferenceState{TagReferenceCount: 3},
+			name:  "nexus references only",
+			state: prompts.PrototypeReferenceState{NexusReferenceCount: 3},
 			expected: []string{
 				"Exactly 3 reference images",
-				"Reference image 1 is the highest-ranked same-project Tag asset and is promoted to the Style Reference",
-				"Reference image 2 is a same-project Tag asset",
-				"Reference image 3 is a same-project Tag asset",
-				"Derive the requested character from the user creative brief",
+				"Reference image 1 is a Nexus Reference selected by matching Tags within the current Project",
+				"Reference image 2 is a Nexus Reference selected by matching Tags within the current Project",
+				"Reference image 3 is a Nexus Reference selected by matching Tags within the current Project",
+				"derive the requested character from the user creative brief",
 			},
+			forbidden: []string{"promoted to the Style Reference"},
 		},
 	}
 
@@ -184,8 +187,8 @@ func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
 	}
 }
 
-func TestPrototypePromptsDescribeTagReferenceRolesForObject(t *testing.T) {
-	state := prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true, TagReferenceCount: 1}
+func TestPrototypePromptsDescribeNexusReferenceRolesForObject(t *testing.T) {
+	state := prompts.PrototypeReferenceState{HasProjectReference: true, HasCreatingReference: true, NexusReferenceCount: 1}
 	prompt := prompts.ObjectPrototype(
 		"magic staff",
 		"Side-On",
@@ -196,10 +199,10 @@ func TestPrototypePromptsDescribeTagReferenceRolesForObject(t *testing.T) {
 
 	for _, expected := range []string{
 		"Exactly 3 reference images",
-		"Reference image 1 is the project prototype image",
-		"Reference image 2 is the user-supplied reference image",
-		"Reference image 3 is a same-project Tag asset",
-		"Apply the project Style Reference's visual language to the requested object",
+		"Reference image 1 is the Project Reference",
+		"Reference image 2 is the Creating Reference (the user's subject or concept reference)",
+		"Reference image 3 is a Nexus Reference selected by matching Tags within the current Project",
+		"Apply the Project Reference's visual language to the requested object",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)
