@@ -55,17 +55,6 @@ export function EditorWorkspace({
     );
   }
 
-  if (recordQuery.data.record.mode === "audio") {
-    return (
-      <EditorStatus
-        icon={<AlertTriangle className="size-5" />}
-        title={t("editorUnavailable")}
-        description={t("audioUnavailable")}
-        action={<Button onClick={onBack}>{t("backToLibraryButton")}</Button>}
-      />
-    );
-  }
-
   return (
     <EditorWorkspaceContent
       key={`${projectId}:${assetId}`}
