@@ -26,12 +26,14 @@
       {
         "patterns": [
           {
-            "regex": "^@/model/.+/types(?:/|$)",
-            "message": "Import through the model module index."
+            "group": ["@/features/*/**"],
+            "caseSensitive": true,
+            "message": "Do not import feature internals. Import from '@/features/<feature>'."
           },
           {
-            "regex": "^@/features/.+/types(?:/|$)",
-            "message": "Import through the feature module index."
+            "group": ["@/model/*/**", "!@/model/generated/**"],
+            "caseSensitive": true,
+            "message": "Do not import model internals. Import from '@/model/<module>'."
           }
         ]
       }
@@ -78,6 +80,121 @@
     "vitest/no-disabled-tests": "warn"
   },
   "overrides": [
+    {
+      "files": ["src/model/**/*.ts", "src/model/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/**"],
+                "caseSensitive": true,
+                "message": "Do not import feature internals. Import from '@/features/<feature>'."
+              },
+              {
+                "group": ["@/model/*/**", "!@/model/generated/**"],
+                "caseSensitive": true,
+                "message": "Do not import model internals. Import from '@/model/<module>'."
+              },
+              {
+                "regex": "^@/(?:app|pages|features|components|hooks)(?:/|$)",
+                "message": "Model modules may not depend on app, pages, features, components, or hooks."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/**/*.ts", "src/features/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/**"],
+                "caseSensitive": true,
+                "message": "Do not import feature internals. Import from '@/features/<feature>'."
+              },
+              {
+                "group": ["@/model/*/**", "!@/model/generated/**"],
+                "caseSensitive": true,
+                "message": "Do not import model internals. Import from '@/model/<module>'."
+              },
+              {
+                "regex": "^@/(?:app|pages)(?:/|$)",
+                "message": "Feature modules may not depend on app or pages."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/components/**/*.ts",
+        "src/components/**/*.tsx",
+        "src/hooks/**/*.ts",
+        "src/hooks/**/*.tsx",
+        "src/lib/**/*.ts",
+        "src/lib/**/*.tsx",
+        "src/config/**/*.ts",
+        "src/config/**/*.tsx",
+        "src/i18n/**/*.ts",
+        "src/i18n/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/**"],
+                "caseSensitive": true,
+                "message": "Do not import feature internals. Import from '@/features/<feature>'."
+              },
+              {
+                "group": ["@/model/*/**", "!@/model/generated/**"],
+                "caseSensitive": true,
+                "message": "Do not import model internals. Import from '@/model/<module>'."
+              },
+              {
+                "regex": "^@/(?:app|pages|features)(?:/|$)",
+                "message": "Shared modules may not depend on app, pages, or features."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/pages/**/*.ts", "src/pages/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/**"],
+                "caseSensitive": true,
+                "message": "Do not import feature internals. Import from '@/features/<feature>'."
+              },
+              {
+                "group": ["@/model/*/**", "!@/model/generated/**"],
+                "caseSensitive": true,
+                "message": "Do not import model internals. Import from '@/model/<module>'."
+              },
+              {
+                "regex": "^@/app(?:/|$)",
+                "message": "Pages may not depend on the app composition layer."
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "files": [
         "**/*.test.ts",
