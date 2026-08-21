@@ -2,13 +2,20 @@ package repository_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/datatypes"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
@@ -95,4 +102,104 @@ func TestTaskRepositoryUpdateTaskResultForwardsCompletionStatus(t *testing.T) {
 	if stub.taskID != 17 || stub.status != uint(taskdomain.StatusAwaitingApplication) || string(stub.result) != string(result) {
 		t.Fatalf("unexpected result update: %+v", stub)
 	}
+}
+
+func TestTaskRepositoryRetryFailedTaskResetsAndRequeuesAtomically(t *testing.T) {
+	db, mock := newMockTaskRepositoryDatabase(t)
+	const taskID = uint(17)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT \* FROM "tasks".*FOR UPDATE`).
+		WithArgs(taskID, 1).
+		WillReturnRows(taskRows(taskID, taskdomain.StatusFailed))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "tasks" SET "error"=$1,"result"=$2,"status"=$3,"updated_at"=$4 WHERE id = $5 AND status = $6`)).
+		WithArgs("", nil, uint(taskdomain.StatusPending), sqlmock.AnyArg(), taskID, uint(taskdomain.StatusFailed)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`INSERT INTO "outboxes" .*RETURNING "id"`).
+		WithArgs(taskID, 0, string(generator.GenerateAnimation), sqlmock.AnyArg(), int64(0), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(23))
+	mock.ExpectCommit()
+
+	repo := repository.NewTaskRepository(db)
+	if err := repo.RetryFailedTask(
+		context.Background(),
+		taskID,
+		taskdomain.StatusAwaitingApplication,
+	); err != nil {
+		t.Fatalf("retry failed task: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestTaskRepositoryRetryFailedTaskRejectsStaleStatus(t *testing.T) {
+	db, mock := newMockTaskRepositoryDatabase(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT \* FROM "tasks".*FOR UPDATE`).
+		WithArgs(uint(17), 1).
+		WillReturnRows(taskRows(17, taskdomain.StatusProcessing))
+	mock.ExpectRollback()
+
+	err := repository.NewTaskRepository(db).RetryFailedTask(context.Background(), 17, taskdomain.StatusCompleted)
+	if !errors.Is(err, taskdomain.ErrTaskNotFailed) {
+		t.Fatalf("expected failed task status error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestTaskRepositoryDeleteFailedTaskRemovesTaskAndOutboxAtomically(t *testing.T) {
+	db, mock := newMockTaskRepositoryDatabase(t)
+	const taskID = uint(17)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT \* FROM "tasks".*FOR UPDATE`).
+		WithArgs(taskID, 1).
+		WillReturnRows(taskRows(taskID, taskdomain.StatusFailed))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "outboxes" WHERE task_id = $1`)).
+		WithArgs(taskID).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "tasks" WHERE id = $1 AND status = $2`)).
+		WithArgs(taskID, uint(taskdomain.StatusFailed)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := repository.NewTaskRepository(db).DeleteFailedTask(context.Background(), taskID); err != nil {
+		t.Fatalf("delete failed task: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func newMockTaskRepositoryDatabase(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
+	t.Helper()
+	connection, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sql mock: %v", err)
+	}
+	t.Cleanup(func() { _ = connection.Close() })
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: connection}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		Logger:                 logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open gorm database: %v", err)
+	}
+	return db, mock
+}
+
+func taskRows(taskID uint, status taskdomain.Status) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{
+		"id", "type", "status", "payload", "result", "error", "created_at", "updated_at",
+	}).AddRow(
+		taskID,
+		string(generator.GenerateAnimation),
+		uint(status),
+		[]byte(`{"project_id":42,"asset_id":9}`),
+		nil,
+		"provider failed",
+		sql.NullTime{},
+		sql.NullTime{},
+	)
 }

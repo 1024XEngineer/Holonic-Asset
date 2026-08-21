@@ -23,6 +23,8 @@ type Manager interface {
 	Start(ctx context.Context) error
 	Stop() error
 	Publish(ctx context.Context, task *Task) (uint, error)
+	RetryFailed(ctx context.Context, taskID uint, completionStatus Status) error
+	DeleteFailed(ctx context.Context, taskID uint) error
 	GetDetail(ctx context.Context, taskID uint) (*Task, error)
 	List(ctx context.Context, filter *ListFilter) ([]*Task, error)
 	Cancel(ctx context.Context, taskID uint) error
@@ -125,6 +127,14 @@ func (m *manager) Publish(ctx context.Context, task *Task) (uint, error) {
 		return 0, fmt.Errorf("task: cannot publish nil task")
 	}
 	return m.store.CreateWithOutbox(ctx, task)
+}
+
+func (m *manager) RetryFailed(ctx context.Context, taskID uint, completionStatus Status) error {
+	return m.store.RetryFailedTask(ctx, taskID, completionStatus)
+}
+
+func (m *manager) DeleteFailed(ctx context.Context, taskID uint) error {
+	return m.store.DeleteFailedTask(ctx, taskID)
 }
 
 func (m *manager) GetDetail(ctx context.Context, taskID uint) (*Task, error) {
