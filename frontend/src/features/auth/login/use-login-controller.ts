@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 
-import { resolveAuthRedirect } from "@/app/auth-navigation";
 import { DataApiError } from "@/lib/data-api-error";
 import {
   authApi,
   AuthSessionPersistenceError,
   saveAuthSession,
 } from "@/model/auth";
+
+import { resolveAuthRedirect } from "./resolve-auth-redirect";
 
 export type LoginError =
   | "invalidCredentials"

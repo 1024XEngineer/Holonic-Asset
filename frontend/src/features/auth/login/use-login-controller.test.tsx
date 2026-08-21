@@ -38,7 +38,7 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/app/auth-navigation", () => ({
+vi.mock("./resolve-auth-redirect", () => ({
   resolveAuthRedirect: mocks.resolveAuthRedirect,
 }));
 
