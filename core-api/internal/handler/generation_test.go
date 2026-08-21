@@ -309,6 +309,18 @@ func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
 	}
 }
 
+func TestRetryReturnsUnexpectedManagerError(t *testing.T) {
+	wantErr := errors.New("retry unavailable")
+	stub := &runManagerStub{retryErr: wantErr}
+	_, err := handler.NewGenerationHandler(stub).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected manager error, got %v", err)
+	}
+}
+
 func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 	stub := &runManagerStub{}
 	err := handler.NewGenerationHandler(stub).ResolveApplication(
