@@ -35,21 +35,25 @@ const (
 // Background is nil for opaque input, its matte colour is detected from the
 // source edges automatically.
 type SplitImageRequest struct {
-	ImageBase64              string          `json:"image_base64"`
-	Mode                     ImageSplitMode  `json:"mode,omitempty"`
-	Columns                  int             `json:"columns,omitempty"`
-	Rows                     int             `json:"rows,omitempty"`
-	ForceProportionalGrid    bool            `json:"force_proportional_grid,omitempty"`
-	DetectGridBounds         bool            `json:"detect_grid_bounds,omitempty"`
-	AlphaThreshold           uint8           `json:"alpha_threshold,omitempty"`
-	MinComponentPixels       int             `json:"min_component_pixels,omitempty"`
-	MinBandSize              int             `json:"min_band_size,omitempty"`
-	ProjectionMergeGap       int             `json:"projection_merge_gap,omitempty"`
-	CropToContent            bool            `json:"crop_to_content,omitempty"`
-	AllowEmptyRegions        bool            `json:"allow_empty_regions,omitempty"`
-	FrameCount               int             `json:"frame_count,omitempty"`
-	FrameWidth               int             `json:"frame_width,omitempty"`
-	FrameHeight              int             `json:"frame_height,omitempty"`
+	ImageBase64           string         `json:"image_base64"`
+	Mode                  ImageSplitMode `json:"mode,omitempty"`
+	Columns               int            `json:"columns,omitempty"`
+	Rows                  int            `json:"rows,omitempty"`
+	ForceProportionalGrid bool           `json:"force_proportional_grid,omitempty"`
+	DetectGridBounds      bool           `json:"detect_grid_bounds,omitempty"`
+	AlphaThreshold        uint8          `json:"alpha_threshold,omitempty"`
+	MinComponentPixels    int            `json:"min_component_pixels,omitempty"`
+	MinBandSize           int            `json:"min_band_size,omitempty"`
+	ProjectionMergeGap    int            `json:"projection_merge_gap,omitempty"`
+	CropToContent         bool           `json:"crop_to_content,omitempty"`
+	AllowEmptyRegions     bool           `json:"allow_empty_regions,omitempty"`
+	FrameCount            int            `json:"frame_count,omitempty"`
+	FrameWidth            int            `json:"frame_width,omitempty"`
+	FrameHeight           int            `json:"frame_height,omitempty"`
+	// RenderScale renders animation frames on a supersampled intermediate
+	// canvas. The caller can then reduce those frames once with the final
+	// pixel-art resampler instead of hardening an already tiny silhouette.
+	RenderScale              int             `json:"render_scale,omitempty"`
 	Margin                   int             `json:"margin,omitempty"`
 	CropPadding              int             `json:"crop_padding,omitempty"`
 	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
@@ -238,7 +242,8 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 	result, err := normalizeAnimationImage(input, normalizeAnimationRequest{
 		Columns: request.Columns, Rows: request.Rows, FrameCount: request.FrameCount,
 		FrameWidth: request.FrameWidth, FrameHeight: request.FrameHeight,
-		Margin: request.Margin, CropPadding: request.CropPadding,
+		RenderScale: request.RenderScale,
+		Margin:      request.Margin, CropPadding: request.CropPadding,
 		AlphaThreshold: request.AlphaThreshold, Anchor: request.Anchor,
 		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
 		PreserveVerticalMotion:   request.PreserveVerticalMotion,

@@ -243,6 +243,7 @@ func (e *executor) generatePrototypeResources(
 		ForceProportionalGrid: true,
 		FrameWidth:            int(dimensions.Width),
 		FrameHeight:           int(dimensions.Height),
+		RenderScale:           imageprocessor.PrototypeRenderScale,
 		Margin:                imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
 		AlphaThreshold:        imageprocessor.PixelAlphaThreshold,
 		Anchor:                imageprocessor.AnimationAnchorCenter,

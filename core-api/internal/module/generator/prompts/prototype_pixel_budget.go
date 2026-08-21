@@ -21,13 +21,15 @@ func prototypeLogicalPixelRules(dimensions assetdomain.Size, subject string) str
 	// treating it as a 32px sprite encourages detail that cannot survive
 	// final-size reduction.
 	tierRule := logicalPixelTierRule(innerWidth, innerHeight, subject)
-	subjectRule := "- Express identifying materials and construction using a few high-contrast color clusters rather than fine texture."
+	subjectRule := `- Express identifying materials and construction using a few high-contrast color clusters rather than fine texture.
+- If the object depends on internal linework such as a structural division, opening, rim, spoke, panel boundary, or seam, keep only the indispensable identity-bearing paths. Draw each retained path as one simplified, continuous, consistently coloured logical-pixel line. Do not render it as broken dots, doubled parallel bands, several antialiased shades, or a thick stripe.
+- For an elongated object such as a weapon, tool, pole, staff, spear, rod, banner, or other long prop, do not compress the whole design into a thin centred line or fit it into a square silhouette. Use the available drawable area along its long axis, keep the complete functional end and the grip/shaft as one connected readable silhouette, and simplify ornaments before shrinking the main form. Reserve enough short-axis pixels for the functional end to remain unmistakable.`
 	smallCanvasRule := ""
 	if subject == "character" {
 		subjectRule = "- Make the face symbolic and readable: use a small number of high-contrast pixel clusters for eyes, hairline, skin, or a defining mask; omit eyelashes, nostrils, individual teeth, and other sub-pixel facial rendering unless the final grid can represent them as whole pixels."
 	}
 	if min(width, height) <= 32 {
-		smallCanvasRule = `- The requested final canvas has a short edge of 32 pixels or less. Explicitly lower the design detail level before rendering: use fewer, larger connected shapes and broader color clusters. Omit secondary texture, seams, folds, small accessories, tiny construction parts, logos, and decorative marks that cannot remain readable as whole native-size pixels. Do not create a detailed high-resolution design and expect downscaling or post-processing to simplify it.`
+		smallCanvasRule = `- The requested final canvas has a short edge of 32 pixels or less. Explicitly lower the design detail level before rendering: use fewer, larger connected shapes and broader color clusters. Omit secondary texture, seams, folds, small accessories, tiny construction parts, logos, and decorative marks that cannot remain readable as whole native-size pixels. Preserve an indispensable identity-bearing internal division only as a simplified continuous one-logical-pixel path with one consistent high-contrast colour. Do not create a detailed high-resolution design and expect downscaling or post-processing to simplify it.`
 		if subject == "character" {
 			smallCanvasRule += ` Simplify facial anatomy, clothing construction, equipment ornament, and limb separation before rendering; preserve identity through silhouette, proportion, and a few major color regions.`
 		}

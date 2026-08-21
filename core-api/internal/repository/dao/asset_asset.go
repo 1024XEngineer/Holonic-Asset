@@ -16,7 +16,7 @@ type Asset struct {
 	ProjectID    uint `gorm:"index"`
 	Type         string
 	Description  string
-	Tags         []string `json:"tags" gorm:"serializer:asset_tags"`
+	Tags         []string `json:"tags" gorm:"type:jsonb;serializer:asset_tags"`
 	Perspective  string
 	Dimensions   datatypes.JSON `gorm:"type:jsonb"`
 	ThumbnailURL string
@@ -107,7 +107,7 @@ func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUp
 		if err != nil {
 			return Asset{}, fmt.Errorf("dao: encode asset tags: %w", err)
 		}
-		// Asset.Tags is a serialized text column. Map updates bypass GORM's
+		// Asset.Tags is a serialized JSONB column. Map updates bypass GORM's
 		// field serializer, so pass the JSON representation explicitly.
 		values["tags"] = string(encoded)
 	}

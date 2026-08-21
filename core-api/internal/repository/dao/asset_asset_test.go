@@ -13,6 +13,24 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestAssetTagsUseJSONBColumn(t *testing.T) {
+	db, _ := newMockAssetDatabase(t)
+	statement := &gorm.Statement{DB: db}
+	if err := statement.Parse(&Asset{}); err != nil {
+		t.Fatalf("parse asset schema: %v", err)
+	}
+	field := statement.Schema.LookUpField("Tags")
+	if field == nil {
+		t.Fatal("tags field not found")
+	}
+	if got := string(field.DataType); got != "jsonb" {
+		t.Fatalf("unexpected tags database type: %q, want jsonb", got)
+	}
+	if got := db.Migrator().FullDataTypeOf(field).SQL; got != "jsonb" {
+		t.Fatalf("unexpected tags migration type: %q, want jsonb", got)
+	}
+}
+
 func TestAssetListLoadsStoredThumbnailWithoutJoiningContent(t *testing.T) {
 	db, mock := newMockUserDatabase(t)
 	mock.ExpectQuery(regexp.QuoteMeta(

@@ -45,7 +45,9 @@ Default production guidelines:
 Direction sheet layout rules:
 %s
 - Draw each object view at the exact centre of its assigned grid cell.
-- Fit the complete object's visible bounding box inside a centred area approximately %d%% of the cell's width and approximately %d%% of the cell's height. Preserve the object's proportions, so one occupied axis may be smaller, and leave the remaining space as evenly distributed matte background.
+- For compact objects, fit the complete object's visible bounding box inside a centred area approximately %d%% of the cell's width and approximately %d%% of the cell's height, preserving the object's proportions.
+- For elongated objects, do not apply that compact square occupancy to both axes: let the long axis use roughly 70-90%% of the available drawable length while keeping the short axis proportional and readable. The complete functional end, shaft/handle, and any indispensable attachment must remain visible as one connected silhouette; reduce decoration before reducing the main silhouette.
+- Leave the remaining space as evenly distributed matte background.
 - Keep equal gutters and equal margins on all four sides of every cell.
 - Do not allow any object pixel, attachment, shadow, or outline to cross a cell boundary. Keep the background uniform in every cell so the processor can split the sheet by its regular grid.
 
