@@ -51,6 +51,7 @@ func (e *executor) generateCharacterPrototype(
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
+		perspective,
 		directionCount,
 		referenceImages(payload.ProjectReference, payload.Reference),
 	)
@@ -124,6 +125,7 @@ func (e *executor) editCharacterPrototype(
 			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
+		asset.Perspective,
 		directionCount,
 		originalReferences,
 	)
@@ -167,6 +169,7 @@ func (e *executor) generateObjectPrototype(
 			prototypeReferenceState(payload.ProjectReference, payload.Reference),
 		),
 		payload.Dimensions,
+		perspective,
 		directionCount,
 		referenceImages(payload.ProjectReference, payload.Reference),
 	)
@@ -201,6 +204,7 @@ func (e *executor) generatePrototypeResources(
 	taskType TaskType,
 	prompt string,
 	dimensions assetdomain.Size,
+	perspective assetdomain.Perspective,
 	directionCount uint,
 	references []string,
 ) ([]assetdomain.ImageResource, error) {
@@ -288,6 +292,10 @@ func (e *executor) generatePrototypeResources(
 		}
 		return nil, fmt.Errorf("generator: split %s direction sheet: got %d regions, want %d", taskType, got, directionCount)
 	}
+	regions, err := e.normalizeSideOnRegions(ctx, split.Regions, perspective, taskType)
+	if err != nil {
+		return nil, err
+	}
 
 	var baseKey string
 	if e.references != nil {
@@ -296,8 +304,8 @@ func (e *executor) generatePrototypeResources(
 			return nil, fmt.Errorf("generator: allocate %s image key: %w", taskType, err)
 		}
 	}
-	resources := make([]assetdomain.ImageResource, 0, len(split.Regions))
-	for index, region := range split.Regions {
+	resources := make([]assetdomain.ImageResource, 0, len(regions))
+	for index, region := range regions {
 		if region.ImageBase64 == "" {
 			return nil, fmt.Errorf("generator: split %s direction %d is empty", taskType, index)
 		}
@@ -336,6 +344,50 @@ func (e *executor) generatePrototypeResources(
 	}
 	return resources, nil
 }
+
+// normalizeSideOnRegions makes the Side-On pair deterministic even when the
+// image model ignores the requested left-facing view and renders both cells
+// facing right. The second cell is the canonical right-facing view; the first
+// cell is always derived by a lossless horizontal mirror.
+func (e *executor) normalizeSideOnRegions(
+	ctx context.Context,
+	regions []imageprocessor.ImageRegion,
+	perspective assetdomain.Perspective,
+	taskType TaskType,
+) ([]imageprocessor.ImageRegion, error) {
+	if perspective != assetdomain.PerspectiveSideOn {
+		return regions, nil
+	}
+	if len(regions) != 2 {
+		return nil, fmt.Errorf("generator: normalize %s Side-On directions: got %d regions, want 2", taskType, len(regions))
+	}
+	flipper, ok := e.processor.(imageprocessor.HorizontalFlipper)
+	if !ok {
+		return nil, fmt.Errorf("generator: normalize %s Side-On directions: horizontal flip is unavailable", taskType)
+	}
+	if regions[1].ImageBase64 == "" {
+		return nil, fmt.Errorf("generator: normalize %s Side-On directions: right direction is empty", taskType)
+	}
+	flipped, err := flipper.FlipHorizontal(ctx, &imageprocessor.FlipHorizontalRequest{
+		ImageBase64: regions[1].ImageBase64,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: normalize %s Side-On directions: mirror right direction: %w", taskType, err)
+	}
+	if flipped == nil || flipped.ImageBase64 == "" {
+		return nil, fmt.Errorf("generator: normalize %s Side-On directions: empty mirrored left direction", taskType)
+	}
+	left := regions[0]
+	left.Index = 0
+	left.ImageBase64 = flipped.ImageBase64
+	if flipped.MIMEType != "" {
+		left.MIMEType = flipped.MIMEType
+	}
+	regions[0] = left
+	regions[1].Index = 1
+	return regions, nil
+}
+
 func parsePerspective(perspective string) (assetdomain.Perspective, error) {
 	value := assetdomain.Perspective(strings.TrimSpace(perspective))
 	if !value.Valid() {
@@ -713,6 +765,7 @@ func (e *executor) editObjectPrototype(
 			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
+		asset.Perspective,
 		directionCount,
 		originalReferences,
 	)

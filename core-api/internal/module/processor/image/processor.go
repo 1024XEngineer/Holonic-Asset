@@ -17,6 +17,13 @@ type Processor interface {
 	SplitImage(context.Context, *SplitImageRequest) (*SplitImageResult, error)
 }
 
+// HorizontalFlipper is an optional processor capability for deterministic
+// left/right derivation. It is kept separate from Processor so existing
+// integrations can continue to provide the core processing methods.
+type HorizontalFlipper interface {
+	FlipHorizontal(context.Context, *FlipHorizontalRequest) (*FlipHorizontalResult, error)
+}
+
 // NormalizeReference enlarges small reference images by an integer scale
 // using exact nearest-neighbour pixel replication. It is intentionally
 // separate from Resize, whose filtering and framing rules target final assets.
@@ -167,6 +174,41 @@ func hasUsableTransparentSubject(img image.Image) bool {
 		}
 	}
 	return nontransparent > 0 && ratio(transparent, total) >= MinTransparentRatio
+}
+
+// FlipHorizontal mirrors a decoded image around its vertical centre line.
+// It is used to derive the opposite Side-On direction from one canonical view.
+func (p *processor) FlipHorizontal(
+	ctx context.Context,
+	request *FlipHorizontalRequest,
+) (*FlipHorizontalResult, error) {
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
+	if request == nil {
+		return nil, fmt.Errorf("flip-horizontal request is required")
+	}
+
+	input, err := decodeBase64Image(request.ImageBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode flip-horizontal image: %w", err)
+	}
+	bounds := input.image.Bounds()
+	output := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			mirroredX := bounds.Min.X + bounds.Max.X - 1 - x
+			output.Set(mirroredX, y, input.image.At(x, y))
+		}
+	}
+	if err := validateContext(ctx); err != nil {
+		return nil, err
+	}
+	encoded, err := EncodePNGBase64(output)
+	if err != nil {
+		return nil, fmt.Errorf("encode flip-horizontal image: %w", err)
+	}
+	return &FlipHorizontalResult{ImageBase64: encoded, MIMEType: pngMIMEType}, nil
 }
 
 // Resize converts an image to a deterministic final game-asset canvas.
