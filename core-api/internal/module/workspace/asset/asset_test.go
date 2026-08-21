@@ -35,3 +35,29 @@ func TestAssetTagNamesSkipsBlankNames(t *testing.T) {
 		t.Fatalf("unexpected tag names: got %v want %v", got, want)
 	}
 }
+
+func TestTagUnmarshalJSONErrors(t *testing.T) {
+	t.Run("nil tag receiver", func(t *testing.T) {
+		var tag *assetdomain.Tag
+		err := tag.UnmarshalJSON([]byte(`"hero"`))
+		if err == nil || err.Error() != "asset: tag is nil" {
+			t.Fatalf("expected nil receiver error, got %v", err)
+		}
+	})
+
+	t.Run("unknown fields rejected", func(t *testing.T) {
+		var tag assetdomain.Tag
+		err := json.Unmarshal([]byte(`{"name":"hero","unknown_field":true}`), &tag)
+		if err == nil {
+			t.Fatal("expected unknown field to be rejected by decoder")
+		}
+	})
+
+	t.Run("malformed json object", func(t *testing.T) {
+		var tag assetdomain.Tag
+		err := json.Unmarshal([]byte(`{"name":`), &tag)
+		if err == nil {
+			t.Fatal("expected malformed JSON to fail")
+		}
+	})
+}

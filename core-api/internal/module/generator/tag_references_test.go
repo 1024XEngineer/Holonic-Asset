@@ -190,5 +190,87 @@ func TestNewPrototypeAssetKeepsStructuredTags(t *testing.T) {
 	}
 }
 
+func TestBuildObjectPrototypePayloadAcceptsTags(t *testing.T) {
+	request := &Request{
+		ProjectID:     42,
+		Kind:          GenerateObjectProtoType,
+		CreativeBrief: "ancient artifact",
+		Parameters: json.RawMessage(`{
+			"asset_name":"artifact",
+			"dimensions":{"width":64,"height":64},
+			"perspective":"Side-On",
+			"tags":["magic",{"name":"relic","description":"holy item","color":"#ABCDEF"}]
+		}`),
+	}
+
+	value, err := buildTaskPayload(request)
+	if err != nil {
+		t.Fatalf("build task payload: %v", err)
+	}
+	payload, ok := value.(CreateObjectPrototypePayload)
+	if !ok {
+		t.Fatalf("unexpected payload type %T", value)
+	}
+	want := []assetdomain.Tag{
+		{Name: "magic", Color: assetdomain.DefaultTagColor},
+		{Name: "relic", Description: "holy item", Color: "#ABCDEF"},
+	}
+	if !reflect.DeepEqual(payload.Tags, want) {
+		t.Fatalf("unexpected tags: got %+v want %+v", payload.Tags, want)
+	}
+}
+
+func TestPrepareObjectPrototypePayloadPersistsTagReferences(t *testing.T) {
+	assets := &tagAssetReaderStub{assets: []assetdomain.Asset{
+		{ID: 1, Version: 2, ThumbnailURL: "refs/relic1.png", Tags: []assetdomain.Tag{{Name: "magic"}}},
+		{ID: 2, Version: 1, ThumbnailURL: "refs/relic2.png", Tags: []assetdomain.Tag{{Name: "magic"}}},
+	}}
+	references := &tagReferenceStoreStub{}
+	engine := &Engine{assets: assets, references: references}
+
+	prepared, err := engine.prepareTaskPayload(context.Background(), 42, CreateObjectPrototypePayload{
+		Reference: "user_relic.png",
+		Tags:      []assetdomain.Tag{{Name: "magic"}},
+	})
+	if err != nil {
+		t.Fatalf("prepare task payload: %v", err)
+	}
+	payload := prepared.(CreateObjectPrototypePayload)
+	if want := []string{"refs/relic1.png", "refs/relic2.png"}; !reflect.DeepEqual(payload.TagReferences, want) {
+		t.Fatalf("unexpected tag references: got %v want %v", payload.TagReferences, want)
+	}
+	if want := []string{"user_relic.png", "refs/relic1.png", "refs/relic2.png"}; !reflect.DeepEqual(references.persisted, want) {
+		t.Fatalf("unexpected persisted references: got %v want %v", references.persisted, want)
+	}
+}
+
+func TestSelectTagReferencesZeroAndEdgeInputs(t *testing.T) {
+	engine := &Engine{assets: &tagAssetReaderStub{}}
+
+	// projectID == 0
+	got, err := engine.selectTagReferences(context.Background(), 0, []assetdomain.Tag{{Name: "tag"}}, 3)
+	if err != nil || got != nil {
+		t.Fatalf("expected nil for zero project ID, got %v, %v", got, err)
+	}
+
+	// len(tags) == 0
+	got, err = engine.selectTagReferences(context.Background(), 42, nil, 3)
+	if err != nil || got != nil {
+		t.Fatalf("expected nil for empty tags, got %v, %v", got, err)
+	}
+
+	// blank tag names only
+	got, err = engine.selectTagReferences(context.Background(), 42, []assetdomain.Tag{{Name: "  "}, {Name: ""}}, 3)
+	if err != nil || got != nil {
+		t.Fatalf("expected nil for blank tag names, got %v, %v", got, err)
+	}
+
+	// limit <= 0
+	got, err = engine.selectTagReferences(context.Background(), 42, []assetdomain.Tag{{Name: "tag"}}, 0)
+	if err != nil || got != nil {
+		t.Fatalf("expected nil for zero limit, got %v, %v", got, err)
+	}
+}
+
 var _ AssetReader = (*tagAssetReaderStub)(nil)
 var _ ReferenceStore = (*tagReferenceStoreStub)(nil)

@@ -213,6 +213,8 @@ func TestDecodeAssetTagsInputTypes(t *testing.T) {
 		{name: "byte array", input: []byte(`["object","pixel-art"]`), want: []assetdomain.Tag{{Name: "object", Color: assetdomain.DefaultTagColor}, {Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
 		{name: "string slice", input: []string{"object", "pixel-art"}, want: []assetdomain.Tag{{Name: "object", Color: assetdomain.DefaultTagColor}, {Name: "pixel-art", Color: assetdomain.DefaultTagColor}}},
 		{name: "unsupported database type", input: func() {}, wantErr: true},
+		{name: "malformed json array", input: `[{"name":`, wantErr: true},
+		{name: "malformed json object", input: `{"name":`, wantErr: true},
 	}
 
 	for _, tt := range tests {

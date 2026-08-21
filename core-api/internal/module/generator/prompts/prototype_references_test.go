@@ -143,6 +143,18 @@ func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
 			},
 		},
 		{
+			name:  "project and tag assets without user reference",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, TagReferenceCount: 2},
+			expected: []string{
+				"Exactly 3 reference images",
+				"Reference image 1 is the project prototype image",
+				"Reference image 2 is a same-project Tag asset",
+				"Reference image 3 is a same-project Tag asset",
+				"Apply the project Style Reference's visual language to the requested character",
+			},
+			forbidden: []string{"Reference image 2 is the highest-ranked"},
+		},
+		{
 			name:  "tag assets only",
 			state: prompts.PrototypeReferenceState{TagReferenceCount: 3},
 			expected: []string{
@@ -169,5 +181,28 @@ func TestPrototypePromptsDescribeTagReferenceFallbackRoles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPrototypePromptsDescribeTagReferenceRolesForObject(t *testing.T) {
+	state := prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true, TagReferenceCount: 1}
+	prompt := prompts.ObjectPrototype(
+		"magic staff",
+		"Side-On",
+		assetdomain.Size{Width: 64, Height: 64},
+		prompts.TransparentBackground(),
+		state,
+	)
+
+	for _, expected := range []string{
+		"Exactly 3 reference images",
+		"Reference image 1 is the project prototype image",
+		"Reference image 2 is the user-supplied reference image",
+		"Reference image 3 is a same-project Tag asset",
+		"Apply the project Style Reference's visual language to the requested object",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)
+		}
 	}
 }
