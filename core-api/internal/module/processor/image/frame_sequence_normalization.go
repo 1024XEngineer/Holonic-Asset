@@ -48,6 +48,7 @@ type normalizeAnimationRequest struct {
 	NormalizeContentScale    bool
 	NormalizeContentArea     bool
 	PreserveSourceCellScale  bool
+	CenterContent            bool
 	MaxStabilizationShift    int
 	DetectGridBounds         bool
 	AllowEmptyFrames         bool
@@ -246,6 +247,9 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		report.RegistrationPolicy = "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop"
 	}
 	stabilizeAnimationCells(cells, cellW, cellH, request, &report)
+	if request.CenterContent {
+		report.RegistrationPolicy += "_per_frame_center_postcondition"
+	}
 
 	pad := max(6, int(math.Round(float64(min(cellW, cellH))*.14)))
 	pad = max(pad, int(math.Ceil(max(report.AppliedMaxShift.X, report.AppliedMaxShift.Y))))
@@ -309,6 +313,10 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 			resized, _ := qualityResize(cropped, cropped.Bounds(), drawW, drawH, RasterModeSmooth)
 			draw.Draw(frame, image.Rect(destX, destY, destX+drawW, destY+drawH), resized, image.Point{}, draw.Over)
 		}
+		var frameCenterShift image.Point
+		if request.CenterContent {
+			frame, frameCenterShift = centerAnimationFrameContent(frame, threshold)
+		}
 		scrubTransparentNRGBA(frame)
 		encoded, err := EncodePNGBase64(frame)
 		if err != nil {
@@ -323,8 +331,8 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		if cells[i].visible {
 			sourceValue := cells[i].anchor
 			outputValue := AnimationPoint{
-				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(renderCrop.Min.X))*scale,
-				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(renderCrop.Min.Y))*scale,
+				X: float64(destX) + (float64(pad+cells[i].shift.X)+cells[i].anchor.X-float64(renderCrop.Min.X))*scale + float64(frameCenterShift.X),
+				Y: float64(destY) + (float64(pad+cells[i].shift.Y)+cells[i].anchor.Y-float64(renderCrop.Min.Y))*scale + float64(frameCenterShift.Y),
 			}
 			sourceAnchor, outputAnchor = &sourceValue, &outputValue
 			outputAnchors = append(outputAnchors, outputValue)
@@ -559,6 +567,37 @@ func animationOpaqueArea(img *image.NRGBA, threshold uint8) int {
 		}
 	}
 	return area
+}
+
+// centerAnimationFrameContent is deliberately a translation-only postcondition.
+// Shared-crop registration aligns an anchor, but a generated static direction
+// can still have a different silhouette bbox relative to that anchor. For
+// prototype objects the frame itself is the contract: every view must occupy
+// the same centre band. Recentring here cannot invent or delete pixels and it
+// leaves the fixed animation/action margin intact.
+func centerAnimationFrameContent(frame *image.NRGBA, threshold uint8) (*image.NRGBA, image.Point) {
+	if frame == nil {
+		return frame, image.Point{}
+	}
+	bbox, ok := alphaBoundsNRGBA(frame, threshold)
+	if !ok {
+		return frame, image.Point{}
+	}
+	canvas := frame.Bounds()
+	targetX := float64(canvas.Min.X+canvas.Max.X) / 2
+	targetY := float64(canvas.Min.Y+canvas.Max.Y) / 2
+	dx := int(math.Round(targetX - float64(bbox.Min.X+bbox.Max.X)/2))
+	dy := int(math.Round(targetY - float64(bbox.Min.Y+bbox.Max.Y)/2))
+	// Never trade a registration error for clipping. This should only matter for
+	// malformed inputs that already touch the fixed frame edges.
+	dx = clampAnimationInt(dx, canvas.Min.X-bbox.Min.X, canvas.Max.X-bbox.Max.X)
+	dy = clampAnimationInt(dy, canvas.Min.Y-bbox.Min.Y, canvas.Max.Y-bbox.Max.Y)
+	if dx == 0 && dy == 0 {
+		return frame, image.Point{}
+	}
+	out := image.NewNRGBA(canvas)
+	draw.Draw(out, canvas.Add(image.Pt(dx, dy)), frame, image.Point{}, draw.Src)
+	return out, image.Pt(dx, dy)
 }
 
 func stabilizeAnimationCells(cells []animationCell, width, height int, request normalizeAnimationRequest, report *AnimationNormalizationReport) {

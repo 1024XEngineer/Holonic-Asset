@@ -298,7 +298,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		splitRequest.RenderScale != imageprocessor.PrototypeRenderScale ||
 		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
 		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
-		!splitRequest.NormalizeContentScale || splitRequest.CropToContent {
+		!splitRequest.NormalizeContentScale || splitRequest.CenterContent || splitRequest.CropToContent {
 		t.Fatalf("prototype directions were not normalized on a shared canvas: %+v", splitRequest)
 	}
 	if len(processor.resizeRequests) != 4 {
@@ -306,10 +306,11 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	for index, request := range processor.resizeRequests {
 		if request.Options.Width != 64 || request.Options.Height != 64 ||
-			request.Options.Margin != 0 || request.Options.CropContent {
+			request.Options.Margin != 0 || request.Options.CropContent ||
+			!request.Options.PreserveCanvasGeometry {
 			t.Fatalf("prototype direction %d changed canonical frame geometry: %+v", index, request.Options)
 		}
-		if request.Options.Mode != imageprocessor.RasterModePixel || !request.Options.HardAlpha || request.Options.PaletteSize != 14 {
+		if request.Options.Mode != imageprocessor.RasterModePixel || !request.Options.HardAlpha || request.Options.PaletteSize != 16 {
 			t.Fatalf("prototype direction %d did not use character pixel output options: %+v", index, request.Options)
 		}
 	}
@@ -409,13 +410,17 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	if len(references.uploads) != 8 {
 		t.Fatalf("expected four unprocessed and four final uploads, got %d: %+v", len(references.uploads), references.uploads)
 	}
+	// Raw frames are persisted first; each original direction is then converted
+	// independently before the conservative cross-direction colour harmonizer.
 	wantEvents := []string{"generate_image", "process_image", "split_image", "allocate_key"}
 	for index := range 4 {
-		wantEvents = append(wantEvents,
-			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
-			"resize_image",
-			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
-		)
+		wantEvents = append(wantEvents, fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index))
+	}
+	for range 4 {
+		wantEvents = append(wantEvents, "resize_image")
+	}
+	for index := range 4 {
+		wantEvents = append(wantEvents, fmt.Sprintf("persist:uploads/prototype-%d.png", index))
 	}
 	wantEvents = append(wantEvents, "create_character_asset")
 	if !reflect.DeepEqual(events, wantEvents) {
@@ -432,12 +437,12 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 		t.Fatalf("expected object keys in generated asset: %+v", content.Prototype)
 	}
 	for index := range 4 {
-		uploadOffset := index * 2
-		if references.uploads[uploadOffset].key != fmt.Sprintf("uploads/prototype-%d-unprocessed.png", index) {
-			t.Fatalf("unexpected unprocessed key at %d: %+v", index, references.uploads[uploadOffset])
+		if references.uploads[index].key != fmt.Sprintf("uploads/prototype-%d-unprocessed.png", index) {
+			t.Fatalf("unexpected unprocessed key at %d: %+v", index, references.uploads[index])
 		}
-		if references.uploads[uploadOffset+1].key != fmt.Sprintf("uploads/prototype-%d.png", index) {
-			t.Fatalf("unexpected final key at %d: %+v", index, references.uploads[uploadOffset+1])
+		finalOffset := 4 + index
+		if references.uploads[finalOffset].key != fmt.Sprintf("uploads/prototype-%d.png", index) {
+			t.Fatalf("unexpected final key at %d: %+v", index, references.uploads[finalOffset])
 		}
 	}
 }
@@ -620,11 +625,17 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		t.Fatalf("pixel post-process request count = %d, want 8", len(processor.resizeRequests))
 	}
 	for index, request := range processor.resizeRequests {
+		if request.ImageBase64 != prototypeTestFrameBase64(index) {
+			t.Fatalf("object direction %d did not pass its original split frame to Resize", index)
+		}
 		if request.Options.Width != 128 || request.Options.Height != 128 ||
-			request.Options.Margin != 0 || request.Options.CropContent ||
-			request.Options.PaletteSize != 18 || !request.Options.NormalizeNearRound ||
-			request.Options.RemoveWeakEdgePixels || request.Options.ConsolidateColourIslands {
-			t.Fatalf("object direction %d did not preserve canonical geometry with object pixel options: %+v", index, request.Options)
+			request.Options.Margin != imageprocessor.AnimationFrameMargin(128, 128) || !request.Options.CropContent ||
+			request.Options.PaletteSize != 24 || request.Options.NormalizeNearRound ||
+			request.Options.RemoveIsolatedComponents || request.Options.RemoveWeakEdgePixels ||
+			request.Options.ConsolidateColourIslands || !request.Options.RecoverPixelGrid ||
+			!request.Options.PrequantizeBeforeResize || !request.Options.PreferNearestReduction ||
+			!request.Options.SpritePixelPipeline || request.Options.PreserveCanvasGeometry {
+			t.Fatalf("object direction %d did not fit content inside the animation safety margin: %+v", index, request.Options)
 		}
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||

@@ -73,9 +73,14 @@ type SplitImageRequest struct {
 	// coordinate system for output frames. Without it, animation mode scales
 	// the sequence-wide foreground union to the target frame, so differences in
 	// individual frame extents can change apparent foreground scale.
-	PreserveSourceCellScale bool                        `json:"preserve_source_cell_scale,omitempty"`
-	MaxStabilizationShift   int                         `json:"max_stabilization_shift,omitempty"`
-	Background              *AnimationBackgroundOptions `json:"background,omitempty"`
+	PreserveSourceCellScale bool `json:"preserve_source_cell_scale,omitempty"`
+	// CenterContent is a static-prototype postcondition. It moves each
+	// rendered foreground bbox to the centre of its fixed frame without
+	// changing scale or shape. It must not be enabled for animation frames
+	// whose intentional motion needs to be preserved.
+	CenterContent         bool                        `json:"center_content,omitempty"`
+	MaxStabilizationShift int                         `json:"max_stabilization_shift,omitempty"`
+	Background            *AnimationBackgroundOptions `json:"background,omitempty"`
 }
 
 // ImageRegion is one independently encoded PNG region. SourceBounds are
@@ -250,6 +255,7 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		NormalizeContentScale:    request.NormalizeContentScale,
 		NormalizeContentArea:     request.NormalizeContentArea,
 		PreserveSourceCellScale:  request.PreserveSourceCellScale,
+		CenterContent:            request.CenterContent,
 		MaxStabilizationShift:    request.MaxStabilizationShift,
 		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,
 		AllowEmptyFrames:         request.AllowEmptyRegions,
