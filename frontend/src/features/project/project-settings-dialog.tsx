@@ -16,8 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
-import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import { isPerspective, projectApi } from "@/model/project";
+import { uploadFile } from "@/model/upload";
 import {
   applyProjectSettings,
   createProjectSettingsDraft,
@@ -38,9 +38,11 @@ export function ProjectSettingsDialog({
   const { t } = useTranslation(["projects", "common"]);
   const [imageError, setImageError] = useState<string>();
   const [isGeneratingReference, setIsGeneratingReference] = useState(false);
+  const [isUploadingReference, setIsUploadingReference] = useState(false);
+  const [referencePreview, setReferencePreview] = useState(project.reference);
   const [previewImage, setPreviewImage] = useState<string>();
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const imageReadController = useRef<AbortController | null>(null);
+  const imageUploadController = useRef<AbortController | null>(null);
   const form = useForm({
     defaultValues: createProjectSettingsDraft(project),
     onSubmit: ({ value }) => {
@@ -51,7 +53,7 @@ export function ProjectSettingsDialog({
     },
   });
 
-  useEffect(() => () => imageReadController.current?.abort(), []);
+  useEffect(() => () => imageUploadController.current?.abort(), []);
 
   return (
     <>
@@ -165,11 +167,11 @@ export function ProjectSettingsDialog({
               {(field) => (
                 <div className="relative grid gap-2">
                   <p className="text-sm font-medium">{t("reference")}</p>
-                  {field.state.value ? (
+                  {referencePreview ? (
                     <ReferenceImage
-                      src={field.state.value}
+                      src={referencePreview}
                       alt={t("referenceImageAlt")}
-                      onPreview={() => setPreviewImage(field.state.value)}
+                      onPreview={() => setPreviewImage(referencePreview)}
                     />
                   ) : (
                     <div className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground">
@@ -196,23 +198,32 @@ export function ProjectSettingsDialog({
                             return;
                           }
 
-                          imageReadController.current?.abort();
+                          imageUploadController.current?.abort();
                           setImageError(undefined);
                           const controller = new AbortController();
-                          imageReadController.current = controller;
+                          imageUploadController.current = controller;
+                          setIsUploadingReference(true);
                           void (async () => {
                             try {
-                              const dataUrl = await readFileAsDataUrl(
+                              const target = await uploadFile(
                                 file,
                                 controller.signal,
                               );
                               if (controller.signal.aborted) return;
-                              field.handleChange(dataUrl);
+                              field.handleChange(target.objectKey);
+                              setReferencePreview(target.objectURL);
                             } catch {
                               if (controller.signal.aborted) return;
                               setImageError(
-                                "We couldn't read that image. Try another file.",
+                                "We couldn't upload that image. Try again.",
                               );
+                            } finally {
+                              if (
+                                imageUploadController.current === controller
+                              ) {
+                                imageUploadController.current = null;
+                                setIsUploadingReference(false);
+                              }
                             }
                           })();
                         }}
@@ -222,9 +233,14 @@ export function ProjectSettingsDialog({
                         variant="secondary"
                         size="sm"
                         className="bg-background/90 shadow-sm backdrop-blur-sm"
+                        disabled={isUploadingReference || isGeneratingReference}
                         onClick={() => imageInputRef.current?.click()}
                       >
-                        <Upload data-icon="inline-start" />
+                        {isUploadingReference ? (
+                          <LoaderCircle className="animate-spin" />
+                        ) : (
+                          <Upload data-icon="inline-start" />
+                        )}
                         {t("upload")}
                       </Button>
                       <Button
@@ -232,7 +248,7 @@ export function ProjectSettingsDialog({
                         variant="secondary"
                         size="sm"
                         className="bg-background/90 shadow-sm backdrop-blur-sm"
-                        disabled={isGeneratingReference}
+                        disabled={isGeneratingReference || isUploadingReference}
                         onClick={async () => {
                           const updatedProject = applyProjectSettings(
                             project,
@@ -248,6 +264,7 @@ export function ProjectSettingsDialog({
                                 updatedProject,
                               );
                             field.handleChange(reference);
+                            setReferencePreview(reference);
                           } catch {
                             setImageError(
                               "We couldn't generate that reference. Try again.",
@@ -278,7 +295,12 @@ export function ProjectSettingsDialog({
               <DialogClose render={<Button type="button" variant="outline" />}>
                 {t("common:actions.cancel")}
               </DialogClose>
-              <Button type="submit">{t("save")}</Button>
+              <Button
+                type="submit"
+                disabled={isUploadingReference || isGeneratingReference}
+              >
+                {t("save")}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
