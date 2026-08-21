@@ -123,6 +123,31 @@ describe("loadCoreAssetWorkspace", () => {
       },
     });
   });
+
+  it.each(["character", "object"] as const)(
+    "loads a persisted %s sprite asset through the Core adapter",
+    async (type) => {
+      mocks.assetDetail.mockResolvedValue(spriteDetail(type));
+
+      await expect(
+        loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+      ).resolves.toMatchObject({
+        asset: { kind: type },
+        record: { mode: type },
+      });
+    },
+  );
+
+  it("loads a persisted UI Set through the Core adapter", async () => {
+    mocks.assetDetail.mockResolvedValue(uiSetDetail());
+
+    await expect(
+      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+    ).resolves.toMatchObject({
+      asset: { kind: "uiset" },
+      record: { mode: "uiset", uiset: { components: [{ label: "Start" }] } },
+    });
+  });
 });
 
 describe("saveCoreAssetRevision", () => {
@@ -220,6 +245,168 @@ describe("saveCoreAssetRevision", () => {
       },
     });
   });
+
+  it("persists Tileset content with and without generated tile URLs", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 2 });
+
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: {
+        mode: "tileset",
+        prompt: "Forest terrain",
+        tileset: {
+          gridSize: 8,
+          items: [
+            {
+              id: "draft-grass",
+              label: "Grass",
+              tiles: [
+                [0, 0],
+                [1, 0],
+              ],
+              tileUrls: ["grass.png"],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      content: {
+        items: [
+          {
+            name: "Grass",
+            tiles: [
+              { url: "grass.png", position: { x: 0, y: 0 } },
+              { position: { x: 1, y: 0 } },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("uses raw UI Set bounds when its canvas dimensions are unavailable", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 2 });
+
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: {
+        mode: "uiset",
+        prompt: "Overlay",
+        uiset: {
+          components: [
+            {
+              id: "draft-component",
+              label: "Overlay",
+              kind: "label",
+              bounds: { x: 5, y: 10, width: 50, height: 25 },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      content: {
+        components: [
+          {
+            id: 1,
+            name: "Overlay",
+            size: { width: 50, height: 25 },
+            position: { x: 5, y: 10 },
+            metadata: { kind: "label" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("serializes omitted scenery display fields and optional transform", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 2 });
+
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: {
+        mode: "scenery",
+        prompt: "Forest",
+        scenery: {
+          layers: [
+            {
+              id: "2",
+              label: "Fog",
+              detail: "Soft fog",
+              imageUrl: "fog.png",
+              blendMode: "normal",
+              transform: { scale: { x: 1, y: 1 }, rotation: 0 },
+              opacity: 0,
+              zIndex: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      content: {
+        layers: [
+          {
+            id: 2,
+            name: "Fog",
+            resource: "fog.png",
+            position: { x: 0, y: 0 },
+            transform: { scale: { x: 1, y: 1 }, rotation: 0 },
+            opacity: 0,
+            zIndex: 0,
+            metadata: { detail: "Soft fog", blendMode: "normal" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("persists character, object, and audio revisions through their Core payloads", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 2 });
+    const sprite = {
+      prototype: {
+        format: "png-sprite-sheet" as const,
+        imageUrl: "sprite.png",
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 1,
+        rows: 1,
+      },
+      animations: [],
+      nodePositions: {},
+    };
+
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: { mode: "character", prompt: "Hero", character: sprite },
+    });
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: { mode: "object", prompt: "Chest", object: sprite },
+    });
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      record: { mode: "audio", prompt: "Theme", audio: {} },
+    });
+
+    expect(mocks.assetRecord).toHaveBeenLastCalledWith({
+      assetId: 9,
+      content: {},
+    });
+  });
 });
 
 describe("toCoreTilesetAssetWorkspace", () => {
@@ -245,6 +432,35 @@ describe("toCoreTilesetAssetWorkspace", () => {
           },
         ],
       },
+    });
+  });
+
+  it("uses empty item collections when generated content is absent", () => {
+    const itemWithoutTiles = tilesetDetail();
+    itemWithoutTiles.content = { items: [{ name: "Empty" }] };
+    const noContent = tilesetDetail();
+    delete noContent.content;
+
+    const itemWorkspace = toCoreTilesetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: itemWithoutTiles,
+      records: [],
+    });
+    const emptyWorkspace = toCoreTilesetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: noContent,
+      records: [],
+    });
+
+    expect(itemWorkspace.record).toMatchObject({
+      mode: "tileset",
+      tileset: { items: [{ label: "Empty", tiles: [], tileUrls: [] }] },
+    });
+    expect(emptyWorkspace.record).toMatchObject({
+      mode: "tileset",
+      tileset: { items: [] },
     });
   });
 });
@@ -343,6 +559,58 @@ describe("toCoreSceneryAssetWorkspace", () => {
       scenery: { layers: [{ transform: undefined }] },
     });
   });
+
+  it("preserves persisted layer details and defaults omitted display properties", () => {
+    const detail = sceneryDetail();
+    const layer = detail.content?.layers?.[0];
+    if (!layer) throw new Error("Expected a scenery layer.");
+    layer.metadata = { detail: "Darkened sky", blendMode: "multiply" };
+    delete layer.visible;
+    delete layer.opacity;
+    delete layer.zIndex;
+
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: {
+        layers: [
+          {
+            detail: "Darkened sky",
+            blendMode: "multiply",
+          },
+        ],
+      },
+    });
+    if (workspace.record.mode !== "scenery") {
+      throw new Error("Expected a scenery workspace.");
+    }
+    expect(workspace.record.scenery.layers[0]).not.toHaveProperty("visible");
+    expect(workspace.record.scenery.layers[0]).not.toHaveProperty("opacity");
+    expect(workspace.record.scenery.layers[0]).not.toHaveProperty("zIndex");
+  });
+
+  it("uses empty layers when Core scenery content is absent", () => {
+    const detail = sceneryDetail();
+    delete detail.content;
+
+    const workspace = toCoreSceneryAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail,
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "scenery",
+      scenery: { layers: [] },
+    });
+  });
 });
 
 describe("non-image Core asset workspaces", () => {
@@ -373,6 +641,50 @@ describe("non-image Core asset workspaces", () => {
       mode: "audio",
       prompt: "A quiet forest ambience",
       audio: {},
+    });
+  });
+
+  it("handles empty UI Set content and zero-sized canvases", () => {
+    const empty = uiSetDetail();
+    empty.dimensions = { width: 0, height: 0 };
+    empty.content = {
+      components: [
+        {
+          id: 8,
+          name: "Fallback",
+          size: { width: 20, height: 10 },
+          position: { x: 5, y: 3 },
+          metadata: { kind: "unknown" },
+        },
+      ],
+    };
+    const noContent = uiSetDetail();
+    delete noContent.content;
+
+    const emptyWorkspace = toCoreUISetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: empty,
+      records: [],
+    });
+    const noContentWorkspace = toCoreUISetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: noContent,
+      records: [],
+    });
+
+    expect(emptyWorkspace.record).toMatchObject({
+      mode: "uiset",
+      uiset: {
+        components: [
+          { kind: "panel", bounds: { x: 0, y: 0, width: 0, height: 0 } },
+        ],
+      },
+    });
+    expect(noContentWorkspace.record).toMatchObject({
+      mode: "uiset",
+      uiset: { components: [] },
     });
   });
 });
@@ -445,6 +757,26 @@ function audioDetail(): Extract<AssetDetailResponse, { type: "audio" }> {
     version: 1,
     content: {},
   };
+}
+
+function spriteDetail(
+  type: "character" | "object",
+): Extract<AssetDetailResponse, { type: "character" | "object" }> {
+  return {
+    assetId: 9,
+    projectId: 11,
+    name: type === "character" ? "Hero" : "Chest",
+    description: "A persisted sprite asset",
+    type,
+    perspective: "Top-Down",
+    dimensions: { width: 32, height: 32 },
+    tags: [],
+    version: 1,
+    content: { directionCount: 4, prototype: [] },
+  } as unknown as Extract<
+    AssetDetailResponse,
+    { type: "character" | "object" }
+  >;
 }
 
 function uiSetDetail(): Extract<AssetDetailResponse, { type: "uiset" }> {
