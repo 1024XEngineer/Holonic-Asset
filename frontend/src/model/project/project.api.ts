@@ -3,7 +3,7 @@ import { readAuthenticatedUserId } from "@/model/auth";
 
 import { coreProjectApi } from "./core-project.api";
 import type {
-  GenerateProjectReferenceRequest,
+  GenerateReferenceRequest,
   ProjectResponse,
 } from "./project.contract";
 import type { CreateProjectInput, ProjectSummary } from "./types";
@@ -14,8 +14,8 @@ export type {
   CreateProjectResponse,
   DeleteProjectRequest,
   DeleteProjectResponse,
-  GenerateProjectReferenceRequest,
-  GenerateProjectReferenceResponse,
+  GenerateReferenceRequest,
+  GenerateReferenceResponse,
   ListProjectsResponse,
   ProjectDetailResponse,
   ProjectGameType,
@@ -89,7 +89,7 @@ export const projectApi: ProjectApi = {
 
 function toCoreProjectFields(
   input: CreateProjectInput,
-): GenerateProjectReferenceRequest {
+): GenerateReferenceRequest {
   return {
     name: input.name,
     gameType: input.gameType,

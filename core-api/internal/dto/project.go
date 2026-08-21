@@ -29,7 +29,7 @@ type CreateProjectResponse struct {
 	ID uint `json:"id" minimum:"1"`
 }
 
-type GenerateProjectReferenceRequest struct {
+type GenerateReferenceRequest struct {
 	Name           string              `json:"name" minLength:"1"`
 	GameType       string              `json:"gameType,omitempty"`
 	Perspective    domain.Perspective  `json:"perspective,omitempty" enum:"Top-Down,Side-On,Isometric" default:"Top-Down"`
@@ -39,7 +39,7 @@ type GenerateProjectReferenceRequest struct {
 	Style          string              `json:"style,omitempty"`
 }
 
-type GenerateProjectReferenceResponse struct {
+type GenerateReferenceResponse struct {
 	Reference string `json:"reference"`
 }
 

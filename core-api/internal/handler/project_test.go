@@ -130,7 +130,7 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 	projectHandler := handler.NewProjectHandler(stub)
 	ctx := context.Background()
 
-	request := dto.GenerateProjectReferenceRequest{
+	request := dto.GenerateReferenceRequest{
 		Name:           "Prototype",
 		GameType:       "RPG",
 		Perspective:    domain.PerspectiveTopDown,
@@ -153,13 +153,13 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 		t.Fatalf("expected reference generation not to require a user ID, got %d", stub.generate.UserID)
 	}
 	if stub.generate.Reference != request.Reference {
-		t.Fatalf("expected reference %q to be forwarded, got %q", request.Reference, stub.generate.Reference)
+		t.Fatalf("expected project reference %q to be forwarded, got %q", request.Reference, stub.generate.Reference)
 	}
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response envelope: %+v", response)
 	}
 	if response.Data.Reference != generatedReference {
-		t.Fatalf("expected generated reference %q, got %q", generatedReference, response.Data.Reference)
+		t.Fatalf("expected generated project reference %q, got %q", generatedReference, response.Data.Reference)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestGenerateReferencePropagatesServiceError(t *testing.T) {
 	wantErr := errors.New("generate project failed")
 	projectHandler := handler.NewProjectHandler(&projectManagerStub{generateErr: wantErr})
 
-	response, err := projectHandler.GenerateReference(context.Background(), dto.GenerateProjectReferenceRequest{
+	response, err := projectHandler.GenerateReference(context.Background(), dto.GenerateReferenceRequest{
 		Name:           "Prototype",
 		GameType:       "",
 		Perspective:    domain.PerspectiveTopDown,
@@ -176,7 +176,7 @@ func TestGenerateReferencePropagatesServiceError(t *testing.T) {
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
 	}
-	if response != (dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}) {
+	if response != (dto.SuccessResponse[dto.GenerateReferenceResponse]{}) {
 		t.Fatalf("expected an empty response on error, got %+v", response)
 	}
 }
@@ -194,7 +194,7 @@ func TestProjectDetailResolvesPersistedObjectKeyWithoutChangingResponseContract(
 		t.Fatalf("get project detail: %v", err)
 	}
 	if response.Data.Project.Reference != "https://cdn.example/projects/7/reference.png?e=123&token=signed" {
-		t.Fatalf("expected signed reference URL, got %q", response.Data.Project.Reference)
+		t.Fatalf("expected signed project reference URL, got %q", response.Data.Project.Reference)
 	}
 	if len(resolver.calls) != 1 || resolver.calls[0] != "projects/7/reference.png" {
 		t.Fatalf("unexpected resolver calls: %v", resolver.calls)
