@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
@@ -73,12 +74,15 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		}
 		return persisted, nil
 	}
-	preparePrototypeReferences := func(userReference string) (string, string, error) {
+	preparePrototypeReferences := func(
+		creatingReference string,
+		tags []assetdomain.Tag,
+	) (string, string, []string, error) {
 		projectReference := ""
 		if e.projects != nil && projectID != 0 {
 			project, err := e.projects.GetDetail(ctx, projectID)
 			if err != nil {
-				return "", "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
+				return "", "", nil, fmt.Errorf("generator: load project %d reference: %w", projectID, err)
 			}
 			if project != nil {
 				projectReference = project.Reference
@@ -87,22 +91,64 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		projectReference, err = persistReference("project", projectReference)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
-		userReference, err = persistReference("user", userReference)
+		creatingReference, err = persistReference("creating", creatingReference)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
-		return projectReference, userReference, nil
+
+		nexusLimit := 3
+		if strings.TrimSpace(creatingReference) != "" {
+			nexusLimit = 2
+		}
+		nexusReferences, err := e.selectNexusReferences(
+			ctx,
+			projectID,
+			tags,
+			nexusLimit,
+			projectReference,
+			creatingReference,
+		)
+		if err != nil {
+			return "", "", nil, err
+		}
+		prepared := make([]string, 0, len(nexusReferences))
+		seen := map[string]struct{}{}
+		for _, reference := range []string{projectReference, creatingReference} {
+			if reference != "" {
+				seen[reference] = struct{}{}
+			}
+		}
+		for _, reference := range nexusReferences {
+			if len(prepared) == nexusLimit {
+				break
+			}
+			persisted, persistErr := persistReference("nexus", reference)
+			if persistErr != nil {
+				return "", "", nil, persistErr
+			}
+			if persisted == "" {
+				continue
+			}
+			if _, duplicate := seen[persisted]; duplicate {
+				continue
+			}
+			seen[persisted] = struct{}{}
+			prepared = append(prepared, persisted)
+		}
+		return projectReference, creatingReference, prepared, nil
 	}
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
+		value.ProjectReference, value.Reference, value.NexusReferences, err =
+			preparePrototypeReferences(value.Reference, value.Tags)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
+		value.ProjectReference, value.Reference, value.NexusReferences, err =
+			preparePrototypeReferences(value.Reference, value.Tags)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -156,6 +202,99 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	default:
 		return payload, nil
 	}
+}
+
+type scoredNexusReference struct {
+	reference string
+	score     int
+	version   uint
+	assetID   uint
+}
+
+func (e *Engine) selectNexusReferences(
+	ctx context.Context,
+	projectID uint,
+	tags []assetdomain.Tag,
+	limit int,
+	excludedReferences ...string,
+) ([]string, error) {
+	requested := normalizedTagNameSet(tags)
+	if projectID == 0 || len(requested) == 0 || limit <= 0 {
+		return nil, nil
+	}
+	if e.assets == nil {
+		return nil, ErrAssetReaderRequired
+	}
+
+	assets, err := e.assets.GetAssets(ctx, projectID, assetdomain.AssetListFilter{})
+	if err != nil {
+		return nil, fmt.Errorf("generator: list project %d assets for Nexus References: %w", projectID, err)
+	}
+	candidates := make([]scoredNexusReference, 0, len(assets))
+	for _, asset := range assets {
+		if asset.ProjectID != 0 && asset.ProjectID != projectID {
+			continue
+		}
+		reference := strings.TrimSpace(asset.ThumbnailURL)
+		score := tagMatchScore(requested, asset.Tags)
+		if reference == "" || score == 0 {
+			continue
+		}
+		candidates = append(candidates, scoredNexusReference{
+			reference: reference,
+			score:     score,
+			version:   asset.Version,
+			assetID:   asset.ID,
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].version != candidates[j].version {
+			return candidates[i].version > candidates[j].version
+		}
+		return candidates[i].assetID > candidates[j].assetID
+	})
+	seen := make(map[string]struct{}, len(excludedReferences)+limit)
+	for _, reference := range excludedReferences {
+		if reference = strings.TrimSpace(reference); reference != "" {
+			seen[reference] = struct{}{}
+		}
+	}
+	references := make([]string, 0, min(limit, len(candidates)))
+	for _, candidate := range candidates {
+		if _, duplicate := seen[candidate.reference]; duplicate {
+			continue
+		}
+		seen[candidate.reference] = struct{}{}
+		references = append(references, candidate.reference)
+		if len(references) == limit {
+			break
+		}
+	}
+	return references, nil
+}
+
+func normalizedTagNameSet(tags []assetdomain.Tag) map[string]struct{} {
+	names := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if name := strings.ToLower(strings.TrimSpace(tag.Name)); name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
+func tagMatchScore(requested map[string]struct{}, tags []assetdomain.Tag) int {
+	matched := make(map[string]struct{})
+	for _, tag := range tags {
+		name := strings.ToLower(strings.TrimSpace(tag.Name))
+		if _, ok := requested[name]; ok {
+			matched[name] = struct{}{}
+		}
+	}
+	return len(matched)
 }
 
 func referencePersistenceError(role string, err error) error {

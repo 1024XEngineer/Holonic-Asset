@@ -57,7 +57,14 @@ func (d *GormProjectDao) CreateProject(ctx context.Context, project *Project) (u
 	if project == nil {
 		return 0, ErrProjectNil
 	}
-	if err := d.db.WithContext(ctx).Create(project).Error; err != nil {
+	if err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(project).Error; err != nil {
+			return err
+		}
+		return tx.Exec(`INSERT INTO project_tags (project_id, template_id, name, description, color)
+			SELECT ?, id, name, description, color
+			FROM tag_templates`, project.ID).Error
+	}); err != nil {
 		return 0, err
 	}
 	return project.ID, nil
