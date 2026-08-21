@@ -26,6 +26,11 @@ type taskManagerStub struct {
 	listErr       error
 	detailErr     error
 	completeErr   error
+	retryID       uint
+	retryStatus   taskdomain.Status
+	retryErr      error
+	deletedID     uint
+	deleteErr     error
 }
 
 type taskStatusUpdate struct {
@@ -47,6 +52,21 @@ func (s *taskManagerStub) Stop() error { return nil }
 func (s *taskManagerStub) Publish(_ context.Context, message *taskdomain.Task) (uint, error) {
 	s.createdTask = message
 	return s.createID, nil
+}
+
+func (s *taskManagerStub) RetryFailed(
+	_ context.Context,
+	taskID uint,
+	completionStatus taskdomain.Status,
+) error {
+	s.retryID = taskID
+	s.retryStatus = completionStatus
+	return s.retryErr
+}
+
+func (s *taskManagerStub) DeleteFailed(_ context.Context, taskID uint) error {
+	s.deletedID = taskID
+	return s.deleteErr
 }
 
 func (s *taskManagerStub) GetDetail(context.Context, uint) (*taskdomain.Task, error) {
@@ -830,6 +850,68 @@ func TestCancelUpdatesTaskStatus(t *testing.T) {
 	if len(tasks.statusUpdates) != 1 || tasks.statusUpdates[0].taskID != 17 ||
 		tasks.statusUpdates[0].status != taskdomain.StatusCancelled {
 		t.Fatalf("unexpected status updates: %+v", tasks.statusUpdates)
+	}
+}
+
+func TestRetryRequeuesFailedRunWithSameID(t *testing.T) {
+	tasks := &taskManagerStub{detail: &taskdomain.Task{
+		ID:     17,
+		Type:   string(generator.GenerateAnimation),
+		Status: taskdomain.StatusFailed,
+	}}
+	engine := generator.NewEngine(tasks, nil)
+
+	runID, err := engine.Retry(context.Background(), 17)
+	if err != nil {
+		t.Fatalf("retry generation: %v", err)
+	}
+	if runID != 17 || tasks.retryID != 17 || tasks.retryStatus != taskdomain.StatusAwaitingApplication {
+		t.Fatalf("unexpected retry: run=%d task=%d completion=%s", runID, tasks.retryID, tasks.retryStatus)
+	}
+}
+
+func TestDeleteRemovesFailedRun(t *testing.T) {
+	tasks := &taskManagerStub{detail: &taskdomain.Task{
+		ID:     17,
+		Type:   string(generator.GenerateScenery),
+		Status: taskdomain.StatusFailed,
+	}}
+
+	if err := generator.NewEngine(tasks, nil).Delete(context.Background(), 17); err != nil {
+		t.Fatalf("delete generation: %v", err)
+	}
+	if tasks.deletedID != 17 {
+		t.Fatalf("unexpected deleted task: %d", tasks.deletedID)
+	}
+}
+
+func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
+	for _, operation := range []struct {
+		name string
+		run  func(*generator.Engine) error
+	}{
+		{name: "retry", run: func(engine *generator.Engine) error {
+			_, err := engine.Retry(context.Background(), 17)
+			return err
+		}},
+		{name: "delete", run: func(engine *generator.Engine) error {
+			return engine.Delete(context.Background(), 17)
+		}},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			tasks := &taskManagerStub{detail: &taskdomain.Task{
+				ID:     17,
+				Type:   string(generator.GenerateScenery),
+				Status: taskdomain.StatusProcessing,
+			}}
+			err := operation.run(generator.NewEngine(tasks, nil))
+			if !errors.Is(err, generator.ErrRunNotFailed) {
+				t.Fatalf("expected non-failed run error, got %v", err)
+			}
+			if tasks.retryID != 0 || tasks.deletedID != 0 {
+				t.Fatalf("non-failed run was changed: %+v", tasks)
+			}
+		})
 	}
 }
 
