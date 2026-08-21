@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { CreateAssetForm } from "@/features/generation/create-asset-form";
+import { CreateAssetForm } from "@/features/generation";
 import { assetKindSchema } from "@/model/asset";
 import { useEnqueueGenerationMutation } from "@/model/generation";
 import { useProjectListQuery } from "@/model/project";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAuthRedirect } from "./auth-navigation";
+import { resolveAuthRedirect } from "./resolve-auth-redirect";
 
 describe("resolveAuthRedirect", () => {
   it("preserves internal destinations", () => {
