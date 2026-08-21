@@ -71,6 +71,22 @@ type CancelGenerationResponse struct {
 	Cancelled bool `json:"cancelled"`
 }
 
+type RetryGenerationRequest struct {
+	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
+}
+
+type RetryGenerationResponse struct {
+	GenerationRunID generator.RunID `json:"generationRunId" minimum:"1"`
+}
+
+type DeleteGenerationRequest struct {
+	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
+}
+
+type DeleteGenerationResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
 type ResolveGenerationApplicationRequest struct {
 	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
 	Applied         bool            `json:"applied"`
