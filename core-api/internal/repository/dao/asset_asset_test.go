@@ -90,6 +90,84 @@ func TestAssetDaoLoadsDetailAndForUpdateWithReusableTags(t *testing.T) {
 	}
 }
 
+func TestAssetDaoDetailReadsPropagateDatabaseErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		load     func(context.Context, *AssetDaoImpl, uint) (Asset, error)
+		failTags bool
+	}{
+		{
+			name: "detail query",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAsset(ctx, id)
+			},
+		},
+		{
+			name: "detail tags",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAsset(ctx, id)
+			},
+			failTags: true,
+		},
+		{
+			name: "locked query",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAssetForUpdate(ctx, id)
+			},
+		},
+		{
+			name: "locked tags",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAssetForUpdate(ctx, id)
+			},
+			failTags: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock := newMockAssetDatabase(t)
+			wantErr := errors.New(tt.name + " failed")
+			if tt.failTags {
+				expectAssetRow(mock, 7, 42)
+				mock.ExpectQuery(`SELECT asset_tags\.asset_id, project_tags\.name, project_tags\.description, project_tags\.color FROM "asset_tags"`).
+					WillReturnError(wantErr)
+			} else {
+				mock.ExpectQuery(`SELECT \* FROM "assets" WHERE "assets"\."id" = \$1`).
+					WithArgs(uint(7), 1).
+					WillReturnError(wantErr)
+			}
+
+			if _, err := tt.load(context.Background(), &AssetDaoImpl{DB: db}, 7); !errors.Is(err, wantErr) {
+				t.Fatalf("expected database error %v, got %v", wantErr, err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadAssetTagsHandlesEmptyAndUnknownAssets(t *testing.T) {
+	if err := (&AssetDaoImpl{}).loadAssetTags(context.Background(), nil); err != nil {
+		t.Fatalf("load empty asset tags: %v", err)
+	}
+
+	db, mock := newMockAssetDatabase(t)
+	assets := []Asset{{ID: 7}}
+	mock.ExpectQuery(`SELECT asset_tags\.asset_id, project_tags\.name, project_tags\.description, project_tags\.color FROM "asset_tags"`).
+		WithArgs(uint(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"asset_id", "name", "description", "color"}).
+			AddRow(99, "orphan", "", assetdomain.DefaultTagColor))
+
+	if err := (&AssetDaoImpl{DB: db}).loadAssetTags(context.Background(), assets); err != nil {
+		t.Fatalf("load tags with unknown asset: %v", err)
+	}
+	if len(assets[0].Tags) != 0 {
+		t.Fatalf("expected unknown association to be ignored, got %#v", assets[0].Tags)
+	}
+}
+
 func TestAssetListLoadsStoredThumbnailAndReusableTags(t *testing.T) {
 	db, mock := newMockAssetDatabase(t)
 	mock.ExpectQuery(regexp.QuoteMeta(
