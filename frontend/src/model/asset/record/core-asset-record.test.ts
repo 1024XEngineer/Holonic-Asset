@@ -8,6 +8,7 @@ import type {
 const mocks = vi.hoisted(() => ({
   assetDetail: vi.fn(),
   assetRecords: vi.fn(),
+  assetRecord: vi.fn(),
   projectDetail: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("../library/core-asset.api", () => ({
   coreAssetApi: {
     detail: mocks.assetDetail,
     records: mocks.assetRecords,
+    record: mocks.assetRecord,
   },
 }));
 vi.mock("../../project", async (importOriginal) => ({
@@ -24,8 +26,11 @@ vi.mock("../../project", async (importOriginal) => ({
 
 import {
   loadCoreAssetWorkspace,
+  saveCoreAssetRevision,
+  toCoreAudioAssetWorkspace,
   toCoreSceneryAssetWorkspace,
   toCoreTilesetAssetWorkspace,
+  toCoreUISetAssetWorkspace,
 } from "./core-asset-record";
 
 beforeEach(() => {
@@ -94,23 +99,126 @@ describe("loadCoreAssetWorkspace", () => {
   });
 
   it.each(["draft", "0", "1.5"])(
-    "skips a non-persisted asset ID: %s",
+    "rejects a non-persisted asset ID: %s",
     async (assetId) => {
       await expect(
         loadCoreAssetWorkspace({ projectId: "11", assetId }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("requires a persisted Core API asset");
       expect(mocks.assetDetail).not.toHaveBeenCalled();
     },
   );
 
-  it("skips an asset type that the editor cannot load", async () => {
+  it("loads audio metadata through the Core adapter", async () => {
     mocks.assetDetail.mockResolvedValue(audioDetail());
 
     await expect(
       loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
-    ).resolves.toBeUndefined();
-    expect(mocks.projectDetail).not.toHaveBeenCalled();
-    expect(mocks.assetRecords).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      projectName: "Demo",
+      asset: { id: "9", kind: "audio", version: "v1" },
+      record: {
+        mode: "audio",
+        prompt: "A quiet forest ambience",
+        audio: {},
+      },
+    });
+  });
+});
+
+describe("saveCoreAssetRevision", () => {
+  it("persists scenery content and reloads real revision history", async () => {
+    mocks.assetRecord.mockResolvedValue({ version: 4 });
+    mocks.assetRecords.mockResolvedValue({ records: [sceneryRecord()] });
+
+    await expect(
+      saveCoreAssetRevision({
+        projectId: "11",
+        assetId: "9",
+        version: "v3",
+        description: "Adjusted the sky",
+        record: {
+          mode: "scenery",
+          prompt: "A layered moonlit forest",
+          scenery: {
+            dimensions: { width: 1920, height: 1080 },
+            layers: [
+              {
+                id: "sky-draft",
+                label: "Sky",
+                detail: "Night sky",
+                imageUrl: "sky.png",
+                blendMode: "multiply",
+                position: { x: 12, y: 24 },
+                visible: true,
+              },
+            ],
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ version: "v4" });
+
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      expectedVersion: 3,
+      description: "Adjusted the sky",
+      content: {
+        layers: [
+          {
+            id: 1,
+            name: "Sky",
+            resource: "sky.png",
+            position: { x: 12, y: 24 },
+            visible: true,
+            metadata: { detail: "Night sky", blendMode: "multiply" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("round-trips UI component coordinates through Core content", async () => {
+    const workspace = toCoreUISetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: uiSetDetail(),
+      records: [],
+    });
+    mocks.assetRecord.mockResolvedValue({ version: 2 });
+
+    await saveCoreAssetRevision({
+      projectId: "11",
+      assetId: "9",
+      version: "v1",
+      record: workspace.record,
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "uiset",
+      uiset: {
+        dimensions: { width: 1920, height: 1080 },
+        components: [
+          {
+            kind: "button",
+            bounds: { x: 10, y: 20, width: 25, height: 10 },
+          },
+        ],
+      },
+    });
+    expect(mocks.assetRecord).toHaveBeenCalledWith({
+      assetId: 9,
+      expectedVersion: 1,
+      content: {
+        components: [
+          {
+            id: 7,
+            name: "Start",
+            size: { width: 480, height: 108 },
+            position: { x: 192, y: 216 },
+            metadata: { kind: "button" },
+          },
+        ],
+      },
+    });
   });
 });
 
@@ -237,6 +345,38 @@ describe("toCoreSceneryAssetWorkspace", () => {
   });
 });
 
+describe("non-image Core asset workspaces", () => {
+  it("maps UI Set components without mock defaults", () => {
+    const workspace = toCoreUISetAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: uiSetDetail(),
+      records: [],
+    });
+
+    expect(workspace.record).toMatchObject({
+      mode: "uiset",
+      prompt: "Main menu controls",
+      uiset: { components: [{ id: "7", label: "Start", kind: "button" }] },
+    });
+  });
+
+  it("maps audio metadata without mock defaults", () => {
+    const workspace = toCoreAudioAssetWorkspace({
+      projectId: "11",
+      projectName: "Demo",
+      detail: audioDetail(),
+      records: [],
+    });
+
+    expect(workspace.record).toEqual({
+      mode: "audio",
+      prompt: "A quiet forest ambience",
+      audio: {},
+    });
+  });
+});
+
 function tilesetDetail(): Extract<AssetDetailResponse, { type: "tileSet" }> {
   return {
     assetId: 9,
@@ -304,6 +444,31 @@ function audioDetail(): Extract<AssetDetailResponse, { type: "audio" }> {
     tags: [],
     version: 1,
     content: {},
+  };
+}
+
+function uiSetDetail(): Extract<AssetDetailResponse, { type: "uiset" }> {
+  return {
+    assetId: 9,
+    projectId: 11,
+    name: "Main Menu",
+    description: "Main menu controls",
+    type: "uiset",
+    perspective: "Top-Down",
+    dimensions: { width: 1920, height: 1080 },
+    tags: [],
+    version: 1,
+    content: {
+      components: [
+        {
+          id: 7,
+          name: "Start",
+          size: { width: 480, height: 108 },
+          position: { x: 192, y: 216 },
+          metadata: { kind: "button" },
+        },
+      ],
+    },
   };
 }
 

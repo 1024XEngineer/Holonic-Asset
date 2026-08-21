@@ -66,7 +66,10 @@ export type TilesetAssetRecord = AssetRecordBase<TilesetAssetKind> & {
 };
 
 export type UISetAssetRecord = AssetRecordBase<UISetAssetKind> & {
-  uiset: { components: UISetComponent[] };
+  uiset: {
+    components: UISetComponent[];
+    dimensions?: { width: number; height: number };
+  };
 };
 
 export type AudioAssetRecord = AssetRecordBase<AudioAssetKind> & {
