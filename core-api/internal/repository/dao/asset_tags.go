@@ -16,7 +16,7 @@ func init() {
 	schema.RegisterSerializer(assetTagsSerializerName, assetTagsSerializer{})
 }
 
-// assetTagsSerializer stores tags as JSON text and tolerates the legacy scalar
+// assetTagsSerializer stores tags as JSON and tolerates the legacy scalar
 // values written by the old map-based update path.
 type assetTagsSerializer struct{}
 

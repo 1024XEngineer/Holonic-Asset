@@ -15,7 +15,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	server := router.Register(
 		handler.NewHandler(nil),
 		handler.NewProjectHandler(nil),
-		handler.NewGenerationHandler(nil),
+		handler.NewGenerationHandler(nil, nil),
 		handler.NewUploadHandler(nil),
 	)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/openapi.json", nil)

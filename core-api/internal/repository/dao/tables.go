@@ -10,6 +10,11 @@ func InitTables(db *gorm.DB) error {
 	if db == nil {
 		return errors.New("dao: database is nil")
 	}
+	if db.Name() == "postgres" {
+		if err := migrateAssetTagsToJSONB(db); err != nil {
+			return err
+		}
+	}
 	if err := db.AutoMigrate(
 		&User{},
 		&Project{},
@@ -24,7 +29,38 @@ func InitTables(db *gorm.DB) error {
 	if db.Name() != "postgres" {
 		return nil
 	}
+	if err := migrateAssetTagsToJSONB(db); err != nil {
+		return err
+	}
 	return migrateAssetAttributes(db)
+}
+
+func migrateAssetTagsToJSONB(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&Asset{}) || !db.Migrator().HasColumn(&Asset{}, "tags") {
+		return nil
+	}
+
+	var dataType string
+	if err := db.Raw(`SELECT data_type
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'assets'
+		  AND column_name = 'tags'`).Scan(&dataType).Error; err != nil {
+		return err
+	}
+	if dataType != "jsonb" {
+		if err := db.Exec(`ALTER TABLE assets
+			ALTER COLUMN tags TYPE jsonb
+			USING CASE
+				WHEN tags IS NULL OR btrim(tags::text) IN ('', 'null') THEN '[]'::jsonb
+				WHEN left(btrim(tags::text), 1) = '[' THEN tags::jsonb
+				WHEN left(btrim(tags::text), 1) IN ('{', '"') THEN jsonb_build_array(tags::jsonb)
+				ELSE jsonb_build_array(btrim(tags::text))
+			END`).Error; err != nil {
+			return err
+		}
+	}
+	return db.Exec(`CREATE INDEX IF NOT EXISTS idx_assets_tags_gin ON assets USING GIN (tags)`).Error
 }
 
 func migrateAssetAttributes(db *gorm.DB) error {

@@ -88,7 +88,7 @@ func newAppWithServices(
 		assetRouter = handler.NewHandler(workspaceModule.Assets, references)
 	}
 
-	generationHandler := handler.NewGenerationHandler(generator.NewEngine(nil, nil), references)
+	generationHandler := handler.NewGenerationHandler(generator.NewEngine(nil, nil), nil, references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
 
 	return &App{
@@ -189,7 +189,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	// Transport.
 	assetHandler := handler.NewHandler(workspaceModule.Assets, references)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
-	generationHandler := handler.NewGenerationHandler(generatorEngine, references)
+	generationHandler := handler.NewGenerationHandler(generatorEngine, taskManager, references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
 	authHandler := handler.NewAuthHandler(authService)
 	httpEngine := router.Register(
