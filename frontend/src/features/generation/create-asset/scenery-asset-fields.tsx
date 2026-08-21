@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,8 +24,8 @@ export function SceneryAssetFields({
   draft,
   onChange,
 }: {
-  draft: SceneryAssetCreationDraft;
-  onChange: (draft: SceneryAssetCreationDraft) => void;
+  draft: SceneryAssetCreationDraft<File>;
+  onChange: (draft: SceneryAssetCreationDraft<File>) => void;
 }) {
   const { t } = useTranslation("generation");
   const [open, setOpen] = useState(false);
@@ -83,6 +84,15 @@ export function SceneryAssetFields({
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      <div className="grid gap-2 text-sm font-medium">
+        <span>{t("creatingReference")}</span>
+        <ImageDropzone
+          value={draft.creatingReference}
+          onChange={(creatingReference) =>
+            onChange({ ...draft, creatingReference })
+          }
+        />
+      </div>
     </div>
   );
 }

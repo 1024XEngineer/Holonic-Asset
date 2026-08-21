@@ -101,10 +101,12 @@ export function VisualAssetFields({
       ) : null}
 
       <div className="grid gap-2 text-sm font-medium">
-        <span>{t("reference")}</span>
+        <span>{t("creatingReference")}</span>
         <ImageDropzone
-          value={draft.reference}
-          onChange={(reference) => onChange({ ...draft, reference })}
+          value={draft.creatingReference}
+          onChange={(creatingReference) =>
+            onChange({ ...draft, creatingReference })
+          }
         />
       </div>
     </>

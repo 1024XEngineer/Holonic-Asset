@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createReferencePreviewLifecycle } from "./reference-preview-lifecycle";
+import { createCreatingReferencePreviewLifecycle } from "./creating-reference-preview-lifecycle";
 
 function setup() {
   let nextId = 0;
@@ -8,10 +8,13 @@ function setup() {
     createPreviewUrl: vi.fn(() => `blob:preview-${++nextId}`),
     revokePreviewUrl: vi.fn(),
   };
-  return { adapter, lifecycle: createReferencePreviewLifecycle(adapter) };
+  return {
+    adapter,
+    lifecycle: createCreatingReferencePreviewLifecycle(adapter),
+  };
 }
 
-describe("reference preview lifecycle", () => {
+describe("creating reference preview lifecycle", () => {
   it("defers revocation while a preview is retained by a submission", () => {
     const { adapter, lifecycle } = setup();
     const url = lifecycle.create(new File(["image"], "reference.png"));

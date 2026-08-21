@@ -12,8 +12,8 @@ describe("quick generation workflow", () => {
       assetId: undefined,
       prompt: "",
       size: defaultQuickGenerationSize,
-      reference: undefined,
-      referenceFileName: undefined,
+      creatingReference: undefined,
+      creatingReferenceFileName: undefined,
     });
   });
 
@@ -24,7 +24,7 @@ describe("quick generation workflow", () => {
           id: "asset-1",
           prompt: "Existing prompt",
           size: "128 × 128 px",
-          referenceFileName: "reference.png",
+          creatingReferenceFileName: "reference.png",
         },
         "blob:reference",
       ),
@@ -32,8 +32,8 @@ describe("quick generation workflow", () => {
       assetId: "asset-1",
       prompt: "",
       size: "128 × 128 px",
-      reference: "blob:reference",
-      referenceFileName: "reference.png",
+      creatingReference: "blob:reference",
+      creatingReferenceFileName: "reference.png",
     });
   });
 
@@ -43,13 +43,13 @@ describe("quick generation workflow", () => {
         assetId: "asset-1",
         prompt: "  Moonlit orchard  ",
         size: " 64 x 64 px ",
-        referenceFileName: "reference.png",
+        creatingReferenceFileName: "reference.png",
       }),
     ).toEqual({
       assetId: "asset-1",
       prompt: "Moonlit orchard",
       size: "64 x 64 px",
-      referenceFileName: "reference.png",
+      creatingReferenceFileName: "reference.png",
     });
   });
 

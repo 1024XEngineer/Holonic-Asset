@@ -22,7 +22,7 @@ describe("VisualAssetFields", () => {
       prompt: "",
       canvasSize: "",
       perspective: "Top-Down",
-      reference: undefined,
+      creatingReference: undefined,
     };
     const onChange = vi.fn();
     render(<VisualAssetFields draft={draft} onChange={onChange} />);

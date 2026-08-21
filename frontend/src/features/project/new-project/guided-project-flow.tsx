@@ -32,9 +32,9 @@ export function GuidedProjectFlow({
     >
       {step === 2 ? (
         <div>
-          <h2 className="text-lg font-semibold">{t("projectOverview")}</h2>
+          <h2 className="text-lg font-semibold">{t("reference")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("overviewDescription")}
+            {t("referenceDescription")}
           </p>
         </div>
       ) : null}
@@ -111,7 +111,7 @@ export function GuidedProjectFlow({
           }}
         >
           <TabsList
-            aria-label={t("overviewSource")}
+            aria-label={t("referenceSource")}
             className="grid w-full grid-cols-2"
           >
             <TabsTrigger value="generate">{t("generate")}</TabsTrigger>
@@ -134,7 +134,7 @@ export function GuidedProjectFlow({
                 >
                   <img
                     src={preview.url}
-                    alt={t("generatedOverview")}
+                    alt={t("generatedReference")}
                     className="size-full object-cover"
                   />
                 </button>
@@ -152,7 +152,11 @@ export function GuidedProjectFlow({
           <TabsContent value="upload">
             <ImageDropzone
               className="aspect-[16/9] min-h-0"
-              label={t("uploadOverview")}
+              label={
+                preview.isUploading
+                  ? t("uploadingReference")
+                  : t("uploadReferenceImage")
+              }
               value={preview.url || undefined}
               error={preview.error}
               onChange={(file) => {
@@ -177,7 +181,7 @@ export function GuidedProjectFlow({
           {previewImage ? (
             <img
               src={previewImage}
-              alt={t("generatedOverview")}
+              alt={t("generatedReference")}
               className="max-h-[92vh] max-w-[96vw] object-contain"
             />
           ) : null}
@@ -194,7 +198,7 @@ export function GuidedProjectFlow({
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2.5 text-sm font-semibold hover:bg-muted"
           type="submit"
-          disabled={step === 2 && preview.isGenerating}
+          disabled={step === 2 && (preview.isGenerating || preview.isUploading)}
         >
           {step === 2 ? t("submit") : t("next")}
           <ArrowRight size={16} />

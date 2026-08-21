@@ -15,6 +15,13 @@ import { withI18n } from "@/testing/with-i18n";
 
 import { Inspector } from "./inspector";
 
+vi.mock("@/model/upload", () => ({
+  uploadFile: vi.fn().mockResolvedValue({
+    objectKey: "uploads/reference.png",
+    objectURL: "https://cdn.example/reference.png?token=signed",
+  }),
+}));
+
 beforeAll(() => {
   Object.defineProperty(Element.prototype, "getAnimations", {
     configurable: true,

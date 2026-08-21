@@ -51,7 +51,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		Default string   `json:"default"`
 	}
 	perspectiveSchemas := map[string]perspectiveSchema{}
-	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
 		var schema struct {
 			Properties map[string]perspectiveSchema `json:"properties"`
 		}
@@ -64,7 +64,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 			t.Fatalf("unexpected %s perspective enum: %v", schemaName, perspective.Enum)
 		}
 	}
-	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest"} {
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateReferenceRequest"} {
 		if got := perspectiveSchemas[schemaName].Default; got != "Top-Down" {
 			t.Fatalf("unexpected %s perspective default: %q", schemaName, got)
 		}
@@ -74,7 +74,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		Type string   `json:"type"`
 		Enum []string `json:"enum"`
 	}
-	for _, schemaName := range []string{"CreateProjectRequest", "GenerateProjectReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
+	for _, schemaName := range []string{"CreateProjectRequest", "GenerateReferenceRequest", "ProjectResponse", "UpdateProjectRequest"} {
 		var schema struct {
 			Properties map[string]gameTypeSchema `json:"properties"`
 		}
@@ -90,11 +90,11 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	var generateReferenceSchema struct {
 		Properties map[string]json.RawMessage `json:"properties"`
 	}
-	if err := json.Unmarshal(document.Components.Schemas["GenerateProjectReferenceRequest"], &generateReferenceSchema); err != nil {
-		t.Fatalf("decode GenerateProjectReferenceRequest schema: %v", err)
+	if err := json.Unmarshal(document.Components.Schemas["GenerateReferenceRequest"], &generateReferenceSchema); err != nil {
+		t.Fatalf("decode GenerateReferenceRequest schema: %v", err)
 	}
 	if _, ok := generateReferenceSchema.Properties["reference"]; !ok {
-		t.Fatal("GenerateProjectReferenceRequest must expose the optional current reference")
+		t.Fatal("GenerateReferenceRequest must expose the optional current project reference")
 	}
 
 	for _, schemaName := range []string{"AssetDetailResponse", "AssetListItemResponse", "UpdateAssetResponse", "RecordAssetResponse"} {

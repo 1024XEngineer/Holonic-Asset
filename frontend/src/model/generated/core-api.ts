@@ -268,8 +268,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Generate a project reference */
-        post: operations["generateProjectReference"];
+        /** Generate a reference */
+        post: operations["generateReference"];
         delete?: never;
         options?: never;
         head?: never;
@@ -487,7 +487,7 @@ export interface components {
              */
             type: string;
         };
-        GenerateProjectReferenceRequest: {
+        GenerateReferenceRequest: {
             description?: string;
             gameType?: string;
             name: string;
@@ -501,7 +501,7 @@ export interface components {
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";
         };
-        GenerateProjectReferenceResponse: {
+        GenerateReferenceResponse: {
             reference: string;
         };
         GenerationResult: {
@@ -701,13 +701,13 @@ export interface components {
             /** @constant */
             message: "success";
         };
-        SuccessResponseGenerateProjectReferenceResponse: {
+        SuccessResponseGenerateReferenceResponse: {
             /**
              * Format: int64
              * @enum {integer}
              */
             code: 200;
-            data: components["schemas"]["GenerateProjectReferenceResponse"];
+            data: components["schemas"]["GenerateReferenceResponse"];
             /** @constant */
             message: "success";
         };
@@ -1632,7 +1632,7 @@ export interface operations {
             };
         };
     };
-    generateProjectReference: {
+    generateReference: {
         parameters: {
             query?: never;
             header?: never;
@@ -1641,7 +1641,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GenerateProjectReferenceRequest"];
+                "application/json": components["schemas"]["GenerateReferenceRequest"];
             };
         };
         responses: {
@@ -1651,7 +1651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessResponseGenerateProjectReferenceResponse"];
+                    "application/json": components["schemas"]["SuccessResponseGenerateReferenceResponse"];
                 };
             };
             /** @description Bad Request */

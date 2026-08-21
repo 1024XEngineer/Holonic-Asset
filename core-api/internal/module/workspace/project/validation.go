@@ -56,8 +56,8 @@ func (p *Project) ValidateReferenceGeneration() error {
 	if err := p.validateDefinition(); err != nil {
 		return err
 	}
-	if !validGenerationReference(p.Reference) {
-		return invalidProject("reference must be an HTTP(S) URL")
+	if !validReference(p.Reference) {
+		return invalidProject("project reference must be an HTTP(S) URL")
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func normalizeGameType(gameType string) (string, error) {
 	return normalized, nil
 }
 
-func validGenerationReference(reference string) bool {
+func validReference(reference string) bool {
 	reference = strings.TrimSpace(reference)
 	if reference == "" {
 		return true

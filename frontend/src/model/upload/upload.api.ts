@@ -10,8 +10,11 @@ export type {
 } from "./upload.contract";
 
 export const uploadApi = {
-  createTarget: async (request: CreateUploadTargetRequest) =>
+  createTarget: async (
+    request: CreateUploadTargetRequest,
+    signal?: AbortSignal,
+  ) =>
     unwrapApiResponse<UploadTarget>(
-      await coreApiClient.POST("/uploads", { body: request }),
+      await coreApiClient.POST("/uploads", { body: request, signal }),
     ),
 };

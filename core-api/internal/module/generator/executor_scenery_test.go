@@ -311,7 +311,7 @@ func TestCreateBuildsSceneryPayloadFromProjectContext(t *testing.T) {
 
 	_, err := engine.Create(context.Background(), &generator.Request{
 		ProjectID: 42, Kind: generator.GenerateScenery, CreativeBrief: "a valley at dawn",
-		Parameters: json.RawMessage(`{"asset_name":"Dawn Valley","dimensions":{"width":640,"height":360},"reference":""}`),
+		Parameters: json.RawMessage(`{"asset_name":"Dawn Valley","dimensions":{"width":640,"height":360},"creating_reference":"https://cdn.example.com/creating.png"}`),
 	})
 	if err != nil {
 		t.Fatalf("create scenery: %v", err)
@@ -323,8 +323,11 @@ func TestCreateBuildsSceneryPayloadFromProjectContext(t *testing.T) {
 	if payload.AssetName != "Dawn Valley" || payload.Perspective != "Side-On" ||
 		payload.ProjectContext.Name != "Moon Valley" || payload.ProjectContext.GameType != "RPG" ||
 		payload.ProjectContext.TargetPlatform != "PC" || payload.ProjectContext.Description != "exploration" ||
-		payload.Reference != "uploads/generated-1.png" || projects.calls != 1 ||
-		!reflect.DeepEqual(references.persisted, []string{"projects/42/reference.png"}) {
+		payload.CreatingReference != "uploads/generated-2.png" || payload.ProjectReference != "uploads/generated-1.png" || projects.calls != 1 ||
+		!reflect.DeepEqual(references.persisted, []string{
+			"projects/42/reference.png",
+			"https://cdn.example.com/creating.png",
+		}) {
 		t.Fatalf("unexpected scenery preparation: payload=%+v project_calls=%d persisted=%v", payload, projects.calls, references.persisted)
 	}
 }

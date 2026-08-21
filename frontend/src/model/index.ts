@@ -174,7 +174,7 @@ export type {
   ProjectResponse,
   UpdateProjectRequest,
 } from "./project/project.api";
-export { uploadApi } from "./upload";
+export { uploadApi, uploadFile } from "./upload";
 export type { CreateUploadTargetRequest, UploadTarget } from "./upload";
 export {
   generateAnimationRequestSchema,

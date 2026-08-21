@@ -1,7 +1,7 @@
-export type QuickGenerationDraft<Reference = unknown> = {
+export type QuickGenerationDraft<CreatingReference = unknown> = {
   assetId?: string;
   prompt: string;
   size: string;
-  reference?: Reference;
-  referenceFileName?: string;
+  creatingReference?: CreatingReference;
+  creatingReferenceFileName?: string;
 };

@@ -42,32 +42,32 @@ describe("quick generation session", () => {
   it("accepts only image references and releases replaced previews", () => {
     const { adapter, session } = setup();
 
-    session.chooseReference(
+    session.chooseCreatingReference(
       new File(["text"], "notes.txt", { type: "text/plain" }),
     );
     expect(adapter.createPreviewUrl).not.toHaveBeenCalled();
 
-    session.chooseReference(
+    session.chooseCreatingReference(
       new File(["first"], "first.png", { type: "image/png" }),
     );
-    session.chooseReference(
+    session.chooseCreatingReference(
       new File(["second"], "second.webp", { type: "image/webp" }),
     );
     expect(adapter.revokePreviewUrl).toHaveBeenCalledWith("blob:reference-1");
     expect(session.getSnapshot().draft).toMatchObject({
-      reference: "blob:reference-2",
-      referenceFileName: "second.webp",
+      creatingReference: "blob:reference-2",
+      creatingReferenceFileName: "second.webp",
     });
 
-    session.clearReference();
+    session.clearCreatingReference();
     expect(adapter.revokePreviewUrl).toHaveBeenCalledWith("blob:reference-2");
-    expect(session.getSnapshot().draft.reference).toBe("");
+    expect(session.getSnapshot().draft.creatingReference).toBe("");
   });
 
   it("prepares a generation once and applies the completed asset", () => {
     const { session } = setup();
     session.updateDraft({ prompt: "  New hero  ", size: " 128 × 128 px " });
-    session.chooseReference(
+    session.chooseCreatingReference(
       new File(["hero"], "hero.png", { type: "image/png" }),
     );
 
@@ -76,7 +76,7 @@ describe("quick generation session", () => {
       assetId: undefined,
       prompt: "New hero",
       size: "128 × 128 px",
-      referenceFileName: "hero.png",
+      creatingReferenceFileName: "hero.png",
     });
 
     submission?.complete(asset("generated"));
@@ -85,7 +85,9 @@ describe("quick generation session", () => {
     expect(session.getSnapshot().currentAssetId).toBe("generated");
 
     session.selectAsset(asset("generated"));
-    expect(session.getSnapshot().draft.reference).toBe("blob:reference-1");
+    expect(session.getSnapshot().draft.creatingReference).toBe(
+      "blob:reference-1",
+    );
   });
 
   it("handles failed submissions, invalid drafts, and deletion races", () => {
@@ -97,11 +99,11 @@ describe("quick generation session", () => {
     expect(session.prepareDeletion([asset("second")])).toBeUndefined();
 
     session.updateDraft({ prompt: "Variation" });
-    session.chooseReference(
+    session.chooseCreatingReference(
       new File(["reference"], "reference.png", { type: "image/png" }),
     );
     const submission = session.prepareGeneration();
-    session.clearReference();
+    session.clearCreatingReference();
     submission?.fail();
     submission?.fail();
     expect(adapter.revokePreviewUrl).toHaveBeenCalledWith("blob:reference-1");

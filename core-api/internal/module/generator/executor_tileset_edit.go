@@ -55,7 +55,7 @@ func (e *executor) editTileSetTiles(
 	if err != nil {
 		return nil, err
 	}
-	editReferences, err := e.resolveTileSetEditReferences(ctx, edit.project, request.Reference)
+	editReferences, err := e.resolveTileSetEditReferences(ctx, edit.project, request.CreatingReference)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (e *executor) editTileSetItem(
 		return nil, err
 	}
 	itemIndex := targets[0].itemIndex
-	editReferences, err := e.resolveTileSetEditReferences(ctx, edit.project, request.Reference)
+	editReferences, err := e.resolveTileSetEditReferences(ctx, edit.project, request.CreatingReference)
 	if err != nil {
 		return nil, err
 	}
@@ -206,11 +206,11 @@ func resolveTileSetTargets(
 func (e *executor) resolveTileSetEditReferences(
 	ctx context.Context,
 	project *projectdomain.Project,
-	editReference string,
+	creatingReference string,
 ) ([]string, error) {
 	references := make([]string, 0, 2)
-	if editReference != "" {
-		resolved, err := e.resolveReferences(ctx, EditTiles, []string{editReference})
+	if creatingReference != "" {
+		resolved, err := e.resolveReferences(ctx, EditTiles, []string{creatingReference})
 		if err != nil {
 			return nil, err
 		}

@@ -38,7 +38,7 @@ export function generateMockQuickAsset(
           ...current,
           prompt,
           size,
-          referenceFileName: input.referenceFileName,
+          creatingReferenceFileName: input.creatingReferenceFileName,
         };
         assets = assets.map((asset) =>
           asset.id === updated.id ? updated : asset,
@@ -50,7 +50,7 @@ export function generateMockQuickAsset(
         id: `quick-asset-${crypto.randomUUID()}`,
         prompt,
         size,
-        referenceFileName: input.referenceFileName,
+        creatingReferenceFileName: input.creatingReferenceFileName,
       };
       assets = [...assets, created];
       return structuredClone(created);

@@ -4,8 +4,8 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { useCreateProjectMutation } from "@/model";
 import { toast } from "@/components/ui/toast";
-import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
 import { projectApi } from "@/model/project";
+import { uploadFile } from "@/model/upload";
 
 import {
   createNewProjectDraft,
@@ -29,15 +29,19 @@ export function useNewProjectController() {
   const [gameFile, setGameFile] = useState<File | null>(null);
   const [generatedPreview, setGeneratedPreview] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState("");
+  const [uploadedReference, setUploadedReference] = useState("");
   const [isGeneratingReference, setIsGeneratingReference] = useState(false);
+  const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [previewError, setPreviewError] = useState<string>();
-  const previewReadController = useRef<AbortController | null>(null);
+  const previewUploadController = useRef<AbortController | null>(null);
   const [previewMode, setPreviewMode] =
     useState<ProjectPreviewMode>("generate");
   const projectPreview =
     previewMode === "generate" ? generatedPreview : uploadedPreview;
+  const reference =
+    previewMode === "generate" ? generatedPreview : uploadedReference;
 
-  useEffect(() => () => previewReadController.current?.abort(), []);
+  useEffect(() => () => previewUploadController.current?.abort(), []);
 
   const form = useForm({
     defaultValues: createNewProjectDraft(),
@@ -51,7 +55,7 @@ export function useNewProjectController() {
           : toCreateProjectInput({
               ...value,
               name,
-              reference: projectPreview,
+              reference,
             }),
       );
       await navigate({
@@ -70,8 +74,12 @@ export function useNewProjectController() {
   );
 
   const chooseIdea = useCallback(() => {
+    previewUploadController.current?.abort();
+    previewUploadController.current = null;
     setGeneratedPreview("");
     setUploadedPreview("");
+    setUploadedReference("");
+    setIsUploadingReference(false);
     setPreviewError(undefined);
     form.setFieldValue("reference", "");
     setPreviewMode("generate");
@@ -80,8 +88,12 @@ export function useNewProjectController() {
   }, [form]);
 
   const chooseBlank = useCallback(() => {
+    previewUploadController.current?.abort();
+    previewUploadController.current = null;
     setGeneratedPreview("");
     setUploadedPreview("");
+    setUploadedReference("");
+    setIsUploadingReference(false);
     setPreviewError(undefined);
     form.setFieldValue("reference", "");
     setPreviewMode("generate");
@@ -131,6 +143,9 @@ export function useNewProjectController() {
   }, [form, generateReference, generatedPreview, selectedStart]);
 
   const returnToStart = useCallback(() => {
+    previewUploadController.current?.abort();
+    previewUploadController.current = null;
+    setIsUploadingReference(false);
     setStep(1);
     setSelectedStart(null);
   }, []);
@@ -143,8 +158,8 @@ export function useNewProjectController() {
 
   const selectUpload = useCallback(() => {
     setPreviewMode("upload");
-    form.setFieldValue("reference", uploadedPreview);
-  }, [form, uploadedPreview]);
+    form.setFieldValue("reference", uploadedReference);
+  }, [form, uploadedReference]);
 
   const generate = useCallback(
     () => void generateReference(),
@@ -153,20 +168,28 @@ export function useNewProjectController() {
 
   const setFile = useCallback(
     (file: File) => {
-      previewReadController.current?.abort();
+      previewUploadController.current?.abort();
       const controller = new AbortController();
-      previewReadController.current = controller;
+      previewUploadController.current = controller;
       setUploadedPreview("");
+      setUploadedReference("");
+      form.setFieldValue("reference", "");
+      setIsUploadingReference(true);
       setPreviewError(undefined);
       void (async () => {
         try {
-          const dataUrl = await readFileAsDataUrl(file, controller.signal);
+          const target = await uploadFile(file, controller.signal);
           if (controller.signal.aborted) return;
-          setUploadedPreview(dataUrl);
-          form.setFieldValue("reference", dataUrl);
+          setUploadedPreview(target.objectURL);
+          setUploadedReference(target.objectKey);
         } catch {
           if (controller.signal.aborted) return;
-          setPreviewError("We couldn't read that image. Try another file.");
+          setPreviewError("We couldn't upload that image. Try again.");
+        } finally {
+          if (previewUploadController.current === controller) {
+            previewUploadController.current = null;
+            setIsUploadingReference(false);
+          }
         }
       })();
     },
@@ -174,8 +197,11 @@ export function useNewProjectController() {
   );
 
   const clear = useCallback(() => {
-    previewReadController.current?.abort();
+    previewUploadController.current?.abort();
+    previewUploadController.current = null;
     setUploadedPreview("");
+    setUploadedReference("");
+    setIsUploadingReference(false);
     form.setFieldValue("reference", "");
     setPreviewError(undefined);
   }, [form]);
@@ -229,6 +255,7 @@ export function useNewProjectController() {
       mode: previewMode,
       url: projectPreview,
       isGenerating: isGeneratingReference,
+      isUploading: isUploadingReference,
       selectGenerate,
       selectUpload,
       generate,
@@ -240,6 +267,7 @@ export function useNewProjectController() {
       clear,
       generate,
       isGeneratingReference,
+      isUploadingReference,
       previewError,
       previewMode,
       projectPreview,
