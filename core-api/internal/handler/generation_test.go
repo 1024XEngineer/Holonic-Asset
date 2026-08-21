@@ -26,6 +26,10 @@ type runManagerStub struct {
 	run           *generator.Run
 	cancelID      generator.RunID
 	cancelErr     error
+	retryID       generator.RunID
+	retryErr      error
+	deleteID      generator.RunID
+	deleteErr     error
 	resolveID     generator.RunID
 	resolved      bool
 	resolveErr    error
@@ -71,6 +75,16 @@ func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, 
 func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
 	s.cancelID = runID
 	return s.cancelErr
+}
+
+func (s *runManagerStub) Retry(_ context.Context, runID generator.RunID) (generator.RunID, error) {
+	s.retryID = runID
+	return runID, s.retryErr
+}
+
+func (s *runManagerStub) Delete(_ context.Context, runID generator.RunID) error {
+	s.deleteID = runID
+	return s.deleteErr
 }
 
 func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.RunID, applied bool) error {
@@ -244,6 +258,54 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	)
 	if err != nil || !response.Data.Cancelled || stub.cancelID != 7 {
 		t.Fatalf("unexpected cancel response: %+v, id=%d, err=%v", response, stub.cancelID, err)
+	}
+}
+
+func TestRetryForwardsTaskBackedRunID(t *testing.T) {
+	stub := &runManagerStub{}
+	response, err := handler.NewGenerationHandler(stub).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || response.Data.GenerationRunID != 7 || stub.retryID != 7 {
+		t.Fatalf("unexpected retry response: %+v, id=%d, err=%v", response, stub.retryID, err)
+	}
+}
+
+func TestDeleteForwardsTaskBackedRunID(t *testing.T) {
+	stub := &runManagerStub{}
+	response, err := handler.NewGenerationHandler(stub).Delete(
+		context.Background(),
+		dto.DeleteGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || !response.Data.Deleted || stub.deleteID != 7 {
+		t.Fatalf("unexpected delete response: %+v, id=%d, err=%v", response, stub.deleteID, err)
+	}
+}
+
+func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
+	for _, operation := range []struct {
+		name string
+		run  func(*handler.GenerationHandler) error
+	}{
+		{name: "retry", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+		{name: "delete", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			stub := &runManagerStub{retryErr: generator.ErrRunNotFailed, deleteErr: generator.ErrRunNotFailed}
+			err := operation.run(handler.NewGenerationHandler(stub))
+			var httpErr *echo.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.Code != http.StatusConflict ||
+				!errors.Is(err, generator.ErrRunNotFailed) {
+				t.Fatalf("expected conflict, got %v", err)
+			}
+		})
 	}
 }
 
