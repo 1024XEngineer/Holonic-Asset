@@ -26,6 +26,11 @@ type taskManagerStub struct {
 	listErr       error
 	detailErr     error
 	completeErr   error
+	retryID       uint
+	retryStatus   taskdomain.Status
+	retryErr      error
+	deletedID     uint
+	deleteErr     error
 }
 
 type taskStatusUpdate struct {
@@ -47,6 +52,21 @@ func (s *taskManagerStub) Stop() error { return nil }
 func (s *taskManagerStub) Publish(_ context.Context, message *taskdomain.Task) (uint, error) {
 	s.createdTask = message
 	return s.createID, nil
+}
+
+func (s *taskManagerStub) RetryFailed(
+	_ context.Context,
+	taskID uint,
+	completionStatus taskdomain.Status,
+) error {
+	s.retryID = taskID
+	s.retryStatus = completionStatus
+	return s.retryErr
+}
+
+func (s *taskManagerStub) DeleteFailed(_ context.Context, taskID uint) error {
+	s.deletedID = taskID
+	return s.deleteErr
 }
 
 func (s *taskManagerStub) GetDetail(context.Context, uint) (*taskdomain.Task, error) {

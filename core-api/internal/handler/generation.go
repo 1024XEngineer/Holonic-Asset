@@ -11,19 +11,30 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 )
+
+type failedTaskManager interface {
+	RetryFailed(ctx context.Context, taskID uint, completionStatus taskdomain.Status) error
+	DeleteFailed(ctx context.Context, taskID uint) error
+}
 
 type GenerationHandler struct {
 	runs       generator.RunManager
+	tasks      failedTaskManager
 	references referenceResolver
 }
 
-func NewGenerationHandler(runs generator.RunManager, references ...referenceResolver) *GenerationHandler {
+func NewGenerationHandler(
+	runs generator.RunManager,
+	tasks failedTaskManager,
+	references ...referenceResolver,
+) *GenerationHandler {
 	var resolver referenceResolver
 	if len(references) > 0 {
 		resolver = references[0]
 	}
-	return &GenerationHandler{runs: runs, references: resolver}
+	return &GenerationHandler{runs: runs, tasks: tasks, references: resolver}
 }
 
 func (h *GenerationHandler) Create(
@@ -139,6 +150,50 @@ func (h *GenerationHandler) Cancel(
 		return dto.SuccessResponse[dto.CancelGenerationResponse]{}, err
 	}
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{Cancelled: true}), nil
+}
+
+func (h *GenerationHandler) Retry(
+	ctx context.Context,
+	request dto.RetryGenerationRequest,
+) (dto.SuccessResponse[dto.RetryGenerationResponse], error) {
+	if h.tasks == nil {
+		return dto.SuccessResponse[dto.RetryGenerationResponse]{}, fmt.Errorf("handler: task manager is required")
+	}
+	run, err := h.runs.Get(ctx, request.GenerationRunID)
+	if err != nil {
+		return dto.SuccessResponse[dto.RetryGenerationResponse]{}, err
+	}
+	var completionStatus taskdomain.Status
+	if run.Kind.AwaitsApplication() {
+		completionStatus = taskdomain.StatusAwaitingApplication
+	}
+	if err := h.tasks.RetryFailed(ctx, uint(request.GenerationRunID), completionStatus); err != nil {
+		return dto.SuccessResponse[dto.RetryGenerationResponse]{}, generationRunMutationError(err)
+	}
+	return dto.NewTypedSuccessResponse(dto.RetryGenerationResponse(request)), nil
+}
+
+func (h *GenerationHandler) Delete(
+	ctx context.Context,
+	request dto.DeleteGenerationRequest,
+) (dto.SuccessResponse[dto.DeleteGenerationResponse], error) {
+	if h.tasks == nil {
+		return dto.SuccessResponse[dto.DeleteGenerationResponse]{}, fmt.Errorf("handler: task manager is required")
+	}
+	if _, err := h.runs.Get(ctx, request.GenerationRunID); err != nil {
+		return dto.SuccessResponse[dto.DeleteGenerationResponse]{}, err
+	}
+	if err := h.tasks.DeleteFailed(ctx, uint(request.GenerationRunID)); err != nil {
+		return dto.SuccessResponse[dto.DeleteGenerationResponse]{}, generationRunMutationError(err)
+	}
+	return dto.NewTypedSuccessResponse(dto.DeleteGenerationResponse{Deleted: true}), nil
+}
+
+func generationRunMutationError(err error) error {
+	if errors.Is(err, taskdomain.ErrTaskNotFailed) {
+		return echo.NewHTTPError(http.StatusConflict, err.Error()).SetInternal(err)
+	}
+	return err
 }
 
 func (h *GenerationHandler) ResolveApplication(

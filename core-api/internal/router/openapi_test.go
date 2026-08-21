@@ -15,7 +15,7 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	server := router.Register(
 		handler.NewHandler(nil),
 		handler.NewProjectHandler(nil),
-		handler.NewGenerationHandler(nil),
+		handler.NewGenerationHandler(nil, nil),
 		handler.NewUploadHandler(nil),
 	)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/openapi.json", nil)
@@ -134,7 +134,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		"/project/update":                        {"put"},
 		"/project/delete":                        {"delete"},
 		"/projects/{project_id}/generation-runs": {"get", "post"},
-		"/generation-runs/{run_id}":              {"get"},
+		"/generation-runs/{run_id}":              {"get", "delete"},
+		"/generation-runs/{run_id}/retry":        {"post"},
 		"/generation-runs/{run_id}/cancel":       {"post"},
 		"/uploads":                               {"post"},
 		"/projects/{project_id}/assets":          {"get"},

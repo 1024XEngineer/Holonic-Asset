@@ -39,10 +39,33 @@ func (s *runManagerStub) Create(
 	return 17, s.createErr
 }
 
+type failedTaskManagerStub struct {
+	retryID     uint
+	retryStatus taskdomain.Status
+	retryErr    error
+	deleteID    uint
+	deleteErr   error
+}
+
+func (s *failedTaskManagerStub) RetryFailed(
+	_ context.Context,
+	taskID uint,
+	completionStatus taskdomain.Status,
+) error {
+	s.retryID = taskID
+	s.retryStatus = completionStatus
+	return s.retryErr
+}
+
+func (s *failedTaskManagerStub) DeleteFailed(_ context.Context, taskID uint) error {
+	s.deleteID = taskID
+	return s.deleteErr
+}
+
 func TestCreateMapsInvalidTaskPayloadToBadRequest(t *testing.T) {
 	wantErr := fmt.Errorf("%w: invalid target", generator.ErrInvalidTaskPayload)
 	stub := &runManagerStub{createErr: wantErr}
-	_, err := handler.NewGenerationHandler(stub).Create(
+	_, err := handler.NewGenerationHandler(stub, nil).Create(
 		context.Background(),
 		dto.CreateGenerationRequest{Kind: generator.EditTiles, CreativeBrief: "edit"},
 	)
@@ -82,7 +105,7 @@ func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.R
 func TestCreateMapsTransportRequest(t *testing.T) {
 	assetID := uint(3)
 	stub := &runManagerStub{}
-	generationHandler := handler.NewGenerationHandler(stub)
+	generationHandler := handler.NewGenerationHandler(stub, nil)
 	parameters := json.RawMessage(`{"size":{"width":64,"height":64}}`)
 	request := dto.CreateGenerationRequest{
 		ProjectID:        2,
@@ -121,7 +144,7 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		Result:    json.RawMessage(`{"asset_id":3,"version":2}`),
 	}}
 
-	response, err := handler.NewGenerationHandler(stub).Get(
+	response, err := handler.NewGenerationHandler(stub, nil).Get(
 		context.Background(),
 		dto.GetGenerationRequest{GenerationRunID: 7},
 	)
@@ -152,7 +175,7 @@ func TestGetResolvesGenerationResultContentReferences(t *testing.T) {
 	}}
 	resolver := &referenceResolverStub{}
 
-	response, err := handler.NewGenerationHandler(stub, resolver).Get(
+	response, err := handler.NewGenerationHandler(stub, nil, resolver).Get(
 		context.Background(),
 		dto.GetGenerationRequest{GenerationRunID: 7},
 	)
@@ -199,7 +222,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 		Limit:     10,
 		Cursor:    "cursor",
 	}
-	response, err := handler.NewGenerationHandler(stub).List(context.Background(), query)
+	response, err := handler.NewGenerationHandler(stub, nil).List(context.Background(), query)
 	if err != nil {
 		t.Fatalf("list generation runs: %v", err)
 	}
@@ -216,7 +239,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 
 func TestListRejectsUnsupportedStatus(t *testing.T) {
 	stub := &runManagerStub{listErr: generator.ErrInvalidRunListStatus}
-	_, err := handler.NewGenerationHandler(stub).List(
+	_, err := handler.NewGenerationHandler(stub, nil).List(
 		context.Background(),
 		dto.ListGenerationRunsRequest{Status: "completed"},
 	)
@@ -227,7 +250,7 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 
 func TestListRejectsInvalidCursor(t *testing.T) {
 	stub := &runManagerStub{listErr: generator.ErrInvalidRunListCursor}
-	_, err := handler.NewGenerationHandler(stub).List(
+	_, err := handler.NewGenerationHandler(stub, nil).List(
 		context.Background(),
 		dto.ListGenerationRunsRequest{Cursor: "invalid"},
 	)
@@ -238,7 +261,7 @@ func TestListRejectsInvalidCursor(t *testing.T) {
 
 func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	stub := &runManagerStub{}
-	response, err := handler.NewGenerationHandler(stub).Cancel(
+	response, err := handler.NewGenerationHandler(stub, nil).Cancel(
 		context.Background(),
 		dto.CancelGenerationRequest{GenerationRunID: 7},
 	)
@@ -247,9 +270,74 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	}
 }
 
+func TestRetryForwardsTaskBackedRunID(t *testing.T) {
+	runs := &runManagerStub{run: &generator.Run{Kind: generator.GenerateAnimation}}
+	tasks := &failedTaskManagerStub{}
+	response, err := handler.NewGenerationHandler(runs, tasks).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || response.Data.GenerationRunID != 7 || tasks.retryID != 7 ||
+		tasks.retryStatus != taskdomain.StatusAwaitingApplication {
+		t.Fatalf("unexpected retry response: %+v, id=%d, status=%s, err=%v", response, tasks.retryID, tasks.retryStatus, err)
+	}
+}
+
+func TestDeleteForwardsTaskBackedRunID(t *testing.T) {
+	runs := &runManagerStub{run: &generator.Run{Kind: generator.GenerateScenery}}
+	tasks := &failedTaskManagerStub{}
+	response, err := handler.NewGenerationHandler(runs, tasks).Delete(
+		context.Background(),
+		dto.DeleteGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || !response.Data.Deleted || tasks.deleteID != 7 {
+		t.Fatalf("unexpected delete response: %+v, id=%d, err=%v", response, tasks.deleteID, err)
+	}
+}
+
+func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
+	for _, operation := range []struct {
+		name string
+		run  func(*handler.GenerationHandler) error
+	}{
+		{name: "retry", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+		{name: "delete", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			runs := &runManagerStub{run: &generator.Run{Kind: generator.GenerateScenery}}
+			tasks := &failedTaskManagerStub{retryErr: taskdomain.ErrTaskNotFailed, deleteErr: taskdomain.ErrTaskNotFailed}
+			err := operation.run(handler.NewGenerationHandler(runs, tasks))
+			var httpErr *echo.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.Code != http.StatusConflict ||
+				!errors.Is(err, taskdomain.ErrTaskNotFailed) {
+				t.Fatalf("expected conflict, got %v", err)
+			}
+		})
+	}
+}
+
+func TestRetryReturnsUnexpectedManagerError(t *testing.T) {
+	wantErr := errors.New("retry unavailable")
+	runs := &runManagerStub{run: &generator.Run{Kind: generator.GenerateScenery}}
+	tasks := &failedTaskManagerStub{retryErr: wantErr}
+	_, err := handler.NewGenerationHandler(runs, tasks).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected manager error, got %v", err)
+	}
+}
+
 func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 	stub := &runManagerStub{}
-	err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub, nil).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
 	)
@@ -261,7 +349,7 @@ func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 func TestResolveApplicationReturnsManagerError(t *testing.T) {
 	wantErr := errors.New("transition failed")
 	stub := &runManagerStub{resolveErr: wantErr}
-	err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub, nil).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7},
 	)

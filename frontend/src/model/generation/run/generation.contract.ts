@@ -32,5 +32,9 @@ export type GenerationRunResponse<Content = unknown> = Omit<
 };
 export type CancelGenerationResponse =
   operations["cancelGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
+export type RetryGenerationResponse =
+  operations["retryGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
+export type DeleteGenerationResponse =
+  operations["deleteGenerationRun"]["responses"][200]["content"]["application/json"]["data"];
 export type ResolveGenerationApplicationRequest =
   operations["resolveGenerationApplication"]["requestBody"]["content"]["application/json"];
