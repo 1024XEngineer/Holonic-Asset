@@ -41,7 +41,7 @@ func (e *executor) generateCharacterPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
-	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.TagReferences)
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.NexusReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateCharacterProtoType,
@@ -160,7 +160,7 @@ func (e *executor) generateObjectPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
-	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.TagReferences)
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.Reference, payload.NexusReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateObjectProtoType,
@@ -513,8 +513,8 @@ func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {
 
 func prototypeReferenceInputs(
 	projectReference string,
-	userReference string,
-	tagReferences []string,
+	creatingReference string,
+	nexusReferences []string,
 ) ([]string, prompts.PrototypeReferenceState) {
 	references := make([]string, 0, maxPrototypeReferenceImages)
 	state := prompts.PrototypeReferenceState{}
@@ -522,17 +522,17 @@ func prototypeReferenceInputs(
 		references = append(references, reference)
 		state.HasProjectReference = true
 	}
-	if reference := strings.TrimSpace(userReference); reference != "" && len(references) < maxPrototypeReferenceImages {
+	if reference := strings.TrimSpace(creatingReference); reference != "" && len(references) < maxPrototypeReferenceImages {
 		references = append(references, reference)
-		state.HasUserReference = true
+		state.HasCreatingReference = true
 	}
-	for _, reference := range tagReferences {
+	for _, reference := range nexusReferences {
 		if len(references) == maxPrototypeReferenceImages {
 			break
 		}
 		if reference = strings.TrimSpace(reference); reference != "" {
 			references = append(references, reference)
-			state.TagReferenceCount++
+			state.NexusReferenceCount++
 		}
 	}
 	return references, state

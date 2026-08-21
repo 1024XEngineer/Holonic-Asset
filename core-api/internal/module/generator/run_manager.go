@@ -75,7 +75,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return persisted, nil
 	}
 	preparePrototypeReferences := func(
-		userReference string,
+		creatingReference string,
 		tags []assetdomain.Tag,
 	) (string, string, []string, error) {
 		projectReference := ""
@@ -93,38 +93,38 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		if err != nil {
 			return "", "", nil, err
 		}
-		userReference, err = persistReference("user", userReference)
+		creatingReference, err = persistReference("creating", creatingReference)
 		if err != nil {
 			return "", "", nil, err
 		}
 
-		tagLimit := 3
-		if strings.TrimSpace(userReference) != "" {
-			tagLimit = 2
+		nexusLimit := 3
+		if strings.TrimSpace(creatingReference) != "" {
+			nexusLimit = 2
 		}
-		tagReferences, err := e.selectTagReferences(
+		nexusReferences, err := e.selectNexusReferences(
 			ctx,
 			projectID,
 			tags,
-			tagLimit,
+			nexusLimit,
 			projectReference,
-			userReference,
+			creatingReference,
 		)
 		if err != nil {
 			return "", "", nil, err
 		}
-		prepared := make([]string, 0, len(tagReferences))
+		prepared := make([]string, 0, len(nexusReferences))
 		seen := map[string]struct{}{}
-		for _, reference := range []string{projectReference, userReference} {
+		for _, reference := range []string{projectReference, creatingReference} {
 			if reference != "" {
 				seen[reference] = struct{}{}
 			}
 		}
-		for _, reference := range tagReferences {
-			if len(prepared) == tagLimit {
+		for _, reference := range nexusReferences {
+			if len(prepared) == nexusLimit {
 				break
 			}
-			persisted, persistErr := persistReference("tag", reference)
+			persisted, persistErr := persistReference("nexus", reference)
 			if persistErr != nil {
 				return "", "", nil, persistErr
 			}
@@ -137,17 +137,17 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			seen[persisted] = struct{}{}
 			prepared = append(prepared, persisted)
 		}
-		return projectReference, userReference, prepared, nil
+		return projectReference, creatingReference, prepared, nil
 	}
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, value.TagReferences, err =
+		value.ProjectReference, value.Reference, value.NexusReferences, err =
 			preparePrototypeReferences(value.Reference, value.Tags)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, value.TagReferences, err =
+		value.ProjectReference, value.Reference, value.NexusReferences, err =
 			preparePrototypeReferences(value.Reference, value.Tags)
 		return value, err
 	case CreateSceneryPayload:
@@ -204,14 +204,14 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	}
 }
 
-type scoredTagReference struct {
+type scoredNexusReference struct {
 	reference string
 	score     int
 	version   uint
 	assetID   uint
 }
 
-func (e *Engine) selectTagReferences(
+func (e *Engine) selectNexusReferences(
 	ctx context.Context,
 	projectID uint,
 	tags []assetdomain.Tag,
@@ -228,16 +228,19 @@ func (e *Engine) selectTagReferences(
 
 	assets, err := e.assets.GetAssets(ctx, projectID, assetdomain.AssetListFilter{})
 	if err != nil {
-		return nil, fmt.Errorf("generator: list project %d assets for tag references: %w", projectID, err)
+		return nil, fmt.Errorf("generator: list project %d assets for Nexus References: %w", projectID, err)
 	}
-	candidates := make([]scoredTagReference, 0, len(assets))
+	candidates := make([]scoredNexusReference, 0, len(assets))
 	for _, asset := range assets {
+		if asset.ProjectID != 0 && asset.ProjectID != projectID {
+			continue
+		}
 		reference := strings.TrimSpace(asset.ThumbnailURL)
 		score := tagMatchScore(requested, asset.Tags)
 		if reference == "" || score == 0 {
 			continue
 		}
-		candidates = append(candidates, scoredTagReference{
+		candidates = append(candidates, scoredNexusReference{
 			reference: reference,
 			score:     score,
 			version:   asset.Version,

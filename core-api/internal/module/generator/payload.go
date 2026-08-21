@@ -22,10 +22,10 @@ type CreateCharacterPrototypePayload struct {
 	CreativeBrief    string            `json:"creative_brief"`
 	Dimensions       assetdomain.Size  `json:"dimensions"`
 	Perspective      string            `json:"perspective"`
-	Reference        string            `json:"reference"`         // User-supplied subject or concept reference.
+	Reference        string            `json:"reference"`         // Creating Reference supplied by the user.
 	ProjectReference string            `json:"project_reference"` // Backend-supplied project style reference.
 	Tags             []assetdomain.Tag `json:"tags,omitempty"`
-	TagReferences    []string          `json:"tag_references,omitempty"`
+	NexusReferences  []string          `json:"nexus_references,omitempty"`
 	ProjectID        uint              `json:"project_id"`
 }
 
@@ -81,10 +81,10 @@ type CreateObjectPrototypePayload struct {
 	CreativeBrief    string            `json:"creative_brief"`
 	Dimensions       assetdomain.Size  `json:"dimensions"`
 	Perspective      string            `json:"perspective"`
-	Reference        string            `json:"reference"`         // User-supplied subject or concept reference.
+	Reference        string            `json:"reference"`         // Creating Reference supplied by the user.
 	ProjectReference string            `json:"project_reference"` // Backend-supplied project style reference.
 	Tags             []assetdomain.Tag `json:"tags,omitempty"`
-	TagReferences    []string          `json:"tag_references,omitempty"`
+	NexusReferences  []string          `json:"nexus_references,omitempty"`
 	ProjectID        uint              `json:"project_id"`
 }
 
