@@ -326,8 +326,7 @@ func (e *executor) generatePrototypeResources(
 	harmonized, err := imageprocessor.HarmonizePrototypeDirectionColours(
 		processedFrames,
 		imageprocessor.PrototypeDirectionPaletteOptions{
-			PaletteSize:           options.PaletteSize,
-			AdaptiveSparsePalette: options.AdaptiveSparsePalette,
+			PaletteSize: options.PaletteSize,
 		},
 	)
 	if err != nil {

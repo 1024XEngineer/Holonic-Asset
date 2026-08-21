@@ -12,8 +12,7 @@ import (
 // model in one request, but their per-frame reductions otherwise keep slightly
 // different representatives for the same material or body region.
 type PrototypeDirectionPaletteOptions struct {
-	PaletteSize           int  `json:"palette_size"`
-	AdaptiveSparsePalette bool `json:"adaptive_sparse_palette"`
+	PaletteSize int `json:"palette_size"`
 }
 
 // directionColourMergeDistance is deliberately much smaller than the accent
@@ -31,6 +30,10 @@ type directionColourStat struct {
 type directionColourCanonical struct {
 	colour color.NRGBA
 	lab    oklabColour
+}
+
+func colourKey(pixel color.NRGBA) pixelColourKey {
+	return pixelColourKey(uint32(pixel.R)<<16 | uint32(pixel.G)<<8 | uint32(pixel.B))
 }
 
 // HarmonizePrototypeDirectionColours makes near-equivalent colours stable

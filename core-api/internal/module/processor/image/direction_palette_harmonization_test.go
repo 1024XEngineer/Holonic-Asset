@@ -79,28 +79,14 @@ func TestHarmonizePrototypeDirectionColoursKeepsStrictSparseObjectBudget(t *test
 
 	outputs, err := HarmonizePrototypeDirectionColours(
 		frames,
-		PrototypeDirectionPaletteOptions{
-			PaletteSize:           10,
-			AdaptiveSparsePalette: true,
-		},
+		PrototypeDirectionPaletteOptions{PaletteSize: 10},
 	)
 	if err != nil {
 		t.Fatalf("harmonize sparse directions: %v", err)
 	}
 	for index, output := range outputs {
-		colours := map[color.RGBA]struct{}{}
-		height := output.Bounds().Dy()
-		width := output.Bounds().Dx()
-		for y := range height {
-			for x := range width {
-				pixel := output.RGBAAt(x, y)
-				if pixel.A != 0 {
-					colours[pixel] = struct{}{}
-				}
-			}
-		}
-		if len(colours) > 4 {
-			t.Fatalf("direction %d has %d colours after sparse harmonization, want at most 4", index, len(colours))
+		if got := output.RGBAAt(4, 16+index); got.R != 100+40*uint8(index) || got.G != 80 || got.B != 40 {
+			t.Fatalf("direction %d changed a distinct source colour: %v", index, got)
 		}
 	}
 }
