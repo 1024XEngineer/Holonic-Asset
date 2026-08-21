@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GenerationQueue } from "@/features/generation/generation-queue";
+import { GenerationQueue } from "@/features/generation";
 
 import { AssetCard } from "./asset-card";
 import { AssetEditDialog } from "./asset-edit-dialog";
