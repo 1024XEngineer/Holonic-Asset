@@ -29,7 +29,6 @@ export function useNewProjectController() {
   const [gameFile, setGameFile] = useState<File | null>(null);
   const [generatedPreview, setGeneratedPreview] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState("");
-  const [uploadedReference, setUploadedReference] = useState("");
   const [isGeneratingReference, setIsGeneratingReference] = useState(false);
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [previewError, setPreviewError] = useState<string>();
@@ -38,8 +37,7 @@ export function useNewProjectController() {
     useState<ProjectPreviewMode>("generate");
   const projectPreview =
     previewMode === "generate" ? generatedPreview : uploadedPreview;
-  const reference =
-    previewMode === "generate" ? generatedPreview : uploadedReference;
+  const reference = projectPreview;
 
   useEffect(() => () => previewUploadController.current?.abort(), []);
 
@@ -78,7 +76,6 @@ export function useNewProjectController() {
     previewUploadController.current = null;
     setGeneratedPreview("");
     setUploadedPreview("");
-    setUploadedReference("");
     setIsUploadingReference(false);
     setPreviewError(undefined);
     form.setFieldValue("reference", "");
@@ -92,7 +89,6 @@ export function useNewProjectController() {
     previewUploadController.current = null;
     setGeneratedPreview("");
     setUploadedPreview("");
-    setUploadedReference("");
     setIsUploadingReference(false);
     setPreviewError(undefined);
     form.setFieldValue("reference", "");
@@ -158,8 +154,8 @@ export function useNewProjectController() {
 
   const selectUpload = useCallback(() => {
     setPreviewMode("upload");
-    form.setFieldValue("reference", uploadedReference);
-  }, [form, uploadedReference]);
+    form.setFieldValue("reference", uploadedPreview);
+  }, [form, uploadedPreview]);
 
   const generate = useCallback(
     () => void generateReference(),
@@ -172,7 +168,6 @@ export function useNewProjectController() {
       const controller = new AbortController();
       previewUploadController.current = controller;
       setUploadedPreview("");
-      setUploadedReference("");
       form.setFieldValue("reference", "");
       setIsUploadingReference(true);
       setPreviewError(undefined);
@@ -181,7 +176,6 @@ export function useNewProjectController() {
           const target = await uploadFile(file, controller.signal);
           if (controller.signal.aborted) return;
           setUploadedPreview(target.objectURL);
-          setUploadedReference(target.objectKey);
         } catch {
           if (controller.signal.aborted) return;
           setPreviewError("We couldn't upload that image. Try again.");
@@ -200,7 +194,6 @@ export function useNewProjectController() {
     previewUploadController.current?.abort();
     previewUploadController.current = null;
     setUploadedPreview("");
-    setUploadedReference("");
     setIsUploadingReference(false);
     form.setFieldValue("reference", "");
     setPreviewError(undefined);
