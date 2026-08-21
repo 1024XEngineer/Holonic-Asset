@@ -679,9 +679,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		}
 		if request.Options.Width != 128 || request.Options.Height != 128 ||
 			request.Options.Margin != imageprocessor.AnimationFrameMargin(128, 128) || !request.Options.CropContent ||
-			request.Options.PaletteSize != 24 || request.Options.NormalizeNearRound ||
-			request.Options.RemoveIsolatedComponents || request.Options.RemoveWeakEdgePixels ||
-			request.Options.ConsolidateColourIslands || !request.Options.RecoverPixelGrid ||
+			request.Options.PaletteSize != 24 || !request.Options.RecoverPixelGrid ||
 			!request.Options.PrequantizeBeforeResize || !request.Options.PreferNearestReduction ||
 			!request.Options.SpritePixelPipeline || request.Options.PreserveCanvasGeometry {
 			t.Fatalf("object direction %d did not fit content inside the animation safety margin: %+v", index, request.Options)
