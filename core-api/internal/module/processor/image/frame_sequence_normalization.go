@@ -45,6 +45,7 @@ type normalizeAnimationRequest struct {
 	PreserveHorizontalMotion bool
 	PreserveVerticalMotion   bool
 	NormalizeContentScale    bool
+	NormalizeContentArea     bool
 	PreserveSourceCellScale  bool
 	MaxStabilizationShift    int
 	DetectGridBounds         bool
@@ -96,7 +97,9 @@ type AnimationNormalizationReport struct {
 	AppliedMaxShift         AnimationPoint    `json:"applied_max_shift"`
 	TranslationClamped      int               `json:"translation_clamped"`
 	ContentScaleNormalized  bool              `json:"content_scale_normalized,omitempty"`
+	ContentAreaNormalized   bool              `json:"content_area_normalized,omitempty"`
 	ContentHeightMedian     float64           `json:"content_height_median,omitempty"`
+	ContentAreaMedian       float64           `json:"content_area_median,omitempty"`
 	ContentScaleMin         float64           `json:"content_scale_min,omitempty"`
 	ContentScaleMax         float64           `json:"content_scale_max,omitempty"`
 	GridXBounds             []int             `json:"grid_x_bounds"`
@@ -140,8 +143,11 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	if request.Margin < 0 || request.CropPadding < 0 || request.MaxStabilizationShift < 0 {
 		return nil, fmt.Errorf("margin, crop padding, and max stabilization shift must not be negative")
 	}
-	if request.NormalizeContentScale && request.PreserveSourceCellScale {
-		return nil, fmt.Errorf("normalize content scale and preserve source cell scale cannot be enabled together")
+	if (request.NormalizeContentScale || request.NormalizeContentArea) && request.PreserveSourceCellScale {
+		return nil, fmt.Errorf("content normalization and preserve source cell scale cannot be enabled together")
+	}
+	if request.NormalizeContentScale && request.NormalizeContentArea {
+		return nil, fmt.Errorf("normalize content scale and normalize content area cannot both be enabled")
 	}
 	anchor := request.Anchor
 	if anchor == "" || anchor == AnimationAnchorAuto {
@@ -224,6 +230,9 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	if request.NormalizeContentScale {
 		normalizeAnimationCellContentScale(cells, cellW, cellH, threshold, anchor, &report)
 		report.RegistrationPolicy = "median_content_height_per_cell_scale_median_root_anchor_shared_union_crop"
+	} else if request.NormalizeContentArea {
+		normalizeAnimationCellContentArea(cells, cellW, cellH, threshold, anchor, &report)
+		report.RegistrationPolicy = "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop"
 	}
 	stabilizeAnimationCells(cells, cellW, cellH, request, &report)
 
@@ -454,6 +463,93 @@ func normalizeAnimationCellContentScale(
 	report.ContentScaleMax = maxScale
 }
 
+// normalizeAnimationCellContentArea is the object-oriented counterpart to
+// normalizeAnimationCellContentScale. Height is a good proxy for a character
+// root, but it is a poor proxy for a static prop: a side view can be much
+// narrower than a front or top view while still representing the same-sized
+// prop. Matching visible alpha area keeps those views at a consistent visual
+// footprint without forcing their aspect ratios to be equal.
+func normalizeAnimationCellContentArea(
+	cells []animationCell,
+	cellW, cellH int,
+	threshold uint8,
+	anchor AnimationAnchor,
+	report *AnimationNormalizationReport,
+) {
+	areas := make([]float64, 0, len(cells))
+	for i := range cells {
+		if !cells[i].visible {
+			continue
+		}
+		if area := animationOpaqueArea(cells[i].image, threshold); area > 0 {
+			areas = append(areas, float64(area))
+		}
+	}
+	if len(areas) == 0 {
+		return
+	}
+	targetArea := medianAnimationValue(areas)
+	minScale, maxScale := math.Inf(1), 0.0
+	for i := range cells {
+		cell := &cells[i]
+		if !cell.visible || cell.bbox.Dx() <= 0 || cell.bbox.Dy() <= 0 {
+			continue
+		}
+		currentArea := float64(animationOpaqueArea(cell.image, threshold))
+		if currentArea <= 0 {
+			continue
+		}
+		scale := math.Sqrt(targetArea / currentArea)
+		// Never let normalization clip a source cell. The following shared
+		// registration pass still handles placement and root alignment.
+		scale = math.Min(scale, float64(cellW)/float64(cell.bbox.Dx()))
+		scale = math.Min(scale, float64(cellH)/float64(cell.bbox.Dy()))
+		if scale <= 0 {
+			continue
+		}
+
+		content := cloneNRGBA(cell.image.SubImage(cell.bbox))
+		drawW := max(1, int(math.Round(float64(cell.bbox.Dx())*scale)))
+		drawH := max(1, int(math.Round(float64(cell.bbox.Dy())*scale)))
+		resized, _ := qualityResize(content, content.Bounds(), drawW, drawH, RasterModeSmooth)
+		relativeAnchorX := (cell.anchor.X - float64(cell.bbox.Min.X)) * scale
+		relativeAnchorY := (cell.anchor.Y - float64(cell.bbox.Min.Y)) * scale
+		dstX := int(math.Round(cell.anchor.X - relativeAnchorX))
+		dstY := int(math.Round(cell.anchor.Y - relativeAnchorY))
+		dstX = clampAnimationInt(dstX, 0, max(0, cellW-drawW))
+		dstY = clampAnimationInt(dstY, 0, max(0, cellH-drawH))
+
+		canvas := image.NewNRGBA(image.Rect(0, 0, cellW, cellH))
+		draw.Draw(canvas, image.Rect(dstX, dstY, dstX+drawW, dstY+drawH), resized, image.Point{}, draw.Over)
+		bbox, visible := alphaBoundsNRGBA(canvas, threshold)
+		cell.image, cell.bbox, cell.visible = canvas, bbox, visible
+		if visible {
+			cell.anchor = animationAnchorFor(canvas, bbox, anchor)
+		}
+		minScale = math.Min(minScale, scale)
+		maxScale = math.Max(maxScale, scale)
+	}
+	if math.IsInf(minScale, 1) {
+		return
+	}
+	report.ContentAreaNormalized = true
+	report.ContentAreaMedian = targetArea
+	report.ContentScaleMin = minScale
+	report.ContentScaleMax = maxScale
+}
+
+func animationOpaqueArea(img *image.NRGBA, threshold uint8) int {
+	area := 0
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			if img.NRGBAAt(x, y).A > threshold {
+				area++
+			}
+		}
+	}
+	return area
+}
+
 func stabilizeAnimationCells(cells []animationCell, width, height int, request normalizeAnimationRequest, report *AnimationNormalizationReport) {
 	xs, ys := make([]float64, 0, len(cells)), make([]float64, 0, len(cells))
 	for i := range cells {
@@ -472,7 +568,7 @@ func stabilizeAnimationCells(cells []animationCell, width, height int, request n
 	targetX, targetY := math.Round(medianX), math.Round(medianY)
 	maxShift := request.MaxStabilizationShift
 	if maxShift == 0 {
-		if request.NormalizeContentScale {
+		if request.NormalizeContentScale || request.NormalizeContentArea {
 			// Static direction sheets often place one row much higher or lower
 			// inside tall source cells. Those are generation/layout errors rather
 			// than intentional motion, so allow complete anchor registration.

@@ -59,6 +59,12 @@ type SplitImageRequest struct {
 	// source content height before anchor registration. It keeps regions with
 	// inconsistent apparent sizes on one fixed output canvas.
 	NormalizeContentScale bool `json:"normalize_content_scale,omitempty"`
+	// NormalizeContentArea rescales each visible foreground region to the median
+	// source alpha area before anchor registration. It is intended for static
+	// object direction sheets where views can have different aspect ratios but
+	// should occupy the same visual amount of the frame. It is mutually exclusive
+	// with NormalizeContentScale.
+	NormalizeContentArea bool `json:"normalize_content_area,omitempty"`
 	// PreserveSourceCellScale keeps the source grid-cell canvas as the
 	// coordinate system for output frames. Without it, animation mode scales
 	// the sequence-wide foreground union to the target frame, so differences in
@@ -237,6 +243,7 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
 		PreserveVerticalMotion:   request.PreserveVerticalMotion,
 		NormalizeContentScale:    request.NormalizeContentScale,
+		NormalizeContentArea:     request.NormalizeContentArea,
 		PreserveSourceCellScale:  request.PreserveSourceCellScale,
 		MaxStabilizationShift:    request.MaxStabilizationShift,
 		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,

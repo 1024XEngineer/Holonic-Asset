@@ -612,6 +612,23 @@ func TestRepairPixelColourBlocksPreservesTwoBlendedSinglePixelEyes(t *testing.T)
 	}
 }
 
+func TestRemapToPalettePreservesIsolatedHighContrastAccent(t *testing.T) {
+	skin := color.NRGBA{R: 184, G: 116, B: 82, A: 255}
+	eye := color.NRGBA{R: 24, G: 20, B: 22, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 5, 5))
+	for y := range 5 {
+		for x := range 5 {
+			img.SetNRGBA(x, y, skin)
+		}
+	}
+	img.SetNRGBA(2, 2, eye)
+
+	remapToPalettePreservingAccents(img, img.Bounds(), []color.RGBA{{R: skin.R, G: skin.G, B: skin.B, A: 255}})
+	if got := img.NRGBAAt(2, 2); got != eye {
+		t.Fatalf("isolated high-contrast accent was remapped into the fill: %+v", got)
+	}
+}
+
 func TestRepairPixelAlphaGapsFillsCoveredBridgeOnly(t *testing.T) {
 	t.Parallel()
 
@@ -633,6 +650,21 @@ func TestRepairPixelAlphaGapsFillsCoveredBridgeOnly(t *testing.T) {
 	}
 	if got := quantized.NRGBAAt(1, 0); got.A != 0 {
 		t.Fatalf("low-coverage background was incorrectly filled: %+v", got)
+	}
+}
+
+func TestRepairPixelAlphaGapsDoesNotInferFromNeighbourMajority(t *testing.T) {
+	green := color.NRGBA{R: 40, G: 170, B: 75, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+	reference := image.NewNRGBA(img.Bounds())
+	for _, point := range []image.Point{{X: 0, Y: 1}, {X: 1, Y: 0}, {X: 2, Y: 0}} {
+		img.SetNRGBA(point.X, point.Y, green)
+	}
+	reference.SetNRGBA(1, 1, color.NRGBA{R: 40, G: 170, B: 75, A: 100})
+
+	repairPixelAlphaGaps(img, reference, pixelAlphaRepairFloor)
+	if got := img.NRGBAAt(1, 1); got.A != 0 {
+		t.Fatalf("neighbour majority created an unsupported block: %+v", got)
 	}
 }
 
@@ -761,6 +793,30 @@ func TestRegularizeNearCircularObjectSilhouetteExpandsSquashedRoundObject(t *tes
 	}
 	assertOpaqueRowWidths(t, img, []int{6, 10, 12, 14, 14, 16, 16, 16, 16, 16, 16, 14, 14, 12, 10, 6})
 	assertImageUsesOnlyPalette(t, img, palette)
+}
+
+func TestRegularizeNearCircularObjectSilhouetteExpandsSymmetricPinchedEllipse(t *testing.T) {
+	orange := color.NRGBA{R: 201, G: 93, B: 30, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := 2; x < 14; x++ {
+			dx := (float64(x) + 0.5 - 8) / 6
+			dy := (float64(y) + 0.5 - 8) / 8
+			if dx*dx+dy*dy <= 1 {
+				img.SetNRGBA(x, y, orange)
+			}
+		}
+	}
+	regularizeNearCircularObjectSilhouette(
+		img,
+		cloneNRGBA(img),
+		[]color.RGBA{{R: orange.R, G: orange.G, B: orange.B, A: 255}},
+	)
+
+	bounds, ok := alphaBounds(img, TransparentAlphaMax)
+	if !ok || bounds.Dx() != bounds.Dy() {
+		t.Fatalf("symmetric pinched ellipse was not expanded to a square footprint: %v", bounds)
+	}
 }
 
 func TestResizeImageObjectPipelineExpandsSquashedRoundObjectInsideCanonicalMargin(t *testing.T) {
@@ -1096,5 +1152,56 @@ func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing
 	}
 	if len(colours) > options.PaletteSize {
 		t.Fatalf("visible colour count = %d, palette limit = %d", len(colours), options.PaletteSize)
+	}
+}
+
+func TestRegularizeNearCircularObjectSilhouetteRepairsStronglyPinchedRoundProp(t *testing.T) {
+	t.Parallel()
+
+	orange := color.NRGBA{R: 204, G: 92, B: 27, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 24, 24))
+	for y := 2; y < 22; y++ {
+		for x := 5; x < 18; x++ {
+			dx := (float64(x) + 0.5 - 11.5) / 6.5
+			dy := (float64(y) + 0.5 - 12) / 10
+			if dx*dx+dy*dy <= 1 {
+				img.SetNRGBA(x, y, orange)
+			}
+		}
+	}
+
+	regularizeNearCircularObjectSilhouette(
+		img,
+		cloneNRGBA(img),
+		[]color.RGBA{{R: orange.R, G: orange.G, B: orange.B, A: 255}},
+	)
+
+	bounds, ok := alphaBounds(img, TransparentAlphaMax)
+	if !ok || bounds.Dx() != bounds.Dy() {
+		t.Fatalf("strongly pinched round prop was not restored to a square footprint: %v", bounds)
+	}
+}
+
+func TestRemoveIsolatedAlphaComponentsRemovesSmallObjectSpecks(t *testing.T) {
+	t.Parallel()
+
+	fill := color.NRGBA{R: 118, G: 79, B: 42, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := 5; y < 11; y++ {
+		for x := 5; x < 11; x++ {
+			img.SetNRGBA(x, y, fill)
+		}
+	}
+	img.SetNRGBA(1, 1, fill)
+	img.SetNRGBA(14, 13, fill)
+	img.SetNRGBA(14, 14, fill)
+
+	removeIsolatedAlphaComponents(img, 2)
+
+	if img.NRGBAAt(1, 1).A != 0 || img.NRGBAAt(14, 13).A != 0 || img.NRGBAAt(14, 14).A != 0 {
+		t.Fatal("detached object specks were not removed")
+	}
+	if img.NRGBAAt(7, 7).A == 0 {
+		t.Fatal("main object component was removed")
 	}
 }

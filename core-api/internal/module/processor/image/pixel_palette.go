@@ -97,7 +97,12 @@ func buildWeightedPalette(
 		return nil
 	}
 	bounds = bounds.Intersect(img.Bounds())
-	type accumulator struct{ r, g, b, weight uint64 }
+	type accumulator struct {
+		weight       uint64
+		sampleKey    uint32
+		sampleWeight uint64
+		hasSample    bool
+	}
 	hist := make(map[int]*accumulator)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
@@ -112,10 +117,14 @@ func buildWeightedPalette(
 				hist[key] = entry
 			}
 			weight := uint64(p.A)
-			entry.r += uint64(p.R) * weight
-			entry.g += uint64(p.G) * weight
-			entry.b += uint64(p.B) * weight
 			entry.weight += weight
+			sampleKey := rgbaKey(color.RGBA{R: p.R, G: p.G, B: p.B})
+			if !entry.hasSample || weight > entry.sampleWeight ||
+				(weight == entry.sampleWeight && sampleKey < entry.sampleKey) {
+				entry.sampleKey = sampleKey
+				entry.sampleWeight = weight
+				entry.hasSample = true
+			}
 		}
 	}
 	points := make([]palettePoint, 0, len(hist))
@@ -123,10 +132,13 @@ func buildWeightedPalette(
 		if entry.weight == 0 {
 			continue
 		}
+		// Keep a real colour from the reduced source rather than the weighted
+		// average of a histogram bucket. The latter can create a new saturated
+		// colour that was never present in the generated art.
 		points = append(points, palettePoint{
-			r:      float64(entry.r) / float64(entry.weight),
-			g:      float64(entry.g) / float64(entry.weight),
-			b:      float64(entry.b) / float64(entry.weight),
+			r:      float64((entry.sampleKey >> 16) & 0xff),
+			g:      float64((entry.sampleKey >> 8) & 0xff),
+			b:      float64(entry.sampleKey & 0xff),
 			weight: entry.weight,
 		})
 	}
@@ -194,17 +206,32 @@ func palettePointKey(point palettePoint) uint32 {
 }
 
 func remapToPalette(img *image.NRGBA, bounds image.Rectangle, palette []color.RGBA) {
+	remapToPaletteWithPolicy(img, bounds, palette, false)
+}
+
+// remapToPalettePreservingAccents is used by the final pixel-art pass. A tiny
+// high-contrast source mark can be a meaningful eye, seam, or button even when
+// it contributes too little area to win a median-cut palette slot. Preserve
+// such marks instead of mapping them to the surrounding fill colour. This is
+// intentionally limited to local, isolated contrast so ordinary gradients and
+// antialias pixels still obey the palette budget.
+func remapToPalettePreservingAccents(img *image.NRGBA, bounds image.Rectangle, palette []color.RGBA) {
+	remapToPaletteWithPolicy(img, bounds, palette, true)
+}
+
+func remapToPaletteWithPolicy(img *image.NRGBA, bounds image.Rectangle, palette []color.RGBA, preserveAccents bool) {
 	if len(palette) == 0 {
 		return
 	}
 	bounds = bounds.Intersect(img.Bounds())
+	snapshot := cloneNRGBA(img)
 	paletteLabs := make([]oklabColour, len(palette))
 	for index, candidate := range palette {
 		paletteLabs[index] = rgbaToOKLab(candidate)
 	}
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			p := img.NRGBAAt(x, y)
+			p := snapshot.NRGBAAt(x, y)
 			if p.A <= TransparentAlphaMax {
 				continue
 			}
@@ -219,9 +246,51 @@ func remapToPalette(img *image.NRGBA, bounds image.Rectangle, palette []color.RG
 					best, bestDistance = candidate, distance
 				}
 			}
+			if preserveAccents && bestDistance > pixelAccentPaletteDistance && isLocalContrastAccent(snapshot, bounds, x, y) {
+				img.SetNRGBA(x, y, p)
+				continue
+			}
 			img.SetNRGBA(x, y, color.NRGBA{R: best.R, G: best.G, B: best.B, A: p.A})
 		}
 	}
+}
+
+const pixelAccentPaletteDistance = 0.02
+
+func isLocalContrastAccent(img *image.NRGBA, bounds image.Rectangle, x, y int) bool {
+	offsets := [...]image.Point{
+		{X: -1, Y: -1}, {Y: -1}, {X: 1, Y: -1},
+		{X: -1}, {X: 1},
+		{X: -1, Y: 1}, {Y: 1}, {X: 1, Y: 1},
+	}
+	counts := make(map[pixelColourKey]int)
+	opaqueNeighbors := 0
+	sameColourNeighbors := 0
+	source := img.NRGBAAt(x, y)
+	for _, offset := range offsets {
+		point := image.Pt(x, y).Add(offset)
+		if !point.In(bounds) {
+			continue
+		}
+		neighbor := img.NRGBAAt(point.X, point.Y)
+		if neighbor.A <= TransparentAlphaMax {
+			continue
+		}
+		opaqueNeighbors++
+		key := colourKey(neighbor)
+		counts[key]++
+		if key == colourKey(source) {
+			sameColourNeighbors++
+		}
+	}
+	if opaqueNeighbors < 5 || sameColourNeighbors > 1 {
+		return false
+	}
+	key, count := dominantBoundaryColour(counts)
+	if count < 4 || key == colourKey(source) {
+		return false
+	}
+	return perceptualColourDistance(nrgbaToOKLab(source), nrgbaToOKLab(colourFromKey(key))) > pixelAccentPaletteDistance
 }
 
 func perceptualColourDistance(left, right oklabColour) float64 {

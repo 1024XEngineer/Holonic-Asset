@@ -22,13 +22,17 @@ func regularizeNearCircularObjectSilhouette(
 		return
 	}
 	aspect := float64(bounds.Dx()) / float64(bounds.Dy())
-	if aspect < 0.84 || aspect > 1.19 || opaqueComponentCount(img, bounds) != 1 {
+	// A generated orthographic/top-down view can be a noticeably pinched
+	// ellipse even when it is still a symmetric round prop. The lower bound is
+	// deliberately conservative; asymmetric and strongly elongated objects are
+	// rejected by the component/symmetry/ellipse checks below.
+	if aspect < 0.60 || aspect > 1.67 || opaqueComponentCount(img, bounds) != 1 {
 		return
 	}
 
 	area := bounds.Dx() * bounds.Dy()
 	horizontalMismatch, verticalMismatch := silhouetteSymmetryMismatch(img, bounds)
-	symmetryTolerance := max(2, area/24)
+	symmetryTolerance := max(2, area/16)
 	if horizontalMismatch > symmetryTolerance || verticalMismatch > symmetryTolerance {
 		return
 	}
@@ -36,7 +40,7 @@ func regularizeNearCircularObjectSilhouette(
 		return
 	}
 
-	target := centredSquareBounds(bounds, img.Bounds())
+	target := centredSquareBoundsForArea(bounds, img.Bounds(), opaquePixelArea(img, bounds))
 	if target.Empty() {
 		return
 	}
@@ -64,7 +68,18 @@ func regularizeNearCircularObjectSilhouette(
 			}
 		}
 	}
-	if union == 0 || changed == 0 || changed*4 > union {
+	// A strongly symmetric pinched view can need more than a handful of pixels
+	// restored, but the target diameter is derived from opaque area so the repair
+	// does not make one direction larger than the other views.
+	// Keep a guard against turning arbitrary props into circles. A more strongly
+	// pinched but still symmetric ellipse needs a larger correction than a mild
+	// one, otherwise the common 13x20 logical basketball footprint is rejected
+	// before it can be restored to a round silhouette.
+	maxChangeRatio := 1.0 / 3.0
+	if aspect < 0.75 || aspect > 1.0/0.75 {
+		maxChangeRatio = 0.60
+	}
+	if union == 0 || changed == 0 || float64(changed)/float64(union) > maxChangeRatio {
 		return
 	}
 
@@ -89,8 +104,16 @@ func regularizeNearCircularObjectSilhouette(
 	}
 }
 
-func centredSquareBounds(bounds, canvas image.Rectangle) image.Rectangle {
-	side := max(bounds.Dx(), bounds.Dy())
+func centredSquareBoundsForArea(bounds, canvas image.Rectangle, opaqueArea int) image.Rectangle {
+	if opaqueArea <= 0 {
+		return image.Rectangle{}
+	}
+	// Preserve the footprint of a squashed round prop instead of expanding it
+	// to the longest axis. A 13x20 ellipse and a 17x17 circle can represent the
+	// same object size; using max(width,height) would turn the former into a
+	// much larger 20x20 sprite.
+	side := max(1, int(math.Ceil(math.Sqrt(float64(opaqueArea)*4/math.Pi))))
+	side = max(side, min(bounds.Dx(), bounds.Dy()))
 	if side <= 0 || side > canvas.Dx() || side > canvas.Dy() {
 		return image.Rectangle{}
 	}
@@ -99,6 +122,18 @@ func centredSquareBounds(bounds, canvas image.Rectangle) image.Rectangle {
 	minX = max(canvas.Min.X, min(minX, canvas.Max.X-side))
 	minY = max(canvas.Min.Y, min(minY, canvas.Max.Y-side))
 	return image.Rect(minX, minY, minX+side, minY+side)
+}
+
+func opaquePixelArea(img *image.NRGBA, bounds image.Rectangle) int {
+	area := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			if img.NRGBAAt(x, y).A > TransparentAlphaMax {
+				area++
+			}
+		}
+	}
+	return area
 }
 
 func silhouetteSymmetryMismatch(img *image.NRGBA, bounds image.Rectangle) (int, int) {
@@ -276,6 +311,22 @@ func ellipseBoundaryFillColour(
 	point image.Point,
 	palette []color.RGBA,
 ) color.RGBA {
+	// The area-resampled source is the authority for interior colour. Looking
+	// only at neighbours makes newly added boundary pixels inherit an arbitrary
+	// outline/highlight colour and is a common cause of stray blocks on props.
+	reference := smoothReference.NRGBAAt(point.X, point.Y)
+	if reference.A > TransparentAlphaMax {
+		best := palette[0]
+		bestDistance := perceptualColourDistance(nrgbaToOKLab(reference), rgbaToOKLab(best))
+		for _, candidate := range palette[1:] {
+			distance := perceptualColourDistance(nrgbaToOKLab(reference), rgbaToOKLab(candidate))
+			if distance < bestDistance || (distance == bestDistance && rgbaKey(candidate) < rgbaKey(best)) {
+				best, bestDistance = candidate, distance
+			}
+		}
+		return best
+	}
+
 	neighbors := [...]image.Point{
 		{X: -1, Y: -1}, {Y: -1}, {X: 1, Y: -1},
 		{X: -1}, {X: 1},
@@ -296,7 +347,6 @@ func ellipseBoundaryFillColour(
 		candidate := colourFromKey(key)
 		return color.RGBA{R: candidate.R, G: candidate.G, B: candidate.B, A: 255}
 	}
-	reference := smoothReference.NRGBAAt(point.X, point.Y)
 	best := palette[0]
 	bestDistance := math.MaxFloat64
 	referenceLab := nrgbaToOKLab(reference)
