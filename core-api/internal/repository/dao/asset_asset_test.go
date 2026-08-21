@@ -14,6 +14,82 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
+func TestAssetDaoCreatesAssetAndInitializesTagAssociations(t *testing.T) {
+	db, mock := newMockAssetDatabase(t)
+	asset := &Asset{
+		Name:        "chair",
+		ProjectID:   42,
+		Type:        "object",
+		Description: "wooden chair",
+		Perspective: "Top-Down",
+		Dimensions:  []byte(`{"width":32,"height":32}`),
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO "assets" .* RETURNING "id"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectCommit()
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "asset_tags" WHERE asset_id = $1`)).
+		WithArgs(uint(7)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+
+	got, err := (&AssetDaoImpl{DB: db}).CreateAsset(context.Background(), asset)
+	if err != nil {
+		t.Fatalf("create asset: %v", err)
+	}
+	if got.ID != 7 || got.Version != 1 || len(got.Tags) != 0 {
+		t.Fatalf("unexpected created asset: %+v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestAssetDaoLoadsDetailAndForUpdateWithReusableTags(t *testing.T) {
+	tests := []struct {
+		name string
+		load func(context.Context, *AssetDaoImpl, uint) (Asset, error)
+	}{
+		{
+			name: "detail",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAsset(ctx, id)
+			},
+		},
+		{
+			name: "for update",
+			load: func(ctx context.Context, dao *AssetDaoImpl, id uint) (Asset, error) {
+				return dao.GetAssetForUpdate(ctx, id)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock := newMockAssetDatabase(t)
+			expectAssetRow(mock, 7, 42)
+			mock.ExpectQuery(`SELECT asset_tags\.asset_id, project_tags\.name, project_tags\.description, project_tags\.color FROM "asset_tags"`).
+				WithArgs(uint(7)).
+				WillReturnRows(sqlmock.NewRows([]string{"asset_id", "name", "description", "color"}).
+					AddRow(7, "furniture", "interior object", "#123456"))
+
+			got, err := tt.load(context.Background(), &AssetDaoImpl{DB: db}, 7)
+			if err != nil {
+				t.Fatalf("load asset: %v", err)
+			}
+			wantTags := []assetdomain.Tag{{Name: "furniture", Description: "interior object", Color: "#123456"}}
+			if got.ID != 7 || !reflect.DeepEqual(got.Tags, wantTags) {
+				t.Fatalf("unexpected asset: %+v", got)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}
+
 func TestAssetListLoadsStoredThumbnailAndReusableTags(t *testing.T) {
 	db, mock := newMockAssetDatabase(t)
 	mock.ExpectQuery(regexp.QuoteMeta(
