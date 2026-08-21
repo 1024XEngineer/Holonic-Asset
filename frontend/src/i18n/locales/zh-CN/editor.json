@@ -61,7 +61,7 @@
   "promptPlaceholder": "你想修改什么？",
   "dropImage": "拖放图片以附加",
   "attachImage": "附加图片",
-  "readingImage": "正在读取图片",
+  "uploadingImage": "正在上传图片",
   "sendPrompt": "发送提示词",
   "removeImage": "移除图片",
   "selectionSummary": "{{value}} 已选中",

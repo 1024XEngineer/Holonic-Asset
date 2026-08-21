@@ -221,9 +221,11 @@ export function UISetAssetFields({
         </Button>
       </div>
       <ImageDropzone
-        label={t("uiSetReferenceImage")}
-        value={draft.reference}
-        onChange={(reference) => onChange({ ...draft, reference })}
+        label={t("uiSetCreatingReferenceImage")}
+        value={draft.creatingReference}
+        onChange={(creatingReference) =>
+          onChange({ ...draft, creatingReference })
+        }
       />
     </>
   );

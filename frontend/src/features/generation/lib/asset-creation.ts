@@ -49,6 +49,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
     ...commonAssetCreationDraftShape,
     kind: z.literal("scenery"),
     aspectRatio: z.enum(sceneryAspectRatios),
+    creatingReference: z.unknown().optional(),
   }),
   z.object({
     ...commonAssetCreationDraftShape,
@@ -80,7 +81,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
         .refine(isUISetCanvasHeight, "Select a supported canvas height."),
     }),
     style: z.string().trim().min(1, "UI Set style is required."),
-    reference: z.unknown().optional(),
+    creatingReference: z.unknown().optional(),
     components: z
       .array(
         z.object({
@@ -98,14 +99,14 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
     ...commonAssetCreationDraftShape,
     kind: z.enum(["character", "object"]),
     perspective: perspectiveSchema,
-    reference: z.unknown().optional(),
+    creatingReference: z.unknown().optional(),
   }),
 ]);
 
-export function createAssetCreationDraft<Reference = unknown>(
+export function createAssetCreationDraft<CreatingReference = unknown>(
   kind: CreatableAssetKind,
   initialPrompt = "",
-): AssetCreationDraft<Reference> {
+): AssetCreationDraft<CreatingReference> {
   const common = {
     name: "",
     prompt: initialPrompt.trim(),
@@ -121,6 +122,7 @@ export function createAssetCreationDraft<Reference = unknown>(
         kind,
         aspectRatio: defaultSceneryAspectRatio,
         canvasSize: getSceneryCanvasSize(defaultSceneryAspectRatio),
+        creatingReference: undefined,
       };
     case "tileset":
       return {
@@ -136,7 +138,7 @@ export function createAssetCreationDraft<Reference = unknown>(
         canvasSize: formatCanvasSize(dimensions),
         dimensions,
         style: "",
-        reference: undefined,
+        creatingReference: undefined,
         components: [createUISetComponent()],
       };
     default:
@@ -144,14 +146,14 @@ export function createAssetCreationDraft<Reference = unknown>(
         ...common,
         kind,
         perspective: perspectiveOptions[0],
-        reference: undefined,
+        creatingReference: undefined,
       };
   }
 }
 
-export function toCreationRequest<Reference>(
-  draft: AssetCreationDraft<Reference>,
-): CreationRequest<Reference> {
+export function toCreationRequest<CreatingReference>(
+  draft: AssetCreationDraft<CreatingReference>,
+): CreationRequest<CreatingReference> {
   const common = {
     kind: draft.kind,
     name: draft.name.trim(),
@@ -167,6 +169,7 @@ export function toCreationRequest<Reference>(
         ...common,
         canvasSize: getSceneryCanvasSize(draft.aspectRatio),
         dimensions: getSceneryDimensions(draft.aspectRatio),
+        creatingReference: draft.creatingReference,
       };
     case "tileset":
       return {
@@ -183,7 +186,7 @@ export function toCreationRequest<Reference>(
         canvasSize: formatCanvasSize(draft.dimensions),
         dimensions: draft.dimensions,
         style: draft.style,
-        reference: draft.reference,
+        creatingReference: draft.creatingReference,
         components: draft.components.map(
           ({ id: _, ...component }) => component,
         ),
@@ -193,7 +196,7 @@ export function toCreationRequest<Reference>(
         ? {
             ...common,
             perspective: draft.perspective,
-            reference: draft.reference,
+            creatingReference: draft.creatingReference,
           }
         : common;
   }

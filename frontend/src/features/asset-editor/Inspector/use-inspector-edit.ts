@@ -7,14 +7,14 @@ import {
 } from "react";
 import { useDropzone } from "react-dropzone";
 
-import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
+import { uploadFile } from "@/model/upload";
 
 import { getInspectorTargetSummary } from "./inspector-target";
 import {
   inspectorPromptSchema,
   inspectorSubmitRequestSchema,
   type SpriteInspectorContentProps,
-  type InspectorReference,
+  type InspectorCreatingReference,
 } from "./inspector.types";
 
 const imageAccept = {
@@ -43,59 +43,70 @@ export function useInspectorEdit({
   | "onSubmit"
   | "isSubmitting"
 >) {
-  const [reference, setReference] = useState<InspectorReference | null>(null);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
-  const [isReadingReference, setIsReadingReference] = useState(false);
+  const [creatingReference, setCreatingReference] =
+    useState<InspectorCreatingReference | null>(null);
+  const [creatingReferenceError, setCreatingReferenceError] = useState<
+    string | null
+  >(null);
+  const [isUploadingCreatingReference, setIsUploadingCreatingReference] =
+    useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const referenceReadController = useRef<AbortController | null>(null);
+  const creatingReferenceUploadController = useRef<AbortController | null>(
+    null,
+  );
 
   useEffect(
     () => () => {
-      referenceReadController.current?.abort();
+      creatingReferenceUploadController.current?.abort();
     },
     [],
   );
 
-  const clearReference = () => {
-    referenceReadController.current?.abort();
-    setReference(null);
-    setReferenceError(null);
-    setIsReadingReference(false);
+  const clearCreatingReference = () => {
+    creatingReferenceUploadController.current?.abort();
+    setCreatingReference(null);
+    setCreatingReferenceError(null);
+    setIsUploadingCreatingReference(false);
   };
 
-  const attachReference = async (file: File) => {
-    referenceReadController.current?.abort();
+  const attachCreatingReference = async (file: File) => {
+    creatingReferenceUploadController.current?.abort();
     const controller = new AbortController();
-    referenceReadController.current = controller;
-    setIsReadingReference(true);
-    setReferenceError(null);
+    creatingReferenceUploadController.current = controller;
+    setIsUploadingCreatingReference(true);
+    setCreatingReferenceError(null);
 
     try {
-      const dataUrl = await readFileAsDataUrl(file, controller.signal);
+      const target = await uploadFile(file, controller.signal);
       if (controller.signal.aborted) return;
-      setReference({ fileName: file.name, mimeType: file.type, dataUrl });
+      setCreatingReference({
+        fileName: file.name,
+        mimeType: file.type,
+        objectKey: target.objectKey,
+        previewUrl: target.objectURL,
+      });
     } catch {
       if (!controller.signal.aborted) {
-        setReferenceError("We couldn't read that image. Try another file.");
+        setCreatingReferenceError("We couldn't upload that image. Try again.");
       }
     } finally {
-      if (!controller.signal.aborted) setIsReadingReference(false);
+      if (!controller.signal.aborted) setIsUploadingCreatingReference(false);
     }
   };
 
   const submit = async () => {
     const result = inspectorSubmitRequestSchema.safeParse({
       prompt,
-      reference: reference ?? undefined,
+      creatingReference: creatingReference ?? undefined,
       target: { nodeIds: selectedNodes, frames: selectedFrames },
     });
-    if (!result.success || isSubmitting || isReadingReference) return;
+    if (!result.success || isSubmitting || isUploadingCreatingReference) return;
 
     setSubmitError(null);
     try {
       await onSubmit(result.data);
-      setReference(null);
-      setReferenceError(null);
+      setCreatingReference(null);
+      setCreatingReferenceError(null);
     } catch {
       setSubmitError("Unable to send the prompt.");
     }
@@ -124,10 +135,10 @@ export function useInspectorEdit({
     noClick: true,
     noKeyboard: true,
     onDropAccepted: ([file]) => {
-      if (file) void attachReference(file);
+      if (file) void attachCreatingReference(file);
     },
     onDropRejected: () => {
-      setReferenceError("Use a PNG, JPEG, or WebP image.");
+      setCreatingReferenceError("Use a PNG, JPEG, or WebP image.");
     },
   });
 
@@ -135,16 +146,16 @@ export function useInspectorEdit({
     canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
     canSubmit:
       inspectorPromptSchema.safeParse(prompt).success &&
-      !isReadingReference &&
+      !isUploadingCreatingReference &&
       !isSubmitting,
     changePrompt,
-    clearReference,
+    clearCreatingReference,
     dropzone,
     handlePromptKeyDown,
     handleSubmit,
-    isReadingReference,
-    reference,
-    referenceError,
+    isUploadingCreatingReference,
+    creatingReference,
+    creatingReferenceError,
     submitError,
     target: getInspectorTargetSummary(
       selectedNodes,

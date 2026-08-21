@@ -31,11 +31,11 @@ export function buildInspectorGenerationRequest(
     kind,
     creative_brief: request.prompt,
     targetAssetPaths,
-    parameters: request.reference
+    parameters: request.creatingReference
       ? {
-          reference: request.reference.dataUrl,
-          referenceFileName: request.reference.fileName,
-          referenceMimeType: request.reference.mimeType,
+          creating_reference: request.creatingReference.objectKey,
+          creating_reference_file_name: request.creatingReference.fileName,
+          creating_reference_mime_type: request.creatingReference.mimeType,
         }
       : undefined,
   };

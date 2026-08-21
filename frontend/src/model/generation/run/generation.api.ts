@@ -1,4 +1,4 @@
-import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
+import { uploadFile } from "@/model/upload";
 
 import {
   assetCanvasSizeDimensionsSchema,
@@ -99,7 +99,9 @@ export async function toCreateGenerationRequest(
         dimensions:
           request.dimensions ??
           assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
-        reference: await resolveReference(request.reference),
+        creating_reference: await resolveCreatingReference(
+          request.creatingReference,
+        ),
       },
     };
   }
@@ -146,7 +148,9 @@ export async function toCreateGenerationRequest(
       asset_name: request.name,
       dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
       perspective: request.perspective,
-      reference: await resolveReference(request.reference),
+      creating_reference: await resolveCreatingReference(
+        request.creatingReference,
+      ),
     },
   };
 }
@@ -255,13 +259,13 @@ function isVisibleGenerationStatus(
   );
 }
 
-async function resolveReference(reference: unknown) {
-  if (reference === undefined) return "";
-  if (typeof reference === "string") return reference.trim();
-  if (typeof File !== "undefined" && reference instanceof File) {
-    return readFileAsDataUrl(reference);
+async function resolveCreatingReference(creatingReference: unknown) {
+  if (creatingReference === undefined) return "";
+  if (typeof creatingReference === "string") return creatingReference.trim();
+  if (typeof File !== "undefined" && creatingReference instanceof File) {
+    return (await uploadFile(creatingReference)).objectKey;
   }
-  throw new Error("Reference must be an image file or URL.");
+  throw new Error("Creating reference must be an image file or URL.");
 }
 
 function toGenerationRequestMetadata(

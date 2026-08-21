@@ -12,14 +12,14 @@ func TestCharacterPrototypeIncludesFullBodyStyleAndDirectionLayout(t *testing.T)
 		"a silver-armored dragon-born interstellar soldier",
 		"Side-On",
 		prompts.SolidMatteBackground("#00FF00"),
-		prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true},
+		prompts.PrototypeReferenceState{HasProjectReference: true, HasCreatingReference: true},
 	)
 
 	for _, expected := range []string{
 		"complete full-body character",
 		"Reference image 1 is the project prototype image and is the Style Reference",
-		"Reference image 2 is the user-supplied reference image",
-		"user-supplied reference image is always a strong reference",
+		"Reference image 2 is the creating reference image",
+		"creating reference image is always a strong reference",
 		"uniform, solid #00FF00 colour",
 		"exactly 2 direction views",
 		"1 row x 2 column sheet",

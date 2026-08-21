@@ -73,7 +73,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		}
 		return persisted, nil
 	}
-	preparePrototypeReferences := func(userReference string) (string, string, error) {
+	preparePrototypeReferences := func(creatingReference string) (string, string, error) {
 		projectReference := ""
 		if e.projects != nil && projectID != 0 {
 			project, err := e.projects.GetDetail(ctx, projectID)
@@ -89,20 +89,20 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		if err != nil {
 			return "", "", err
 		}
-		userReference, err = persistReference("user", userReference)
+		creatingReference, err = persistReference("creating", creatingReference)
 		if err != nil {
 			return "", "", err
 		}
-		return projectReference, userReference, nil
+		return projectReference, creatingReference, nil
 	}
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
+		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.ProjectReference, value.Reference, err = preparePrototypeReferences(value.Reference)
+		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -120,10 +120,11 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(string(project.GameType)),
 			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
 		}
-		if strings.TrimSpace(value.Reference) == "" {
-			value.Reference = project.Reference
+		value.ProjectReference, err = persistReference("project", project.Reference)
+		if err != nil {
+			return nil, err
 		}
-		value.Reference, err = persistReference("scenery", value.Reference)
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
 		if err != nil {
 			return nil, err
 		}
@@ -147,11 +148,11 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return value, nil
 	case EditTilesetItemPayload:
 		var err error
-		value.Reference, err = persistReference("edit", value.Reference)
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
 		return value, err
 	case EditTilesPayload:
 		var err error
-		value.Reference, err = persistReference("edit", value.Reference)
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
 		return value, err
 	default:
 		return payload, nil
@@ -214,9 +215,9 @@ func buildTaskPayload(request *Request) (any, error) {
 		return payload, nil
 	case GenerateScenery:
 		parameters := struct {
-			AssetName  string           `json:"asset_name"`
-			Dimensions assetdomain.Size `json:"dimensions"`
-			Reference  string           `json:"reference"`
+			AssetName         string           `json:"asset_name"`
+			Dimensions        assetdomain.Size `json:"dimensions"`
+			CreatingReference string           `json:"creating_reference"`
 		}{}
 		if request.AssetID != nil || len(request.TargetAssetPaths) != 0 {
 			return nil, fmt.Errorf("%w: generate_scenery does not accept assetId or targetAssetPaths", ErrInvalidSceneryPayload)
@@ -226,7 +227,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload := CreateSceneryPayload{
 			AssetName: parameters.AssetName, CreativeBrief: request.CreativeBrief,
-			Dimensions: parameters.Dimensions, Reference: parameters.Reference,
+			Dimensions: parameters.Dimensions, CreatingReference: parameters.CreatingReference,
 			ProjectID: request.ProjectID,
 		}
 		if payload.ProjectID == 0 || strings.TrimSpace(payload.AssetName) == "" || strings.TrimSpace(payload.CreativeBrief) == "" {
@@ -301,8 +302,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		return payload, nil
 	case EditTilesetItem:
 		parameters := struct {
-			Target    *TileSetEditTarget `json:"target"`
-			Reference string             `json:"reference,omitempty"`
+			Target            *TileSetEditTarget `json:"target"`
+			CreatingReference string             `json:"creating_reference,omitempty"`
 		}{}
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tileset_item does not accept targetAssetPaths")
@@ -311,10 +312,10 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload := EditTilesetItemPayload{
-			ProjectID:     request.ProjectID,
-			CreativeBrief: request.CreativeBrief,
-			Target:        parameters.Target,
-			Reference:     parameters.Reference,
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			Target:            parameters.Target,
+			CreatingReference: parameters.CreatingReference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
@@ -325,8 +326,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		return payload, nil
 	case EditTiles:
 		parameters := struct {
-			Targets   []TileSetEditTarget `json:"targets"`
-			Reference string              `json:"reference,omitempty"`
+			Targets           []TileSetEditTarget `json:"targets"`
+			CreatingReference string              `json:"creating_reference,omitempty"`
 		}{}
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tiles does not accept targetAssetPaths")
@@ -335,10 +336,10 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload := EditTilesPayload{
-			ProjectID:     request.ProjectID,
-			CreativeBrief: request.CreativeBrief,
-			Targets:       append([]TileSetEditTarget(nil), parameters.Targets...),
-			Reference:     parameters.Reference,
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			Targets:           append([]TileSetEditTarget(nil), parameters.Targets...),
+			CreatingReference: parameters.CreatingReference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID

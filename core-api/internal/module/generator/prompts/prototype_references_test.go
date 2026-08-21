@@ -39,13 +39,13 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		forbidden []string
 	}{
 		{
-			name:  "project and user references",
-			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasUserReference: true},
+			name:  "project and creating references",
+			state: prompts.PrototypeReferenceState{HasProjectReference: true, HasCreatingReference: true},
 			expected: []string{
 				"Exactly two reference images are supplied in an authoritative order",
 				"Reference image 1 is the project prototype image and is the Style Reference",
-				"Reference image 2 is the user-supplied reference image",
-				"user-supplied reference image is always a strong reference",
+				"Reference image 2 is the creating reference image",
+				"creating reference image is always a strong reference",
 				"preserve every unmentioned visual attribute",
 				"make only the changes explicitly requested in the user creative brief",
 			},
@@ -57,17 +57,17 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 			expected: []string{
 				"Exactly one reference image is supplied",
 				"Reference image 1 is the project prototype image and is the Style Reference",
-				"No user-supplied reference image is supplied",
+				"No creating reference image is supplied",
 			},
 			forbidden: []string{"Reference image 1 is the user-supplied image"},
 		},
 		{
-			name:  "user reference only",
-			state: prompts.PrototypeReferenceState{HasUserReference: true},
+			name:  "creating reference only",
+			state: prompts.PrototypeReferenceState{HasCreatingReference: true},
 			expected: []string{
 				"Exactly one reference image is supplied",
-				"Reference image 1 is the user-supplied reference image",
-				"user-supplied reference image is always a strong reference",
+				"Reference image 1 is the creating reference image",
+				"creating reference image is always a strong reference",
 				"preserve every unmentioned visual attribute",
 				"make only the changes explicitly requested in the user creative brief",
 				"No project Style Reference is supplied",
@@ -84,7 +84,7 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 			state: prompts.PrototypeReferenceState{},
 			expected: []string{
 				"No reference images are supplied",
-				"Do not assume that any unstated project or user reference is available",
+				"Do not assume that any unstated project or creating reference is available",
 			},
 			forbidden: []string{"Exactly one reference image", "Exactly two reference images"},
 		},

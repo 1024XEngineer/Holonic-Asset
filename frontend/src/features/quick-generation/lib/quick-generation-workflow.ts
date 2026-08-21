@@ -16,16 +16,16 @@ export const quickGenerationSizes = [
 
 export const defaultQuickGenerationSize = quickGenerationSizes[1];
 
-export function createQuickGenerationDraft<Reference = unknown>(
+export function createQuickGenerationDraft<CreatingReference = unknown>(
   asset?: QuickGenerationAsset,
-  reference?: Reference,
-): QuickGenerationDraft<Reference> {
+  creatingReference?: CreatingReference,
+): QuickGenerationDraft<CreatingReference> {
   return {
     assetId: asset?.id,
     prompt: "",
     size: asset?.size ?? defaultQuickGenerationSize,
-    reference,
-    referenceFileName: asset?.referenceFileName,
+    creatingReference,
+    creatingReferenceFileName: asset?.creatingReferenceFileName,
   };
 }
 
@@ -36,7 +36,7 @@ export function toGenerateQuickAssetInput(
     assetId: draft.assetId,
     prompt: draft.prompt,
     size: draft.size,
-    referenceFileName: draft.referenceFileName,
+    creatingReferenceFileName: draft.creatingReferenceFileName,
   });
 
   return result.success ? result.data : undefined;

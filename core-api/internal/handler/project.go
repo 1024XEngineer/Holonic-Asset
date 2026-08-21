@@ -51,8 +51,8 @@ func (h *ProjectHandler) Create(
 
 func (h *ProjectHandler) GenerateReference(
 	c context.Context,
-	request dto.GenerateProjectReferenceRequest,
-) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	request dto.GenerateReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateReferenceResponse], error) {
 	project := &domain.Project{
 		Name:           request.Name,
 		GameType:       request.GameType,
@@ -65,10 +65,10 @@ func (h *ProjectHandler) GenerateReference(
 
 	reference, err := h.manager.GenerateReference(c, project)
 	if err != nil {
-		return dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.GenerateReferenceResponse]{}, projectHandlerError(err)
 	}
 
-	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{Reference: reference}), nil
+	return dto.NewTypedSuccessResponse(dto.GenerateReferenceResponse{Reference: reference}), nil
 }
 
 func (h *ProjectHandler) ListByUID(

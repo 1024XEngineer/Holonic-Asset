@@ -114,8 +114,11 @@ func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPay
 
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {
 	references := []string(nil)
-	if payload.Reference != "" {
-		reference := payload.Reference
+	reference := payload.CreatingReference
+	if reference == "" {
+		reference = payload.ProjectReference
+	}
+	if reference != "" {
 		if e.references != nil {
 			resolved, err := e.references.ResolveReference(ctx, reference)
 			if err != nil {

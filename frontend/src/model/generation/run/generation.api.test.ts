@@ -8,15 +8,15 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
   },
   assetDetail: vi.fn(),
-  readFileAsDataUrl: vi.fn(),
+  uploadFile: vi.fn(),
 }));
 
 vi.mock("./core-generation.api", () => ({ coreGenerationApi: mocks.core }));
 vi.mock("../../asset/library/core-asset.api", () => ({
   coreAssetApi: { detail: mocks.assetDetail },
 }));
-vi.mock("@/lib/read-file-as-data-url", () => ({
-  readFileAsDataUrl: mocks.readFileAsDataUrl,
+vi.mock("@/model/upload", () => ({
+  uploadFile: mocks.uploadFile,
 }));
 
 import {
@@ -33,7 +33,7 @@ beforeEach(() => {
   mocks.core.create.mockResolvedValue({ generationRunId: 17 });
   mocks.core.list.mockResolvedValue({ items: [] });
   mocks.assetDetail.mockResolvedValue({ type: "character" });
-  mocks.readFileAsDataUrl.mockResolvedValue("data:image/png;base64,reference");
+  mocks.uploadFile.mockResolvedValue({ objectKey: "uploads/reference.png" });
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -48,7 +48,7 @@ describe("generationApi", () => {
       const reference = new File(["image"], "reference.png", {
         type: "image/png",
       });
-      const request = creationRequest({ kind, reference });
+      const request = creationRequest({ kind, creatingReference: reference });
 
       await expect(toCreateGenerationRequest(request)).resolves.toEqual({
         kind: taskKind,
@@ -57,10 +57,10 @@ describe("generationApi", () => {
           asset_name: "Orchard Keeper",
           dimensions: { width: 48, height: 64 },
           perspective: "Isometric",
-          reference: "data:image/png;base64,reference",
+          creating_reference: "uploads/reference.png",
         },
       });
-      expect(mocks.readFileAsDataUrl).toHaveBeenCalledWith(reference);
+      expect(mocks.uploadFile).toHaveBeenCalledWith(reference);
     },
   );
 
@@ -122,7 +122,7 @@ describe("generationApi", () => {
       kind: "scenery",
       canvasSize: "stale display value",
       dimensions: { width: 1792, height: 768 },
-      reference,
+      creatingReference: reference,
     });
 
     await expect(toCreateGenerationRequest(request)).resolves.toEqual({
@@ -131,10 +131,10 @@ describe("generationApi", () => {
       parameters: {
         asset_name: "Orchard Keeper",
         dimensions: { width: 1792, height: 768 },
-        reference: "data:image/png;base64,reference",
+        creating_reference: "uploads/reference.png",
       },
     });
-    expect(mocks.readFileAsDataUrl).toHaveBeenCalledWith(reference);
+    expect(mocks.uploadFile).toHaveBeenCalledWith(reference);
   });
 
   it("resolves an awaiting animation edit to the owning asset kind", async () => {
