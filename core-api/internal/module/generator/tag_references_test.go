@@ -74,24 +74,25 @@ func TestBuildPrototypePayloadAcceptsLegacyAndStructuredTags(t *testing.T) {
 	}
 }
 
-func TestSelectTagReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
+func TestSelectNexusReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 	assets := &tagAssetReaderStub{assets: []assetdomain.Asset{
-		{ID: 1, Version: 8, ThumbnailURL: "refs/one.png", Tags: []assetdomain.Tag{{Name: "knight"}}},
-		{ID: 2, Version: 3, ThumbnailURL: "refs/two.png", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
-		{ID: 4, Version: 3, ThumbnailURL: "refs/four.png", Tags: []assetdomain.Tag{{Name: "KNIGHT"}, {Name: "player"}}},
-		{ID: 7, Version: 4, ThumbnailURL: "refs/four.png", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
-		{ID: 5, Version: 9, ThumbnailURL: "", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
-		{ID: 6, Version: 9, ThumbnailURL: "refs/unmatched.png", Tags: []assetdomain.Tag{{Name: "villager"}}},
+		{ID: 1, ProjectID: 42, Version: 8, ThumbnailURL: "refs/one.png", Tags: []assetdomain.Tag{{Name: "knight"}}},
+		{ID: 2, ProjectID: 42, Version: 3, ThumbnailURL: "refs/two.png", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
+		{ID: 4, ProjectID: 42, Version: 3, ThumbnailURL: "refs/four.png", Tags: []assetdomain.Tag{{Name: "KNIGHT"}, {Name: "player"}}},
+		{ID: 7, ProjectID: 42, Version: 4, ThumbnailURL: "refs/four.png", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
+		{ID: 5, ProjectID: 42, Version: 9, ThumbnailURL: "", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
+		{ID: 6, ProjectID: 42, Version: 9, ThumbnailURL: "refs/unmatched.png", Tags: []assetdomain.Tag{{Name: "villager"}}},
+		{ID: 8, ProjectID: 99, Version: 99, ThumbnailURL: "refs/cross-project.png", Tags: []assetdomain.Tag{{Name: "knight"}, {Name: "player"}}},
 	}}
 	engine := &Engine{assets: assets}
 
-	got, err := engine.selectTagReferences(context.Background(), 42, []assetdomain.Tag{
+	got, err := engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{
 		{Name: " knight "},
 		{Name: "player"},
 		{Name: "player"},
 	}, 3)
 	if err != nil {
-		t.Fatalf("select tag references: %v", err)
+		t.Fatalf("select Nexus References: %v", err)
 	}
 	want := []string{"refs/four.png", "refs/two.png", "refs/one.png"}
 	if !reflect.DeepEqual(got, want) {
@@ -101,7 +102,7 @@ func TestSelectTagReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 		t.Fatalf("unexpected project ID %d", assets.projectID)
 	}
 
-	got, err = engine.selectTagReferences(
+	got, err = engine.selectNexusReferences(
 		context.Background(),
 		42,
 		[]assetdomain.Tag{{Name: "knight"}, {Name: "player"}},
@@ -109,27 +110,27 @@ func TestSelectTagReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 		"refs/four.png",
 	)
 	if err != nil {
-		t.Fatalf("select tag references with exclusion: %v", err)
+		t.Fatalf("select Nexus References with exclusion: %v", err)
 	}
 	if want := []string{"refs/two.png", "refs/one.png"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected references after exclusion: got %v want %v", got, want)
 	}
 }
 
-func TestSelectTagReferencesRequiresReaderAndPropagatesListFailure(t *testing.T) {
+func TestSelectNexusReferencesRequiresReaderAndPropagatesListFailure(t *testing.T) {
 	tags := []assetdomain.Tag{{Name: "knight"}}
-	if _, err := (&Engine{}).selectTagReferences(context.Background(), 42, tags, 3); !errors.Is(err, ErrAssetReaderRequired) {
+	if _, err := (&Engine{}).selectNexusReferences(context.Background(), 42, tags, 3); !errors.Is(err, ErrAssetReaderRequired) {
 		t.Fatalf("expected asset reader error, got %v", err)
 	}
 
 	wantErr := errors.New("list failed")
 	engine := &Engine{assets: &tagAssetReaderStub{err: wantErr}}
-	if _, err := engine.selectTagReferences(context.Background(), 42, tags, 3); !errors.Is(err, wantErr) {
+	if _, err := engine.selectNexusReferences(context.Background(), 42, tags, 3); !errors.Is(err, wantErr) {
 		t.Fatalf("expected list error %v, got %v", wantErr, err)
 	}
 }
 
-func TestPreparePrototypePayloadPersistsOnlyAdaptiveTagReferenceLimit(t *testing.T) {
+func TestPreparePrototypePayloadPersistsOnlyAdaptiveNexusReferenceLimit(t *testing.T) {
 	assets := &tagAssetReaderStub{assets: []assetdomain.Asset{
 		{ID: 1, Version: 3, ThumbnailURL: "refs/one.png", Tags: []assetdomain.Tag{{Name: "knight"}}},
 		{ID: 2, Version: 2, ThumbnailURL: "refs/two.png", Tags: []assetdomain.Tag{{Name: "knight"}}},
@@ -146,8 +147,8 @@ func TestPreparePrototypePayloadPersistsOnlyAdaptiveTagReferenceLimit(t *testing
 		t.Fatalf("prepare task payload: %v", err)
 	}
 	payload := prepared.(CreateCharacterPrototypePayload)
-	if want := []string{"refs/one.png", "refs/two.png"}; !reflect.DeepEqual(payload.TagReferences, want) {
-		t.Fatalf("unexpected tag references: got %v want %v", payload.TagReferences, want)
+	if want := []string{"refs/one.png", "refs/two.png"}; !reflect.DeepEqual(payload.NexusReferences, want) {
+		t.Fatalf("unexpected Nexus References: got %v want %v", payload.NexusReferences, want)
 	}
 	if want := []string{"user.png", "refs/one.png", "refs/two.png"}; !reflect.DeepEqual(references.persisted, want) {
 		t.Fatalf("unexpected persisted references: got %v want %v", references.persisted, want)
@@ -164,7 +165,7 @@ func TestPrototypeReferenceInputsPreservesPriorityAndCapsAtFive(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected ordered references: got %v want %v", got, want)
 	}
-	if !state.HasProjectReference || !state.HasUserReference || state.TagReferenceCount != 3 {
+	if !state.HasProjectReference || !state.HasCreatingReference || state.NexusReferenceCount != 3 {
 		t.Fatalf("unexpected reference state: %+v", state)
 	}
 }
@@ -220,7 +221,7 @@ func TestBuildObjectPrototypePayloadAcceptsTags(t *testing.T) {
 	}
 }
 
-func TestPrepareObjectPrototypePayloadPersistsTagReferences(t *testing.T) {
+func TestPrepareObjectPrototypePayloadPersistsNexusReferences(t *testing.T) {
 	assets := &tagAssetReaderStub{assets: []assetdomain.Asset{
 		{ID: 1, Version: 2, ThumbnailURL: "refs/relic1.png", Tags: []assetdomain.Tag{{Name: "magic"}}},
 		{ID: 2, Version: 1, ThumbnailURL: "refs/relic2.png", Tags: []assetdomain.Tag{{Name: "magic"}}},
@@ -236,37 +237,37 @@ func TestPrepareObjectPrototypePayloadPersistsTagReferences(t *testing.T) {
 		t.Fatalf("prepare task payload: %v", err)
 	}
 	payload := prepared.(CreateObjectPrototypePayload)
-	if want := []string{"refs/relic1.png", "refs/relic2.png"}; !reflect.DeepEqual(payload.TagReferences, want) {
-		t.Fatalf("unexpected tag references: got %v want %v", payload.TagReferences, want)
+	if want := []string{"refs/relic1.png", "refs/relic2.png"}; !reflect.DeepEqual(payload.NexusReferences, want) {
+		t.Fatalf("unexpected Nexus References: got %v want %v", payload.NexusReferences, want)
 	}
 	if want := []string{"user_relic.png", "refs/relic1.png", "refs/relic2.png"}; !reflect.DeepEqual(references.persisted, want) {
 		t.Fatalf("unexpected persisted references: got %v want %v", references.persisted, want)
 	}
 }
 
-func TestSelectTagReferencesZeroAndEdgeInputs(t *testing.T) {
+func TestSelectNexusReferencesZeroAndEdgeInputs(t *testing.T) {
 	engine := &Engine{assets: &tagAssetReaderStub{}}
 
 	// projectID == 0
-	got, err := engine.selectTagReferences(context.Background(), 0, []assetdomain.Tag{{Name: "tag"}}, 3)
+	got, err := engine.selectNexusReferences(context.Background(), 0, []assetdomain.Tag{{Name: "tag"}}, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for zero project ID, got %v, %v", got, err)
 	}
 
 	// len(tags) == 0
-	got, err = engine.selectTagReferences(context.Background(), 42, nil, 3)
+	got, err = engine.selectNexusReferences(context.Background(), 42, nil, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for empty tags, got %v, %v", got, err)
 	}
 
 	// blank tag names only
-	got, err = engine.selectTagReferences(context.Background(), 42, []assetdomain.Tag{{Name: "  "}, {Name: ""}}, 3)
+	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "  "}, {Name: ""}}, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for blank tag names, got %v, %v", got, err)
 	}
 
 	// limit <= 0
-	got, err = engine.selectTagReferences(context.Background(), 42, []assetdomain.Tag{{Name: "tag"}}, 0)
+	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "tag"}}, 0)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for zero limit, got %v, %v", got, err)
 	}
