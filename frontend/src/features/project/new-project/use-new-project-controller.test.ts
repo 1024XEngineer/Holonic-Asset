@@ -171,13 +171,13 @@ describe("useNewProjectController", () => {
 
     controller.preview.generate();
     await vi.waitFor(() =>
-      expect(mocks.setters[11]).toHaveBeenCalledWith(
+      expect(mocks.setters[10]).toHaveBeenCalledWith(
         "We couldn't generate that reference. Try again.",
       ),
     );
 
     expect(mocks.generateReference).toHaveBeenCalledOnce();
-    expect(mocks.setters[9]).toHaveBeenLastCalledWith(false);
+    expect(mocks.setters[8]).toHaveBeenLastCalledWith(false);
   });
 
   it("submits blank projects directly and trims imported game links", async () => {
@@ -207,7 +207,9 @@ describe("useNewProjectController", () => {
 
     controller.preview.setFile(file);
     await vi.waitFor(() =>
-      expect(mocks.setters[8]).toHaveBeenCalledWith("uploads/preview.png"),
+      expect(mocks.setters[7]).toHaveBeenCalledWith(
+        "https://cdn.example/preview.png?token=signed",
+      ),
     );
     controller.preview.clear();
 
@@ -221,8 +223,7 @@ describe("useNewProjectController", () => {
   it("keeps the form reference synchronized with the selected preview", async () => {
     mocks.stateOverrides.set(6, "generated.png");
     mocks.stateOverrides.set(7, "https://cdn.example/uploaded.png");
-    mocks.stateOverrides.set(8, "uploads/uploaded.png");
-    mocks.stateOverrides.set(12, "upload");
+    mocks.stateOverrides.set(11, "upload");
     const controller = useNewProjectController();
 
     controller.preview.selectGenerate();
@@ -235,11 +236,11 @@ describe("useNewProjectController", () => {
     );
     expect(mocks.form.setFieldValue).toHaveBeenCalledWith(
       "reference",
-      "uploads/uploaded.png",
+      "https://cdn.example/uploaded.png",
     );
     expect(mocks.createProject).toHaveBeenCalledWith({
       name: "Project",
-      reference: "uploads/uploaded.png",
+      reference: "https://cdn.example/uploaded.png",
     });
   });
 
