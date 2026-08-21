@@ -3,33 +3,44 @@ package dao
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-// Tag is reusable within a project. NormalizedName provides a deterministic,
-// case-insensitive identity without changing the display name returned by APIs.
-type Tag struct {
-	ID             uint   `gorm:"primaryKey"`
-	ProjectID      uint   `gorm:"not null;uniqueIndex:idx_tags_project_normalized_name"`
-	Name           string `gorm:"not null"`
-	NormalizedName string `gorm:"not null;uniqueIndex:idx_tags_project_normalized_name"`
-	Description    string
-	Color          string  `gorm:"not null"`
-	Project        Project `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+// TagTemplate defines one system-provided tag. Projects receive independent
+// copies when they are created, so deleting a project tag never alters a
+// system template or another project's available tags.
+type TagTemplate struct {
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"not null;uniqueIndex"`
+	Description string
+	Color       string `gorm:"not null"`
 }
 
-// AssetTag preserves caller order while associating reusable tags with assets.
+// ProjectTag is the reusable tag selected by assets in one project.
+type ProjectTag struct {
+	ID          uint `gorm:"primaryKey"`
+	ProjectID   uint `gorm:"not null;index"`
+	TemplateID  *uint
+	Name        string `gorm:"not null"`
+	Description string
+	Color       string       `gorm:"not null"`
+	Project     Project      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Template    *TagTemplate `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+}
+
+// AssetTag associates one asset with one project-scoped tag.
 type AssetTag struct {
-	AssetID  uint  `gorm:"primaryKey"`
-	TagID    uint  `gorm:"primaryKey;index"`
-	Position uint  `gorm:"not null"`
-	Asset    Asset `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Tag      Tag   `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	AssetID uint       `gorm:"primaryKey"`
+	TagID   uint       `gorm:"primaryKey;index"`
+	Asset   Asset      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Tag     ProjectTag `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type assetTagRow struct {
@@ -39,16 +50,12 @@ type assetTagRow struct {
 	Color       string
 }
 
-func normalizeTagName(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
-
 func normalizeAssetTags(tags []assetdomain.Tag) []assetdomain.Tag {
 	result := make([]assetdomain.Tag, 0, len(tags))
 	seen := make(map[string]struct{}, len(tags))
 	for _, tag := range tags {
 		name := strings.TrimSpace(tag.Name)
-		normalizedName := normalizeTagName(name)
+		normalizedName := strings.ToLower(name)
 		if normalizedName == "" {
 			continue
 		}
@@ -69,34 +76,41 @@ func normalizeAssetTags(tags []assetdomain.Tag) []assetdomain.Tag {
 	return result
 }
 
-func (a *AssetDaoImpl) resolveTag(
+func (a *AssetDaoImpl) resolveProjectTag(
 	ctx context.Context,
 	projectID uint,
 	value assetdomain.Tag,
-) (Tag, error) {
-	tag := Tag{
-		ProjectID:      projectID,
-		Name:           value.Name,
-		NormalizedName: normalizeTagName(value.Name),
-		Description:    value.Description,
-		Color:          value.Color,
+) (ProjectTag, error) {
+	var existing ProjectTag
+	lookup := a.DB.WithContext(ctx).
+		Where("project_id = ? AND lower(trim(name)) = lower(trim(?))", projectID, value.Name).
+		First(&existing)
+	if lookup.Error == nil {
+		return existing, nil
 	}
-	result := a.DB.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "project_id"}, {Name: "normalized_name"}},
-		DoNothing: true,
-	}).Create(&tag)
+	if !errors.Is(lookup.Error, gorm.ErrRecordNotFound) {
+		return ProjectTag{}, fmt.Errorf("dao: get reusable project tag %q: %w", value.Name, lookup.Error)
+	}
+
+	tag := ProjectTag{
+		ProjectID:   projectID,
+		Name:        value.Name,
+		Description: value.Description,
+		Color:       value.Color,
+	}
+	result := a.DB.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&tag)
 	if result.Error != nil {
-		return Tag{}, fmt.Errorf("dao: create tag %q: %w", value.Name, result.Error)
+		return ProjectTag{}, fmt.Errorf("dao: create project tag %q: %w", value.Name, result.Error)
 	}
 	if result.RowsAffected > 0 {
 		return tag, nil
 	}
 	if err := a.DB.WithContext(ctx).
-		Where("project_id = ? AND normalized_name = ?", projectID, tag.NormalizedName).
-		First(&tag).Error; err != nil {
-		return Tag{}, fmt.Errorf("dao: get reusable tag %q: %w", value.Name, err)
+		Where("project_id = ? AND lower(trim(name)) = lower(trim(?))", projectID, value.Name).
+		First(&existing).Error; err != nil {
+		return ProjectTag{}, fmt.Errorf("dao: get concurrently created project tag %q: %w", value.Name, err)
 	}
-	return tag, nil
+	return existing, nil
 }
 
 func (a *AssetDaoImpl) replaceAssetTags(
@@ -111,15 +125,14 @@ func (a *AssetDaoImpl) replaceAssetTags(
 
 	normalized := normalizeAssetTags(tags)
 	result := make([]assetdomain.Tag, 0, len(normalized))
-	for position, value := range normalized {
-		tag, err := a.resolveTag(ctx, projectID, value)
+	for _, value := range normalized {
+		tag, err := a.resolveProjectTag(ctx, projectID, value)
 		if err != nil {
 			return nil, err
 		}
 		if err := a.DB.WithContext(ctx).Create(&AssetTag{
-			AssetID:  assetID,
-			TagID:    tag.ID,
-			Position: uint(position),
+			AssetID: assetID,
+			TagID:   tag.ID,
 		}).Error; err != nil {
 			return nil, fmt.Errorf("dao: associate tag %d with asset %d: %w", tag.ID, assetID, err)
 		}
@@ -148,10 +161,10 @@ func (a *AssetDaoImpl) loadAssetTags(ctx context.Context, assets []Asset) error 
 	var rows []assetTagRow
 	if err := a.DB.WithContext(ctx).
 		Table("asset_tags").
-		Select("asset_tags.asset_id, tags.name, tags.description, tags.color").
-		Joins("JOIN tags ON tags.id = asset_tags.tag_id").
+		Select("asset_tags.asset_id, project_tags.name, project_tags.description, project_tags.color").
+		Joins("JOIN project_tags ON project_tags.id = asset_tags.tag_id").
 		Where("asset_tags.asset_id IN ?", assetIDs).
-		Order("asset_tags.asset_id ASC, asset_tags.position ASC, asset_tags.tag_id ASC").
+		Order("asset_tags.asset_id ASC, project_tags.name ASC, project_tags.id ASC").
 		Scan(&rows).Error; err != nil {
 		return fmt.Errorf("dao: load asset tags: %w", err)
 	}
