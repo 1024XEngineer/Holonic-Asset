@@ -103,15 +103,7 @@ func AnimationFrameResizeOptions(width, height int) ResizeOptions {
 // the full transparent canvas.
 func PrototypePixelResizeOptions(width, height int) ResizeOptions {
 	options := prototypePixelResizeOptions(width, height)
-	targetShortEdge := min(width, height)
-	switch {
-	case targetShortEdge <= 16:
-		options.PaletteSize = 8
-	case targetShortEdge <= 64:
-		options.PaletteSize = 16
-	default:
-		options.PaletteSize = 24
-	}
+	options.PaletteSize = prototypePixelPaletteSize(width, height)
 	return options
 }
 
@@ -121,16 +113,34 @@ func PrototypePixelResizeOptions(width, height int) ResizeOptions {
 // from diverging from the object result.
 func CharacterPrototypePixelResizeOptions(width, height int) ResizeOptions {
 	options := prototypePixelResizeOptions(width, height)
+	options.PaletteSize = prototypePixelPaletteSize(width, height)
+	return options
+}
+
+// AnimationPixelResizeOptions converts an already-normalized animation frame
+// to the same discrete pixel-art representation used by prototypes. Animation
+// normalization already owns scale, anchor, motion, and safety margins, so this
+// profile must process the complete fixed canvas without cropping, recentering,
+// or adding another margin.
+func AnimationPixelResizeOptions(width, height int) ResizeOptions {
+	options := prototypePixelResizeOptions(width, height)
+	options.PaletteSize = prototypePixelPaletteSize(width, height)
+	options.Margin = 0
+	options.CropContent = false
+	options.PreserveCanvasGeometry = true
+	return options
+}
+
+func prototypePixelPaletteSize(width, height int) int {
 	targetShortEdge := min(width, height)
 	switch {
 	case targetShortEdge <= 16:
-		options.PaletteSize = 8
+		return 8
 	case targetShortEdge <= 64:
-		options.PaletteSize = 16
+		return 16
 	default:
-		options.PaletteSize = 24
+		return 24
 	}
-	return options
 }
 
 func prototypePixelResizeOptions(width, height int) ResizeOptions {

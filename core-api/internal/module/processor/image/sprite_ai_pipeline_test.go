@@ -199,3 +199,52 @@ func TestObjectSpritePipelinePreservesLongThinAspectRatioInsideSafetyMargin(t *t
 		t.Fatalf("long object aspect ratio was distorted: bounds=%v", bounds)
 	}
 }
+
+func TestAnimationPixelResizePreservesFixedFramePositionAndHardensEdges(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	// A deliberately off-centre subject models intentional animation motion.
+	// The translucent outer row models the smooth fringe produced by animation
+	// normalization before the final pixel-art conversion.
+	for y := 8; y < 25; y++ {
+		for x := 3; x < 13; x++ {
+			alpha := uint8(255)
+			if x == 3 || x == 12 || y == 8 || y == 24 {
+				alpha = 96
+			}
+			source.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(160 + (x % 4 * 12)),
+				G: uint8(48 + (y % 3 * 9)),
+				B: 32,
+				A: alpha,
+			})
+		}
+	}
+
+	options := AnimationPixelResizeOptions(32, 32)
+	got, report, err := ResizeImage(source, options)
+	if err != nil {
+		t.Fatalf("pixel-process normalized animation frame: %v", err)
+	}
+	if report.CroppedToContent || report.Margin != 0 || report.Sampling != resizeSamplingNearest {
+		t.Fatalf("animation pixel report changed fixed-canvas geometry: %+v", report)
+	}
+
+	bounds, visible := alphaBounds(toNRGBA(got), 0)
+	if !visible {
+		t.Fatal("animation subject disappeared during pixel conversion")
+	}
+	wantBounds := image.Rect(4, 9, 12, 24)
+	if bounds != wantBounds {
+		t.Fatalf("animation subject moved or was refit: bounds=%v, want %v", bounds, wantBounds)
+	}
+	for y := range 32 {
+		for x := range 32 {
+			alpha := got.RGBAAt(x, y).A
+			if alpha != 0 && alpha != 255 {
+				t.Fatalf("animation frame retained partial alpha at (%d,%d): %d", x, y, alpha)
+			}
+		}
+	}
+}
