@@ -88,8 +88,6 @@ export function useEditorGenerationWorkspace<Content>({
             {
               ...generation.submittedTask,
               status: "processing" as const,
-              projectId: asset.projectId,
-              kind: asset.kind,
             },
           ]
         : []),

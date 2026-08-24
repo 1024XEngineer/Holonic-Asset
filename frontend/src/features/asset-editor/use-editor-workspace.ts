@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 
-import { buildSpriteGenerationRequest } from "@/features/generation";
+import {
+  buildSpriteGenerationRequest,
+  type GenerationTaskListItem,
+} from "@/features/generation";
 import {
   toCoreSpriteCandidateRecord,
   useGenerateAnimationMutation,
@@ -12,7 +15,6 @@ import {
 
 import type { AnimatedSpriteCanvasReview } from "./Canvas/AnimatedSpriteCanvas";
 import type { SpriteEditorModeProps } from "./EditorModes/sprite-editor-mode.types";
-import type { EditorGenerationTask } from "./Header/editor-header";
 import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
 import { useEditorGenerationWorkspace } from "./use-editor-generation-workspace";
 
@@ -26,7 +28,7 @@ export function useEditorWorkspace({
   const { asset } = data;
   const animationMutation = useGenerateAnimationMutation();
   const [animationTask, setAnimationTask] =
-    useState<EditorGenerationTask | null>(null);
+    useState<GenerationTaskListItem | null>(null);
   const additionalTasks = useMemo(
     () => (animationTask ? [animationTask] : []),
     [animationTask],
