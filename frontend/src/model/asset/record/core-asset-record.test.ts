@@ -27,10 +27,10 @@ vi.mock("../../project", async (importOriginal) => ({
 import {
   loadCoreAssetWorkspace,
   saveCoreAssetRevision,
-  toCoreSceneryAssetWorkspace,
-  toCoreTilesetAssetWorkspace,
-  toCoreUISetAssetWorkspace,
 } from "./core-asset-record";
+import { toCoreSceneryAssetWorkspace } from "./core-scenery-record";
+import { toCoreTilesetAssetWorkspace } from "./core-tileset-record";
+import { toCoreUISetAssetWorkspace } from "./core-uiset-record";
 
 beforeEach(() => {
   vi.clearAllMocks();
