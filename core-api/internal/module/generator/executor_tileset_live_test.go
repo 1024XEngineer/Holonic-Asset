@@ -65,11 +65,10 @@ func (s *liveTileSetReferenceStore) PersistReferenceAt(_ context.Context, key st
 
 	// Also persist to disk for visual verification if directory is specified
 	if s.diskDir != "" {
-		if strings.HasPrefix(dataURI, "data:image/png;base64,") {
-			rawB64 := strings.TrimPrefix(dataURI, "data:image/png;base64,")
+		if rawB64, ok := strings.CutPrefix(dataURI, "data:image/png;base64,"); ok {
 			if decoded, err := base64.StdEncoding.DecodeString(rawB64); err == nil {
 				fileName := strings.ReplaceAll(key, "/", "_")
-				_ = os.WriteFile(filepath.Join(s.diskDir, fileName), decoded, 0o644)
+				_ = os.WriteFile(filepath.Join(s.diskDir, fileName), decoded, 0o600)
 			}
 		}
 	}
@@ -124,7 +123,7 @@ func TestLiveAddTilesetItemEndToEndGeneration(t *testing.T) {
 	processor := imageprocessor.NewProcessor()
 
 	artifactDir := "/Users/lx/.gemini/antigravity/brain/03e53355-54e3-4379-9149-a8bb19de001d"
-	_ = os.MkdirAll(artifactDir, 0o755)
+	_ = os.MkdirAll(artifactDir, 0o750)
 
 	references := &liveTileSetReferenceStore{
 		objects: make(map[string]string),
@@ -262,8 +261,8 @@ func TestLiveAddTilesetItemEndToEndGeneration(t *testing.T) {
 	canvas := image.NewRGBA(image.Rect(0, 0, gridCols*tileW, gridRows*tileH))
 
 	// Draw grid background
-	for y := 0; y < gridRows*tileH; y++ {
-		for x := 0; x < gridCols*tileW; x++ {
+	for y := range gridRows * tileH {
+		for x := range gridCols * tileW {
 			if (x/tileW+y/tileH)%2 == 0 {
 				canvas.SetRGBA(x, y, color.RGBA{R: 40, G: 44, B: 52, A: 255})
 			} else {
@@ -307,7 +306,7 @@ func TestLiveAddTilesetItemEndToEndGeneration(t *testing.T) {
 	compositePath := filepath.Join(artifactDir, "generated_tileset_add_item_composite.png")
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, canvas); err == nil {
-		_ = os.WriteFile(compositePath, buf.Bytes(), 0o644)
+		_ = os.WriteFile(compositePath, buf.Bytes(), 0o600)
 		t.Logf("Saved live tileset composite preview to: %s", compositePath)
 	}
 }
@@ -384,7 +383,7 @@ func TestLiveSequentialTileSetItemGenerationWithUnprocessedReference(t *testing.
 	processor := imageprocessor.NewProcessor()
 
 	artifactDir := "/Users/lx/.gemini/antigravity/brain/03e53355-54e3-4379-9149-a8bb19de001d"
-	_ = os.MkdirAll(artifactDir, 0o755)
+	_ = os.MkdirAll(artifactDir, 0o750)
 
 	references := &liveTileSetReferenceStore{
 		objects: make(map[string]string),
@@ -579,8 +578,8 @@ func TestLiveSequentialTileSetItemGenerationWithUnprocessedReference(t *testing.
 	canvas := image.NewRGBA(image.Rect(0, 0, gridCols*tileW, gridRows*tileH))
 
 	// Checkerboard tile grid background
-	for y := 0; y < gridRows*tileH; y++ {
-		for x := 0; x < gridCols*tileW; x++ {
+	for y := range gridRows * tileH {
+		for x := range gridCols * tileW {
 			if (x/tileW+y/tileH)%2 == 0 {
 				canvas.SetRGBA(x, y, color.RGBA{R: 35, G: 38, B: 45, A: 255})
 			} else {
@@ -610,7 +609,7 @@ func TestLiveSequentialTileSetItemGenerationWithUnprocessedReference(t *testing.
 	compositePath := filepath.Join(artifactDir, "generated_tileset_multi_item_sequence.png")
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, canvas); err == nil {
-		_ = os.WriteFile(compositePath, buf.Bytes(), 0o644)
+		_ = os.WriteFile(compositePath, buf.Bytes(), 0o600)
 		t.Logf("Saved multi-item sequence tileset composite to: %s", compositePath)
 	}
 }

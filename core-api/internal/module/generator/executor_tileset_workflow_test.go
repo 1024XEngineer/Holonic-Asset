@@ -233,6 +233,33 @@ func TestAddTileSetItemReturnsCandidateWithoutMutatingPersistedState(t *testing.
 	}
 }
 
+func TestResolveTileSetUnprocessedReference(t *testing.T) {
+	if got := resolveTileSetUnprocessedReference(assetdomain.AssetContent{}); got != "" {
+		t.Fatalf("expected empty string for empty content, got %q", got)
+	}
+
+	emptyTileURL := ""
+	contentNoURL := assetdomain.AssetContent{
+		Items: []assetdomain.TileSetItem{
+			{Name: "Item1", Tiles: []assetdomain.Tile{{URL: nil}, {URL: &emptyTileURL}}},
+		},
+	}
+	if got := resolveTileSetUnprocessedReference(contentNoURL); got != "" {
+		t.Fatalf("expected empty string for nil/blank tile URLs, got %q", got)
+	}
+
+	validURL := "uploads/tileset/tile-001.png"
+	contentWithURL := assetdomain.AssetContent{
+		Items: []assetdomain.TileSetItem{
+			{Name: "Item1", Tiles: []assetdomain.Tile{{URL: &validURL}}},
+		},
+	}
+	want := "uploads/tileset/tile-001-unprocessed.png"
+	if got := resolveTileSetUnprocessedReference(contentWithURL); got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
 func TestStabilizeTileSetTileEditPreservesAlphaAndSeamEdge(t *testing.T) {
 	original := image.NewRGBA(image.Rect(0, 0, 4, 4))
 	generated := image.NewRGBA(image.Rect(0, 0, 4, 4))
