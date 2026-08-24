@@ -28,6 +28,11 @@ type AnimationBackgroundOptions struct {
 	Threshold        *float64 `json:"threshold,omitempty"`
 	Softness         *float64 `json:"softness,omitempty"`
 	SpillSuppression *float64 `json:"spill_suppression,omitempty"`
+	// BorderConnectedOnly prevents a foreground that shares the matte hue
+	// from being removed by the global colour-distance fallback. Animation
+	// frames can contain green subjects, so only matte-like pixels connected
+	// to the canvas border are treated as background in this mode.
+	BorderConnectedOnly bool `json:"border_connected_only,omitempty"`
 }
 
 // normalizeAnimationRequest is the private animation engine input assembled
@@ -371,7 +376,13 @@ func removeAnimationBackground(input image.Image, options AnimationBackgroundOpt
 		matte = &matteColor
 	}
 	settings := ResolveChromaSettings(options.Material, options.Threshold, options.Softness, options.SpillSuppression)
-	output, report := ExtractChromaWithReport(input, matte, settings)
+	var output *image.RGBA
+	var report ExtractionReport
+	if options.BorderConnectedOnly {
+		output, report = extractBorderConnectedChromaWithReport(input, matte, settings)
+	} else {
+		output, report = ExtractChromaWithReport(input, matte, settings)
+	}
 	return toNRGBA(output), report, nil
 }
 

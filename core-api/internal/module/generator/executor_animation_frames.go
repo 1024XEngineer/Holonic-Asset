@@ -19,12 +19,37 @@ func (s *animationGenerationService) pixelProcessAnimationFrames(
 	options := imageprocessor.AnimationPixelResizeOptions(frameWidth, frameHeight)
 	processedRegions := make([]imageprocessor.ImageRegion, 0, len(regions))
 	processedImages := make([]image.Image, 0, len(regions))
+
+	// Quantize the complete sequence with one palette before resizing. Running
+	// the quantizer independently for each frame lets tiny generation changes
+	// move palette centroids, which makes materials flicker or appear to lose
+	// colour during animation.
+	sources := make([]image.Image, len(regions))
 	for index, region := range regions {
 		if strings.TrimSpace(region.ImageBase64) == "" {
 			return nil, "", fmt.Errorf("generator: pixel-process animation frame %d: empty input", index+1)
 		}
+		decoded, err := imageprocessor.DecodeBase64Image(region.ImageBase64)
+		if err != nil {
+			return nil, "", fmt.Errorf("generator: decode animation frame %d for shared palette: %w", index+1, err)
+		}
+		sources[index] = decoded
+	}
+	quantized, err := imageprocessor.QuantizePixelArtSources(sources, options.PaletteSize)
+	if err != nil {
+		return nil, "", fmt.Errorf("generator: quantize animation frames with shared palette: %w", err)
+	}
+	quantizedImages := make([]image.Image, len(quantized))
+	for index, frame := range quantized {
+		quantizedImages[index] = frame
+	}
+	for index, region := range regions {
+		quantizedBase64, err := imageprocessor.EncodePNGBase64(quantized[index])
+		if err != nil {
+			return nil, "", fmt.Errorf("generator: encode shared-palette animation frame %d: %w", index+1, err)
+		}
 		resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-			ImageBase64: region.ImageBase64,
+			ImageBase64: quantizedBase64,
 			Options:     options,
 		})
 		if err != nil {

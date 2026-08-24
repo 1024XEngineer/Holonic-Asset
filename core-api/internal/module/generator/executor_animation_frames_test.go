@@ -14,6 +14,7 @@ import (
 type animationFrameProcessorStub struct {
 	resizeResults []*imageprocessor.ResizeResult
 	resizeErrors  []error
+	resizeFunc    func(context.Context, *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error)
 	requests      []*imageprocessor.ResizeRequest
 }
 
@@ -25,12 +26,15 @@ func (*animationFrameProcessorStub) NormalizeReference(context.Context, *imagepr
 	return nil, errors.New("unexpected NormalizeReference call")
 }
 
-func (s *animationFrameProcessorStub) Resize(_ context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
+func (s *animationFrameProcessorStub) Resize(ctx context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
 	copy := *request
 	s.requests = append(s.requests, &copy)
 	index := len(s.requests) - 1
 	if index < len(s.resizeErrors) && s.resizeErrors[index] != nil {
 		return nil, s.resizeErrors[index]
+	}
+	if s.resizeFunc != nil {
+		return s.resizeFunc(ctx, request)
 	}
 	if index >= len(s.resizeResults) {
 		return nil, errors.New("unexpected Resize call")
@@ -55,8 +59,8 @@ func TestPixelProcessAnimationFramesBuildsSheetAndDefaultsMIMEType(t *testing.T)
 	}}
 	service := &animationGenerationService{processor: processor}
 	input := []imageprocessor.ImageRegion{
-		{Index: 3, ImageBase64: "source-red", MIMEType: "image/jpeg"},
-		{Index: 4, ImageBase64: "source-blue", MIMEType: "image/jpeg"},
+		{Index: 3, ImageBase64: red, MIMEType: "image/jpeg"},
+		{Index: 4, ImageBase64: blue, MIMEType: "image/jpeg"},
 	}
 
 	regions, encodedSheet, err := service.pixelProcessAnimationFrames(context.Background(), input, 2, 2, 2)
@@ -76,8 +80,11 @@ func TestPixelProcessAnimationFramesBuildsSheetAndDefaultsMIMEType(t *testing.T)
 		t.Fatalf("Resize calls = %d, want 2", len(processor.requests))
 	}
 	for index, request := range processor.requests {
-		if request.ImageBase64 != input[index].ImageBase64 {
-			t.Fatalf("Resize request %d input = %q", index, request.ImageBase64)
+		if strings.TrimSpace(request.ImageBase64) == "" {
+			t.Fatalf("Resize request %d has an empty image", index)
+		}
+		if _, err := imageprocessor.DecodeBase64Image(request.ImageBase64); err != nil {
+			t.Fatalf("Resize request %d image is not decodable: %v", index, err)
 		}
 		options := request.Options
 		if options.Width != 2 || options.Height != 2 || !options.SpritePixelPipeline || !options.PreserveCanvasGeometry {
@@ -98,6 +105,122 @@ func TestPixelProcessAnimationFramesBuildsSheetAndDefaultsMIMEType(t *testing.T)
 	if got := sheet.RGBAAt(3, 1); got.B != 210 || got.A != 255 {
 		t.Fatalf("second sheet frame pixel = %+v", got)
 	}
+}
+
+func TestPixelProcessAnimationFramesUsesOneSharedPalette(t *testing.T) {
+	first := encodedAnimationPaletteFrame(t, 16, 16, 0)
+	second := encodedAnimationPaletteFrame(t, 16, 16, 1)
+	realProcessor := imageprocessor.NewProcessor()
+	processor := &animationFrameProcessorStub{
+		resizeFunc: func(ctx context.Context, request *imageprocessor.ResizeRequest) (*imageprocessor.ResizeResult, error) {
+			return realProcessor.Resize(ctx, request)
+		},
+	}
+	service := &animationGenerationService{processor: processor}
+
+	regions, _, err := service.pixelProcessAnimationFrames(
+		context.Background(),
+		[]imageprocessor.ImageRegion{{ImageBase64: first}, {ImageBase64: second}},
+		2,
+		4,
+		4,
+	)
+	if err != nil {
+		t.Fatalf("pixel process animation frames: %v", err)
+	}
+	if len(regions) != 2 || len(processor.requests) != 2 {
+		t.Fatalf("processed frames/requests = %d/%d, want 2/2", len(regions), len(processor.requests))
+	}
+
+	frames := make([]*image.RGBA, len(processor.requests))
+	for index, request := range processor.requests {
+		decoded, decodeErr := imageprocessor.DecodeBase64Image(request.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode shared-palette request %d: %v", index, decodeErr)
+		}
+		frames[index] = decoded
+	}
+	body := frames[0].RGBAAt(8, 8)
+	outline := frames[0].RGBAAt(4, 6)
+	if body != frames[1].RGBAAt(8, 8) {
+		t.Fatalf("body colour changed between shared-palette frames: %v vs %v", body, frames[1].RGBAAt(8, 8))
+	}
+	if outline != frames[1].RGBAAt(4, 6) {
+		t.Fatalf("outline colour changed between shared-palette frames: %v vs %v", outline, frames[1].RGBAAt(4, 6))
+	}
+	if outline.R > 40 || outline.G < 40 || outline.B < 40 || outline.A != 255 {
+		t.Fatalf("outline colour was lost or converted to black: %v", outline)
+	}
+	sharedPalette := make(map[color.RGBA]struct{})
+	for index, frame := range frames {
+		palette := visiblePalette(frame)
+		if len(palette) > 8 {
+			t.Fatalf("shared-palette request %d has %d visible colours; want at most 8", index, len(palette))
+		}
+		for pixel := range palette {
+			sharedPalette[pixel] = struct{}{}
+		}
+	}
+	if len(sharedPalette) > 8 {
+		t.Fatalf("animation requests used %d visible colours in total; want one palette of at most 8", len(sharedPalette))
+	}
+
+	finalPalette := make(map[color.RGBA]struct{})
+	for index, region := range regions {
+		frame, decodeErr := imageprocessor.DecodeBase64Image(region.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode final animation frame %d: %v", index, decodeErr)
+		}
+		for pixel := range visiblePalette(frame) {
+			finalPalette[pixel] = struct{}{}
+		}
+	}
+	if len(finalPalette) > 8 {
+		t.Fatalf("final animation frames used %d visible colours in total; want at most 8", len(finalPalette))
+	}
+}
+
+func visiblePalette(img *image.RGBA) map[color.RGBA]struct{} {
+	palette := make(map[color.RGBA]struct{})
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel := img.RGBAAt(x, y)
+			if pixel.A != 0 {
+				palette[pixel] = struct{}{}
+			}
+		}
+	}
+	return palette
+}
+
+func encodedAnimationPaletteFrame(t *testing.T, width, height, variation int) string {
+	t.Helper()
+	noiseR := [5]uint8{0, 1, 2, 3, 4}
+	noiseG := [7]uint8{0, 1, 2, 3, 4, 5, 6}
+	noiseB := [4]uint8{0, 1, 2, 3}
+	frame := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for y := 4; y < 12; y++ {
+		for x := 4; x < 12; x++ {
+			pixel := color.NRGBA{R: 24, G: 104, B: 92, A: 255}
+			if x > 4 && x < 11 && y > 4 && y < 11 {
+				pixel = color.NRGBA{R: 80, G: 220, B: 72, A: 255}
+			}
+			if x == 6 && y == 6 {
+				pixel = color.NRGBA{R: 250, G: 250, B: 220, A: 255}
+			}
+			if (x+y+variation)%3 == 0 && x > 4 && x < 11 && y > 4 && y < 11 {
+				pixel.R += noiseR[(x+y)%len(noiseR)]
+				pixel.G -= noiseG[(x+variation)%len(noiseG)]
+				pixel.B += noiseB[(y+variation)%len(noiseB)]
+			}
+			frame.SetNRGBA(x, y, pixel)
+		}
+	}
+	encoded, err := imageprocessor.EncodePNGBase64(frame)
+	if err != nil {
+		t.Fatalf("encode palette animation frame: %v", err)
+	}
+	return encoded
 }
 
 func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
@@ -121,8 +244,14 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 			wantError: "frame 1: empty input",
 		},
 		{
+			name:      "invalid input encoding",
+			regions:   []imageprocessor.ImageRegion{{ImageBase64: "not-base64"}},
+			columns:   1,
+			wantError: "decode animation frame 1 for shared palette",
+		},
+		{
 			name:       "resize error",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    1,
 			errors:     []error{resizeErr},
 			wantError:  "frame 1: resize failed",
@@ -130,7 +259,7 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 		},
 		{
 			name:       "nil resize result",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    1,
 			results:    []*imageprocessor.ResizeResult{nil},
 			wantError:  "frame 1: empty result",
@@ -138,7 +267,7 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 		},
 		{
 			name:       "blank resize result",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    1,
 			results:    []*imageprocessor.ResizeResult{{ImageBase64: "\t"}},
 			wantError:  "frame 1: empty result",
@@ -146,7 +275,7 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 		},
 		{
 			name:       "invalid encoded result",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    1,
 			results:    []*imageprocessor.ResizeResult{{ImageBase64: "not-base64"}},
 			wantError:  "decode pixel-processed animation frame 1",
@@ -154,7 +283,7 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 		},
 		{
 			name:       "wrong result dimensions",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    1,
 			results:    []*imageprocessor.ResizeResult{{ImageBase64: wrongSize}},
 			wantError:  "dimensions 3x2; want 2x2",
@@ -162,7 +291,7 @@ func TestPixelProcessAnimationFramesRejectsInvalidStages(t *testing.T) {
 		},
 		{
 			name:       "invalid sheet columns",
-			regions:    []imageprocessor.ImageRegion{{ImageBase64: "source"}},
+			regions:    []imageprocessor.ImageRegion{{ImageBase64: valid}},
 			columns:    0,
 			results:    []*imageprocessor.ResizeResult{{ImageBase64: valid}},
 			wantError:  "pack pixel-processed animation frames: generator: animation columns must be positive",

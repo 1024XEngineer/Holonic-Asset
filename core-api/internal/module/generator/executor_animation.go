@@ -55,6 +55,8 @@ const (
 	animationMotionCoverageWeight    = 0.65
 	animationRecoveryWeight          = 0.35
 
+	// Green remains the default animation matte. AutoDetect allows generated
+	// videos to use an alternate matte when the subject contains green.
 	animationChromaHueMin              = 30
 	animationChromaHueMax              = 90
 	animationChromaHighSaturationMin   = 80
@@ -540,7 +542,8 @@ func (s *animationGenerationService) processVideo(
 		// normalization may receive an entirely opaque sheet and cannot
 		// compute the character bounds.
 		Background: &imageprocessor.AnimationBackgroundOptions{
-			MatteColor: "auto",
+			MatteColor:          "auto",
+			BorderConnectedOnly: true,
 		},
 	})
 	if err != nil {

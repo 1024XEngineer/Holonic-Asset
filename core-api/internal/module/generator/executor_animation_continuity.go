@@ -58,6 +58,7 @@ func animationVideoChromaKey() videoprocessor.ChromaKey {
 		HueMin: animationChromaHueMin, HueMax: animationChromaHueMax,
 		HighSaturationMin: animationChromaHighSaturationMin, HighValueMin: animationChromaHighValueMin,
 		BrightSaturationMin: animationChromaBrightSaturationMin, BrightValueMin: animationChromaBrightValueMin,
+		AutoDetect: true,
 	}
 }
 

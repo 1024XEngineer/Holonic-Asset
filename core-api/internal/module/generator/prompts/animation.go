@@ -60,19 +60,32 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - preserve identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
 		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
 %s
+- begin the change by the first target, keep it readable across most target samples, and complete it by the last
 - one continuous chronological take; no restart, montage, unrelated motion, or phase reordering; boundary images may omit an internal action extreme
 - ADDITIVE EDIT: keep the pre-existing action recognizable while performing the requested change; never replace it
 - PRIMARY REQUIREMENT: the requested change must be unmistakably visible; copying original target pixels or making only a token change is invalid
 - retain the original action's identity and principal phase/extreme, but allow local pose, path, and timing adjustments needed to show the change clearly
-- begin the change by the first target, keep it readable across most target samples, and complete it by the last
 - non-target samples are seam context only: match entry/exit smoothly, but do not force target poses to resemble the originals`, targetFrames, options.FrameCount, originalActionInstruction)
+	}
+	sections := fmt.Sprintf("%s\n\n%s", referenceInstructions, actionInstructions)
+	if options.LocalFrameEdit {
+		// Keep the edit requirements before the boundary-reference details so the
+		// provider limit cannot truncate the requested change instructions. A
+		// single-sample edit prioritizes the boundary anchors instead.
+		if len(options.TargetFrameIndices) == 1 {
+			sections = fmt.Sprintf("%s\n\n%s", referenceInstructions, actionInstructions)
+		} else {
+			sections = fmt.Sprintf("%s\n\n%s", actionInstructions, referenceInstructions)
+		}
 	}
 	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image inputs.
 
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
 - every frame contains exactly ONE complete subject and its attached or held props
 - normal full-frame video; never a contact sheet, collage, grid, storyboard, spritesheet, multiple views, poses, or copies
-- fixed camera and root; keep the whole subject inside the inner 70%% on a uniform pure-green #00FF00 background
+- fixed camera/root; keep the subject inside the inner 70%% on a uniform chroma background: use pure green #00FF00 by default, but use pure magenta #FF00FF only when the subject contains substantial colours close to pure green
+- preserve original colours and saturation; never recolour, desaturate, gray out, or remove green subject pixels
+- matte only in the background; never use its exact colour inside or over the subject
 
 USER SPECIFICATION — AUTHORITATIVE:
 - subject: %s
@@ -82,18 +95,16 @@ USER SPECIFICATION — AUTHORITATIVE:
 
 %s
 
-%s
-
 CONTINUITY:
-- preserve silhouette, proportions, details, materials, equipment, and attached-part geometry
-- fixed root and camera: no sliding, turning, warping, squash, stretch, scale pulsing, or detached parts
+- preserve silhouette, proportions, details, materials, equipment, and attached parts
+- fixed root/camera: no sliding, turning, warping, squash, stretch, scale pulsing, or detached parts
 
 FRAMING AND BACKGROUND:
 - fixed camera: no pan, tilt, zoom, shake, crop, reframe, or cut
 - keep the whole subject and props inside the inner 70%%; maintain at least 15%% uninterrupted empty space on every side
-- keep long parts, weapons, or tool tips inside the central area; reduce amplitude rather than reaching toward an edge
-- background is perfectly uniform pure chroma green #00FF00: no floor, shadow, gradient, scenery, lighting change, particles, text, audio, trails, or motion graphics`,
-		description, style, action, options.FrameCount, referenceInstructions, actionInstructions))
+- keep long parts, weapons, and tool tips central; reduce amplitude rather than reaching toward an edge
+- background is perfectly uniform in the selected matte; never mix mattes`,
+		description, style, action, options.FrameCount, sections))
 	return limit(prompt, MaxAnimationVideoCharacters)
 }
 
@@ -113,14 +124,14 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 	correction := `Generate a fresh take; the previous take failed framing checks.
 - output exactly one subject in a normal video frame; never reproduce a multi-direction reference sheet or show multiple views
 - keep the complete subject and every attached or held object inside the inner 64% of the frame throughout the entire video
-- maintain at least 18% uninterrupted pure-green empty space on every side
+- maintain at least 18% uninterrupted empty space in the selected pure chroma matte on every side
 - preserve the smaller scale of the supplied reference and never zoom, crop, reframe, or push any subject part toward an edge
 - keep long parts, weapons, or tool tips inside the central 64%%; use a compact controlled motion instead of a wide edge-reaching swing`
 	if issueKind == "subject" || issueKind == "foreground" {
 		correction = `Generate a fresh take; the previous take lost the readable subject silhouette.
 - output exactly one subject in every frame; never reproduce a multi-direction reference sheet or show multiple views
 - preserve the exact subject, attached parts, and opaque silhouette in every frame
-- keep the background uniformly #00FF00 with strong colour separation
+- keep the background uniformly pure green #00FF00 by default; use pure magenta #FF00FF only when the subject contains substantial green, with strong colour separation
 - do not fade, dissolve, blur away, or merge any body or object part into the background`
 	}
 	if issueKind == "continuity" {

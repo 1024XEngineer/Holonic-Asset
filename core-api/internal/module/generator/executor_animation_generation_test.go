@@ -371,7 +371,8 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		t.Fatalf("quality retry was not issued: %+v", videos.requests)
 	}
 	if len(videoProcessor.options) != 2 || videoProcessor.options[1].AnalysisFPS != animationAnalysisFPS ||
-		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin {
+		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin ||
+		!videoProcessor.options[1].ChromaKey.AutoDetect {
 		t.Fatalf("executor did not supply media selection policy: %+v", videoProcessor.options)
 	}
 	if !strings.Contains(videos.requests[0].Prompt, action) ||
@@ -409,7 +410,8 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		!processor.splitRequest.PreserveVerticalMotion ||
 		!processor.splitRequest.PreserveSourceCellScale ||
 		processor.splitRequest.Background == nil ||
-		processor.splitRequest.Background.MatteColor != "auto" {
+		processor.splitRequest.Background.MatteColor != "auto" ||
+		!processor.splitRequest.Background.BorderConnectedOnly {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
 	}
 }

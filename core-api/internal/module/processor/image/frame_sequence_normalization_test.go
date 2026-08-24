@@ -325,3 +325,38 @@ func TestNormalizeAnimationImageRejectsTwoContentNormalizationPolicies(t *testin
 		t.Fatal("expected mutually exclusive content normalization policies to fail")
 	}
 }
+
+func TestNormalizeAnimationImagePreservesBrightGreenSubjectOnGreenMatte(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 48, 24))
+	fillRect(src, src.Bounds(), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(6, 4, 18, 20), color.NRGBA{R: 15, G: 25, B: 20, A: 255})
+	fillRect(src, image.Rect(9, 7, 15, 18), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(30, 4, 42, 20), color.NRGBA{R: 15, G: 25, B: 20, A: 255})
+	fillRect(src, image.Rect(33, 7, 39, 18), color.NRGBA{G: 255, A: 255})
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 32, FrameHeight: 32,
+		Background: &AnimationBackgroundOptions{MatteColor: "#00ff00", BorderConnectedOnly: true},
+	})
+	if err != nil {
+		t.Fatalf("normalize green-on-green animation: %v", err)
+	}
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		foundGreen := false
+		for y := decoded.Bounds().Min.Y; y < decoded.Bounds().Max.Y; y++ {
+			for x := decoded.Bounds().Min.X; x < decoded.Bounds().Max.X; x++ {
+				pixel := color.NRGBAModel.Convert(decoded.At(x, y)).(color.NRGBA)
+				if pixel.A >= 250 && pixel.G >= 240 && pixel.R <= 10 && pixel.B <= 10 {
+					foundGreen = true
+				}
+			}
+		}
+		if !foundGreen {
+			t.Fatalf("frame %d lost bright green subject", index)
+		}
+	}
+}
