@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -24,6 +25,7 @@ type runManagerStub struct {
 	listPage      *generator.RunListPage
 	listErr       error
 	run           *generator.Run
+	runErr        error
 	cancelID      generator.RunID
 	cancelErr     error
 	resolveID     generator.RunID
@@ -88,7 +90,7 @@ func (s *runManagerStub) List(
 }
 
 func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, error) {
-	return s.run, nil
+	return s.run, s.runErr
 }
 
 func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
@@ -332,6 +334,59 @@ func TestRetryReturnsUnexpectedManagerError(t *testing.T) {
 	)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected manager error, got %v", err)
+	}
+}
+
+func TestRetryAndDeleteRejectUnavailableTaskManagerOrRun(t *testing.T) {
+	lookupErr := errors.New("run lookup failed")
+	for _, test := range []struct {
+		name string
+		run  func(*handler.GenerationHandler) error
+		h    *handler.GenerationHandler
+		want string
+	}{
+		{
+			name: "retry without task manager",
+			h:    handler.NewGenerationHandler(nil, nil),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: "task manager is required",
+		},
+		{
+			name: "delete without task manager",
+			h:    handler.NewGenerationHandler(nil, nil),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: "task manager is required",
+		},
+		{
+			name: "retry lookup failure",
+			h:    handler.NewGenerationHandler(&runManagerStub{runErr: lookupErr}, &failedTaskManagerStub{}),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: lookupErr.Error(),
+		},
+		{
+			name: "delete lookup failure",
+			h:    handler.NewGenerationHandler(&runManagerStub{runErr: lookupErr}, &failedTaskManagerStub{}),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: lookupErr.Error(),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.run(test.h); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected error containing %q, got %v", test.want, err)
+			}
+		})
 	}
 }
 
