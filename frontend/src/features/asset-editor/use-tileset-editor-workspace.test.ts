@@ -4,6 +4,7 @@ import type {
   AssetRecord,
   AssetWorkspaceData,
   GenerationTaskType,
+  TileSetAssetContent,
 } from "@/model";
 
 const mocks = vi.hoisted(() => ({
@@ -42,6 +43,9 @@ const mocks = vi.hoisted(() => ({
     },
   },
   stateValues: [] as unknown[],
+  candidateRecordOverride: undefined as
+    | ((record: AssetRecord, patch: TileSetAssetContent) => AssetRecord)
+    | undefined,
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -76,6 +80,11 @@ vi.mock("@/model", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/model")>();
   return {
     ...actual,
+    toCoreTilesetCandidateRecord: (
+      ...args: Parameters<typeof actual.toCoreTilesetCandidateRecord>
+    ) =>
+      mocks.candidateRecordOverride?.(...args) ??
+      actual.toCoreTilesetCandidateRecord(...args),
     coreGenerationApi: { create: mocks.coreCreate },
     rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
     useGenerationCandidateQuery: () => mocks.candidateQuery,
@@ -95,6 +104,7 @@ beforeEach(() => {
   mocks.candidateQuery.data = undefined;
   mocks.applicationMutation.isPending = false;
   mocks.applicationMutation.mutateAsync.mockResolvedValue(undefined);
+  mocks.candidateRecordOverride = undefined;
   mocks.coreCreate.mockResolvedValue({ generationRunId: 31 });
   mocks.session.save.mockResolvedValue({ status: "saved" });
   mocks.session.snapshot = snapshot(tilesetRecord());
@@ -291,6 +301,42 @@ describe("useTilesetEditorWorkspace", () => {
         onBack: vi.fn(),
       }),
     ).toBeNull();
+  });
+
+  it("omits reviews when a changed item is absent from the candidate", () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Edit Asset",
+        prompt: "Add cracks",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "edit_tiles",
+      status: "awaiting_application",
+      result: {
+        content: {
+          items: [
+            {
+              name: "Ground",
+              tiles: [{ position: { x: 0, y: 0 }, url: "/new.png" }],
+            },
+          ],
+        },
+      },
+    };
+    mocks.candidateRecordOverride = () => ({
+      ...tilesetRecord(),
+      tileset: { ...tilesetRecord().tileset, items: [] },
+    });
+
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.review?.items).toEqual([]);
   });
 });
 

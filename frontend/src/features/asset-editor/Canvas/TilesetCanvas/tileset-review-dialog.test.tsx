@@ -72,7 +72,42 @@ describe("TilesetReviewDialog", () => {
     view.unmount();
   });
 
+  it("covers tall and image-less item previews", () => {
+    render(
+      withI18n(
+        <TilesetReviewDialog
+          item={{
+            itemId: "wall",
+            currentItem: {
+              id: "wall",
+              label: "Wall",
+              tiles: [
+                [0, 0],
+                [0, 1],
+              ],
+            },
+            candidateItem: {
+              id: "wall",
+              label: "Wall",
+              tiles: [
+                [0, 0],
+                [0, 1],
+              ],
+            },
+          }}
+          isResolving={false}
+          onClose={vi.fn()}
+          onResolve={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(screen.getAllByRole("button", { name: "Tile 1" })).toHaveLength(2);
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+  });
+
   it("keeps the dialog actions disabled while resolving", () => {
+    const onClose = vi.fn();
     render(
       withI18n(
         <TilesetReviewDialog
@@ -82,7 +117,7 @@ describe("TilesetReviewDialog", () => {
             candidateItem: { id: "empty", label: "Empty", tiles: [] },
           }}
           isResolving
-          onClose={vi.fn()}
+          onClose={onClose}
           onResolve={vi.fn()}
         />,
       ),
@@ -96,5 +131,7 @@ describe("TilesetReviewDialog", () => {
       (screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

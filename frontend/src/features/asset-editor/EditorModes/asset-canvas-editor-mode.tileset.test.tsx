@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
     onSubmit: vi.fn(),
     onResolveReview: vi.fn(),
   },
+  editorEnabled: true,
   canvas: {
     selectedCellIndexes: [0] as number[],
     selectedItems: ["ground"] as string[],
@@ -41,7 +42,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../use-tileset-editor-workspace", () => ({
-  useTilesetEditorWorkspace: () => mocks.editor,
+  useTilesetEditorWorkspace: () => (mocks.editorEnabled ? mocks.editor : null),
 }));
 
 vi.mock("../Canvas/TilesetCanvas", () => ({
@@ -96,12 +97,15 @@ vi.mock("../Inspector/inspector", () => ({
     onSubmit,
     onClearSelection,
     onPromptChange,
+    targetError,
   }: {
     onSubmit: (request: { prompt: string }) => void;
     onClearSelection: () => void;
     onPromptChange: (prompt: string) => void;
+    targetError: string | null;
   }) => (
     <aside>
+      {targetError ? <p>{targetError}</p> : null}
       <button type="button" onClick={() => onPromptChange("prompt")}>
         prompt change
       </button>
@@ -119,6 +123,10 @@ import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
 
 describe("AssetCanvasEditorMode tileset wiring", () => {
   it("routes tree, canvas, review, and inspector events", () => {
+    mocks.editor.review = {
+      items: [],
+      isResolving: false,
+    };
     render(
       withI18n(
         <AssetCanvasEditorMode
@@ -150,7 +158,9 @@ describe("AssetCanvasEditorMode tileset wiring", () => {
     fireEvent.click(screen.getByRole("button", { name: "tile select" }));
     fireEvent.click(screen.getByRole("button", { name: "prompt change" }));
     fireEvent.click(screen.getByRole("button", { name: "clear selection" }));
-    fireEvent.click(screen.getByRole("button", { name: "submit edit" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "submit edit" }).at(-1)!,
+    );
 
     expect(mocks.canvas.send).toHaveBeenCalledWith({
       type: "cell.selection.toggled",
@@ -173,5 +183,125 @@ describe("AssetCanvasEditorMode tileset wiring", () => {
       { prompt: "prompt" },
       expect.objectContaining({ kind: "item", itemId: "ground" }),
     );
+    mocks.editor.review = undefined;
+  });
+
+  it("renders empty branches when the workspace is unavailable or mode is unknown", () => {
+    mocks.editorEnabled = false;
+    const { container, rerender } = render(
+      withI18n(
+        <AssetCanvasEditorMode
+          data={{
+            projectName: "Project",
+            asset: {
+              id: "8",
+              projectId: "7",
+              kind: "tileset",
+              name: "Tileset",
+              perspective: "Top-Down",
+              version: "v1",
+              history: [],
+            },
+            record: {
+              mode: "tileset",
+              prompt: "",
+              tileset: { gridSize: 4, items: mocks.editor.sourceItems },
+            },
+          }}
+          onBack={vi.fn()}
+        />,
+      ),
+    );
+    expect(container.textContent).toBe("");
+
+    rerender(
+      withI18n(
+        <AssetCanvasEditorMode
+          data={{ record: { mode: "unknown" } } as never}
+          onBack={vi.fn()}
+        />,
+      ),
+    );
+    expect(container.textContent).toBe("");
+    mocks.editorEnabled = true;
+  });
+
+  it("renders target validation and ignores submit without a target", () => {
+    const previousItems = mocks.editor.sourceItems;
+    const previousGridSize = mocks.editor.gridSize;
+    const previousSelected = mocks.canvas.selectedCellIndexes;
+    const manyItems = Array.from({ length: 257 }, (_, index) => ({
+      id: `item-${index}`,
+      label: `Item ${index}`,
+      tiles: [[index % 20, Math.floor(index / 20)] as [number, number]],
+    }));
+    mocks.editor.sourceItems = manyItems as never;
+    mocks.editor.gridSize = 20;
+    mocks.canvas.selectedCellIndexes = Array.from(
+      { length: 257 },
+      (_, index) => index,
+    );
+
+    const view = render(
+      withI18n(
+        <AssetCanvasEditorMode
+          data={{
+            projectName: "Project",
+            asset: {
+              id: "8",
+              projectId: "7",
+              kind: "tileset",
+              name: "Tileset",
+              perspective: "Top-Down",
+              version: "v1",
+              history: [],
+            },
+            record: {
+              mode: "tileset",
+              prompt: "",
+              tileset: { gridSize: 20, items: manyItems },
+            },
+          }}
+          onBack={vi.fn()}
+        />,
+      ),
+    );
+    expect(
+      screen.getByText("Select no more than 256 generated tiles."),
+    ).toBeTruthy();
+
+    mocks.editor.sourceItems = previousItems;
+    mocks.editor.gridSize = previousGridSize;
+    mocks.canvas.selectedCellIndexes = [];
+    mocks.editor.onSubmit.mockClear();
+    view.rerender(
+      withI18n(
+        <AssetCanvasEditorMode
+          data={{
+            projectName: "Project",
+            asset: {
+              id: "8",
+              projectId: "7",
+              kind: "tileset",
+              name: "Tileset",
+              perspective: "Top-Down",
+              version: "v1",
+              history: [],
+            },
+            record: {
+              mode: "tileset",
+              prompt: "",
+              tileset: { gridSize: 4, items: previousItems },
+            },
+          }}
+          onBack={vi.fn()}
+        />,
+      ),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "submit edit" }).at(-1)!,
+    );
+    expect(mocks.editor.onSubmit).not.toHaveBeenCalled();
+    mocks.canvas.selectedCellIndexes = previousSelected;
   });
 });
