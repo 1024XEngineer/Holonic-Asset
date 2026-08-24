@@ -74,7 +74,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       version: `v${item.version}`,
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
-      tags: item.tags ?? [],
+      tags: normalizeAssetTagNames(item.tags),
       ...(item.thumbnailUrl ? { thumbnailUrl: item.thumbnailUrl } : {}),
       history: [],
       animations: [],
@@ -83,6 +83,15 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
+}
+
+function normalizeAssetTagNames(
+  tags: (string | { name: string })[] | null | undefined,
+): string[] {
+  if (!tags) return [];
+  return tags
+    .map((tag) => (typeof tag === "string" ? tag.trim() : tag.name.trim()))
+    .filter(Boolean);
 }
 
 function coreProjectId(projectId: string) {

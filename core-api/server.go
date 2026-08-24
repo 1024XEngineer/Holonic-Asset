@@ -183,6 +183,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	)
 	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,
+		Assets:     workspaceModule.Assets,
 		References: references,
 	})
 
