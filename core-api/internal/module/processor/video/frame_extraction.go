@@ -223,7 +223,7 @@ func runFrameExtraction(
 ) error {
 	// The executable is either an explicitly configured ffmpeg binary or the
 	// result of exec.LookPath; request data is passed as fixed arguments.
-	command := exec.CommandContext( //nolint:gosec // Variable executable path is intentionally validated by resolveFFmpeg.
+	command := exec.CommandContext( // #nosec G204 -- Variable executable path is intentionally validated by resolveFFmpeg.
 		ctx,
 		ffmpeg,
 		"-hide_banner", "-loglevel", "error",
@@ -261,7 +261,7 @@ func decodeFrames(paths []string, label string) ([]image.Image, error) {
 	frames := make([]image.Image, 0, len(paths))
 	for _, path := range paths {
 		// paths only contains entries produced by filepath.Glob inside temp.
-		file, openErr := os.Open(path) //nolint:gosec // The path is constrained to the private temporary directory.
+		file, openErr := os.Open(path) // #nosec G304 -- The path is constrained to the private temporary directory.
 		if openErr != nil {
 			return nil, fmt.Errorf("video: open extracted %sframe: %w", label, openErr)
 		}
@@ -318,7 +318,7 @@ func validateExtractedFrameCount(count int) error {
 
 func decodeFrameConfig(path string) (image.Config, error) {
 	// path is produced by filepath.Glob inside the private temporary directory.
-	file, err := os.Open(path) //nolint:gosec // The path is constrained to the private temporary directory.
+	file, err := os.Open(path) // #nosec G304 -- The path is constrained to the private temporary directory.
 	if err != nil {
 		return image.Config{}, fmt.Errorf("video: open extracted frame metadata: %w", err)
 	}
@@ -378,7 +378,7 @@ func resolveFFmpeg(configured string) (string, error) {
 	}
 	if path != "" {
 		// A caller may intentionally configure an ffmpeg binary outside PATH.
-		info, err := os.Stat(path) //nolint:gosec // This is an operator-supplied executable path, not request input.
+		info, err := os.Stat(path) // #nosec G703 -- This is an operator-supplied executable path, not request input.
 		if err == nil && !info.IsDir() {
 			return path, nil
 		}
