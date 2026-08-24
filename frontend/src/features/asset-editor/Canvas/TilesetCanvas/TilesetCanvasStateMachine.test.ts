@@ -153,6 +153,19 @@ describe("tileset canvas state", () => {
     ).toBe(state);
   });
 
+  it("clears the current selection explicitly", () => {
+    let state = createInitialTilesetCanvasState(items, 4);
+    state = reduceTilesetCanvas(
+      state,
+      { type: "cell.selection.toggled", gridCellIndex: 0 },
+      items,
+      4,
+    );
+    state = reduceTilesetCanvas(state, { type: "selection.cleared" }, items, 4);
+
+    expect(state.selectedCellIndexes).toEqual([]);
+  });
+
   it("labels unowned cells and resets state against a new model", () => {
     let state = createInitialTilesetCanvasState(items, 4);
     state = reduceTilesetCanvas(
