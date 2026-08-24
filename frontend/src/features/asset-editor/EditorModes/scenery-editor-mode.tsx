@@ -1,6 +1,6 @@
 import type { AssetWorkspaceData } from "@/model";
 
-import { AssetTree } from "../AssetTree/asset-tree";
+import { SceneryAssetTree } from "../AssetTree/scenery-asset-tree";
 import {
   SceneryCanvas,
   useSceneryCanvasStateMachine,
@@ -34,8 +34,7 @@ export function SceneryEditorMode({ data, onBack }: SceneryEditorModeProps) {
       projectName={projectName}
       onBack={onBack}
     >
-      <AssetTree
-        kind="scenery"
+      <SceneryAssetTree
         layers={layers}
         selectedLayerId={selectedLayerId}
         visibleLayerIds={canvas.visibleLayerIds}
