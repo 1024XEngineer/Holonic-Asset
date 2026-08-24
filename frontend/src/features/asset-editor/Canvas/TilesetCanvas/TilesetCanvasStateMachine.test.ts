@@ -305,7 +305,11 @@ function InteractiveProbe() {
     null,
     createElement(
       "button",
-      { type: "button", onClick: () => canvas.send({ type: "cell.selection.toggled", gridCellIndex: 0 }) },
+      {
+        type: "button",
+        onClick: () =>
+          canvas.send({ type: "cell.selection.toggled", gridCellIndex: 0 }),
+      },
       "toggle",
     ),
     createElement("span", null, String(canvas.isCellSelected("sofa", 0))),
