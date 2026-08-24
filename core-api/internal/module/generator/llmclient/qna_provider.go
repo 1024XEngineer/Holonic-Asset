@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/qnasdk"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
@@ -25,7 +25,6 @@ const (
 	qnaResponseFormatJSONObject  = "json_object"
 	qnaThinkingDisabled          = "disabled"
 	invalidStructuredJSONMessage = "LLM response contains invalid structured JSON"
-	maxErrorBodyBytes            = 1 << 20
 	qnaStructuredMaxTokens       = 8192
 	defaultQNAHTTPTimeout        = 5 * time.Minute
 )
@@ -36,6 +35,7 @@ type QNAConfig struct {
 	APIKey       string
 	DefaultModel string
 	HTTPClient   *http.Client
+	SDKClient    *qnasdk.Client
 	Logger       logger.Logger
 }
 
@@ -45,6 +45,7 @@ type QNAProvider struct {
 	apiKey       string
 	defaultModel string
 	httpClient   *http.Client
+	sdkClient    *qnasdk.Client
 	logger       logger.Logger
 }
 
@@ -58,11 +59,16 @@ func NewQNAProvider(config QNAConfig) *QNAProvider {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultQNAHTTPTimeout}
 	}
+	sdkClient := config.SDKClient
+	if sdkClient == nil {
+		sdkClient = qnasdk.NewClient(baseURL, config.APIKey, httpClient)
+	}
 	provider := &QNAProvider{
 		baseURL:      baseURL,
 		apiKey:       strings.TrimSpace(config.APIKey),
 		defaultModel: strings.TrimSpace(config.DefaultModel),
 		httpClient:   httpClient,
+		sdkClient:    sdkClient,
 		logger:       config.Logger,
 	}
 	if provider.logger != nil {
@@ -164,59 +170,31 @@ func (p *QNAProvider) completeWithResponseFormat(
 		return nil, providerErr
 	}
 
-	httpRequest, err := http.NewRequestWithContext(
+	var decoded qnaChatResponse
+	metadata, err := p.sdkClient.ExecuteWithMetadata(
 		ctx,
 		http.MethodPost,
-		p.baseURL+DefaultQNAChatCompletionsPath,
-		bytes.NewReader(body),
+		"chat/completions",
+		body,
+		&decoded,
 	)
 	if err != nil {
-		providerErr := newQNAError(ErrorKindInvalidRequest, 0, false, "create LLM request", err)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, 0, 0, providerErr, logger.String("response_format", responseFormatType))
-		return nil, providerErr
-	}
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-	httpRequest.Header.Set("Accept", "application/json")
-
-	response, err := p.httpClient.Do(httpRequest)
-	if err != nil {
-		providerErr := classifyQNARequestError(ctx, err)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, 0, 0, providerErr, logger.String("response_format", responseFormatType))
-		return nil, providerErr
-	}
-	defer func() { _ = response.Body.Close() }()
-
-	responseBody, readErr := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		providerErr := qnaStatusErrorFromBody(response, responseBody, readErr)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, response.StatusCode, len(responseBody), providerErr, logger.String("response_format", responseFormatType))
-		return nil, providerErr
-	}
-	if readErr != nil {
-		providerErr := newQNAError(ErrorKindInvalidResponse, response.StatusCode, true, "read LLM response", readErr)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, response.StatusCode, len(responseBody), providerErr, logger.String("response_format", responseFormatType))
-		return nil, providerErr
-	}
-
-	var decoded qnaChatResponse
-	if err := json.Unmarshal(responseBody, &decoded); err != nil {
-		providerErr := newQNAError(ErrorKindInvalidResponse, response.StatusCode, true, "decode LLM response", err)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, response.StatusCode, len(responseBody), providerErr, logger.String("response_format", responseFormatType))
+		providerErr := classifyQNASDKError(ctx, err)
+		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, metadata.StatusCode, metadata.BodyBytes, providerErr, logger.String("response_format", responseFormatType))
 		return nil, providerErr
 	}
 	if len(decoded.Choices) == 0 {
-		providerErr := newQNAError(ErrorKindInvalidResponse, response.StatusCode, true, "LLM response contains no choices", nil)
-		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, response.StatusCode, len(responseBody), providerErr, logger.String("response_format", responseFormatType))
+		providerErr := newQNAError(ErrorKindInvalidResponse, metadata.StatusCode, true, "LLM response contains no choices", nil)
+		p.logRequestFailure(model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath, startedAt, metadata.StatusCode, metadata.BodyBytes, providerErr, logger.String("response_format", responseFormatType))
 		return nil, providerErr
 	}
 	choice := decoded.Choices[0]
 	structuredJSON, contentFormat, structuredErr := extractQNAStructuredJSON(choice.Message.Content)
 	if structuredErr != nil {
-		providerErr := newQNAError(ErrorKindInvalidResponse, response.StatusCode, true, invalidStructuredJSONMessage, structuredErr)
+		providerErr := newQNAError(ErrorKindInvalidResponse, metadata.StatusCode, true, invalidStructuredJSONMessage, structuredErr)
 		p.logRequestFailure(
 			model, len(request.ImageURLs), request.ResponseSchema.Name, p.baseURL+DefaultQNAChatCompletionsPath,
-			startedAt, response.StatusCode, len(responseBody), providerErr,
+			startedAt, metadata.StatusCode, metadata.BodyBytes, providerErr,
 			logger.String("response_format", responseFormatType),
 			logger.String("finish_reason", choice.FinishReason),
 			logger.Int("content_bytes", len(choice.Message.Content)),
@@ -235,8 +213,8 @@ func (p *QNAProvider) completeWithResponseFormat(
 		request.ResponseSchema.Name,
 		p.baseURL+DefaultQNAChatCompletionsPath,
 		startedAt,
-		response.StatusCode,
-		len(responseBody),
+		metadata.StatusCode,
+		metadata.BodyBytes,
 		responseModel,
 		decoded.ID,
 		logger.String("response_format", responseFormatType),
@@ -367,6 +345,26 @@ func isInvalidStructuredJSONError(err error) bool {
 		providerErr.Message == invalidStructuredJSONMessage
 }
 
+func classifyQNASDKError(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return classifyQNARequestError(ctx, ctxErr)
+	}
+	var sdkErr *qnasdk.Error
+	if errors.As(err, &sdkErr) {
+		kind, transient := classifyQNAStatus(sdkErr.StatusCode)
+		return newQNAError(kind, sdkErr.StatusCode, transient, sdkErr.Message, err)
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "withbaseurl failed") ||
+		strings.Contains(message, "unsupported protocol scheme") {
+		return newQNAError(ErrorKindInvalidRequest, 0, false, "configure QNA SDK request", err)
+	}
+	if strings.Contains(message, "decode sdk response json") {
+		return newQNAError(ErrorKindInvalidResponse, http.StatusOK, true, "decode LLM response", err)
+	}
+	return classifyQNARequestError(ctx, err)
+}
+
 func classifyQNARequestError(ctx context.Context, err error) error {
 	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
 		return newQNAError(ErrorKindCanceled, 0, false, "request canceled", err)
@@ -376,16 +374,6 @@ func classifyQNARequestError(ctx context.Context, err error) error {
 	}
 	return newQNAError(ErrorKindTransport, 0, true, "request failed", err)
 }
-
-func qnaStatusErrorFromBody(response *http.Response, body []byte, readErr error) error {
-	message := qnaErrorMessage(body)
-	if message == "" {
-		message = response.Status
-	}
-	kind, transient := classifyQNAStatus(response.StatusCode)
-	return newQNAError(kind, response.StatusCode, transient, message, readErr)
-}
-
 func classifyQNAStatus(statusCode int) (ErrorKind, bool) {
 	switch statusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
@@ -402,31 +390,6 @@ func classifyQNAStatus(statusCode int) (ErrorKind, bool) {
 		}
 		return ErrorKindInvalidRequest, false
 	}
-}
-
-func qnaErrorMessage(body []byte) string {
-	var envelope struct {
-		Message string          `json:"message"`
-		Error   json.RawMessage `json:"error"`
-	}
-	if err := json.Unmarshal(body, &envelope); err == nil {
-		if envelope.Message != "" {
-			return envelope.Message
-		}
-		if len(envelope.Error) > 0 {
-			var nested struct {
-				Message string `json:"message"`
-			}
-			if err := json.Unmarshal(envelope.Error, &nested); err == nil && nested.Message != "" {
-				return nested.Message
-			}
-			var text string
-			if err := json.Unmarshal(envelope.Error, &text); err == nil && text != "" {
-				return text
-			}
-		}
-	}
-	return strings.TrimSpace(string(body))
 }
 
 func newQNAError(
