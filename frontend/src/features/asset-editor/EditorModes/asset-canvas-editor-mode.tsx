@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { AssetWorkspaceData, TilesetItem, UISetComponent } from "@/model";
+import { useTranslation } from "react-i18next";
 
+import type { AssetWorkspaceData, UISetComponent } from "@/model";
+
+import { TilesetAssetTree } from "../AssetTree/tileset-asset-tree";
 import {
   TilesetCanvas,
+  type TilesetCanvasEvent,
   useTilesetCanvasStateMachine,
 } from "../Canvas/TilesetCanvas";
 import { UISetCanvas } from "../Canvas/UISetCanvas";
+import { EditorHeader } from "../Header/editor-header";
+import { Inspector } from "../Inspector/inspector";
+import {
+  MAX_TILESET_EDIT_TARGETS,
+  resolveTilesetEditTarget,
+} from "../tileset-edit-target";
+import { useTilesetEditorWorkspace } from "../use-tileset-editor-workspace";
 import {
   EditorModeFrame,
   type EditorModeFrameProps,
@@ -21,26 +32,16 @@ export function AssetCanvasEditorMode({
   data,
   onBack,
 }: AssetCanvasEditorModeProps) {
-  const frameProps = {
-    assetName: data.asset.name,
-    version: data.asset.version,
-    projectName: data.projectName,
-    onBack,
-  };
-
   switch (data.record.mode) {
     case "tileset":
-      return (
-        <TilesetEditor
-          {...frameProps}
-          gridSize={data.record.tileset.gridSize}
-          items={data.record.tileset.items}
-        />
-      );
+      return <TilesetEditor data={data} onBack={onBack} />;
     case "uiset":
       return (
         <UISetEditor
-          {...frameProps}
+          assetName={data.asset.name}
+          version={data.asset.version}
+          projectName={data.projectName}
+          onBack={onBack}
           components={data.record.uiset.components}
         />
       );
@@ -49,27 +50,86 @@ export function AssetCanvasEditorMode({
   }
 }
 
-function TilesetEditor({
-  gridSize,
-  items,
-  ...frameProps
-}: Omit<EditorModeFrameProps, "assetKind" | "children"> & {
-  gridSize: number;
-  items: TilesetItem[];
+function TilesetEditor({ data, onBack }: AssetCanvasEditorModeProps) {
+  const editor = useTilesetEditorWorkspace({ data, onBack });
+  return editor ? <ConnectedTilesetEditor editor={editor} /> : null;
+}
+
+function ConnectedTilesetEditor({
+  editor,
+}: {
+  editor: NonNullable<ReturnType<typeof useTilesetEditorWorkspace>>;
 }) {
-  const canvas = useTilesetCanvasStateMachine(items, gridSize);
+  const { t } = useTranslation("editor");
+  const canvas = useTilesetCanvasStateMachine(
+    editor.sourceItems,
+    editor.gridSize,
+  );
+  const resolution = resolveTilesetEditTarget({
+    selectedCellIndexes: canvas.selectedCellIndexes,
+    items: editor.sourceItems,
+    gridSize: editor.gridSize,
+  });
+  const target = resolution.target
+    ? { label: resolution.target.label, detail: t("tilesetTargetDetail") }
+    : null;
+  const targetError =
+    resolution.error === "too-many"
+      ? t("tooManyTilesetTargets", { count: MAX_TILESET_EDIT_TARGETS })
+      : resolution.error === "missing"
+        ? t("selectTilesetTarget")
+        : null;
+  const handleCanvasEvent = (event: TilesetCanvasEvent) => {
+    switch (event.type) {
+      case "cell.selection.toggled":
+        canvas.send(event);
+        return;
+      case "generation-review.resolved":
+        editor.onResolveReview(event.applied);
+    }
+  };
 
   return (
-    <EditorModeFrame {...frameProps} assetKind="tileset">
-      <TilesetCanvas
-        model={{
-          gridSize,
-          items,
-          selectedCellIndexes: canvas.selectedCellIndexes,
-        }}
-        onEvent={canvas.send}
-      />
-    </EditorModeFrame>
+    <>
+      <EditorHeader {...editor.header} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <TilesetAssetTree
+          items={editor.sourceItems}
+          selectedItemIds={canvas.selectedItems}
+          isTileSelected={canvas.isCellSelected}
+          onToggleItem={(itemId) =>
+            canvas.send({ type: "item.toggle", itemId })
+          }
+          onToggleTile={(itemId, itemCellIndex) =>
+            canvas.send({ type: "item-cell.toggle", itemId, itemCellIndex })
+          }
+        />
+        <TilesetCanvas
+          model={{
+            gridSize: editor.gridSize,
+            items: editor.items,
+            selectedCellIndexes: canvas.selectedCellIndexes,
+            ...(editor.review ? { review: editor.review } : {}),
+          }}
+          onEvent={handleCanvasEvent}
+        />
+        <Inspector
+          kind="tileset"
+          prompt={editor.prompt}
+          history={editor.history}
+          target={target}
+          targetError={targetError}
+          isSubmitting={editor.isSubmitting}
+          onPromptChange={editor.onPromptChange}
+          onSubmit={(request) =>
+            resolution.target
+              ? editor.onSubmit(request, resolution.target)
+              : undefined
+          }
+          onClearSelection={() => canvas.send({ type: "selection.cleared" })}
+        />
+      </div>
+    </>
   );
 }
 
