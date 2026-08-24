@@ -320,7 +320,10 @@ func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices 
 		// Check if it is a data URL or raw base64
 		trimmed := strings.TrimSpace(contentStr)
 		if strings.HasPrefix(trimmed, "data:image/") || isLikelyBase64(trimmed) {
-			b64 := stripDataURLPrefix(trimmed)
+			b64, err := p.resolveImageToB64(ctx, trimmed)
+			if err != nil {
+				return nil, err
+			}
 			images = append(images, b64)
 		}
 	}
@@ -330,7 +333,17 @@ func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices 
 func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawURL string) (string, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if strings.HasPrefix(rawURL, "data:image/") {
-		return stripDataURLPrefix(rawURL), nil
+		b64, err := parseImageDataURL(rawURL)
+		if err != nil {
+			return "", newChatProviderError(
+				ErrorKindInvalidResponse,
+				0,
+				false,
+				"invalid generated image data URL",
+				err,
+			)
+		}
+		return b64, nil
 	}
 	if isLikelyBase64(rawURL) {
 		return rawURL, nil
@@ -416,12 +429,21 @@ func formatChatImageRef(ref string) string {
 	return ref
 }
 
-func stripDataURLPrefix(dataURL string) string {
-	commaIndex := strings.Index(dataURL, ",")
-	if commaIndex != -1 && strings.HasPrefix(dataURL, "data:") {
-		return dataURL[commaIndex+1:]
+func parseImageDataURL(dataURL string) (string, error) {
+	commaIndex := strings.IndexByte(dataURL, ',')
+	if commaIndex < 0 || !strings.HasPrefix(dataURL, "data:image/") ||
+		!strings.HasSuffix(strings.ToLower(dataURL[:commaIndex]), ";base64") {
+		return "", errors.New("image data URL must contain a base64 payload")
 	}
-	return dataURL
+
+	payload := dataURL[commaIndex+1:]
+	if payload == "" {
+		return "", errors.New("image data URL payload is empty")
+	}
+	if _, err := base64.StdEncoding.DecodeString(payload); err != nil {
+		return "", fmt.Errorf("decode image data URL payload: %w", err)
+	}
+	return payload, nil
 }
 
 func isLikelyBase64(s string) bool {

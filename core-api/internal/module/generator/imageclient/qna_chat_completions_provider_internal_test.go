@@ -212,8 +212,8 @@ func TestChatCompletionsImageReferenceHelpers(t *testing.T) {
 	if got := formatChatImageRef("asset-id"); got != "asset-id" {
 		t.Fatalf("opaque reference = %q", got)
 	}
-	if got := stripDataURLPrefix("not-a-data-url"); got != "not-a-data-url" {
-		t.Fatalf("plain value = %q", got)
+	if got, err := parseImageDataURL("data:image/png;base64," + raw); err != nil || got != raw {
+		t.Fatalf("data URL payload = %q, error = %v", got, err)
 	}
 	if !isLikelyBase64("  " + raw + "\n") {
 		t.Fatal("whitespace-wrapped base64 was rejected")
@@ -236,6 +236,15 @@ func TestQNAChatCompletionsProviderImageResolutionFailures(t *testing.T) {
 		got, err := provider.resolveImageToB64(context.Background(), raw)
 		if err != nil || got != raw {
 			t.Fatalf("raw base64 result = %q, error = %v", got, err)
+		}
+	})
+
+	t.Run("invalid data URL base64", func(t *testing.T) {
+		provider := baseProvider(nil)
+		_, err := provider.resolveImageToB64(context.Background(), "data:image/png;base64,not-base64")
+		var providerErr *ProviderError
+		if !errors.As(err, &providerErr) || providerErr.Kind != ErrorKindInvalidResponse || providerErr.Transient {
+			t.Fatalf("data URL error = %v, want permanent invalid response", err)
 		}
 	})
 
