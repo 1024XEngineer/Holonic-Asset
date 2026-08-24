@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { AssetTree } from "../AssetTree/asset-tree";
+import { SpriteAssetTree } from "../AssetTree/sprite-asset-tree";
 import {
   AnimatedSpriteCanvas,
   type AnimatedSpriteCanvasEvent,
@@ -71,8 +71,7 @@ export function SpriteEditorMode({
     <>
       <EditorHeader {...header} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <AssetTree
-          kind="sprite"
+        <SpriteAssetTree
           animations={animations}
           perspective={sprite.perspective}
           selectedNode={selection.nodeIds[0] ?? null}

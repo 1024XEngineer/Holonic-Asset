@@ -1,93 +1,41 @@
-// @vitest-environment happy-dom
-
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { withI18n } from "@/testing/with-i18n";
+import { describe, expect, it } from "vitest";
 
 import { AssetTree } from "./asset-tree";
 
-afterEach(cleanup);
-
-const layers = [
-  {
-    id: "sky",
-    label: "Sky",
-    detail: "Backdrop",
-    imageUrl: "/sky.png",
-    blendMode: "normal" as const,
-  },
-  {
-    id: "trees",
-    label: "Trees",
-    detail: "Foreground",
-    imageUrl: "/trees.png",
-    blendMode: "multiply" as const,
-  },
-];
-
 describe("AssetTree", () => {
-  it("renders scenery layers through the shared tree", () => {
+  it("renders shared tree chrome and content", () => {
     const html = renderToStaticMarkup(
-      withI18n(
-        <AssetTree
-          kind="scenery"
-          layers={layers}
-          selectedLayerId="trees"
-          visibleLayerIds={["sky"]}
-          onSelect={vi.fn()}
-          onToggleVisibility={vi.fn()}
-        />,
-      ),
+      <AssetTree
+        title="Asset tree"
+        description="Mode-specific assets"
+        count={2}
+        footer={<button type="button">Action</button>}
+      >
+        <span>Node</span>
+      </AssetTree>,
     );
 
-    expect(html).toContain("Scene layers");
-    expect(html).toContain("Sky");
-    expect(html).toContain("Trees");
-    expect(html).toContain("Backdrop");
-    expect(html).toContain("Hide Sky");
+    expect(html).toContain("Asset tree");
+    expect(html).toContain("Mode-specific assets");
+    expect(html).toContain("Node");
+    expect(html).toContain("Action");
+    expect(html).toContain(">2<");
   });
 
-  it("routes scenery layer selection and visibility actions", () => {
-    const onSelect = vi.fn();
-    const onToggleVisibility = vi.fn();
-    render(
-      withI18n(
-        <AssetTree
-          kind="scenery"
-          layers={layers}
-          selectedLayerId="trees"
-          visibleLayerIds={["sky"]}
-          onSelect={onSelect}
-          onToggleVisibility={onToggleVisibility}
-        />,
-      ),
-    );
-
-    const layerButton = screen.getByText("Trees").closest("button");
-    if (!layerButton) throw new Error("Expected the scenery layer button.");
-    fireEvent.click(layerButton);
-    fireEvent.click(screen.getByRole("button", { name: "Show Trees" }));
-
-    expect(onSelect).toHaveBeenCalledWith("trees");
-    expect(onToggleVisibility).toHaveBeenCalledWith("trees");
-  });
-
-  it("renders the empty scenery state", () => {
+  it("renders the shared empty state instead of children", () => {
     const html = renderToStaticMarkup(
-      withI18n(
-        <AssetTree
-          kind="scenery"
-          layers={[]}
-          selectedLayerId={null}
-          visibleLayerIds={[]}
-          onSelect={vi.fn()}
-          onToggleVisibility={vi.fn()}
-        />,
-      ),
+      <AssetTree
+        title="Asset tree"
+        description="Mode-specific assets"
+        count={0}
+        emptyMessage="Nothing here"
+      >
+        <span>Hidden node</span>
+      </AssetTree>,
     );
 
-    expect(html).toContain("No scenery layers");
+    expect(html).toContain("Nothing here");
+    expect(html).not.toContain("Hidden node");
   });
 });

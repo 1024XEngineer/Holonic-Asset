@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { buildInspectorGenerationRequest } from "./editor-generation-request";
+import { buildSpriteGenerationRequest } from "./sprite-generation-request";
 
-describe("buildInspectorGenerationRequest", () => {
+describe("buildSpriteGenerationRequest", () => {
   it("maps a frame selection and reference image to an edit request", () => {
     expect(
-      buildInspectorGenerationRequest("character", 12, {
+      buildSpriteGenerationRequest("character", 12, {
         prompt: "Make the stride longer",
         creatingReference: {
           fileName: "stride.png",
           mimeType: "image/png",
           objectKey: "uploads/stride.png",
-          previewUrl: "https://cdn.example/stride.png?token=signed",
         },
         target: {
           nodeIds: ["walk"],
@@ -39,7 +38,7 @@ describe("buildInspectorGenerationRequest", () => {
 
   it("maps an unselected object prompt to the prototype editor", () => {
     expect(
-      buildInspectorGenerationRequest("object", 4, {
+      buildSpriteGenerationRequest("object", 4, {
         prompt: "Add stronger highlights",
         target: { nodeIds: [], frames: [] },
       }),

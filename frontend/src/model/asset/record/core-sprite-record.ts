@@ -9,7 +9,6 @@ import { coreAssetApi } from "../library/core-asset.api";
 import { mergeAssetContentPatch } from "../library/merge-asset-content";
 import type {
   AssetKind,
-  AssetRevision,
   CharacterAnimation,
   CharacterSpriteSheet,
 } from "../types";
@@ -22,6 +21,10 @@ import type {
   GetAssetRecordInput,
   SaveAssetRecordInput,
 } from "./types";
+import {
+  createCoreAssetWorkspace,
+  toCoreAssetHistory,
+} from "./core-asset-workspace";
 
 type CoreSpriteAssetKind = Extract<AssetKind, "character" | "object">;
 
@@ -69,7 +72,7 @@ export async function saveCoreSpriteAssetRevision(
     projectId: input.projectId,
     assetId: input.assetId,
     version: `v${saved.version}`,
-    history: toHistory(records.records, saved.version),
+    history: toCoreAssetHistory(records.records, saved.version),
     record: structuredClone(input.record),
   };
 }
@@ -100,19 +103,14 @@ export function toCoreSpriteAssetWorkspace({
       ? { mode: kind, prompt: detail.description, character: sprite }
       : { mode: kind, prompt: detail.description, object: sprite };
 
-  return {
+  return createCoreAssetWorkspace({
+    projectId,
     projectName,
-    asset: {
-      id: String(detail.assetId),
-      projectId,
-      kind,
-      name: detail.name,
-      perspective: detail.perspective,
-      version: `v${detail.version}`,
-      history: toHistory(records, detail.version),
-    },
+    detail,
+    kind,
     record,
-  } as AssetWorkspaceData;
+    records,
+  });
 }
 
 export function toCoreSpriteCandidateRecord(
@@ -277,17 +275,4 @@ function parseVersion(version: string | undefined) {
 function numericId(value: string, fallback: number) {
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : fallback;
-}
-
-function toHistory(records: AssetRecordResponse[], currentVersion: number) {
-  return records.map(
-    (record): AssetRevision => ({
-      id: String(record.recordId),
-      version: `v${record.version}`,
-      description: record.description,
-      savedAt: record.createdAt,
-      status: "ready",
-      isCurrent: record.version === currentVersion,
-    }),
-  );
 }
