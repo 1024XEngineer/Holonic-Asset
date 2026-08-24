@@ -1,14 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { useTimeout } from "@/hooks/use-timeout";
+import { buildSpriteGenerationRequest } from "@/features/generation";
 import {
-  coreGenerationApi,
-  rememberGenerationRunMetadata,
   toCoreSpriteCandidateRecord,
   useGenerateAnimationMutation,
-  useGenerationCandidateQuery,
-  useGenerationRunsQuery,
-  useResolveGenerationApplicationMutation,
   type AssetWorkspaceData,
   type CoreSpriteAssetContentPatch,
   type GenerateAnimationRequest,
@@ -19,9 +14,7 @@ import type { AnimatedSpriteCanvasReview } from "./Canvas/AnimatedSpriteCanvas";
 import type { SpriteEditorModeProps } from "./EditorModes/sprite-editor-mode.types";
 import type { EditorGenerationTask } from "./Header/editor-header";
 import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
-import { buildInspectorGenerationRequest } from "./editor-generation-request";
-import { getEditorStatus } from "./editor-status";
-import { useEditorSession } from "./state";
+import { useEditorGenerationWorkspace } from "./use-editor-generation-workspace";
 
 export function useEditorWorkspace({
   data,
@@ -30,132 +23,23 @@ export function useEditorWorkspace({
   data: AssetWorkspaceData;
   onBack: () => void;
 }): SpriteEditorModeProps | null {
-  const { asset, projectName } = data;
-  const session = useEditorSession({
-    target: {
-      projectId: asset.projectId,
-      assetId: asset.id,
-      version: asset.version,
-    },
-    initialRecord: data.record,
-  });
-  const { snapshot, syncExternalRecord } = session;
+  const { asset } = data;
   const animationMutation = useGenerateAnimationMutation();
-  const applicationMutation = useResolveGenerationApplicationMutation();
-  const { data: generationRuns = [] } = useGenerationRunsQuery(
-    asset.projectId,
-    asset.id,
-  );
-  const awaitingRuns = useMemo(
-    () => generationRuns.filter((run) => run.status === "awaiting_application"),
-    [generationRuns],
-  );
-  const reviewRun = awaitingRuns[0];
-  const candidateQuery =
-    useGenerationCandidateQuery<CoreSpriteAssetContentPatch>(reviewRun?.id);
   const [animationTask, setAnimationTask] =
     useState<EditorGenerationTask | null>(null);
-  const [promptTask, setPromptTask] = useState<EditorGenerationTask | null>(
-    null,
+  const additionalTasks = useMemo(
+    () => (animationTask ? [animationTask] : []),
+    [animationTask],
   );
-  const [inspectorPrompt, setInspectorPrompt] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
-  const { schedule: scheduleNoticeReset } = useTimeout();
-  const { schedule: schedulePromptTaskReset } = useTimeout();
-
-  useEffect(() => {
-    setNotice(null);
-    setAnimationTask(null);
-    setPromptTask(null);
-    setInspectorPrompt("");
-  }, [asset.id, asset.projectId]);
-
-  useEffect(() => {
-    syncExternalRecord(data.record);
-  }, [data.record, syncExternalRecord]);
-
-  const reportAction = (message: string) => {
-    setNotice(message);
-    scheduleNoticeReset(() => setNotice(null), 2400);
-  };
-  const resolveApplication = async (
-    runId: string,
-    applied: boolean,
-    candidate?: AssetWorkspaceData["record"] | null,
-  ) => {
-    try {
-      await applicationMutation.mutateAsync({
-        projectId: asset.projectId,
-        assetId: asset.id,
-        runId,
-        applied,
-      });
-      if (applied && candidate) {
-        session.dispatch({ type: "record.candidate.apply", record: candidate });
-      }
-      reportAction(applied ? "Generation applied" : "Generation denied");
-    } catch {
-      reportAction("Unable to consume generation result");
-    }
-  };
-
-  const generationTasks = useMemo<EditorGenerationTask[]>(
-    () => [
-      ...generationRuns.flatMap((run) =>
-        run.status === "pending" ||
-        run.status === "processing" ||
-        run.status === "failed"
-          ? [
-              {
-                id: run.id,
-                name: run.name,
-                prompt: run.prompt,
-                status:
-                  run.status === "pending"
-                    ? "queued"
-                    : run.status === "failed"
-                      ? "failed"
-                      : "processing",
-                ...(run.error ? { error: run.error } : {}),
-              } satisfies EditorGenerationTask,
-            ]
-          : [],
-      ),
-      ...(animationTask ? [animationTask] : []),
-      ...(promptTask ? [promptTask] : []),
-    ],
-    [animationTask, generationRuns, promptTask],
-  );
-
-  const candidateRecord = useMemo(() => {
-    const content = candidateQuery.data?.result?.content;
-    if (content === undefined) return null;
-    try {
-      return toCoreSpriteCandidateRecord(
-        snapshot.record,
-        asset.perspective,
-        content,
-      );
-    } catch {
-      return null;
-    }
-  }, [asset.perspective, candidateQuery.data, snapshot.record]);
-
-  const status = getEditorStatus({
-    saveState: snapshot.saveState,
-    isPromptSubmitting: promptTask !== null,
-    isGeneratingAnimation: animationMutation.isPending,
-    notice,
-    isDirty: snapshot.dirty,
+  const flow = useEditorGenerationWorkspace<CoreSpriteAssetContentPatch>({
+    data,
+    onBack,
+    additionalTasks,
+    isAdditionalGenerationPending: animationMutation.isPending,
+    toCandidateRecord: (record, content) =>
+      toCoreSpriteCandidateRecord(record, asset.perspective, content),
   });
-
-  const save = async () => {
-    if (!snapshot.dirty) return;
-
-    const result = await session.save();
-    if (result.status === "saved") reportAction("Saved just now");
-    if (result.status === "failed") reportAction("Save failed");
-  };
+  const { snapshot, session, candidateRecord, reportAction } = flow;
 
   if (
     snapshot.record.mode !== "character" &&
@@ -164,7 +48,7 @@ export function useEditorWorkspace({
     return null;
   }
 
-  const reviewKind = candidateQuery.data?.kind;
+  const reviewKind = flow.candidateKind;
   const displayRecord =
     reviewKind === "generate_animation" && candidateRecord
       ? candidateRecord
@@ -174,8 +58,8 @@ export function useEditorWorkspace({
     taskKind: reviewKind,
     currentRecord: snapshot.record,
     candidateRecord,
-    animationId: candidateQuery.data?.result?.animation_id,
-    isResolving: applicationMutation.isPending,
+    animationId: flow.candidateAnimationId,
+    isResolving: flow.isResolvingReview,
   });
   const assetKind = snapshot.record.mode;
 
@@ -204,72 +88,21 @@ export function useEditorWorkspace({
   };
 
   const submitInspectorPrompt = async (request: InspectorSubmitRequest) => {
-    if (promptTask) return;
-    const prompt = request.prompt;
-
-    const taskId = `prompt-${crypto.randomUUID()}`;
-    setPromptTask({
-      id: taskId,
-      name: `Edit ${asset.name}`,
-      prompt,
-      status: "processing",
+    const assetId = Number(asset.id);
+    await flow.submit({
+      prompt: request.prompt,
+      request: buildSpriteGenerationRequest(assetKind, assetId, request),
     });
-
-    try {
-      const projectId = Number(asset.projectId);
-      const assetId = Number(asset.id);
-      if (Number.isSafeInteger(projectId) && Number.isSafeInteger(assetId)) {
-        const created = await coreGenerationApi.create(
-          projectId,
-          buildInspectorGenerationRequest(assetKind, assetId, request),
-        );
-        rememberGenerationRunMetadata(
-          asset.projectId,
-          created.generationRunId,
-          {
-            kind: assetKind,
-            name: `Edit ${asset.name}`,
-            prompt,
-            assetId: asset.id,
-          },
-        );
-      }
-
-      reportAction("Prompt sent");
-      schedulePromptTaskReset(() => {
-        setPromptTask((current) => (current?.id === taskId ? null : current));
-      }, 1800);
-    } catch (error) {
-      setPromptTask((current) => (current?.id === taskId ? null : current));
-      reportAction("Prompt submission failed");
-      throw error;
-    }
   };
 
   return {
-    header: {
-      assetKind,
-      assetName: asset.name,
-      version: asset.version,
-      projectName,
-      status,
-      canUndo: snapshot.canUndo,
-      canRedo: snapshot.canRedo,
-      isDirty: snapshot.dirty,
-      isSaving: snapshot.saveState.phase === "saving",
-      generationTasks,
-      onBack,
-      onUndo: () => session.dispatch({ type: "history.undo" }),
-      onRedo: () => session.dispatch({ type: "history.redo" }),
-      onSave: () => void save(),
-    },
-    ...(reviewRun && generationReview
+    header: flow.header,
+    ...(flow.reviewRun && generationReview
       ? {
           generationReview: {
             ...generationReview,
-            onApply: () =>
-              void resolveApplication(reviewRun.id, true, candidateRecord),
-            onDeny: () => void resolveApplication(reviewRun.id, false),
+            onApply: () => void flow.resolveReview(true),
+            onDeny: () => void flow.resolveReview(false),
           },
         }
       : {}),
@@ -296,10 +129,10 @@ export function useEditorWorkspace({
         }),
     },
     inspector: {
-      prompt: inspectorPrompt,
+      prompt: flow.prompt,
       history: asset.history,
-      isSubmitting: promptTask !== null,
-      onPromptChange: (value) => setInspectorPrompt(value),
+      isSubmitting: flow.isPromptSubmitting,
+      onPromptChange: flow.setPrompt,
       onSubmit: submitInspectorPrompt,
     },
   };
