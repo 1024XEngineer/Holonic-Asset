@@ -2,10 +2,8 @@ package imageclient
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -23,7 +21,6 @@ const (
 	qnaProviderName       = "qna"
 	qnaGeneratePath       = "/v1/images/generations"
 	qnaEditPath           = "/v1/images/edits"
-	maxErrorBodyBytes     = 1 << 20
 	defaultQNAHTTPTimeout = 5 * time.Minute
 )
 
@@ -212,17 +209,6 @@ func classifyQNARequestError(ctx context.Context, err error) error {
 	return newQNAError(ErrorKindTransport, 0, true, "request failed", err)
 }
 
-func qnaStatusError(response *http.Response) error {
-	body, readErr := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
-	message := qnaErrorMessage(body)
-	if message == "" {
-		message = response.Status
-	}
-
-	kind, transient := classifyQNAStatus(response.StatusCode)
-	return newQNAError(kind, response.StatusCode, transient, message, readErr)
-}
-
 func classifyQNAStatus(statusCode int) (ErrorKind, bool) {
 	switch statusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
@@ -239,31 +225,6 @@ func classifyQNAStatus(statusCode int) (ErrorKind, bool) {
 		}
 		return ErrorKindInvalidRequest, false
 	}
-}
-
-func qnaErrorMessage(body []byte) string {
-	var envelope struct {
-		Message string          `json:"message"`
-		Error   json.RawMessage `json:"error"`
-	}
-	if err := json.Unmarshal(body, &envelope); err == nil {
-		if envelope.Message != "" {
-			return envelope.Message
-		}
-		if len(envelope.Error) > 0 {
-			var nested struct {
-				Message string `json:"message"`
-			}
-			if err := json.Unmarshal(envelope.Error, &nested); err == nil && nested.Message != "" {
-				return nested.Message
-			}
-			var text string
-			if err := json.Unmarshal(envelope.Error, &text); err == nil && text != "" {
-				return text
-			}
-		}
-	}
-	return strings.TrimSpace(string(body))
 }
 
 func newQNAError(

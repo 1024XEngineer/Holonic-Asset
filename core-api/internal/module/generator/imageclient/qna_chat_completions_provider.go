@@ -22,7 +22,6 @@ const (
 	DefaultQNAChatCompletionsModel = "google/nano-banana-2"
 
 	chatCompletionsProviderName = "chat_completions"
-	chatCompletionsPath         = "/chat/completions"
 	maxChatErrorBodyBytes       = 1 << 20
 	maxGeneratedImageBytes      = 32 << 20
 	defaultChatHTTPTimeout      = 5 * time.Minute
@@ -206,14 +205,6 @@ func (p *QNAChatCompletionsProvider) call(
 			RequestCount: 1,
 		},
 	}, nil
-}
-
-func (p *QNAChatCompletionsProvider) endpointURL() string {
-	baseURL := strings.TrimRight(p.baseURL, "/")
-	if strings.HasSuffix(baseURL, "/v1") {
-		return baseURL + chatCompletionsPath
-	}
-	return baseURL + "/v1" + chatCompletionsPath
 }
 
 func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices []chatChoice) ([]string, error) {
