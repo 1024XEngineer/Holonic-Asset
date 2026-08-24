@@ -1,4 +1,5 @@
 import { Grid3X3 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { TileSelectionGrid } from "@/components/tile-selection-grid";
@@ -10,9 +11,11 @@ import {
   getTilesetCellIndex,
   isValidGridSize,
 } from "./TilesetCanvasStateMachine";
+import { TilesetReviewDialog } from "./tileset-review-dialog";
 
 export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
   const { t } = useTranslation("editor");
+  const [reviewItemId, setReviewItemId] = useState<string | null>(null);
   const gridSize = isValidGridSize(model.gridSize) ? model.gridSize : 0;
   const highlightedCells = new Set(
     model.selectedCellIndexes.filter(
@@ -23,9 +26,12 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
     ),
   );
   const hasSelection = highlightedCells.size > 0;
+  const activeReviewItem = model.review?.items.find(
+    (item) => item.itemId === reviewItemId,
+  );
 
   return (
-    <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#eeece7] p-4 sm:p-6 lg:p-8">
+    <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#eeece7] p-4 sm:p-6 lg:p-8">
       <section
         aria-label={t("tilesetCanvas")}
         className="flex h-full min-h-[24rem] items-center justify-center [container-type:size] lg:min-h-[36rem]"
@@ -90,15 +96,40 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
               </>
             }
             afterCells={
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-30 opacity-80"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(to right, #5dabb0 1px, transparent 1px), linear-gradient(to bottom, #5dabb0 1px, transparent 1px)",
-                  backgroundSize: `${100 / gridSize}% ${100 / gridSize}%`,
-                }}
-              />
+              <>
+                {model.review?.items.flatMap((reviewItem) => {
+                  const bounds = getRenderableItemBounds(
+                    reviewItem.candidateItem,
+                    gridSize,
+                  );
+                  if (!bounds) return [];
+
+                  return (
+                    <button
+                      key={`review:${reviewItem.itemId}`}
+                      type="button"
+                      aria-label={t("reviewTilesetItem", {
+                        value: reviewItem.candidateItem.label,
+                      })}
+                      className="z-30 size-full bg-emerald-200/35 outline-2 outline-offset-[-2px] outline-emerald-600/60 transition-colors hover:bg-emerald-200/45 focus-visible:outline-emerald-700"
+                      style={{
+                        gridColumn: `${bounds.x + 1} / span ${bounds.width}`,
+                        gridRow: `${bounds.y + 1} / span ${bounds.height}`,
+                      }}
+                      onClick={() => setReviewItemId(reviewItem.itemId)}
+                    />
+                  );
+                })}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-30 opacity-80"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(to right, #5dabb0 1px, transparent 1px), linear-gradient(to bottom, #5dabb0 1px, transparent 1px)",
+                    backgroundSize: `${100 / gridSize}% ${100 / gridSize}%`,
+                  }}
+                />
+              </>
             }
           />
         )}
@@ -108,6 +139,16 @@ export function TilesetCanvas({ model, onEvent }: TilesetCanvasProps) {
           ? t("tilesSelected", { count: highlightedCells.size })
           : t("noTilesSelected")}
       </p>
+      {activeReviewItem && model.review ? (
+        <TilesetReviewDialog
+          item={activeReviewItem}
+          isResolving={model.review.isResolving}
+          onClose={() => setReviewItemId(null)}
+          onResolve={(applied) =>
+            onEvent({ type: "generation-review.resolved", applied })
+          }
+        />
+      ) : null}
     </main>
   );
 }

@@ -1,5 +1,8 @@
+// @vitest-environment happy-dom
+
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TilesetItem } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
@@ -34,6 +37,8 @@ const items: TilesetItem[] = [
     ],
   },
 ];
+
+afterEach(cleanup);
 
 describe("TilesetCanvas", () => {
   it("renders valid item images and filters invalid selected cells", () => {
@@ -71,5 +76,89 @@ describe("TilesetCanvas", () => {
 
     expect(html).toContain("No tileset grid");
     expect(html).toContain("No tiles selected");
+  });
+
+  it("opens an item-level comparison and emits review decisions", () => {
+    const onEvent = vi.fn();
+    const currentItem = items[4]!;
+    const candidateItem = {
+      ...currentItem,
+      tileUrls: ["/candidate-1.png", "/generated-2.png"],
+    };
+    render(
+      withI18n(
+        <TilesetCanvas
+          model={{
+            gridSize: 4,
+            items: [...items.slice(0, 4), candidateItem],
+            selectedCellIndexes: [],
+            review: {
+              items: [
+                {
+                  itemId: currentItem.id,
+                  currentItem,
+                  candidateItem,
+                },
+              ],
+              isResolving: false,
+            },
+          }}
+          onEvent={onEvent}
+        />,
+      ),
+    );
+
+    const reviewButton = screen.getByRole("button", {
+      name: "Review Generated changes",
+    }) as HTMLButtonElement;
+    expect(reviewButton.style.gridColumn).toBe("3 / span 2");
+    expect(reviewButton.className).toContain("bg-emerald-200/35");
+    fireEvent.click(reviewButton);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Current")).toBeTruthy();
+    expect(screen.getByText("Generated")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "generation-review.resolved",
+      applied: true,
+    });
+  });
+
+  it("disables review decisions while resolving", () => {
+    const currentItem = items[4]!;
+    render(
+      withI18n(
+        <TilesetCanvas
+          model={{
+            gridSize: 4,
+            items,
+            selectedCellIndexes: [],
+            review: {
+              items: [
+                {
+                  itemId: currentItem.id,
+                  currentItem,
+                  candidateItem: currentItem,
+                },
+              ],
+              isResolving: true,
+            },
+          }}
+          onEvent={vi.fn()}
+        />,
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review Generated changes" }),
+    );
+
+    expect(
+      (screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });
