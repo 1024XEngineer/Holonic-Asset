@@ -24,7 +24,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@components": fileURLToPath(new URL("./src/components", import.meta.url)),
+      "@components": fileURLToPath(
+        new URL("./src/components", import.meta.url),
+      ),
       "@/lib": fileURLToPath(new URL("./src/lib", import.meta.url)),
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
