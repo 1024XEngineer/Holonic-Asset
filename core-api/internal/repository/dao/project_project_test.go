@@ -8,16 +8,13 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func TestCreateProjectCopiesSystemTagTemplates(t *testing.T) {
+func TestCreateProjectSeedsDefaultProjectTags(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO "projects"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(42))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO project_tags (project_id, template_id, name, description, color)
-			SELECT $1, id, name, description, color
-			FROM tag_templates`)).
-		WithArgs(uint(42)).
-		WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO "project_tags"`)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1).AddRow(2).AddRow(3).AddRow(4))
 	mock.ExpectCommit()
 
 	project := &Project{Name: "new project"}

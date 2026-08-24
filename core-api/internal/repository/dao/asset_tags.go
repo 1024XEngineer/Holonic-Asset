@@ -13,26 +13,14 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-// TagTemplate defines one system-provided tag. Projects receive independent
-// copies when they are created, so deleting a project tag never alters a
-// system template or another project's available tags.
-type TagTemplate struct {
-	ID          uint   `gorm:"primaryKey"`
-	Name        string `gorm:"not null;uniqueIndex"`
-	Description string
-	Color       string `gorm:"not null"`
-}
-
 // ProjectTag is the reusable tag selected by assets in one project.
 type ProjectTag struct {
-	ID          uint `gorm:"primaryKey"`
-	ProjectID   uint `gorm:"not null;index"`
-	TemplateID  *uint
+	ID          uint   `gorm:"primaryKey"`
+	ProjectID   uint   `gorm:"not null;index"`
 	Name        string `gorm:"not null"`
 	Description string
-	Color       string       `gorm:"not null"`
-	Project     Project      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Template    *TagTemplate `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Color       string  `gorm:"not null"`
+	Project     Project `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // AssetTag associates one asset with one project-scoped tag.

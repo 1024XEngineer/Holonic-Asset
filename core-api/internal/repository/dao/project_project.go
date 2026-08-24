@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 var (
@@ -61,13 +63,27 @@ func (d *GormProjectDao) CreateProject(ctx context.Context, project *Project) (u
 		if err := tx.Create(project).Error; err != nil {
 			return err
 		}
-		return tx.Exec(`INSERT INTO project_tags (project_id, template_id, name, description, color)
-			SELECT ?, id, name, description, color
-			FROM tag_templates`, project.ID).Error
+		return seedDefaultProjectTags(tx, project.ID)
 	}); err != nil {
 		return 0, err
 	}
 	return project.ID, nil
+}
+
+func seedDefaultProjectTags(tx *gorm.DB, projectID uint) error {
+	if len(assetdomain.DefaultProjectTags) == 0 {
+		return nil
+	}
+	tags := make([]ProjectTag, 0, len(assetdomain.DefaultProjectTags))
+	for _, tag := range assetdomain.DefaultProjectTags {
+		tags = append(tags, ProjectTag{
+			ProjectID:   projectID,
+			Name:        tag.Name,
+			Description: tag.Description,
+			Color:       tag.Color,
+		})
+	}
+	return tx.Create(&tags).Error
 }
 
 func (d *GormProjectDao) FindByID(ctx context.Context, id uint) (*Project, error) {

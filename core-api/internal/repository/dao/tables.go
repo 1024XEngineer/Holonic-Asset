@@ -11,9 +11,7 @@ func InitTables(db *gorm.DB) error {
 	if db == nil {
 		return errors.New("dao: database is nil")
 	}
-	bootstrapProjectTemplates := false
 	if db.Name() == "postgres" {
-		bootstrapProjectTemplates = !db.Migrator().HasColumn(&ProjectTag{}, "template_id")
 		if err := migrateLegacyTagTableName(db); err != nil {
 			return err
 		}
@@ -22,7 +20,6 @@ func InitTables(db *gorm.DB) error {
 		&User{},
 		&Project{},
 		&Asset{},
-		&TagTemplate{},
 		&ProjectTag{},
 		&AssetTag{},
 		&AssetContent{},
@@ -44,65 +41,25 @@ func InitTables(db *gorm.DB) error {
 	if err := migrateAssetTagsToTables(db); err != nil {
 		return err
 	}
-	if err := seedTagTemplates(db); err != nil {
-		return err
-	}
-	if bootstrapProjectTemplates {
-		if err := bootstrapProjectTagsFromTemplates(db); err != nil {
-			return err
-		}
-	}
 	return migrateAssetAttributes(db)
 }
 
-// cleanupLegacyTagColumns removes columns that belonged to the former tags and
-// ordered asset_tags schemas. AutoMigrate intentionally does not drop columns.
+// cleanupLegacyTagColumns removes columns that belonged to the former tags,
+// tag_templates, and ordered asset_tags schemas. AutoMigrate intentionally does not drop columns.
 func cleanupLegacyTagColumns(db *gorm.DB) error {
 	for _, statement := range []string{
 		`DROP INDEX IF EXISTS idx_tags_project_normalized_name`,
 		`DROP INDEX IF EXISTS idx_project_tags_project_normalized_name`,
 		`DROP INDEX IF EXISTS idx_project_tags_template`,
+		`DROP INDEX IF EXISTS idx_project_tags_project_template`,
 		`ALTER TABLE project_tags DROP COLUMN IF EXISTS normalized_name`,
+		`ALTER TABLE project_tags DROP COLUMN IF EXISTS template_id`,
 		`ALTER TABLE asset_tags DROP COLUMN IF EXISTS position`,
+		`DROP TABLE IF EXISTS tag_templates CASCADE`,
 	} {
 		if err := db.Exec(statement).Error; err != nil {
 			return fmt.Errorf("dao: cleanup legacy tag schema: %w", err)
 		}
-	}
-	return nil
-}
-
-// bootstrapProjectTagsFromTemplates runs only when template_id is introduced.
-// Later project-tag deletions remain deleted across application restarts.
-func bootstrapProjectTagsFromTemplates(db *gorm.DB) error {
-	if err := db.Exec(`UPDATE project_tags
-		SET template_id = tag_templates.id
-		FROM tag_templates
-		WHERE project_tags.template_id IS NULL
-		  AND lower(trim(project_tags.name)) = lower(trim(tag_templates.name))
-		  AND NOT EXISTS (
-			SELECT 1
-			FROM project_tags AS linked
-			WHERE linked.project_id = project_tags.project_id
-			  AND linked.template_id = tag_templates.id
-		  )`).Error; err != nil {
-		return fmt.Errorf("dao: link existing project tags to templates: %w", err)
-	}
-	if err := db.Exec(`INSERT INTO project_tags (project_id, template_id, name, description, color)
-		SELECT projects.id, tag_templates.id, tag_templates.name, tag_templates.description, tag_templates.color
-		FROM projects
-		CROSS JOIN tag_templates
-		WHERE NOT EXISTS (
-			SELECT 1
-			FROM project_tags
-			WHERE project_tags.project_id = projects.id
-			  AND (
-				project_tags.template_id = tag_templates.id
-				OR lower(trim(project_tags.name)) = lower(trim(tag_templates.name))
-			  )
-		)
-		ON CONFLICT DO NOTHING`).Error; err != nil {
-		return fmt.Errorf("dao: bootstrap project tags from templates: %w", err)
 	}
 	return nil
 }
@@ -115,74 +72,9 @@ func migrateLegacyTagTableName(db *gorm.DB) error {
 }
 
 func ensureProjectTagIndexes(db *gorm.DB) error {
-	statements := []string{
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_tags_project_name_ci ON project_tags (project_id, lower(trim(name)))`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_project_tags_project_template ON project_tags (project_id, template_id) WHERE template_id IS NOT NULL`,
-	}
-	for _, statement := range statements {
-		if err := db.Exec(statement).Error; err != nil {
-			return fmt.Errorf("dao: ensure project tag index: %w", err)
-		}
-	}
-	return nil
-}
-
-var defaultTagTemplates = []TagTemplate{
-	{Name: "warriors", Description: "Warrior characters and combat units", Color: "#4F46E5"},
-	{Name: "weapon", Description: "Weapons and combat equipment", Color: "#DC2626"},
-	{Name: "environment", Description: "Environment and scenery assets", Color: "#16A34A"},
-	{Name: "background", Description: "Backgrounds and backdrop assets", Color: "#0891B2"},
-}
-
-func seedTagTemplates(db *gorm.DB) error {
-	for index := range defaultTagTemplates {
-		template := defaultTagTemplates[index]
-		if err := db.Transaction(func(tx *gorm.DB) error {
-			result := tx.Where("name = ?", template.Name).FirstOrCreate(&template)
-			if result.Error != nil {
-				return result.Error
-			}
-			if result.RowsAffected == 0 {
-				return nil
-			}
-			return copyTagTemplateToProjects(tx, template)
-		}); err != nil {
-			return fmt.Errorf("dao: seed tag template %q: %w", template.Name, err)
-		}
-	}
-	return nil
-}
-
-func copyTagTemplateToProjects(db *gorm.DB, template TagTemplate) error {
-	if err := db.Exec(`UPDATE project_tags
-		SET template_id = ?
-		WHERE project_tags.template_id IS NULL
-		  AND lower(trim(project_tags.name)) = lower(trim(?))
-		  AND NOT EXISTS (
-			SELECT 1
-			FROM project_tags AS linked
-			WHERE linked.project_id = project_tags.project_id
-			  AND linked.template_id = ?
-		  )`, template.ID, template.Name, template.ID).Error; err != nil {
-		return fmt.Errorf("dao: link tag template %q to projects: %w", template.Name, err)
-	}
-	if err := db.Exec(`INSERT INTO project_tags (project_id, template_id, name, description, color)
-		SELECT projects.id, ?, ?, ?, ?
-		FROM projects
-		WHERE NOT EXISTS (
-			SELECT 1
-			FROM project_tags
-			WHERE project_tags.project_id = projects.id
-			  AND (
-				project_tags.template_id = ?
-				OR lower(trim(project_tags.name)) = lower(trim(?))
-			  )
-		)
-		ON CONFLICT DO NOTHING`,
-		template.ID, template.Name, template.Description, template.Color,
-		template.ID, template.Name,
-	).Error; err != nil {
-		return fmt.Errorf("dao: copy tag template %q to projects: %w", template.Name, err)
+	statement := `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_tags_project_name_ci ON project_tags (project_id, lower(trim(name)))`
+	if err := db.Exec(statement).Error; err != nil {
+		return fmt.Errorf("dao: ensure project tag index: %w", err)
 	}
 	return nil
 }
