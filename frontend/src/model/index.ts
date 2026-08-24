@@ -1,4 +1,5 @@
 export {
+  DEFAULT_ANIMATION_FRAME_DURATION_MS,
   assetDirectionSchema,
   assetDirections,
   assetDirectionsByPerspective,
@@ -7,9 +8,12 @@ export {
   assetKeys,
   creatableAssetKinds,
   createAssetLibraryCollection,
+  getAnimationFrameDuration,
+  getEffectiveAnimationFps,
   getDefaultAssetCanvasSize,
   recordQueryOptions,
   toCoreSpriteCandidateRecord,
+  describeAssetRecordChanges,
   useAddAudioTrackMutation,
   useAssetLibraryQuery,
   useAudioTracksQuery,
@@ -56,9 +60,9 @@ export type {
   ProjectAsset,
   SaveAssetRecordInput,
   SceneryAssetData,
+  SceneryCanvasDimensions,
   SceneryLayer,
-  AudioAssetKind,
-  AudioAssetRecord,
+  AssetRecordKind,
   CharacterAssetKind,
   CharacterAssetRecord,
   SceneryAssetKind,
@@ -170,7 +174,7 @@ export type {
   ProjectResponse,
   UpdateProjectRequest,
 } from "./project/project.api";
-export { uploadApi } from "./upload";
+export { uploadApi, uploadFile } from "./upload";
 export type { CreateUploadTargetRequest, UploadTarget } from "./upload";
 export {
   generateAnimationRequestSchema,

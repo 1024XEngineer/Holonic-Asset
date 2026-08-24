@@ -25,6 +25,10 @@ type HTTPConfig struct {
 	AllowedOrigins []string `mapstructure:"allowedOrigins" yaml:"allowedOrigins"`
 }
 
+type PprofConfig struct {
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+}
+
 type LogConfig struct {
 	Path       string `mapstructure:"path" yaml:"path"`
 	MaxSize    int    `mapstructure:"maxSize" yaml:"maxSize"`
@@ -71,6 +75,7 @@ type Config struct {
 	Queue QueueConfig       `mapstructure:"queue" yaml:"queue"`
 	Auth  AuthConfig        `mapstructure:"auth" yaml:"auth"`
 	HTTP  HTTPConfig        `mapstructure:"http" yaml:"http"`
+	Pprof PprofConfig       `mapstructure:"pprof" yaml:"pprof"`
 	Log   LogConfig         `mapstructure:"log" yaml:"log"`
 	Image ImageClientConfig `mapstructure:"image" yaml:"image"`
 	LLM   LLMClientConfig   `mapstructure:"llm" yaml:"llm"`

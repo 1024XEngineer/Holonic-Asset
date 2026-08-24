@@ -2,6 +2,7 @@ package image
 
 import (
 	"context"
+	"errors"
 	"image"
 	"image/color"
 	"slices"
@@ -482,4 +483,106 @@ func controlledMatteFixtureBase64(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return encoded
+}
+
+func TestProcessorFlipHorizontalMirrorsImage(t *testing.T) {
+	t.Parallel()
+
+	source := image.NewRGBA(image.Rect(0, 0, 3, 2))
+	source.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
+	source.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
+	source.SetRGBA(2, 0, color.RGBA{B: 255, A: 255})
+	source.SetRGBA(0, 1, color.RGBA{R: 255, G: 255, A: 255})
+	source.SetRGBA(1, 1, color.RGBA{G: 255, B: 255, A: 255})
+	source.SetRGBA(2, 1, color.RGBA{R: 255, B: 255, A: 255})
+	encoded, err := EncodePNGBase64(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := NewProcessor().(HorizontalFlipper).FlipHorizontal(context.Background(), &FlipHorizontalRequest{
+		ImageBase64: encoded,
+	})
+	if err != nil {
+		t.Fatalf("flip horizontal: %v", err)
+	}
+	if result.ImageBase64 == "" || result.MIMEType != pngMIMEType {
+		t.Fatalf("unexpected flip result: %#v", result)
+	}
+	flipped, err := DecodeBase64Image(result.ImageBase64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flipped.Bounds() != source.Bounds() {
+		t.Fatalf("flipped bounds = %v, want %v", flipped.Bounds(), source.Bounds())
+	}
+	for y := range 2 {
+		for x := range 3 {
+			if got, want := flipped.RGBAAt(x, y), source.RGBAAt(2-x, y); got != want {
+				t.Fatalf("pixel (%d,%d) = %#v, want %#v", x, y, got, want)
+			}
+		}
+	}
+}
+
+func TestProcessorFlipHorizontalRejectsInvalidRequestsAndContext(t *testing.T) {
+	t.Parallel()
+
+	flipper := NewProcessor().(HorizontalFlipper)
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tests := []struct {
+		name string
+		ctx  context.Context
+		req  *FlipHorizontalRequest
+	}{
+		{name: "cancelled context", ctx: cancelled, req: &FlipHorizontalRequest{}},
+		{name: "nil request", ctx: context.Background()},
+		{name: "invalid image data", ctx: context.Background(), req: &FlipHorizontalRequest{ImageBase64: "not-base64"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := flipper.FlipHorizontal(test.ctx, test.req); err == nil {
+				t.Fatal("expected FlipHorizontal to fail")
+			}
+		})
+	}
+
+	source := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	source.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
+	source.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
+	encoded, err := EncodePNGBase64(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &cancelOnSecondDoneContext{Context: context.Background(), done: make(chan struct{})}
+	if _, err := flipper.FlipHorizontal(ctx, &FlipHorizontalRequest{ImageBase64: encoded}); err == nil {
+		t.Fatal("expected cancellation after image processing")
+	} else if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context canceled", err)
+	}
+}
+
+type cancelOnSecondDoneContext struct {
+	context.Context
+	done  chan struct{}
+	calls int
+}
+
+func (c *cancelOnSecondDoneContext) Done() <-chan struct{} {
+	c.calls++
+	if c.calls == 2 {
+		close(c.done)
+	}
+	return c.done
+}
+
+func (c *cancelOnSecondDoneContext) Err() error {
+	select {
+	case <-c.done:
+		return context.Canceled
+	default:
+		return nil
+	}
 }

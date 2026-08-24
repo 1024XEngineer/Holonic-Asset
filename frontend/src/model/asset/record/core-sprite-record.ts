@@ -1,14 +1,12 @@
 import type {
   AssetDetailResponse,
   AssetRecordResponse,
-} from "../library/asset.contract";
-import { coreAssetApi } from "../library/core-asset.api";
-import { mergeAssetContentPatch } from "../library/merge-asset-content";
-import type {
   CharacterAssetContent,
   CoreSpriteAssetContent,
   CoreSpriteAssetContentPatch,
 } from "../library/asset.contract";
+import { coreAssetApi } from "../library/core-asset.api";
+import { mergeAssetContentPatch } from "../library/merge-asset-content";
 import type {
   AssetKind,
   AssetRevision,
@@ -17,8 +15,9 @@ import type {
 } from "../types";
 import { getPerspectiveDirectionLayout } from "../types";
 import { projectApi } from "../../project";
-import type { AssetRecord, AssetWorkspaceData } from "./types";
 import type {
+  AssetRecord,
+  AssetWorkspaceData,
   AssetRecordSaveResult,
   GetAssetRecordInput,
   SaveAssetRecordInput,
@@ -62,6 +61,7 @@ export async function saveCoreSpriteAssetRevision(
   const saved = await coreAssetApi.record({
     assetId,
     ...(expectedVersion ? { expectedVersion } : {}),
+    ...(input.description ? { description: input.description } : {}),
     content: toCoreSpriteAssetContent(input.record),
   });
   const records = await coreAssetApi.records(assetId);
@@ -93,7 +93,7 @@ export function toCoreSpriteAssetWorkspace({
   const sprite = {
     prototype: toPrototype(detail),
     animations: toAnimations(detail),
-    nodePositions: readNodePositions(detail.content?.metadata),
+    nodePositions: {},
   };
   const record: AssetRecord =
     kind === "character"
@@ -143,7 +143,7 @@ export function toCoreSpriteCandidateRecord(
       currentSprite.prototype.frameWidth,
       currentSprite.prototype.frameHeight,
     ),
-    nodePositions: readNodePositions(content.metadata),
+    nodePositions: {},
   };
   return record.mode === "character"
     ? { ...record, character: sprite }
@@ -196,12 +196,18 @@ function toAnimationsFromContent(
   frameHeight: number,
 ): CharacterAnimation[] {
   return (animations ?? []).map((animation) => {
-    const frameUrls = readURLs(animation.frames);
+    const frames = (animation.frames ?? []).flatMap((frame) =>
+      frame.url ? [{ url: frame.url, duration: frame.duration }] : [],
+    );
+    const frameUrls = frames.map((frame) => frame.url);
     return {
       kind: "clip",
       id: String(animation.id),
       label: animation.name,
       frameCount: frameUrls.length,
+      ...(frames.some((frame) => frame.duration !== undefined)
+        ? { frameDurations: frames.map((frame) => frame.duration) }
+        : {}),
       ...(animation.generation
         ? { generation: structuredClone(animation.generation) }
         : {}),
@@ -228,7 +234,9 @@ function readURLs(resources: Array<{ url?: string }> | undefined) {
   );
 }
 
-function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
+export function toCoreSpriteAssetContent(
+  record: AssetRecord,
+): CoreSpriteAssetContent {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error("Core sprite records require a Character or Object asset.");
   }
@@ -249,34 +257,16 @@ function toCoreSpriteAssetContent(record: AssetRecord): CoreSpriteAssetContent {
         (url, frameIndex) => ({
           id: frameIndex + 1,
           url,
+          ...(animation.frameDurations?.[frameIndex] !== undefined
+            ? { duration: animation.frameDurations[frameIndex] }
+            : {}),
         }),
       ),
       ...(animation.generation
         ? { generation: structuredClone(animation.generation) }
         : {}),
     })),
-    metadata: { nodePositions: structuredClone(sprite.nodePositions) },
   };
-}
-
-function readNodePositions(metadata: Record<string, unknown> | undefined) {
-  const value = metadata?.nodePositions;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([id, position]) => {
-      if (
-        !position ||
-        typeof position !== "object" ||
-        Array.isArray(position)
-      ) {
-        return [];
-      }
-      const { x, y } = position as { x?: unknown; y?: unknown };
-      return typeof x === "number" && typeof y === "number"
-        ? [[id, { x, y }]]
-        : [];
-    }),
-  );
 }
 
 function parseVersion(version: string | undefined) {

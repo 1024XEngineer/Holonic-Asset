@@ -2,14 +2,18 @@ package generator_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -249,7 +253,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"creative_brief":"pixel knight",
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
-		"reference":"https://cdn.example/reference.png",
+		"creating_reference":"reference.png",
 		"project_id":11
 	}`)
 
@@ -261,28 +265,36 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_character_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
 	if images.request == nil || images.request.MaxAttempts != 3 || !strings.Contains(images.request.Prompt, "pixel knight") ||
+		!strings.Contains(images.request.Prompt, "The subject's correct colours always take precedence") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
-		images.request.Size != "" ||
-		!reflect.DeepEqual(images.request.ReferenceImages, []string{"https://cdn.example/reference.png"}) {
+		images.request.Size != "896x896" ||
+		!reflect.DeepEqual(images.request.ReferenceImages, []string{"reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
 	}
-	if len(processor.resizeRequests) != 4 || processor.resizeRequests[0].Options.Width != 64 || processor.resizeRequests[0].Options.Height != 64 {
-		t.Fatalf("asset dimensions were not passed to processor: %+v", processor.resizeRequests)
+	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
+		t.Fatalf("prototype background removal did not auto-detect the matte: %+v", processor.removeRequests)
 	}
-	wantMargin := imageprocessor.AnimationFrameMargin(64, 64)
-	for index, request := range processor.resizeRequests {
-		if request.Options.Margin != wantMargin {
-			t.Fatalf("prototype direction %d margin = %d, want %d", index, request.Options.Margin, wantMargin)
-		}
+	if len(processor.splitRequests) != 1 {
+		t.Fatalf("expected one prototype split request, got %d", len(processor.splitRequests))
+	}
+	splitRequest := processor.splitRequests[0]
+	if splitRequest.Mode != imageprocessor.ImageSplitModeAnimation ||
+		!splitRequest.ForceProportionalGrid ||
+		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
+		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
+		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
+		!splitRequest.NormalizeContentScale || splitRequest.CropToContent ||
+		!splitRequest.RejectGridBoundaryContent || splitRequest.GridBoundaryMargin != 14 {
+		t.Fatalf("prototype directions were not normalized on a shared canvas: %+v", splitRequest)
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
 	}
 	if assets.characterAsset == nil || assets.characterAsset.Name != "hero" ||
 		assets.characterAsset.ProjectID != 11 ||
@@ -301,6 +313,48 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.characterAsset, 4)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 41})
+}
+
+func TestExecutorNormalizesSideOnPrototypeToOppositeDirections(t *testing.T) {
+	events := []string{}
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		&imageGenerationServiceStub{events: &events, result: generatedImages()},
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel basketball player",
+		"dimensions":{"width":64,"height":64},
+		"perspective":"Side-On",
+		"project_id":17
+	}`)
+	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
+		t.Fatalf("generate side-on character prototype: %v", err)
+	}
+	if !reflect.DeepEqual(events, []string{
+		"generate_image",
+		"process_image",
+		"split_image",
+		"flip_horizontal",
+		"create_character_asset",
+	}) {
+		t.Fatalf("unexpected workflow order: %v", events)
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized Side-On directions must not be resampled again: %+v", processor.resizeRequests)
+	}
+	content, err := assets.characterAsset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode character content: %v", err)
+	}
+	if content.DirectionCount != 2 || content.Prototype == nil || len(*content.Prototype) != 2 {
+		t.Fatalf("unexpected side-on content: %+v", content)
+	}
 }
 
 func TestExecutorDerivesCharacterDirectionCountFromPerspectiveAndIgnoresLegacyInput(t *testing.T) {
@@ -360,15 +414,22 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 			"dimensions":{"width":64,"height":64},
 		"perspective":"Top-Down",
 		"direction_count":"4",
-		"reference":"projects/7/reference.png",
+		"project_reference":"projects/7/style.png",
+		"creating_reference":"uploads/user-concept.png",
 		"project_id":11
 	}`)
 
 	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err != nil {
 		t.Fatalf("generate prototype: %v", err)
 	}
-	if len(references.resolved) != 1 || references.resolved[0] != "projects/7/reference.png" {
+	if !reflect.DeepEqual(references.resolved, []string{"projects/7/style.png", "uploads/user-concept.png"}) {
 		t.Fatalf("expected execution-time reference resolution, got %v", references.resolved)
+	}
+	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
+		"signed:projects/7/style.png",
+		"signed:uploads/user-concept.png",
+	}) {
+		t.Fatalf("unexpected resolved image reference order: %+v", images.request)
 	}
 	if len(references.uploads) != 8 {
 		t.Fatalf("expected four unprocessed and four final uploads, got %d: %+v", len(references.uploads), references.uploads)
@@ -377,7 +438,6 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	for index := range 4 {
 		wantEvents = append(wantEvents,
 			fmt.Sprintf("persist:uploads/prototype-%d-unprocessed.png", index),
-			"resize_image",
 			fmt.Sprintf("persist:uploads/prototype-%d.png", index),
 		)
 	}
@@ -406,6 +466,138 @@ func TestExecutorResolvesReferencesAtExecutionAndPersistsGeneratedImagesAsKeys(t
 	}
 }
 
+func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T) {
+	const downloaded = "small-pixel-reference"
+	client := &http.Client{Transport: prototypeReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"image/png"}},
+			Body:       io.NopCloser(strings.NewReader(downloaded)),
+		}, nil
+	})}
+
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{
+		events: &events,
+		normalizeResults: []*imageprocessor.NormalizeReferenceResult{
+			{ImageBase64: "project-canonical", MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 1}},
+			{ImageBase64: "user-upscaled", MIMEType: "image/png", Report: imageprocessor.ReferenceNormalizationReport{Scale: 16, Upscaled: true}},
+		},
+	}
+	references := &executorReferenceStoreStub{resolveValues: map[string]string{
+		"projects/7/style.png": "https://references.example/project",
+		"uploads/user.png":     "https://references.example/user",
+	}}
+	executor := generator.NewExecutorWithPrototypeReferenceHTTPClientForTest(
+		images,
+		processor,
+		assets,
+		references,
+		client,
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"project_reference":"projects/7/style.png",
+		"creating_reference":"uploads/user.png"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate normalized-reference prototype: %v", err)
+	}
+	if len(processor.normalizeRequests) != 2 {
+		t.Fatalf("normalization calls = %d, want 2", len(processor.normalizeRequests))
+	}
+	wantDownloaded := base64.StdEncoding.EncodeToString([]byte(downloaded))
+	for index, request := range processor.normalizeRequests {
+		if request.ImageBase64 != wantDownloaded {
+			t.Fatalf("normalization request %d did not receive downloaded bytes", index)
+		}
+	}
+	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
+		"https://references.example/project",
+		"data:image/png;base64,user-upscaled",
+	}) {
+		t.Fatalf("unexpected normalized reference order: %+v", images.request)
+	}
+}
+
+func TestExecutorRejectsPrivatePrototypeReferenceBeforeDownload(t *testing.T) {
+	downloadAttempted := false
+	client := &http.Client{Transport: prototypeReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		downloadAttempted = true
+		return nil, errors.New("unexpected download")
+	})}
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	references := &executorReferenceStoreStub{resolveValues: map[string]string{
+		"uploads/user.png": "http://169.254.169.254/latest/meta-data",
+	}}
+	executor := generator.NewExecutorWithPrototypeReferenceHTTPClientForTest(
+		images,
+		processor,
+		&generationAssetWriterStub{events: &events},
+		references,
+		client,
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"creating_reference":"uploads/user.png"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if err == nil || !strings.Contains(err.Error(), "not public") {
+		t.Fatalf("generate error = %v, want non-public reference rejection", err)
+	}
+	if downloadAttempted {
+		t.Fatal("private reference reached the HTTP transport")
+	}
+	if images.request != nil || len(processor.normalizeRequests) != 0 {
+		t.Fatalf("private reference reached generation: request=%+v normalization=%d", images.request, len(processor.normalizeRequests))
+	}
+}
+
+func TestExecutorRequiresReferenceStoreForPrototypeURL(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		&generationAssetWriterStub{events: &events},
+		generator.ExecutorDependencies{},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"sapling",
+		"creative_brief":"a sapling",
+		"dimensions":{"width":48,"height":48},
+		"perspective":"Side-On",
+		"creating_reference":"https://attacker.example/reference.png"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if err == nil || !strings.Contains(err.Error(), "object-storage reference store is required") {
+		t.Fatalf("generate error = %v, want managed reference requirement", err)
+	}
+	if images.request != nil || len(processor.normalizeRequests) != 0 {
+		t.Fatalf("unmanaged URL reached generation: request=%+v normalization=%d", images.request, len(processor.normalizeRequests))
+	}
+}
+
+type prototypeReferenceRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function prototypeReferenceRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
 func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	events := []string{}
 	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
@@ -432,19 +624,11 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 		"generate_image",
 		"process_image",
 		"split_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
-		"resize_image",
 		"create_object_asset",
 	}) {
 		t.Fatalf("unexpected workflow order: %v", events)
 	}
-	if images.request == nil || images.request.MaxAttempts != 3 {
+	if images.request == nil || images.request.MaxAttempts != 3 || images.request.Size != "1536x768" {
 		t.Fatalf("expected MaxAttempts 3, got %+v", images.request)
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
@@ -466,6 +650,316 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 	}
 	assertPrototypeResources(t, assets.objectAsset, 8)
 	assertExecutionResult(t, result, generator.ExecutionResult{AssetID: 42})
+}
+
+func TestExecutorUsesTargetAspectRatioAndRetriesGridBoundaryCandidates(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{
+		events:      &events,
+		splitErrors: []error{imageprocessor.ErrGridBoundaryContent, nil},
+	}
+	assets := &generationAssetWriterStub{events: &events}
+	references := &executorReferenceStoreStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"king_sofa",
+		"creative_brief":"ornate black and white striped sofa",
+		"dimensions":{"width":188,"height":128},
+		"perspective":"Top-Down"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate rectangular prototype after boundary retry: %v", err)
+	}
+	if len(images.requests) != 2 {
+		t.Fatalf("generation requests = %d, want 2", len(images.requests))
+	}
+	for index, request := range images.requests {
+		if request.Size != "1504x1024" {
+			t.Fatalf("generation request %d size = %q, want 1504x1024", index, request.Size)
+		}
+	}
+	if len(processor.splitRequests) != 2 {
+		t.Fatalf("split requests = %d, want 2", len(processor.splitRequests))
+	}
+	for index, request := range processor.splitRequests {
+		if request.Mode != imageprocessor.ImageSplitModeAnimation ||
+			request.Columns != 2 || request.Rows != 2 ||
+			request.FrameWidth != 188 || request.FrameHeight != 128 ||
+			request.Anchor != imageprocessor.AnimationAnchorCenter ||
+			!request.NormalizeContentScale || !request.RejectGridBoundaryContent ||
+			request.GridBoundaryMargin != 16 {
+			t.Fatalf("unexpected split request %d: %+v", index, request)
+		}
+	}
+	if len(processor.resizeRequests) != 0 {
+		t.Fatalf("normalized prototype PNGs must not be resampled again: %+v", processor.resizeRequests)
+	}
+	if len(references.uploads) != 8 {
+		t.Fatalf("uploads = %d, want only 8 from the successful candidate", len(references.uploads))
+	}
+	if assets.objectAsset == nil {
+		t.Fatal("expected object asset after successful boundary retry")
+	}
+}
+
+func TestExecutorRejectsPrototypeAfterAllGridBoundaryCandidatesFail(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{
+		events: &events,
+		splitErrors: []error{
+			imageprocessor.ErrGridBoundaryContent,
+			imageprocessor.ErrGridBoundaryContent,
+			imageprocessor.ErrGridBoundaryContent,
+		},
+	}
+	assets := &generationAssetWriterStub{events: &events}
+	references := &executorReferenceStoreStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{References: references},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"king_sofa",
+		"creative_brief":"ornate black and white striped sofa",
+		"dimensions":{"width":188,"height":128},
+		"perspective":"Top-Down"
+	}`)
+
+	_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+	if !errors.Is(err, imageprocessor.ErrGridBoundaryContent) {
+		t.Fatalf("error = %v, want ErrGridBoundaryContent", err)
+	}
+	if len(images.requests) != 3 || len(processor.splitRequests) != 3 {
+		t.Fatalf("generation/split attempts = %d/%d, want 3/3", len(images.requests), len(processor.splitRequests))
+	}
+	if assets.objectAsset != nil {
+		t.Fatalf("asset must not be created from invalid candidates: %+v", assets.objectAsset)
+	}
+	if len(references.uploads) != 0 {
+		t.Fatalf("invalid candidates must not be persisted: %+v", references.uploads)
+	}
+}
+
+func TestExecutorRejectsInvalidGeneratedPrototypeCandidates(t *testing.T) {
+	wantSplitErr := errors.New("split failed")
+	wantPersistErr := errors.New("persist failed")
+	tests := []struct {
+		name      string
+		result    *imageclient.GenerateResult
+		configure func(*imageProcessorStub, *executorReferenceStoreStub)
+		wantErr   error
+		wantText  string
+		withStore bool
+	}{
+		{name: "nil generation result", wantText: "image result is required"},
+		{name: "empty generation result", result: &imageclient.GenerateResult{}, wantText: "image result is required"},
+		{
+			name: "multiple direction sheets",
+			result: &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{
+				{Base64: "first", MediaType: "image/png"},
+				{Base64: "second", MediaType: "image/png"},
+			}},
+			wantText: "expected one direction sheet, got 2",
+		},
+		{
+			name:     "empty background removal result",
+			result:   &imageclient.GenerateResult{Images: []imageclient.GeneratedImage{{MediaType: "image/png"}}},
+			wantText: "remove generate_object_prototype background: empty result",
+		},
+		{
+			name:   "non-boundary split failure",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitErrors = []error{wantSplitErr}
+			},
+			wantErr: wantSplitErr,
+		},
+		{
+			name:   "wrong region count",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitResults = []*imageprocessor.SplitImageResult{{
+					Regions: []imageprocessor.ImageRegion{{ImageBase64: "only-one"}},
+				}}
+			},
+			wantText: "got 1 regions, want 4",
+		},
+		{
+			name:   "empty direction image",
+			result: generatedImages(),
+			configure: func(processor *imageProcessorStub, _ *executorReferenceStoreStub) {
+				processor.splitResults = []*imageprocessor.SplitImageResult{{Regions: []imageprocessor.ImageRegion{
+					{ImageBase64: "first"},
+					{ImageBase64: "second"},
+					{},
+					{ImageBase64: "fourth"},
+				}}}
+			},
+			wantText:  "direction 2 is empty",
+			withStore: true,
+		},
+		{
+			name:   "unprocessed image persistence failure",
+			result: generatedImages(),
+			configure: func(_ *imageProcessorStub, references *executorReferenceStoreStub) {
+				references.persistErr = wantPersistErr
+			},
+			wantErr:   wantPersistErr,
+			withStore: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: test.result}
+			processor := &imageProcessorStub{events: &events}
+			references := &executorReferenceStoreStub{events: &events}
+			if test.configure != nil {
+				test.configure(processor, references)
+			}
+			dependencies := generator.ExecutorDependencies{}
+			if test.withStore {
+				dependencies.References = references
+			}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				processor,
+				&generationAssetWriterStub{events: &events},
+				dependencies,
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"king_sofa",
+				"creative_brief":"ornate sofa",
+				"dimensions":{"width":128,"height":128},
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil {
+				t.Fatal("expected prototype generation failure")
+			}
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("error = %v, want wrapped %v", err, test.wantErr)
+			}
+			if test.wantText != "" && !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("error = %v, want text %q", err, test.wantText)
+			}
+		})
+	}
+}
+
+func TestExecutorRejectsUnsafePrototypeSheetDimensions(t *testing.T) {
+	tests := []struct {
+		name       string
+		dimensions string
+		wantText   string
+	}{
+		{name: "zero width", dimensions: `{"width":0,"height":64}`, wantText: "dimensions must be positive"},
+		{
+			name:       "sheet dimension overflow",
+			dimensions: `{"width":18446744073709551615,"height":18446744073709551615}`,
+			wantText:   "overflow sheet dimensions",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				&imageProcessorStub{events: &events},
+				&generationAssetWriterStub{events: &events},
+				generator.ExecutorDependencies{},
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"unsafe_sofa",
+				"creative_brief":"unsafe dimensions",
+				"dimensions":` + test.dimensions + `,
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("error = %v, want text %q", err, test.wantText)
+			}
+			if len(images.requests) != 0 {
+				t.Fatalf("image requests = %d, want none", len(images.requests))
+			}
+		})
+	}
+}
+
+func TestExecutorDownscalesOversizedTargetSheetWithinProviderLimits(t *testing.T) {
+	events := []string{}
+	images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+	processor := &imageProcessorStub{events: &events}
+	assets := &generationAssetWriterStub{events: &events}
+	executor := generator.NewExecutorWithDependencies(
+		images,
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+	payload := json.RawMessage(`{
+		"asset_name":"large_sofa",
+		"creative_brief":"large sofa",
+		"dimensions":{"width":2048,"height":1024},
+		"perspective":"Top-Down"
+	}`)
+
+	if _, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload); err != nil {
+		t.Fatalf("generate oversized-target prototype: %v", err)
+	}
+	if images.request == nil || images.request.Size != "3840x1920" {
+		t.Fatalf("provider size = %+v, want 3840x1920", images.request)
+	}
+	if len(processor.splitRequests) != 1 || processor.splitRequests[0].GridBoundaryMargin != 30 {
+		t.Fatalf("unexpected oversized-target split request: %+v", processor.splitRequests)
+	}
+}
+
+func TestExecutorRejectsPrototypeSheetAspectBeyondProviderLimit(t *testing.T) {
+	for _, dimensions := range []string{
+		`{"width":1024,"height":64}`,
+		`{"width":64,"height":1024}`,
+	} {
+		t.Run(dimensions, func(t *testing.T) {
+			events := []string{}
+			images := &imageGenerationServiceStub{events: &events, result: generatedImages()}
+			executor := generator.NewExecutorWithDependencies(
+				images,
+				&imageProcessorStub{events: &events},
+				&generationAssetWriterStub{events: &events},
+				generator.ExecutorDependencies{},
+			)
+			payload := json.RawMessage(`{
+				"asset_name":"extreme_sofa",
+				"creative_brief":"extreme sofa",
+				"dimensions":` + dimensions + `,
+				"perspective":"Top-Down"
+			}`)
+
+			_, err := executor.Generate(context.Background(), generator.GenerateObjectProtoType, payload)
+			if err == nil || !strings.Contains(err.Error(), "exceeding 3:1") {
+				t.Fatalf("error = %v, want provider aspect-ratio rejection", err)
+			}
+			if len(images.requests) != 0 {
+				t.Fatalf("image requests = %d, want none", len(images.requests))
+			}
+		})
+	}
 }
 
 func TestExecutorRejectsInvalidPrototypePerspectiveBeforeImageGeneration(t *testing.T) {
@@ -700,5 +1194,37 @@ func editableObjectAsset() assetdomain.Asset {
 		Dimensions:  json.RawMessage(`{"width":128,"height":128}`),
 		Content:     encoded,
 		Version:     4,
+	}
+}
+
+func TestExecutorRejectsSideOnPrototypeWhenDirectionNormalizationFails(t *testing.T) {
+	events := []string{}
+	wantErr := errors.New("horizontal flip unavailable")
+	assets := &generationAssetWriterStub{events: &events}
+	processor := &imageProcessorStub{events: &events, flipErr: wantErr}
+	executor := generator.NewExecutorWithDependencies(
+		&imageGenerationServiceStub{events: &events, result: generatedImages()},
+		processor,
+		assets,
+		generator.ExecutorDependencies{},
+	)
+
+	payload := json.RawMessage(`{
+		"asset_name":"hero",
+		"creative_brief":"pixel basketball player",
+		"dimensions":{"width":64,"height":64},
+		"perspective":"Side-On",
+		"project_id":17
+	}`)
+	if _, err := executor.Generate(context.Background(), generator.GenerateCharacterProtoType, payload); err == nil {
+		t.Fatal("expected Side-On normalization failure")
+	} else if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want wrapped error %v", err, wantErr)
+	}
+	if assets.characterAsset != nil {
+		t.Fatal("invalid Side-On prototype was persisted")
+	}
+	if reflect.DeepEqual(events, []string{"generate_image", "process_image", "split_image", "flip_horizontal"}) == false {
+		t.Fatalf("unexpected workflow after normalization failure: %v", events)
 	}
 }

@@ -220,7 +220,7 @@ func TestGetObjectMetadataUsesBucketManager(t *testing.T) {
 	assertQiniuPrivateURL(t, metadata.ObjectURL, "https://cdn.example.com/uploads/object.webp")
 }
 
-func TestReferenceNormalizationAndResolutionCompatibility(t *testing.T) {
+func TestReferenceNormalizationAndResolutionUsesManagedStorage(t *testing.T) {
 	store, err := NewQiniuStorage(validQiniuConfig())
 	if err != nil {
 		t.Fatalf("create object store: %v", err)
@@ -228,26 +228,47 @@ func TestReferenceNormalizationAndResolutionCompatibility(t *testing.T) {
 	store.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 	ownURL := "https://cdn.example.com/projects/7/reference%20image.png?e=1700001800&token=signed"
-	if got := store.normalizeReference(ownURL); got != "projects/7/reference image.png" {
+	got, err := store.normalizeReference(ownURL)
+	if err != nil {
+		t.Fatalf("normalize own URL: %v", err)
+	}
+	if got != "projects/7/reference image.png" {
 		t.Fatalf("expected own URL to normalize to key, got %q", got)
 	}
-	for _, value := range []string{
-		"https://images.example.org/reference.png",
-		"data:image/png;base64,aGVsbG8=",
-	} {
-		if got := store.normalizeReference(value); got != value {
-			t.Fatalf("expected %q to remain unchanged, got %q", value, got)
-		}
-		resolved, resolveErr := store.ResolveReference(context.Background(), value)
-		if resolveErr != nil || resolved != value {
-			t.Fatalf("expected passthrough for %q, got %q err=%v", value, resolved, resolveErr)
-		}
+	persisted, err := store.PersistReference(context.Background(), ownURL)
+	if err != nil || persisted != "projects/7/reference image.png" {
+		t.Fatalf("persist own URL = %q, err=%v", persisted, err)
 	}
 	resolved, err := store.ResolveReference(context.Background(), "projects/7/reference image.png")
 	if err != nil {
 		t.Fatalf("resolve object key: %v", err)
 	}
 	assertQiniuPrivateURL(t, resolved, "https://cdn.example.com/projects/7/reference%20image.png")
+}
+
+func TestReferencePersistenceAndResolutionRejectExternalURLs(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+
+	for _, value := range []string{
+		"https://images.example.org/reference.png",
+		"https://cdn.example.com.attacker.test/reference.png",
+		"http://127.0.0.1:8080/admin",
+		"http://10.0.0.5/internal",
+		"//cdn.example.com/reference.png",
+		"ftp://cdn.example.com/reference.png",
+	} {
+		t.Run(value, func(t *testing.T) {
+			if _, err := store.PersistReference(context.Background(), value); !errors.Is(err, ErrUntrustedReference) {
+				t.Fatalf("persist error = %v, want untrusted reference", err)
+			}
+			if _, err := store.ResolveReference(context.Background(), value); !errors.Is(err, ErrUntrustedReference) {
+				t.Fatalf("resolve error = %v, want untrusted reference", err)
+			}
+		})
+	}
 }
 
 func TestCreatePrivateURLUsesS3SignatureForQiniuS3Endpoint(t *testing.T) {

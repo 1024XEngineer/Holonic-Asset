@@ -1,15 +1,21 @@
 import type { Viewport } from "pixi-viewport";
 import type { CharacterAnimation } from "@/model";
 import type { Rect } from "@/lib/rect";
-import type { AnimatedSpriteCanvasModel } from "../AnimatedSpriteCanvas.interface";
+import type {
+  AnimatedSpriteCanvasFrameSelection,
+  AnimatedSpriteCanvasModel,
+} from "../AnimatedSpriteCanvas.interface";
 import type { NodeId } from "../animated-sprite-node";
 import type { CanvasPosition } from "../AnimatedSpriteCanvas.constants";
 
 export type AnimatedSpriteCanvasActions = {
-  onSelect: (node: NodeId) => void;
-  onSelectFrame: (node: NodeId, index: number) => void;
-  onSelectFrames: (node: NodeId, indexes: number[]) => void;
-  onSelectNodes: (nodes: NodeId[]) => void;
+  onSelect: (node: NodeId, additive?: boolean) => void;
+  onSelectFrame: (node: NodeId, index: number, additive?: boolean) => void;
+  onSelectFrames: (
+    frames: AnimatedSpriteCanvasFrameSelection[],
+    additive?: boolean,
+  ) => void;
+  onSelectNodes: (nodes: NodeId[], additive?: boolean) => void;
   onClearSelection: () => void;
   onNodePositionChange: (node: NodeId, position: CanvasPosition) => void;
   onReviewResolve: (applied: boolean) => void;
@@ -39,6 +45,7 @@ export type AnimatedSpriteSceneState = {
   expanded: Set<NodeId>;
   playing: Set<NodeId>;
   previewFrames: Map<NodeId, number>;
+  playbackElapsed: Map<NodeId, number>;
   marquee: { start: CanvasPosition; end: CanvasPosition } | null;
 };
 

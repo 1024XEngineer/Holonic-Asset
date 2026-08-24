@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -50,8 +51,8 @@ func (h *ProjectHandler) Create(
 
 func (h *ProjectHandler) GenerateReference(
 	c context.Context,
-	request dto.GenerateProjectReferenceRequest,
-) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	request dto.GenerateReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateReferenceResponse], error) {
 	project := &domain.Project{
 		Name:           request.Name,
 		GameType:       request.GameType,
@@ -64,10 +65,10 @@ func (h *ProjectHandler) GenerateReference(
 
 	reference, err := h.manager.GenerateReference(c, project)
 	if err != nil {
-		return dto.SuccessResponse[dto.GenerateProjectReferenceResponse]{}, projectHandlerError(err)
+		return dto.SuccessResponse[dto.GenerateReferenceResponse]{}, projectHandlerError(err)
 	}
 
-	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{Reference: reference}), nil
+	return dto.NewTypedSuccessResponse(dto.GenerateReferenceResponse{Reference: reference}), nil
 }
 
 func (h *ProjectHandler) ListByUID(
@@ -167,6 +168,10 @@ func projectHandlerError(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, domain.ErrInvalidProject):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+	case errors.Is(err, upload.ErrUntrustedReference),
+		errors.Is(err, upload.ErrInvalidObjectData),
+		errors.Is(err, upload.ErrInvalidUploadRequest):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
 	case errors.Is(err, domain.ErrProjectNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, domain.ErrProjectNotFound.Error()).SetInternal(err)

@@ -16,12 +16,13 @@ import (
 // CreateCharacterPrototypePayload is the complete input consumed by the
 // character prototype task handler.
 type CreateCharacterPrototypePayload struct {
-	AssetName     string           `json:"asset_name"`
-	CreativeBrief string           `json:"creative_brief"`
-	Dimensions    assetdomain.Size `json:"dimensions"`
-	Perspective   string           `json:"perspective"`
-	Reference     string           `json:"reference"`
-	ProjectID     uint             `json:"project_id"`
+	AssetName         string           `json:"asset_name"`
+	CreativeBrief     string           `json:"creative_brief"`
+	Dimensions        assetdomain.Size `json:"dimensions"`
+	Perspective       string           `json:"perspective"`
+	CreatingReference string           `json:"creating_reference"` // User-supplied subject or concept reference.
+	ProjectReference  string           `json:"project_reference"`  // Backend-supplied project style reference.
+	ProjectID         uint             `json:"project_id"`
 }
 
 // EditCharacterPrototypePayload is the self-contained input consumed by the
@@ -72,12 +73,13 @@ type EditAnimationPayload struct {
 // CreateObjectPrototypePayload is the complete input consumed by the object
 // prototype task handler.
 type CreateObjectPrototypePayload struct {
-	AssetName     string           `json:"asset_name"`
-	CreativeBrief string           `json:"creative_brief"`
-	Dimensions    assetdomain.Size `json:"dimensions"`
-	Perspective   string           `json:"perspective"`
-	Reference     string           `json:"reference"`
-	ProjectID     uint             `json:"project_id"`
+	AssetName         string           `json:"asset_name"`
+	CreativeBrief     string           `json:"creative_brief"`
+	Dimensions        assetdomain.Size `json:"dimensions"`
+	Perspective       string           `json:"perspective"`
+	CreatingReference string           `json:"creating_reference"` // User-supplied subject or concept reference.
+	ProjectReference  string           `json:"project_reference"`  // Backend-supplied project style reference.
+	ProjectID         uint             `json:"project_id"`
 }
 
 type SceneryLayerDefinition struct {
@@ -94,14 +96,14 @@ type SceneryProjectContext struct {
 }
 
 type CreateSceneryPayload struct {
-	AssetName      string                `json:"asset_name"`
-	CreativeBrief  string                `json:"creative_brief"`
-	Style          string                `json:"style"`
-	Dimensions     assetdomain.Size      `json:"dimensions"`
-	Perspective    string                `json:"perspective"`
-	ProjectContext SceneryProjectContext `json:"project_context"`
-	Reference      string                `json:"reference"`
-	ProjectID      uint                  `json:"project_id"`
+	AssetName         string                `json:"asset_name"`
+	CreativeBrief     string                `json:"creative_brief"`
+	Dimensions        assetdomain.Size      `json:"dimensions"`
+	Perspective       string                `json:"perspective"`
+	ProjectContext    SceneryProjectContext `json:"project_context"`
+	CreatingReference string                `json:"creating_reference"`
+	ProjectReference  string                `json:"project_reference"`
+	ProjectID         uint                  `json:"project_id"`
 }
 
 type ProcessedSceneryLayer struct {
@@ -236,34 +238,34 @@ type CreateTileSetPayload struct {
 
 // EditTilesetItemPayload is the complete input consumed by an Item edit task.
 type EditTilesetItemPayload struct {
-	AssetID       uint               `json:"asset_id"`
-	ProjectID     uint               `json:"project_id"`
-	CreativeBrief string             `json:"creative_brief"`
-	Target        *TileSetEditTarget `json:"target"`
-	Reference     string             `json:"reference,omitempty"`
+	AssetID           uint               `json:"asset_id"`
+	ProjectID         uint               `json:"project_id"`
+	CreativeBrief     string             `json:"creative_brief"`
+	Target            *TileSetEditTarget `json:"target"`
+	CreatingReference string             `json:"creating_reference,omitempty"`
 }
 
 // EditTilesPayload is the complete input consumed by a Tile edit task.
 type EditTilesPayload struct {
-	AssetID       uint                `json:"asset_id"`
-	ProjectID     uint                `json:"project_id"`
-	CreativeBrief string              `json:"creative_brief"`
-	Targets       []TileSetEditTarget `json:"targets"`
-	Reference     string              `json:"reference,omitempty"`
+	AssetID           uint                `json:"asset_id"`
+	ProjectID         uint                `json:"project_id"`
+	CreativeBrief     string              `json:"creative_brief"`
+	Targets           []TileSetEditTarget `json:"targets"`
+	CreatingReference string              `json:"creating_reference,omitempty"`
 }
 
 const (
-	maxTileSetItems           = 64
-	maxTilesPerItem           = 256
-	maxTileSetGridTiles       = 4096
-	maxTileEdge               = 1024
-	maxGeneratedItemImageEdge = 4096
-	maxTileEditTargets        = 256
-	maxAssetNameLength        = 200
-	maxCreativeBriefLength    = 4000
-	maxItemNameLength         = 200
-	maxItemDescriptionLength  = 2000
-	maxReferenceLength        = 8 << 20
+	maxTileSetItems            = 64
+	maxTilesPerItem            = 256
+	maxTileSetGridTiles        = 4096
+	maxTileEdge                = 1024
+	maxGeneratedItemImageEdge  = 4096
+	maxTileEditTargets         = 256
+	maxAssetNameLength         = 200
+	maxCreativeBriefLength     = 4000
+	maxItemNameLength          = 200
+	maxItemDescriptionLength   = 2000
+	maxCreatingReferenceLength = 8 << 20
 )
 
 // TileSetEditTarget identifies an occupied global Tileset cell. Execution
@@ -379,7 +381,7 @@ func validateEditTilesetItemPayload(payload *EditTilesetItemPayload) error {
 	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
 		return err
 	}
-	if err := validateOptionalReference(payload.Reference); err != nil {
+	if err := validateOptionalCreatingReference(payload.CreatingReference); err != nil {
 		return err
 	}
 	if err := validateTileSetEditTarget("target", payload.Target); err != nil {
@@ -395,7 +397,7 @@ func validateEditTilesPayload(payload *EditTilesPayload) error {
 	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
 		return err
 	}
-	if err := validateOptionalReference(payload.Reference); err != nil {
+	if err := validateOptionalCreatingReference(payload.CreatingReference); err != nil {
 		return err
 	}
 	if len(payload.Targets) == 0 || len(payload.Targets) > maxTileEditTargets {
@@ -442,19 +444,19 @@ func validateEditPayloadBase(projectID, assetID uint, creativeBrief string) erro
 	return nil
 }
 
-func validateOptionalReference(reference string) error {
-	if reference == "" {
+func validateOptionalCreatingReference(creatingReference string) error {
+	if creatingReference == "" {
 		return nil
 	}
-	if len(reference) > maxReferenceLength {
-		return invalidTaskPayload("reference exceeds maximum length of %d bytes", maxReferenceLength)
+	if len(creatingReference) > maxCreatingReferenceLength {
+		return invalidTaskPayload("creating reference exceeds maximum length of %d bytes", maxCreatingReferenceLength)
 	}
-	if strings.TrimSpace(reference) == "" {
-		return invalidTaskPayload("reference must not be blank")
+	if strings.TrimSpace(creatingReference) == "" {
+		return invalidTaskPayload("creating reference must not be blank")
 	}
-	for _, r := range reference {
+	for _, r := range creatingReference {
 		if unicode.IsControl(r) {
-			return invalidTaskPayload("reference contains invalid control characters")
+			return invalidTaskPayload("creating reference contains invalid control characters")
 		}
 	}
 	return nil

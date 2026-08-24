@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createAnimatedSpriteCanvasActions } from "./animated-sprite-canvas-events";
 import { getAnimatedSpriteNodeLabel } from "./animated-sprite-node";
@@ -28,11 +28,16 @@ export function AnimatedSpriteCanvas({
     FRAME_SIZE,
     MAX_SOURCE_PIXEL_SCREEN_SIZE,
   );
-  const runtimeProps = {
-    model,
-    actions: createAnimatedSpriteCanvasActions(onEvent),
-    onZoomChange: setZoom,
-  };
+  const runtimeProps = useMemo(
+    () => ({
+      model,
+      actions: createAnimatedSpriteCanvasActions(onEvent, model.selection),
+      onZoomChange: setZoom,
+    }),
+    [model, onEvent],
+  );
+  const runtimePropsRef = useRef(runtimeProps);
+  runtimePropsRef.current = runtimeProps;
   const selectionLabel = model.selection.nodeIds
     .map((nodeId) => getAnimatedSpriteNodeLabel(nodeId, model.animations))
     .join(", ");
@@ -40,18 +45,18 @@ export function AnimatedSpriteCanvas({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const runtime = new AnimatedSpriteCanvasRuntime(runtimeProps);
+    const runtime = new AnimatedSpriteCanvasRuntime(runtimePropsRef.current);
     runtimeRef.current = runtime;
     let disposed = false;
-    void runtime
-      .initialize(host)
-      .then(() => {
+    void (async () => {
+      try {
+        await runtime.initialize(host);
         if (disposed) runtime.destroy();
         else setLoading(false);
-      })
-      .catch(() => {
+      } catch {
         if (!disposed) setLoading(false);
-      });
+      }
+    })();
     return () => {
       disposed = true;
       runtimeRef.current = null;

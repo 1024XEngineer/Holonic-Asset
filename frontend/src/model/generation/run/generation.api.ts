@@ -1,4 +1,4 @@
-import { readFileAsDataUrl } from "@/lib/read-file-as-data-url";
+import { uploadFile } from "@/model/upload";
 
 import {
   assetCanvasSizeDimensionsSchema,
@@ -90,6 +90,22 @@ const generationRequestsStorageKey = "holonic-generation-requests";
 export async function toCreateGenerationRequest(
   request: CreationRequest,
 ): Promise<CreateGenerationRequest> {
+  if (request.kind === "scenery") {
+    return {
+      kind: "generate_scenery",
+      creative_brief: request.prompt,
+      parameters: {
+        asset_name: request.name,
+        dimensions:
+          request.dimensions ??
+          assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
+        creating_reference: await resolveCreatingReference(
+          request.creatingReference,
+        ),
+      },
+    };
+  }
+
   if (request.kind === "tileset") {
     if (!request.tiles || request.tiles.length === 0) {
       throw new Error("At least one tileset item is required.");
@@ -115,7 +131,7 @@ export async function toCreateGenerationRequest(
 
   if (request.kind !== "character" && request.kind !== "object") {
     throw new Error(
-      "Core API creation currently supports Character, Object, and Tileset assets only.",
+      "Core API creation currently supports Character, Object, Scenery, and Tileset assets only.",
     );
   }
   if (!request.perspective) {
@@ -132,7 +148,9 @@ export async function toCreateGenerationRequest(
       asset_name: request.name,
       dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
       perspective: request.perspective,
-      reference: await resolveReference(request.reference),
+      creating_reference: await resolveCreatingReference(
+        request.creatingReference,
+      ),
     },
   };
 }
@@ -167,6 +185,7 @@ function generationKindToAssetKind(
   requestedKind?: CreatableAssetKind,
   resolvedAnimationKind?: "character" | "object",
 ) {
+  if (kind === "generate_scenery") return "scenery" as const;
   if (
     kind === "generate_character_prototype" ||
     kind === "edit_character_prototype"
@@ -240,13 +259,13 @@ function isVisibleGenerationStatus(
   );
 }
 
-async function resolveReference(reference: unknown) {
-  if (reference === undefined) return "";
-  if (typeof reference === "string") return reference.trim();
-  if (typeof File !== "undefined" && reference instanceof File) {
-    return readFileAsDataUrl(reference);
+async function resolveCreatingReference(creatingReference: unknown) {
+  if (creatingReference === undefined) return "";
+  if (typeof creatingReference === "string") return creatingReference.trim();
+  if (typeof File !== "undefined" && creatingReference instanceof File) {
+    return (await uploadFile(creatingReference)).objectKey;
   }
-  throw new Error("Reference must be an image file or URL.");
+  throw new Error("Creating reference must be an image file or URL.");
 }
 
 function toGenerationRequestMetadata(

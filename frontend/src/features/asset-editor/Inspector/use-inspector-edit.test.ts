@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
         onDropRejected: () => void;
       }
     | undefined,
-  readFile: vi.fn(),
+  uploadFile: vi.fn(),
   stateSetters: [] as ReturnType<typeof vi.fn>[],
   stateValues: [] as unknown[],
 }));
@@ -48,8 +48,8 @@ vi.mock("react-dropzone", () => ({
   },
 }));
 
-vi.mock("@/lib/read-file-as-data-url", () => ({
-  readFileAsDataUrl: mocks.readFile,
+vi.mock("@/model/upload", () => ({
+  uploadFile: mocks.uploadFile,
 }));
 
 import { useInspectorEdit } from "./use-inspector-edit";
@@ -73,17 +73,21 @@ beforeEach(() => {
   mocks.dropzoneOptions = undefined;
   mocks.stateSetters.length = 0;
   mocks.stateValues.length = 0;
-  mocks.readFile.mockResolvedValue("data:image/png;base64,image");
+  mocks.uploadFile.mockResolvedValue({
+    objectKey: "uploads/hero.png",
+    objectURL: "https://cdn.example/hero.png?token=signed",
+  });
 });
 
 describe("useInspectorEdit", () => {
   it("submits a validated prompt with its reference", async () => {
-    const reference = {
+    const creatingReference = {
       fileName: "hero.png",
       mimeType: "image/png",
-      dataUrl: "data:image/png;base64,hero",
+      objectKey: "uploads/hero.png",
+      previewUrl: "https://cdn.example/hero.png?token=signed",
     };
-    mocks.stateValues.push(reference, null, false, null);
+    mocks.stateValues.push(creatingReference, null, false, null);
     const onPromptChange = vi.fn();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const inspector = useInspectorEdit({
@@ -103,12 +107,12 @@ describe("useInspectorEdit", () => {
 
     expect(inspector.canClearSelection).toBe(true);
     expect(inspector.canSubmit).toBe(true);
-    expect(inspector.reference).toBe(reference);
+    expect(inspector.creatingReference).toBe(creatingReference);
     expect(onPromptChange).toHaveBeenCalledWith("Updated prompt");
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(onSubmit).toHaveBeenCalledWith({
       prompt: "Refine the walk",
-      reference,
+      creatingReference,
       target: {
         nodeIds: ["walk"],
         frames: [{ nodeId: "walk", index: 1 }],
@@ -191,11 +195,15 @@ describe("useInspectorEdit", () => {
     mocks.dropzoneOptions?.onDropAccepted([file]);
     await flushPromises();
 
-    expect(mocks.readFile).toHaveBeenCalledWith(file, expect.any(AbortSignal));
+    expect(mocks.uploadFile).toHaveBeenCalledWith(
+      file,
+      expect.any(AbortSignal),
+    );
     expect(mocks.stateSetters[0]).toHaveBeenCalledWith({
       fileName: "hero.png",
       mimeType: "image/png",
-      dataUrl: "data:image/png;base64,image",
+      objectKey: "uploads/hero.png",
+      previewUrl: "https://cdn.example/hero.png?token=signed",
     });
 
     mocks.dropzoneOptions?.onDropRejected();
@@ -203,11 +211,11 @@ describe("useInspectorEdit", () => {
       "Use a PNG, JPEG, or WebP image.",
     );
 
-    mocks.readFile.mockRejectedValueOnce(new Error("unreadable"));
+    mocks.uploadFile.mockRejectedValueOnce(new Error("upload failed"));
     mocks.dropzoneOptions?.onDropAccepted([file]);
     await flushPromises();
     expect(mocks.stateSetters[1]).toHaveBeenCalledWith(
-      "We couldn't read that image. Try another file.",
+      "We couldn't upload that image. Try again.",
     );
   });
 
@@ -225,7 +233,7 @@ describe("useInspectorEdit", () => {
     });
     const file = { name: "hero.png", type: "image/png" } as File;
     mocks.dropzoneOptions?.onDropAccepted([file]);
-    inspector.clearReference();
+    inspector.clearCreatingReference();
     inspector.handleSubmit({ preventDefault: vi.fn() } as never);
     await flushPromises();
     mocks.cleanups.forEach((cleanup) => cleanup());

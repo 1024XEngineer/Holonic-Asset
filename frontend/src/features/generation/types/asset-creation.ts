@@ -1,6 +1,7 @@
 import type { CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
 import type { ItemTile } from "@/model/item-tile";
+import type { SceneryAspectRatio } from "../create-asset/scenery-aspect-ratio";
 
 type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   kind: K;
@@ -9,20 +10,18 @@ type CommonAssetCreationDraft<K extends CreatableAssetKind> = {
   canvasSize: string;
 };
 
-export type VisualAssetCreationDraft<Reference = unknown> =
+export type VisualAssetCreationDraft<CreatingReference = unknown> =
   CommonAssetCreationDraft<
     Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "uiset">
   > & {
     perspective: Perspective;
-    reference: Reference | undefined;
+    creatingReference: CreatingReference | undefined;
   };
 
-export type SceneryAssetCreationDraft<Reference = unknown> =
+export type SceneryAssetCreationDraft<CreatingReference = unknown> =
   CommonAssetCreationDraft<"scenery"> & {
-    style: string;
-    aspectRatio: string;
-    layers: { description: string }[];
-    reference: Reference | undefined;
+    aspectRatio: SceneryAspectRatio;
+    creatingReference: CreatingReference | undefined;
   };
 
 export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
@@ -33,19 +32,19 @@ export type TilesetAssetCreationDraft = CommonAssetCreationDraft<"tileset"> & {
   }[];
 };
 
-export type UISetAssetCreationDraft<Reference = unknown> =
+export type UISetAssetCreationDraft<CreatingReference = unknown> =
   CommonAssetCreationDraft<"uiset"> & {
     dimensions: { width: number; height: number };
     style: string;
-    reference: Reference | undefined;
+    creatingReference: CreatingReference | undefined;
     components: { id: string; name: string; description: string }[];
   };
 
 export type AudioAssetCreationDraft = CommonAssetCreationDraft<"audio">;
 
-export type AssetCreationDraft<Reference = unknown> =
-  | VisualAssetCreationDraft<Reference>
-  | SceneryAssetCreationDraft<Reference>
+export type AssetCreationDraft<CreatingReference = unknown> =
+  | VisualAssetCreationDraft<CreatingReference>
+  | SceneryAssetCreationDraft<CreatingReference>
   | TilesetAssetCreationDraft
-  | UISetAssetCreationDraft<Reference>
+  | UISetAssetCreationDraft<CreatingReference>
   | AudioAssetCreationDraft;

@@ -2,6 +2,7 @@ package image
 
 const (
 	DefaultMatteColor               = "#00ff00"
+	DefaultReferenceMaxEdge         = 768
 	DefaultChromaThreshold          = 28.0
 	DefaultChromaSoftness           = 34.0
 	DefaultSpillSuppression         = 0.85
@@ -185,6 +186,29 @@ type RemoveBackgroundResult struct {
 	Report      ExtractionReport `json:"report"`
 }
 
+// NormalizeReferenceRequest prepares a small raster reference for a visual
+// model without inventing pixels. MaxEdge limits the longest output edge and
+// defaults to DefaultReferenceMaxEdge.
+type NormalizeReferenceRequest struct {
+	ImageBase64 string `json:"image_base64"`
+	MaxEdge     int    `json:"max_edge,omitempty"`
+}
+
+type ReferenceNormalizationReport struct {
+	InputWidth   int  `json:"input_width"`
+	InputHeight  int  `json:"input_height"`
+	OutputWidth  int  `json:"output_width"`
+	OutputHeight int  `json:"output_height"`
+	Scale        int  `json:"scale"`
+	Upscaled     bool `json:"upscaled"`
+}
+
+type NormalizeReferenceResult struct {
+	ImageBase64 string                       `json:"image_base64"`
+	MIMEType    string                       `json:"mime_type"`
+	Report      ReferenceNormalizationReport `json:"report"`
+}
+
 // ResizeRequest converts a Base64 image to the requested final canvas.
 type ResizeRequest struct {
 	ImageBase64 string        `json:"image_base64"`
@@ -195,6 +219,17 @@ type ResizeResult struct {
 	ImageBase64 string       `json:"image_base64"`
 	MIMEType    string       `json:"mime_type"`
 	Report      ResizeReport `json:"report"`
+}
+
+// FlipHorizontalRequest mirrors an image around its vertical centre line.
+type FlipHorizontalRequest struct {
+	ImageBase64 string `json:"image_base64"`
+}
+
+// FlipHorizontalResult contains the mirrored PNG image.
+type FlipHorizontalResult struct {
+	ImageBase64 string `json:"image_base64"`
+	MIMEType    string `json:"mime_type"`
 }
 
 // VerifyRequest validates a Base64 image without modifying it.

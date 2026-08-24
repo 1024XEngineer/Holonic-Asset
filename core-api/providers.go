@@ -66,11 +66,16 @@ func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) ima
 }
 
 // InitLLMService creates the external multimodal provider and its application service.
-func InitLLMService(cfg config.LLMClientConfig) llmclient.LLMService {
+func InitLLMService(cfg config.LLMClientConfig, appLogger ...logger.Logger) llmclient.LLMService {
+	var providerLogger logger.Logger
+	if len(appLogger) > 0 {
+		providerLogger = appLogger[0]
+	}
 	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
 		BaseURL:      cfg.BaseURL,
 		APIKey:       cfg.APIKey,
 		DefaultModel: cfg.DefaultModel,
+		Logger:       providerLogger,
 	})
 	return llmclient.NewLLMService(provider)
 }

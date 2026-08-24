@@ -15,9 +15,7 @@ export type SceneryCanvasStateEvent =
   | { type: "layer.visibility.toggled"; layerId: string }
   | { type: "layers.synced"; layerIds: string[] };
 
-type SceneryCanvasPublicEvent =
-  | SceneryCanvasEvent
-  | { type: "layer.visibility.toggled"; layerId: string };
+type SceneryCanvasPublicEvent = SceneryCanvasEvent;
 
 export function createInitialSceneryCanvasState(
   layers: readonly SceneryLayer[],
@@ -27,7 +25,10 @@ export function createInitialSceneryCanvasState(
   return {
     layerIds,
     selectedLayerIds: [],
-    visibleLayerIds: [...layerIds],
+    visibleLayerIds: layerIds.filter(
+      (layerId) =>
+        layers.find((layer) => layer.id === layerId)?.visible !== false,
+    ),
   };
 }
 
@@ -35,23 +36,22 @@ export function reduceSceneryCanvas(
   state: SceneryCanvasState,
   event: SceneryCanvasStateEvent,
 ): SceneryCanvasState {
-  if (event.type === "layers.synced") {
-    return reconcileLayers(state, unique(event.layerIds));
+  switch (event.type) {
+    case "layers.synced":
+      return reconcileLayers(state, unique(event.layerIds));
+    case "layer.selection.toggled":
+      if (!state.layerIds.includes(event.layerId)) return state;
+      return {
+        ...state,
+        selectedLayerIds: toggle(state.selectedLayerIds, event.layerId),
+      };
+    case "layer.visibility.toggled":
+      if (!state.layerIds.includes(event.layerId)) return state;
+      return {
+        ...state,
+        visibleLayerIds: toggle(state.visibleLayerIds, event.layerId),
+      };
   }
-
-  if (!state.layerIds.includes(event.layerId)) return state;
-
-  if (event.type === "layer.selection.toggled") {
-    return {
-      ...state,
-      selectedLayerIds: toggle(state.selectedLayerIds, event.layerId),
-    };
-  }
-
-  return {
-    ...state,
-    visibleLayerIds: toggle(state.visibleLayerIds, event.layerId),
-  };
 }
 
 export function useSceneryCanvasStateMachine(layers: readonly SceneryLayer[]) {

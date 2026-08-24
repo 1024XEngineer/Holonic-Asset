@@ -182,6 +182,168 @@ func TestProcessorSplitImageRejectsEmptyGridRegion(t *testing.T) {
 	}
 }
 
+func TestProcessorSplitImageRejectsContentInInternalGridBoundaryMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 40))
+	fillRect(src, image.Rect(4, 4, 19, 15), color.NRGBA{R: 255, A: 255})
+	fillRect(src, image.Rect(25, 4, 36, 15), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(4, 25, 15, 36), color.NRGBA{B: 255, A: 255})
+	fillRect(src, image.Rect(25, 25, 36, 36), color.NRGBA{R: 255, G: 255, A: 255})
+
+	_, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeGrid,
+		Columns:                   2,
+		Rows:                      2,
+		ForceProportionalGrid:     true,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if !errors.Is(err, ErrGridBoundaryContent) {
+		t.Fatalf("error = %v, want ErrGridBoundaryContent", err)
+	}
+}
+
+func TestProcessorSplitImageAnimationRejectsContentInInternalGridBoundaryMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 40))
+	fillRect(src, image.Rect(4, 4, 19, 15), color.NRGBA{R: 255, A: 255})
+	fillRect(src, image.Rect(25, 4, 36, 15), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(4, 25, 15, 36), color.NRGBA{B: 255, A: 255})
+	fillRect(src, image.Rect(25, 25, 36, 36), color.NRGBA{R: 255, G: 255, A: 255})
+
+	_, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeAnimation,
+		Columns:                   2,
+		Rows:                      2,
+		ForceProportionalGrid:     true,
+		FrameWidth:                32,
+		FrameHeight:               32,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if !errors.Is(err, ErrGridBoundaryContent) {
+		t.Fatalf("error = %v, want ErrGridBoundaryContent", err)
+	}
+}
+
+func TestProcessorSplitImageAllowsContentAtOuterCanvasEdges(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, image.Rect(0, 3, 12, 17), color.NRGBA{R: 255, A: 255})
+	fillRect(src, image.Rect(28, 3, 40, 17), color.NRGBA{G: 255, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeGrid,
+		Columns:                   2,
+		Rows:                      1,
+		ForceProportionalGrid:     true,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if err != nil {
+		t.Fatalf("split content at outer edges: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("regions = %d, want 2", len(result.Regions))
+	}
+}
+
+func TestProcessorSplitImageRejectsNegativeGridBoundaryMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 20))
+	fillRect(src, image.Rect(3, 3, 17, 17), color.NRGBA{A: 255})
+	_, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:        encodeImageForTest(t, src),
+		Mode:               ImageSplitModeGrid,
+		Columns:            1,
+		Rows:               1,
+		GridBoundaryMargin: -1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "grid boundary margin must not be negative") {
+		t.Fatalf("expected negative margin validation error, got %v", err)
+	}
+}
+
+func TestProcessorSplitImageValidatesGridBoundaryRejectionConfiguration(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 20))
+	fillRect(src, image.Rect(4, 4, 16, 16), color.NRGBA{A: 255})
+	encoded := encodeImageForTest(t, src)
+	tests := []struct {
+		name    string
+		request SplitImageRequest
+		want    string
+	}{
+		{
+			name: "zero margin",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeGrid, Columns: 1, Rows: 1,
+				RejectGridBoundaryContent: true,
+			},
+			want: "grid boundary margin must be positive",
+		},
+		{
+			name: "unsupported mode",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeComponents,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "requires grid or animation splitting mode",
+		},
+		{
+			name: "missing animation grid",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeAnimation,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "columns and rows must be positive",
+		},
+		{
+			name: "animation grid exceeds source",
+			request: SplitImageRequest{
+				ImageBase64: encoded, Mode: ImageSplitModeAnimation, Columns: 21, Rows: 1,
+				RejectGridBoundaryContent: true, GridBoundaryMargin: 2,
+			},
+			want: "grid dimensions 21x1 exceed source image size 20x20",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewProcessor().SplitImage(context.Background(), &test.request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want text %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestProcessorSplitImageAnimationChecksOpaqueContentBeforeNormalization(t *testing.T) {
+	matte := color.NRGBA{R: 240, G: 240, B: 240, A: 255}
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, src.Bounds(), matte)
+	fillRect(src, image.Rect(4, 4, 14, 16), color.NRGBA{R: 220, G: 60, B: 40, A: 255})
+	fillRect(src, image.Rect(26, 4, 36, 16), color.NRGBA{R: 40, G: 80, B: 220, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:               encodeImageForTest(t, src),
+		Mode:                      ImageSplitModeAnimation,
+		Columns:                   2,
+		Rows:                      1,
+		FrameWidth:                32,
+		FrameHeight:               32,
+		RejectGridBoundaryContent: true,
+		GridBoundaryMargin:        3,
+	})
+	if err != nil {
+		t.Fatalf("split opaque animation with boundary validation: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("regions = %d, want 2", len(result.Regions))
+	}
+	if result.AnimationReport == nil || result.AnimationReport.BackgroundRemovalReport == nil {
+		t.Fatal("opaque boundary validation should report automatic matte extraction")
+	}
+}
+
 func TestProcessorSplitImageHonoursCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -353,4 +515,52 @@ func TestProcessorSplitImageProjectionUsesConfiguredMergeGap(t *testing.T) {
 	if len(result.Regions) != 1 {
 		t.Fatalf("wide merge gap regions = %d, want 1 merged group", len(result.Regions))
 	}
+}
+
+func TestProcessorSplitImageAnimationNormalizesPrototypeScaleAndCenter(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	// Two views of the same static object are intentionally rendered at
+	// different scales and at different positions inside their fixed cells.
+	fillRect(src, image.Rect(14, 15, 24, 25), color.NRGBA{R: 220, G: 80, B: 40, A: 255})
+	fillRect(src, image.Rect(50, 10, 70, 30), color.NRGBA{R: 220, G: 80, B: 40, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64:           encodeImageForTest(t, src),
+		Mode:                  ImageSplitModeAnimation,
+		Columns:               2,
+		Rows:                  1,
+		ForceProportionalGrid: true,
+		FrameWidth:            64,
+		FrameHeight:           64,
+		Anchor:                AnimationAnchorCenter,
+		NormalizeContentScale: true,
+	})
+	if err != nil {
+		t.Fatalf("split normalized prototype: %v", err)
+	}
+	if len(result.Regions) != 2 {
+		t.Fatalf("got %d regions, want 2", len(result.Regions))
+	}
+
+	var bounds [2]image.Rectangle
+	for index, region := range result.Regions {
+		decoded, err := DecodeBase64Image(region.ImageBase64)
+		if err != nil {
+			t.Fatalf("decode region %d: %v", index, err)
+		}
+		var ok bool
+		bounds[index], ok = alphaBounds(decoded, defaultImageSplitAlphaThreshold)
+		if !ok {
+			t.Fatalf("region %d has no visible content", index)
+		}
+		if got := decoded.Bounds().Size(); got != image.Pt(64, 64) {
+			t.Fatalf("region %d size = %v, want 64x64", index, got)
+		}
+	}
+	if bounds[0].Dx() != bounds[1].Dx() || bounds[0].Dy() != bounds[1].Dy() {
+		t.Fatalf("normalized content sizes differ: %v and %v", bounds[0].Size(), bounds[1].Size())
+	}
+	// Registration is driven by the configured anchor metadata rather than by
+	// recentering the final alpha bounding box. This keeps irregular silhouettes
+	// and asymmetric details intact.
 }

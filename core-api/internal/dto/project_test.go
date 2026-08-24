@@ -15,7 +15,7 @@ func TestCreateProjectRequestKeepsReferenceContract(t *testing.T) {
 		t.Fatalf("unmarshal request: %v", err)
 	}
 	if request.Reference != objectURL {
-		t.Fatalf("expected reference %q, got %q", objectURL, request.Reference)
+		t.Fatalf("expected project reference %q, got %q", objectURL, request.Reference)
 	}
 }
 

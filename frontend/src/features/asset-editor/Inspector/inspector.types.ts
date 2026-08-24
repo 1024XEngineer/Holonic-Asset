@@ -2,6 +2,8 @@ import type {
   AssetRevision,
   CharacterAnimation,
   CharacterSpriteSheet,
+  SceneryCanvasDimensions,
+  SceneryLayer,
 } from "@/model";
 import { z } from "zod";
 
@@ -12,16 +14,18 @@ export type InspectorFrameSelection = {
   index: number;
 };
 
-export type InspectorReference = {
+export type InspectorCreatingReference = {
   fileName: string;
   mimeType: string;
-  dataUrl: string;
+  objectKey: string;
+  previewUrl: string;
 };
 
-const inspectorReferenceSchema = z.object({
+const inspectorCreatingReferenceSchema = z.object({
   fileName: z.string().min(1),
   mimeType: z.string().min(1),
-  dataUrl: z.string().min(1),
+  objectKey: z.string().min(1),
+  previewUrl: z.string().min(1),
 });
 
 const inspectorFrameSelectionSchema = z.object({
@@ -33,7 +37,7 @@ export const inspectorPromptSchema = z.string().trim().min(1);
 
 export const inspectorSubmitRequestSchema = z.object({
   prompt: inspectorPromptSchema,
-  reference: inspectorReferenceSchema.optional(),
+  creatingReference: inspectorCreatingReferenceSchema.optional(),
   target: z.object({
     nodeIds: z.array(z.string().min(1)),
     frames: z.array(inspectorFrameSelectionSchema),
@@ -44,7 +48,8 @@ export type InspectorSubmitRequest = z.infer<
   typeof inspectorSubmitRequestSchema
 >;
 
-export type InspectorProps = {
+export type SpriteInspectorProps = {
+  kind: "sprite";
   selectedNodes: AnimatedSpriteNodeId[];
   selectedFrames: InspectorFrameSelection[];
   prompt: string;
@@ -57,7 +62,21 @@ export type InspectorProps = {
   isSubmitting?: boolean;
 };
 
-export type InspectorEditProps = Omit<InspectorProps, "history">;
+export type SceneryInspectorProps = {
+  kind: "scenery";
+  layer: SceneryLayer | null;
+  dimensions?: SceneryCanvasDimensions;
+  history: AssetRevision[];
+  visible: boolean;
+  onToggleVisibility: () => void;
+};
+
+export type InspectorProps = SpriteInspectorProps | SceneryInspectorProps;
+
+export type SpriteInspectorContentProps = Omit<
+  SpriteInspectorProps,
+  "history" | "kind"
+>;
 
 export type InspectorTargetSummary = {
   label: string;

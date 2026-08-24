@@ -7,10 +7,11 @@ describe("buildInspectorGenerationRequest", () => {
     expect(
       buildInspectorGenerationRequest("character", 12, {
         prompt: "Make the stride longer",
-        reference: {
+        creatingReference: {
           fileName: "stride.png",
           mimeType: "image/png",
-          dataUrl: "data:image/png;base64,c3RyaWRl",
+          objectKey: "uploads/stride.png",
+          previewUrl: "https://cdn.example/stride.png?token=signed",
         },
         target: {
           nodeIds: ["walk"],
@@ -29,9 +30,9 @@ describe("buildInspectorGenerationRequest", () => {
         "animations.walk.frames.2",
       ],
       parameters: {
-        reference: "data:image/png;base64,c3RyaWRl",
-        referenceFileName: "stride.png",
-        referenceMimeType: "image/png",
+        creating_reference: "uploads/stride.png",
+        creating_reference_file_name: "stride.png",
+        creating_reference_mime_type: "image/png",
       },
     });
   });

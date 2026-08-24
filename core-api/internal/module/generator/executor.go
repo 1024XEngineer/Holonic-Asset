@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
@@ -17,7 +19,8 @@ type Executor interface {
 }
 
 // ReferenceStore is the object-storage boundary shared by run preparation and
-// generation execution.
+// generation execution. Implementations must reject external URLs so queued
+// tasks contain only managed object keys or uploaded image data.
 type ReferenceStore interface {
 	ResolveReference(context.Context, string) (string, error)
 	PersistReference(context.Context, string) (string, error)
@@ -51,14 +54,16 @@ type AssetWriter interface {
 }
 
 type executor struct {
-	images     imageclient.ImageGenerationService
-	llm        llmclient.LLMService
-	animations AnimationGenerationService
-	processor  imageprocessor.Processor
-	assets     AssetWriter
-	projects   ProjectReader
-	references ReferenceStore
-	resources  ResourceStore
+	images              imageclient.ImageGenerationService
+	llm                 llmclient.LLMService
+	animations          AnimationGenerationService
+	processor           imageprocessor.Processor
+	assets              AssetWriter
+	projects            ProjectReader
+	references          ReferenceStore
+	resources           ResourceStore
+	referenceHTTPClient *http.Client
+	logger              logger.Logger
 }
 
 // ExecutorDependencies contains optional workflow integrations.
@@ -68,6 +73,7 @@ type ExecutorDependencies struct {
 	LLM        llmclient.LLMService
 	Animations AnimationGenerationService
 	Resources  ResourceStore
+	Logger     logger.Logger
 }
 
 // NewExecutorWithDependencies creates an executor with explicit optional
@@ -79,14 +85,16 @@ func NewExecutorWithDependencies(
 	dependencies ExecutorDependencies,
 ) Executor {
 	return &executor{
-		images:     images,
-		llm:        dependencies.LLM,
-		animations: dependencies.Animations,
-		processor:  processor,
-		assets:     assets,
-		projects:   dependencies.Projects,
-		references: dependencies.References,
-		resources:  dependencies.Resources,
+		images:              images,
+		llm:                 dependencies.LLM,
+		animations:          dependencies.Animations,
+		processor:           processor,
+		assets:              assets,
+		projects:            dependencies.Projects,
+		references:          dependencies.References,
+		resources:           dependencies.Resources,
+		referenceHTTPClient: newPrototypeReferenceHTTPClient(),
+		logger:              dependencies.Logger,
 	}
 }
 

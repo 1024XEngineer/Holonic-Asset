@@ -24,12 +24,14 @@ export const coreGenerationApi = {
     unwrapApiResponse<ListGenerationRunsResponse>(
       await coreApiClient.GET("/projects/{project_id}/generation-runs", {
         params: { path: { project_id: projectID }, query },
+        cache: "no-store",
       }),
     ),
   detail: async <Content = unknown>(runID: number) =>
     unwrapApiResponse<GenerationRunResponse<Content>>(
       await coreApiClient.GET("/generation-runs/{run_id}", {
         params: { path: { run_id: runID } },
+        cache: "no-store",
       }),
     ),
   cancel: async (runID: number) =>

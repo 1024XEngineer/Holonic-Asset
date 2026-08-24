@@ -226,7 +226,7 @@ func (p *QNAImagesProvider) call(
 	}, nil
 }
 
-const minimumQNAImagePixels = 1024 * 1024
+const minimumQNAImagePixels = 655_360
 
 func normalizeQNAImageSize(size string) string {
 	size = strings.TrimSpace(size)

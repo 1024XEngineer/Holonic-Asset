@@ -499,6 +499,9 @@ func (r *AssetRepositoryImpl) createRecord(ctx context.Context, record *domain.A
 		Dimensions:  append([]byte(nil), asset.Dimensions...),
 		Content:     append([]byte(nil), content...),
 	}
+	if record.Description != "" {
+		snapshot.Description = record.Description
+	}
 	contentRecord, err := r.ContentDao.CreateAssetContent(ctx, &dao.AssetContent{
 		AssetID: asset.ID,
 		Content: datatypes.JSON(snapshot.Content),

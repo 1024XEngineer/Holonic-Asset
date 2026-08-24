@@ -39,8 +39,8 @@ export function useQuickGeneration() {
   };
 
   useEffect(() => {
-    if (assetsQuery.isSuccess) session.synchronize(assets);
-  }, [assets, assetsQuery.isSuccess, session]);
+    if (assetsQuery.isSuccess) session.synchronize(assetsQuery.data);
+  }, [assetsQuery.data, assetsQuery.isSuccess, session]);
 
   useEffect(() => () => session.dispose(), [session]);
 
@@ -70,8 +70,8 @@ export function useQuickGeneration() {
       status,
     },
     actions: {
-      chooseReference: session.chooseReference,
-      clearReference: session.clearReference,
+      chooseCreatingReference: session.chooseCreatingReference,
+      clearCreatingReference: session.clearCreatingReference,
       deleteCurrentAsset,
       generate,
       reload: assetsQuery.refetch,

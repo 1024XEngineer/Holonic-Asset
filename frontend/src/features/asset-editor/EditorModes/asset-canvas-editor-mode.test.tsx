@@ -1,22 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { AssetKind, AssetRecord, AssetWorkspaceData } from "@/model";
+import type { AssetRecord, AssetWorkspaceData } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
 
 describe("AssetCanvasEditorMode", () => {
   it.each([
-    [
-      "scenery",
-      {
-        mode: "scenery",
-        prompt: "Forest clearing",
-        scenery: { layers: [] },
-      },
-      "Scenery canvas",
-    ],
     [
       "tileset",
       {
@@ -35,7 +26,9 @@ describe("AssetCanvasEditorMode", () => {
       },
       "UI Set canvas",
     ],
-  ] satisfies Array<[AssetKind, AssetRecord, string]>)(
+  ] satisfies Array<
+    [AssetWorkspaceData["asset"]["kind"], AssetRecord, string]
+  >)(
     "renders the %s record in its editor canvas",
     (kind, record, canvasLabel) => {
       const html = renderToStaticMarkup(
@@ -52,27 +45,10 @@ describe("AssetCanvasEditorMode", () => {
       expect(html).toContain("Preview ready");
     },
   );
-
-  it("renders no canvas for unsupported record modes", () => {
-    const html = renderToStaticMarkup(
-      withI18n(
-        <AssetCanvasEditorMode
-          data={workspaceData("audio", {
-            mode: "audio",
-            prompt: "Theme",
-            audio: {},
-          })}
-          onBack={() => undefined}
-        />,
-      ),
-    );
-
-    expect(html).toBe("");
-  });
 });
 
 function workspaceData(
-  kind: AssetKind,
+  kind: AssetWorkspaceData["asset"]["kind"],
   record: AssetRecord,
 ): AssetWorkspaceData {
   return {

@@ -39,7 +39,7 @@ export function useEditorWorkspace({
     },
     initialRecord: data.record,
   });
-  const { snapshot } = session;
+  const { snapshot, syncExternalRecord } = session;
   const animationMutation = useGenerateAnimationMutation();
   const applicationMutation = useResolveGenerationApplicationMutation();
   const { data: generationRuns = [] } = useGenerationRunsQuery(
@@ -71,8 +71,8 @@ export function useEditorWorkspace({
   }, [asset.id, asset.projectId]);
 
   useEffect(() => {
-    session.syncExternalRecord(data.record);
-  }, [data.record, session.syncExternalRecord]);
+    syncExternalRecord(data.record);
+  }, [data.record, syncExternalRecord]);
 
   const reportAction = (message: string) => {
     setNotice(message);
@@ -277,13 +277,8 @@ export function useEditorWorkspace({
       perspective: asset.perspective,
       prototype: sprite.prototype,
       animations: sprite.animations ?? [],
-      nodePositions: sprite.nodePositions,
-      onPositionChange: (nodeId, position) =>
-        session.dispatch({
-          type: "sprite.node-position.set",
-          nodeId,
-          position,
-        }),
+      nodePositions: {},
+      onPositionChange: () => undefined,
     },
     tree: {
       isGeneratingAnimation: animationMutation.isPending,

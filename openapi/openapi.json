@@ -219,7 +219,8 @@
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "creative_brief"
         ],
         "type": "object"
       },
@@ -443,7 +444,7 @@
         },
         "type": "object"
       },
-      "GenerateProjectReferenceRequest": {
+      "GenerateReferenceRequest": {
         "additionalProperties": false,
         "properties": {
           "description": {
@@ -486,7 +487,7 @@
         ],
         "type": "object"
       },
-      "GenerateProjectReferenceResponse": {
+      "GenerateReferenceResponse": {
         "additionalProperties": false,
         "properties": {
           "reference": {
@@ -847,6 +848,9 @@
             "type": "integer"
           },
           "content": {},
+          "description": {
+            "type": "string"
+          },
           "expectedVersion": {
             "format": "int64",
             "minimum": 1,
@@ -1149,7 +1153,7 @@
         ],
         "type": "object"
       },
-      "SuccessResponseGenerateProjectReferenceResponse": {
+      "SuccessResponseGenerateReferenceResponse": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -1160,7 +1164,7 @@
             "type": "integer"
           },
           "data": {
-            "$ref": "#/components/schemas/GenerateProjectReferenceResponse"
+            "$ref": "#/components/schemas/GenerateReferenceResponse"
           },
           "message": {
             "const": "success",
@@ -2670,12 +2674,12 @@
     },
     "/project/reference/generate": {
       "post": {
-        "operationId": "generateProjectReference",
+        "operationId": "generateReference",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GenerateProjectReferenceRequest"
+                "$ref": "#/components/schemas/GenerateReferenceRequest"
               }
             }
           },
@@ -2686,7 +2690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponseGenerateProjectReferenceResponse"
+                  "$ref": "#/components/schemas/SuccessResponseGenerateReferenceResponse"
                 }
               }
             },
@@ -2728,7 +2732,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Generate a project reference",
+        "summary": "Generate a reference",
         "tags": [
           "Projects"
         ]

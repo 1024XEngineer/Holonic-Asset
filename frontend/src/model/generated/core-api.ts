@@ -268,8 +268,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Generate a project reference */
-        post: operations["generateProjectReference"];
+        /** Generate a reference */
+        post: operations["generateReference"];
         delete?: never;
         options?: never;
         head?: never;
@@ -397,7 +397,7 @@ export interface components {
         CreateGenerationRequest: {
             /** Format: int64 */
             assetId?: number;
-            creative_brief?: string;
+            creative_brief: string;
             /** @enum {string} */
             kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
             parameters?: unknown;
@@ -487,7 +487,7 @@ export interface components {
              */
             type: string;
         };
-        GenerateProjectReferenceRequest: {
+        GenerateReferenceRequest: {
             description?: string;
             gameType?: string;
             name: string;
@@ -501,7 +501,7 @@ export interface components {
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";
         };
-        GenerateProjectReferenceResponse: {
+        GenerateReferenceResponse: {
             reference: string;
         };
         GenerationResult: {
@@ -592,6 +592,7 @@ export interface components {
             /** Format: int64 */
             assetId: number;
             content: unknown;
+            description?: string;
             /** Format: int64 */
             expectedVersion?: number;
         };
@@ -700,13 +701,13 @@ export interface components {
             /** @constant */
             message: "success";
         };
-        SuccessResponseGenerateProjectReferenceResponse: {
+        SuccessResponseGenerateReferenceResponse: {
             /**
              * Format: int64
              * @enum {integer}
              */
             code: 200;
-            data: components["schemas"]["GenerateProjectReferenceResponse"];
+            data: components["schemas"]["GenerateReferenceResponse"];
             /** @constant */
             message: "success";
         };
@@ -1631,7 +1632,7 @@ export interface operations {
             };
         };
     };
-    generateProjectReference: {
+    generateReference: {
         parameters: {
             query?: never;
             header?: never;
@@ -1640,7 +1641,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GenerateProjectReferenceRequest"];
+                "application/json": components["schemas"]["GenerateReferenceRequest"];
             };
         };
         responses: {
@@ -1650,7 +1651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessResponseGenerateProjectReferenceResponse"];
+                    "application/json": components["schemas"]["SuccessResponseGenerateReferenceResponse"];
                 };
             };
             /** @description Bad Request */

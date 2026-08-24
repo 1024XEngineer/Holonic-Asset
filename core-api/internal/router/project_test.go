@@ -24,7 +24,7 @@ type unreachableProjectDao struct {
 type projectRouterStub struct {
 	router.ProjectRouter
 	createRequest            dto.CreateProjectRequest
-	generateReferenceRequest dto.GenerateProjectReferenceRequest
+	generateReferenceRequest dto.GenerateReferenceRequest
 }
 
 func (s *projectRouterStub) ListByUID(
@@ -51,15 +51,15 @@ func (s *projectRouterStub) Create(
 
 func (s *projectRouterStub) GenerateReference(
 	_ context.Context,
-	request dto.GenerateProjectReferenceRequest,
-) (dto.SuccessResponse[dto.GenerateProjectReferenceResponse], error) {
+	request dto.GenerateReferenceRequest,
+) (dto.SuccessResponse[dto.GenerateReferenceResponse], error) {
 	s.generateReferenceRequest = request
-	return dto.NewTypedSuccessResponse(dto.GenerateProjectReferenceResponse{
+	return dto.NewTypedSuccessResponse(dto.GenerateReferenceResponse{
 		Reference: "data:image/png;base64,aGVsbG8=",
 	}), nil
 }
 
-func TestProjectReferenceGenerationUsesOpenAPIContract(t *testing.T) {
+func TestReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 	stub := &projectRouterStub{}
 	e := router.Register(nil, stub, nil, nil)
 	recorder := serveProjectRequest(
@@ -87,7 +87,7 @@ func TestProjectReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 	}
 }
 
-func TestProjectReferenceGenerationRejectsExplicitEmptyPerspective(t *testing.T) {
+func TestReferenceGenerationRejectsExplicitEmptyPerspective(t *testing.T) {
 	stub := &projectRouterStub{}
 	e := router.Register(nil, stub, nil, nil)
 	recorder := serveProjectRequest(

@@ -1,6 +1,5 @@
 export type {
-  AudioAssetKind,
-  AudioAssetRecord,
+  AssetRecordKind,
   CharacterAssetKind,
   CharacterAssetRecord,
   AssetCanvasPosition,
@@ -10,6 +9,7 @@ export type {
   UISetComponent,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SceneryCanvasDimensions,
   SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,

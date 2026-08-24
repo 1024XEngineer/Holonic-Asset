@@ -11,11 +11,14 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import type { SceneryAssetCreationDraft } from "../types";
 
-const itemCounts = [1, 2, 3, 4, 5, 6, 8];
+import type { SceneryAssetCreationDraft } from "../types";
+import {
+  defaultSceneryAspectRatio,
+  getSceneryCanvasSize,
+  sceneryAspectRatios,
+  type SceneryAspectRatio,
+} from "./scenery-aspect-ratio";
 
 export function SceneryAssetFields({
   draft,
@@ -25,118 +28,71 @@ export function SceneryAssetFields({
   onChange: (draft: SceneryAssetCreationDraft<File>) => void;
 }) {
   const { t } = useTranslation("generation");
-
-  return (
-    <>
-      <label className="grid gap-2 text-sm font-medium">
-        {t("style")}
-        <Textarea
-          required
-          className="min-h-20 resize-none"
-          placeholder={t("scenePlaceholder")}
-          value={draft.style}
-          onChange={(event) =>
-            onChange({ ...draft, style: event.target.value })
-          }
-        />
-      </label>
-      <CountSelect
-        label={t("layerCount")}
-        value={draft.layers.length}
-        onChange={(count) =>
-          onChange({
-            ...draft,
-            layers: Array.from(
-              { length: count },
-              (_, index) => draft.layers[index] ?? { description: "" },
-            ),
-          })
-        }
-      />
-      <div className="grid gap-3">
-        {draft.layers.map((layer, index) => (
-          <label key={index} className="grid gap-2 text-sm font-medium">
-            {t("layerDescription", { number: index + 1 })}
-            <Textarea
-              required
-              className="resize-none"
-              value={layer.description}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  layers: draft.layers.map((item, itemIndex) =>
-                    itemIndex === index
-                      ? { ...item, description: event.target.value }
-                      : item,
-                  ),
-                })
-              }
-            />
-          </label>
-        ))}
-      </div>
-      <label className="grid gap-2 text-sm font-medium">
-        {t("aspectRatio")}
-        <Input
-          required
-          placeholder={t("aspectPlaceholder")}
-          value={draft.aspectRatio}
-          onChange={(event) =>
-            onChange({ ...draft, aspectRatio: event.target.value })
-          }
-        />
-      </label>
-      <ImageDropzone
-        value={draft.reference}
-        onChange={(reference) => onChange({ ...draft, reference })}
-      />
-    </>
-  );
-}
-
-function CountSelect({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (count: number) => void;
-}) {
   const [open, setOpen] = useState(false);
 
   return (
-    <label className="grid gap-2 text-sm font-medium">
-      {label}
+    <div className="grid gap-2">
+      <div>
+        <p className="text-sm font-medium">{t("aspectRatio")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("sceneryAspectRatioDescription")}
+        </p>
+      </div>
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           render={
             <Button
               type="button"
               variant="outline"
-              className="h-9 w-full justify-between px-3 font-normal"
+              className="h-10 w-full justify-between px-3 font-normal"
+              aria-label={t("aspectRatio")}
             />
           }
         >
-          {value}
+          <span className="font-medium">{draft.aspectRatio}</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {getSceneryCanvasSize(draft.aspectRatio)}
+          </span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-(--anchor-width)">
+        <DropdownMenuContent className="w-(--anchor-width) min-w-72">
           <DropdownMenuRadioGroup
-            value={String(value)}
-            onValueChange={(nextValue) => {
-              onChange(Number(nextValue));
+            value={draft.aspectRatio}
+            onValueChange={(value) => {
+              const aspectRatio = value as SceneryAspectRatio;
+              onChange({
+                ...draft,
+                aspectRatio,
+                canvasSize: getSceneryCanvasSize(aspectRatio),
+              });
               setOpen(false);
             }}
           >
-            {itemCounts.map((count) => (
-              <DropdownMenuRadioItem key={count} value={String(count)}>
-                {count}
+            {sceneryAspectRatios.map((aspectRatio) => (
+              <DropdownMenuRadioItem key={aspectRatio} value={aspectRatio}>
+                <span className="font-medium">{aspectRatio}</span>
+                {aspectRatio === defaultSceneryAspectRatio ? (
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {t("recommended")}
+                  </span>
+                ) : null}
+                <span className="ml-auto pr-5 text-xs tabular-nums text-muted-foreground">
+                  {getSceneryCanvasSize(aspectRatio)}
+                </span>
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-    </label>
+      <div className="grid gap-2 text-sm font-medium">
+        <span>{t("creatingReference")}</span>
+        <ImageDropzone
+          value={draft.creatingReference}
+          onChange={(creatingReference) =>
+            onChange({ ...draft, creatingReference })
+          }
+        />
+      </div>
+    </div>
   );
 }

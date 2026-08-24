@@ -18,6 +18,7 @@ export type {
   AssetLibraryItem,
 } from "./library";
 export {
+  describeAssetRecordChanges,
   toCoreSpriteCandidateRecord,
   useRecordQuery,
   useSaveAssetRevisionMutation,
@@ -31,14 +32,14 @@ export type {
   AssetWorkspaceAsset,
   AssetWorkspaceData,
   AssetWorkspaceDataForKind,
-  AudioAssetKind,
-  AudioAssetRecord,
+  AssetRecordKind,
   CharacterAssetKind,
   CharacterAssetRecord,
   GetAssetRecordInput,
   SaveAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
+  SceneryCanvasDimensions,
   SpriteAssetRecordData,
   TilesetAssetKind,
   TilesetAssetRecord,
@@ -63,6 +64,7 @@ export type {
   UpdateAudioTrackInput,
 } from "./audio";
 export {
+  DEFAULT_ANIMATION_FRAME_DURATION_MS,
   assetDirectionSchema,
   assetDirections,
   assetDirectionsByPerspective,
@@ -70,6 +72,8 @@ export {
   assetKindSchema,
   assetKinds,
   creatableAssetKinds,
+  getAnimationFrameDuration,
+  getEffectiveAnimationFps,
   type AnimationGenerationConfig,
   type AssetAnimation,
   type AssetDirection,

@@ -2,17 +2,15 @@ import type { CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
 import type { ItemTile } from "@/model/item-tile";
 
-export type CreationRequest<Reference = unknown> = {
+export type CreationRequest<CreatingReference = unknown> = {
   kind: CreatableAssetKind;
   name: string;
   prompt: string;
   canvasSize: string;
   dimensions?: { width: number; height: number };
   perspective?: Perspective;
-  reference?: Reference;
+  creatingReference?: CreatingReference;
   style?: string;
-  aspectRatio?: string;
-  layers?: { description: string }[];
   tiles?: {
     name: string;
     description: string;
@@ -21,17 +19,18 @@ export type CreationRequest<Reference = unknown> = {
   components?: { name: string; description: string }[];
 };
 
-export type GenerationRun<Reference = unknown> = CreationRequest<Reference> & {
-  id: string;
-  projectId: string;
-  assetId?: string;
-  // Completed and cancelled runs leave this current-work projection. Awaiting
-  // results stay visible until the editor explicitly applies or discards them.
-  status: "pending" | "processing" | "awaiting_application" | "failed";
-  error?: string;
-};
+export type GenerationRun<CreatingReference = unknown> =
+  CreationRequest<CreatingReference> & {
+    id: string;
+    projectId: string;
+    assetId?: string;
+    // Completed and cancelled runs leave this current-work projection. Awaiting
+    // results stay visible until the editor explicitly applies or discards them.
+    status: "pending" | "processing" | "awaiting_application" | "failed";
+    error?: string;
+  };
 
-export type GenerationInput<Reference = unknown> = {
+export type GenerationInput<CreatingReference = unknown> = {
   projectId: string;
-  request: CreationRequest<Reference>;
+  request: CreationRequest<CreatingReference>;
 };

@@ -1,13 +1,13 @@
-export type ReferencePreviewAdapter = {
+export type CreatingReferencePreviewAdapter = {
   createPreviewUrl: (file: File) => string;
   revokePreviewUrl: (url: string) => void;
 };
 
-export type ReferencePreviewLifecycle = {
+export type CreatingReferencePreviewLifecycle = {
   create: (file: File) => string;
   previewForAsset: (assetId: string) => string | undefined;
   releaseUncommitted: (
-    draftReference: string | undefined,
+    draftCreatingReference: string | undefined,
     currentAssetId: string | null,
   ) => void;
   retainForSubmission: (url: string) => void;
@@ -15,20 +15,21 @@ export type ReferencePreviewLifecycle = {
   settleSubmission: (
     url: string,
     keep: boolean,
-    currentDraftReference: string | undefined,
+    currentDraftCreatingReference: string | undefined,
   ) => void;
   releaseAsset: (assetId: string) => void;
   dispose: () => void;
 };
 
-export const browserReferencePreviewAdapter: ReferencePreviewAdapter = {
-  createPreviewUrl: (file) => URL.createObjectURL(file),
-  revokePreviewUrl: (url) => URL.revokeObjectURL(url),
-};
+export const browserCreatingReferencePreviewAdapter: CreatingReferencePreviewAdapter =
+  {
+    createPreviewUrl: (file) => URL.createObjectURL(file),
+    revokePreviewUrl: (url) => URL.revokeObjectURL(url),
+  };
 
-export function createReferencePreviewLifecycle(
-  adapter: ReferencePreviewAdapter = browserReferencePreviewAdapter,
-): ReferencePreviewLifecycle {
+export function createCreatingReferencePreviewLifecycle(
+  adapter: CreatingReferencePreviewAdapter = browserCreatingReferencePreviewAdapter,
+): CreatingReferencePreviewLifecycle {
   const previewsByAsset = new Map<string, string>();
   const ownedUrls = new Set<string>();
   const retainedUrls = new Set<string>();
@@ -57,12 +58,15 @@ export function createReferencePreviewLifecycle(
       return url;
     },
     previewForAsset: (assetId) => previewsByAsset.get(assetId),
-    releaseUncommitted: (draftReference, currentAssetId) => {
-      const committedReference = currentAssetId
+    releaseUncommitted: (draftCreatingReference, currentAssetId) => {
+      const committedCreatingReference = currentAssetId
         ? previewsByAsset.get(currentAssetId)
         : undefined;
-      if (draftReference && draftReference !== committedReference) {
-        revoke(draftReference);
+      if (
+        draftCreatingReference &&
+        draftCreatingReference !== committedCreatingReference
+      ) {
+        revoke(draftCreatingReference);
       }
     },
     retainForSubmission: (url) => {
@@ -74,7 +78,7 @@ export function createReferencePreviewLifecycle(
       if (url) previewsByAsset.set(assetId, url);
       else previewsByAsset.delete(assetId);
     },
-    settleSubmission: (url, keep, currentDraftReference) => {
+    settleSubmission: (url, keep, currentDraftCreatingReference) => {
       if (!url || !ownedUrls.has(url)) return;
       retainedUrls.delete(url);
       if (keep) {
@@ -83,7 +87,7 @@ export function createReferencePreviewLifecycle(
       }
       if (
         deferredRevocations.has(url) ||
-        (currentDraftReference !== url &&
+        (currentDraftCreatingReference !== url &&
           ![...previewsByAsset.values()].includes(url))
       ) {
         forceRevoke(url);

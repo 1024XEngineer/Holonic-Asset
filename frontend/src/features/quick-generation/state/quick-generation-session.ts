@@ -5,10 +5,10 @@ import type {
   QuickGenerationAsset,
 } from "@/model/generation";
 import {
-  browserReferencePreviewAdapter,
-  createReferencePreviewLifecycle,
-  type ReferencePreviewAdapter,
-} from "./reference-preview-lifecycle";
+  browserCreatingReferencePreviewAdapter,
+  createCreatingReferencePreviewLifecycle,
+  type CreatingReferencePreviewAdapter,
+} from "./creating-reference-preview-lifecycle";
 
 type QuickGenerationDraftPatch = Pick<
   QuickGenerationDraft<string>,
@@ -38,8 +38,8 @@ export type QuickGenerationSession = {
   selectAsset: (asset: QuickGenerationAsset) => void;
   startNewAsset: () => void;
   updateDraft: (patch: Partial<QuickGenerationDraftPatch>) => void;
-  chooseReference: (file: File | undefined) => void;
-  clearReference: () => void;
+  chooseCreatingReference: (file: File | undefined) => void;
+  clearCreatingReference: () => void;
   prepareGeneration: () => QuickGenerationSubmission | undefined;
   prepareDeletion: (
     assets: QuickGenerationAsset[],
@@ -48,7 +48,7 @@ export type QuickGenerationSession = {
 };
 
 export function createQuickGenerationSession(
-  referencePreview: ReferencePreviewAdapter = browserReferencePreviewAdapter,
+  creatingReferencePreview: CreatingReferencePreviewAdapter = browserCreatingReferencePreviewAdapter,
 ): QuickGenerationSession {
   let initialized = false;
   let snapshot: QuickGenerationSessionSnapshot = {
@@ -56,7 +56,9 @@ export function createQuickGenerationSession(
     draft: createQuickGenerationDraft<string>(),
   };
   const listeners = new Set<() => void>();
-  const referencePreviews = createReferencePreviewLifecycle(referencePreview);
+  const creatingReferencePreviews = createCreatingReferencePreviewLifecycle(
+    creatingReferencePreview,
+  );
 
   function emit(nextSnapshot: QuickGenerationSessionSnapshot) {
     snapshot = nextSnapshot;
@@ -68,14 +70,16 @@ export function createQuickGenerationSession(
       currentAssetId: asset?.id ?? null,
       draft: createQuickGenerationDraft(
         asset,
-        asset ? (referencePreviews.previewForAsset(asset.id) ?? "") : "",
+        asset
+          ? (creatingReferencePreviews.previewForAsset(asset.id) ?? "")
+          : "",
       ),
     });
   }
 
-  function releaseUncommittedReference() {
-    referencePreviews.releaseUncommitted(
-      snapshot.draft.reference,
+  function releaseUncommittedCreatingReference() {
+    creatingReferencePreviews.releaseUncommitted(
+      snapshot.draft.creatingReference,
       snapshot.currentAssetId,
     );
   }
@@ -101,46 +105,46 @@ export function createQuickGenerationSession(
     },
     selectAsset: (asset) => {
       initialized = true;
-      releaseUncommittedReference();
+      releaseUncommittedCreatingReference();
       applyAsset(asset);
     },
     startNewAsset: () => {
       initialized = true;
-      releaseUncommittedReference();
+      releaseUncommittedCreatingReference();
       applyAsset();
     },
     updateDraft: (patch) => {
       emit({ ...snapshot, draft: { ...snapshot.draft, ...patch } });
     },
-    chooseReference: (file) => {
+    chooseCreatingReference: (file) => {
       if (!file?.type.startsWith("image/")) return;
-      releaseUncommittedReference();
-      const previewUrl = referencePreviews.create(file);
+      releaseUncommittedCreatingReference();
+      const previewUrl = creatingReferencePreviews.create(file);
       emit({
         ...snapshot,
         draft: {
           ...snapshot.draft,
-          reference: previewUrl,
-          referenceFileName: file.name,
+          creatingReference: previewUrl,
+          creatingReferenceFileName: file.name,
         },
       });
     },
-    clearReference: () => {
-      releaseUncommittedReference();
+    clearCreatingReference: () => {
+      releaseUncommittedCreatingReference();
       emit({
         ...snapshot,
         draft: {
           ...snapshot.draft,
-          reference: "",
-          referenceFileName: undefined,
+          creatingReference: "",
+          creatingReferenceFileName: undefined,
         },
       });
     },
     prepareGeneration: () => {
       const input = toGenerateQuickAssetInput(snapshot.draft);
       if (!input) return undefined;
-      const submittedReference = snapshot.draft.reference ?? "";
-      referencePreviews.retainForSubmission(submittedReference);
+      const submittedCreatingReference = snapshot.draft.creatingReference ?? "";
+      creatingReferencePreviews.retainForSubmission(submittedCreatingReference);
       let settled = false;
 
       return {
@@ -148,22 +152,25 @@ export function createQuickGenerationSession(
         complete: (asset) => {
           if (settled) return;
           settled = true;
-          releaseUncommittedReference();
-          referencePreviews.commit(asset.id, submittedReference);
-          referencePreviews.settleSubmission(
-            submittedReference,
+          releaseUncommittedCreatingReference();
+          creatingReferencePreviews.commit(
+            asset.id,
+            submittedCreatingReference,
+          );
+          creatingReferencePreviews.settleSubmission(
+            submittedCreatingReference,
             true,
-            snapshot.draft.reference,
+            snapshot.draft.creatingReference,
           );
           applyAsset(asset);
         },
         fail: () => {
           if (settled) return;
           settled = true;
-          referencePreviews.settleSubmission(
-            submittedReference,
+          creatingReferencePreviews.settleSubmission(
+            submittedCreatingReference,
             false,
-            snapshot.draft.reference,
+            snapshot.draft.creatingReference,
           );
         },
       };
@@ -182,17 +189,17 @@ export function createQuickGenerationSession(
           if (completed) return;
           completed = true;
           if (snapshot.currentAssetId === deletedAssetId) {
-            releaseUncommittedReference();
-            referencePreviews.releaseAsset(deletedAssetId);
+            releaseUncommittedCreatingReference();
+            creatingReferencePreviews.releaseAsset(deletedAssetId);
             applyAsset(remaining[0]);
           } else {
-            referencePreviews.releaseAsset(deletedAssetId);
+            creatingReferencePreviews.releaseAsset(deletedAssetId);
           }
         },
       };
     },
     dispose: () => {
-      referencePreviews.dispose();
+      creatingReferencePreviews.dispose();
     },
   };
 }

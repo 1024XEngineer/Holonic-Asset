@@ -3,8 +3,8 @@ import type {
   CreateProjectResponse,
   DeleteProjectRequest,
   DeleteProjectResponse,
-  GenerateProjectReferenceRequest,
-  GenerateProjectReferenceResponse,
+  GenerateReferenceRequest,
+  GenerateReferenceResponse,
   ListProjectsResponse,
   ProjectDetailResponse,
   UpdateProjectRequest,
@@ -17,8 +17,8 @@ export const coreProjectApi = {
     unwrapApiResponse<CreateProjectResponse>(
       await coreApiClient.POST("/project/create", { body: request }),
     ),
-  generateReference: async (request: GenerateProjectReferenceRequest) =>
-    unwrapApiResponse<GenerateProjectReferenceResponse>(
+  generateReference: async (request: GenerateReferenceRequest) =>
+    unwrapApiResponse<GenerateReferenceResponse>(
       await coreApiClient.POST("/project/reference/generate", {
         body: request,
       }),

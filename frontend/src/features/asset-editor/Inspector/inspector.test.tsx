@@ -1,11 +1,35 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
 
-import type { CharacterAnimation } from "@/model";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import type { AssetRevision, CharacterAnimation, SceneryLayer } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { Inspector } from "./inspector";
-import { getInspectorTargetSummary } from "./inspector-target";
+
+vi.mock("@/model/upload", () => ({
+  uploadFile: vi.fn().mockResolvedValue({
+    objectKey: "uploads/reference.png",
+    objectURL: "https://cdn.example/reference.png?token=signed",
+  }),
+}));
+
+beforeAll(() => {
+  Object.defineProperty(Element.prototype, "getAnimations", {
+    configurable: true,
+    value: () => [],
+  });
+});
+
+afterEach(cleanup);
 
 const animations: CharacterAnimation[] = [
   {
@@ -33,11 +57,36 @@ const prototype = {
   rows: 1,
 };
 
+const sceneryLayer: SceneryLayer = {
+  id: "sky",
+  label: "Sky",
+  detail: "Backdrop",
+  imageUrl: "/sky.png",
+  blendMode: "normal",
+  position: { x: 0, y: 0 },
+  transform: { scale: { x: 1, y: 1 }, rotation: 0 },
+  visible: true,
+  opacity: 1,
+  zIndex: 0,
+};
+
+const sceneryHistory: AssetRevision[] = [
+  {
+    id: "1",
+    version: "v1",
+    description: "Initial scenery",
+    savedAt: "2026-01-01T00:00:00Z",
+    status: "ready",
+    isCurrent: true,
+  },
+];
+
 describe("Inspector", () => {
   it("renders the AI composer controls without the old draft label", () => {
     const html = renderToStaticMarkup(
       withI18n(
         <Inspector
+          kind="sprite"
           selectedNodes={[]}
           selectedFrames={[]}
           prompt="Refine the silhouette"
@@ -60,101 +109,11 @@ describe("Inspector", () => {
     expect(html).not.toContain("Draft context");
   });
 
-  it("describes selected animation frames inside the composer", () => {
-    expect(
-      getInspectorTargetSummary(
-        ["idle-front"],
-        [
-          { nodeId: "idle-front", index: 0 },
-          { nodeId: "idle-front", index: 2 },
-        ],
-        animations,
-        prototype,
-      ),
-    ).toEqual({
-      label: "Idle Front - Frames 1, 3",
-      detail: "Selected on canvas",
-      thumbnail: {
-        imageUrl: "/idle-front.png",
-        column: 0,
-        row: 0,
-        columns: 2,
-        rows: 2,
-      },
-    });
-  });
-
-  it("names a selected prototype frame in the target control", () => {
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [{ nodeId: "prototype", index: 0 }],
-        animations,
-        prototype,
-      ),
-    ).toEqual({
-      label: "Prototype - Frame 1",
-      detail: "Selected on canvas",
-      thumbnail: {
-        imageUrl: "/prototype.png",
-        column: 0,
-        row: 0,
-        columns: 4,
-        rows: 1,
-      },
-    });
-  });
-
-  it("uses an independent direction image for the selected prototype frame", () => {
-    const directionalPrototype = {
-      ...prototype,
-      frameUrls: ["/front.png", "/back.png", "/left.png", "/right.png"],
-    };
-
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [{ nodeId: "prototype", index: 2 }],
-        animations,
-        directionalPrototype,
-      ),
-    ).toMatchObject({
-      thumbnail: {
-        imageUrl: "/left.png",
-        column: 0,
-        row: 0,
-        columns: 1,
-        rows: 1,
-      },
-    });
-  });
-
-  it("uses the first independent direction image for a prototype node target", () => {
-    const directionalPrototype = {
-      ...prototype,
-      frameUrls: ["/front.png", "/back.png"],
-    };
-
-    expect(
-      getInspectorTargetSummary(
-        ["prototype"],
-        [],
-        animations,
-        directionalPrototype,
-      ),
-    ).toMatchObject({
-      thumbnail: {
-        imageUrl: "/front.png",
-        columns: 1,
-        rows: 1,
-      },
-    });
-  });
-
   it("renders the selected frame thumbnail in the target control", () => {
     const html = renderToStaticMarkup(
       withI18n(
         <Inspector
+          kind="sprite"
           selectedNodes={["prototype"]}
           selectedFrames={[{ nodeId: "prototype", index: 1 }]}
           prompt="Refine the silhouette"
@@ -173,19 +132,89 @@ describe("Inspector", () => {
     expect(html).toContain("translate(-25%, -0%)");
   });
 
-  it("uses the selected animation image for a node target", () => {
-    expect(
-      getInspectorTargetSummary(["idle-front"], [], animations, prototype),
-    ).toEqual({
-      label: "Idle Front",
-      detail: "Selected item",
-      thumbnail: {
-        imageUrl: "/idle-front.png",
-        column: 0,
-        row: 0,
-        columns: 2,
-        rows: 2,
+  it("updates the prompt and previews an attached reference", async () => {
+    const onPromptChange = vi.fn();
+    render(
+      withI18n(
+        <Inspector
+          kind="sprite"
+          selectedNodes={[]}
+          selectedFrames={[]}
+          prompt="Refine the silhouette"
+          onPromptChange={onPromptChange}
+          history={[]}
+          animations={animations}
+          prototype={prototype}
+          onSubmit={vi.fn()}
+          onClearSelection={vi.fn()}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Edit prompt"), {
+      target: { value: "Add a stronger outline" },
+    });
+    expect(onPromptChange).toHaveBeenCalledWith("Add a stronger outline");
+
+    const fileInput =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!fileInput) throw new Error("Expected the reference file input.");
+    fireEvent.change(fileInput, {
+      target: {
+        files: [
+          new File(["reference"], "reference.png", { type: "image/png" }),
+        ],
       },
     });
+
+    await waitFor(() =>
+      expect(screen.getByAltText("reference.png")).toBeTruthy(),
+    );
+  });
+
+  it("renders scenery content through the shared inspector", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="scenery"
+          layer={sceneryLayer}
+          dimensions={{ width: 1920, height: 1080 }}
+          history={sceneryHistory}
+          visible
+          onToggleVisibility={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(html).toContain("Selected layer");
+    expect(html).toContain("Sky");
+    expect(html).toContain("Canvas: 1920 x 1080");
+    expect(html).toContain("History");
+  });
+
+  it("renders scenery defaults when optional layer metadata is absent", () => {
+    const html = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="scenery"
+          layer={{
+            ...sceneryLayer,
+            position: undefined,
+            transform: undefined,
+            opacity: undefined,
+            zIndex: undefined,
+          }}
+          history={[]}
+          visible={false}
+          onToggleVisibility={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(html).toContain("Hidden");
+    expect(html).toContain("0, 0");
+    expect(html).toContain("1.00 x 1.00 / 0°");
+    expect(html).toContain("100%");
+    expect(html).not.toContain("Canvas:");
   });
 });

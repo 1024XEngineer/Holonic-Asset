@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -58,44 +60,49 @@ func (e *Engine) Create(ctx context.Context, request *Request) (RunID, error) {
 }
 
 func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload any) (any, error) {
-	prepare := func(reference string) (string, error) {
-		if reference == "" && e.projects != nil && projectID != 0 {
-			project, err := e.projects.GetDetail(ctx, projectID)
-			if err != nil {
-				return "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
-			}
-			if project != nil {
-				reference = project.Reference
-			}
+	persistReference := func(role, reference string) (string, error) {
+		if strings.TrimSpace(reference) == "" {
+			return "", nil
 		}
-		if e.references == nil || reference == "" {
-			return reference, nil
-		}
-		resolved, err := e.references.PersistReference(ctx, reference)
-		if err != nil {
-			return "", fmt.Errorf("generator: persist reference: %w", err)
-		}
-		return resolved, nil
-	}
-	persistEditReference := func(reference string) (string, error) {
-		if reference == "" || e.references == nil {
-			return reference, nil
+		if e.references == nil {
+			return "", ErrReferenceStoreRequired
 		}
 		persisted, err := e.references.PersistReference(ctx, reference)
 		if err != nil {
-			return "", fmt.Errorf("generator: persist edit reference: %w", err)
+			return "", referencePersistenceError(role, err)
 		}
 		return persisted, nil
 	}
-
+	preparePrototypeReferences := func(creatingReference string) (string, string, error) {
+		projectReference := ""
+		if e.projects != nil && projectID != 0 {
+			project, err := e.projects.GetDetail(ctx, projectID)
+			if err != nil {
+				return "", "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
+			}
+			if project != nil {
+				projectReference = project.Reference
+			}
+		}
+		var err error
+		projectReference, err = persistReference("project", projectReference)
+		if err != nil {
+			return "", "", err
+		}
+		creatingReference, err = persistReference("creating", creatingReference)
+		if err != nil {
+			return "", "", err
+		}
+		return projectReference, creatingReference, nil
+	}
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.Reference, err = prepare(value.Reference)
+		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.Reference, err = prepare(value.Reference)
+		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -113,17 +120,13 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(string(project.GameType)),
 			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
 		}
-		if strings.TrimSpace(value.Style) == "" {
-			value.Style = strings.TrimSpace(project.Style)
+		value.ProjectReference, err = persistReference("project", project.Reference)
+		if err != nil {
+			return nil, err
 		}
-		if strings.TrimSpace(value.Reference) == "" {
-			value.Reference = project.Reference
-		}
-		if e.references != nil && strings.TrimSpace(value.Reference) != "" {
-			value.Reference, err = e.references.PersistReference(ctx, value.Reference)
-			if err != nil {
-				return nil, fmt.Errorf("generator: persist reference: %w", err)
-			}
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
+		if err != nil {
+			return nil, err
 		}
 		if err := validateSceneryPayload(value); err != nil {
 			return nil, err
@@ -145,15 +148,27 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return value, nil
 	case EditTilesetItemPayload:
 		var err error
-		value.Reference, err = persistEditReference(value.Reference)
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
 		return value, err
 	case EditTilesPayload:
 		var err error
-		value.Reference, err = persistEditReference(value.Reference)
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
 		return value, err
 	default:
 		return payload, nil
 	}
+}
+
+func referencePersistenceError(role string, err error) error {
+	if errors.Is(err, upload.ErrUntrustedReference) ||
+		errors.Is(err, upload.ErrInvalidObjectData) ||
+		errors.Is(err, upload.ErrInvalidUploadRequest) {
+		return invalidTaskPayload(
+			"%s reference must be an object key, configured object-storage URL, or image data URL",
+			role,
+		)
+	}
+	return fmt.Errorf("generator: persist %s reference: %w", role, err)
 }
 
 func buildTaskPayload(request *Request) (any, error) {
@@ -167,6 +182,7 @@ func buildTaskPayload(request *Request) (any, error) {
 		if err := decodeParameters(request, &payload); err != nil {
 			return nil, err
 		}
+		payload.ProjectReference = ""
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
@@ -193,15 +209,15 @@ func buildTaskPayload(request *Request) (any, error) {
 		if err := decodeParameters(request, &payload); err != nil {
 			return nil, err
 		}
+		payload.ProjectReference = ""
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
 		return payload, nil
 	case GenerateScenery:
 		parameters := struct {
-			AssetName  string           `json:"asset_name"`
-			Style      string           `json:"style"`
-			Dimensions assetdomain.Size `json:"dimensions"`
-			Reference  string           `json:"reference"`
+			AssetName         string           `json:"asset_name"`
+			Dimensions        assetdomain.Size `json:"dimensions"`
+			CreatingReference string           `json:"creating_reference"`
 		}{}
 		if request.AssetID != nil || len(request.TargetAssetPaths) != 0 {
 			return nil, fmt.Errorf("%w: generate_scenery does not accept assetId or targetAssetPaths", ErrInvalidSceneryPayload)
@@ -211,8 +227,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		}
 		payload := CreateSceneryPayload{
 			AssetName: parameters.AssetName, CreativeBrief: request.CreativeBrief,
-			Style: parameters.Style, Dimensions: parameters.Dimensions,
-			Reference: parameters.Reference, ProjectID: request.ProjectID,
+			Dimensions: parameters.Dimensions, CreatingReference: parameters.CreatingReference,
+			ProjectID: request.ProjectID,
 		}
 		if payload.ProjectID == 0 || strings.TrimSpace(payload.AssetName) == "" || strings.TrimSpace(payload.CreativeBrief) == "" {
 			return nil, fmt.Errorf("%w: project ID, asset name, and creative brief are required", ErrInvalidSceneryPayload)
@@ -286,8 +302,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		return payload, nil
 	case EditTilesetItem:
 		parameters := struct {
-			Target    *TileSetEditTarget `json:"target"`
-			Reference string             `json:"reference,omitempty"`
+			Target            *TileSetEditTarget `json:"target"`
+			CreatingReference string             `json:"creating_reference,omitempty"`
 		}{}
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tileset_item does not accept targetAssetPaths")
@@ -296,10 +312,10 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload := EditTilesetItemPayload{
-			ProjectID:     request.ProjectID,
-			CreativeBrief: request.CreativeBrief,
-			Target:        parameters.Target,
-			Reference:     parameters.Reference,
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			Target:            parameters.Target,
+			CreatingReference: parameters.CreatingReference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
@@ -310,8 +326,8 @@ func buildTaskPayload(request *Request) (any, error) {
 		return payload, nil
 	case EditTiles:
 		parameters := struct {
-			Targets   []TileSetEditTarget `json:"targets"`
-			Reference string              `json:"reference,omitempty"`
+			Targets           []TileSetEditTarget `json:"targets"`
+			CreatingReference string              `json:"creating_reference,omitempty"`
 		}{}
 		if len(request.TargetAssetPaths) != 0 {
 			return nil, invalidTaskPayload("edit_tiles does not accept targetAssetPaths")
@@ -320,10 +336,10 @@ func buildTaskPayload(request *Request) (any, error) {
 			return nil, err
 		}
 		payload := EditTilesPayload{
-			ProjectID:     request.ProjectID,
-			CreativeBrief: request.CreativeBrief,
-			Targets:       append([]TileSetEditTarget(nil), parameters.Targets...),
-			Reference:     parameters.Reference,
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			Targets:           append([]TileSetEditTarget(nil), parameters.Targets...),
+			CreatingReference: parameters.CreatingReference,
 		}
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID

@@ -14,10 +14,12 @@ import (
 )
 
 type imageGenerationServiceStub struct {
-	events  *[]string
-	request *imageclient.GenerateRequest
-	result  *imageclient.GenerateResult
-	err     error
+	events   *[]string
+	request  *imageclient.GenerateRequest
+	requests []*imageclient.GenerateRequest
+	result   *imageclient.GenerateResult
+	results  []*imageclient.GenerateResult
+	err      error
 }
 
 type animationGenerationServiceStub struct {
@@ -47,9 +49,16 @@ func (s *animationGenerationServiceStub) Generate(
 }
 
 type imageProcessorStub struct {
-	events         *[]string
-	resizeRequests []*imageprocessor.ResizeRequest
-	err            error
+	events            *[]string
+	normalizeRequests []*imageprocessor.NormalizeReferenceRequest
+	normalizeResults  []*imageprocessor.NormalizeReferenceResult
+	removeRequests    []*imageprocessor.RemoveBackgroundRequest
+	resizeRequests    []*imageprocessor.ResizeRequest
+	splitRequests     []*imageprocessor.SplitImageRequest
+	splitResults      []*imageprocessor.SplitImageResult
+	splitErrors       []error
+	err               error
+	flipErr           error
 }
 
 type referenceUpload struct {
@@ -117,11 +126,52 @@ func (s *imageProcessorStub) RemoveBackground(
 	request *imageprocessor.RemoveBackgroundRequest,
 ) (*imageprocessor.RemoveBackgroundResult, error) {
 	*s.events = append(*s.events, "process_image")
+	s.removeRequests = append(s.removeRequests, request)
 	if s.err != nil {
 		return nil, s.err
 	}
 	return &imageprocessor.RemoveBackgroundResult{
 		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+	}, nil
+}
+
+func (s *imageProcessorStub) NormalizeReference(
+	_ context.Context,
+	request *imageprocessor.NormalizeReferenceRequest,
+) (*imageprocessor.NormalizeReferenceResult, error) {
+	if s.events != nil {
+		*s.events = append(*s.events, "normalize_reference")
+	}
+	s.normalizeRequests = append(s.normalizeRequests, request)
+	if s.err != nil {
+		return nil, s.err
+	}
+	if len(s.normalizeResults) > 0 {
+		result := s.normalizeResults[0]
+		s.normalizeResults = s.normalizeResults[1:]
+		return result, nil
+	}
+	return &imageprocessor.NormalizeReferenceResult{
+		ImageBase64: request.ImageBase64,
+		MIMEType:    "image/png",
+		Report:      imageprocessor.ReferenceNormalizationReport{Scale: 1},
+	}, nil
+}
+
+func (s *imageProcessorStub) FlipHorizontal(
+	_ context.Context,
+	request *imageprocessor.FlipHorizontalRequest,
+) (*imageprocessor.FlipHorizontalResult, error) {
+	*s.events = append(*s.events, "flip_horizontal")
+	if s.flipErr != nil {
+		return nil, s.flipErr
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &imageprocessor.FlipHorizontalResult{
+		ImageBase64: "mirrored:" + request.ImageBase64,
 		MIMEType:    "image/png",
 	}, nil
 }
@@ -152,8 +202,17 @@ func (s *imageProcessorStub) SplitImage(
 	if s.events != nil {
 		*s.events = append(*s.events, "split_image")
 	}
+	copy := *request
+	s.splitRequests = append(s.splitRequests, &copy)
+	call := len(s.splitRequests) - 1
+	if call < len(s.splitErrors) && s.splitErrors[call] != nil {
+		return nil, s.splitErrors[call]
+	}
 	if s.err != nil {
 		return nil, s.err
+	}
+	if call < len(s.splitResults) && s.splitResults[call] != nil {
+		return s.splitResults[call], nil
 	}
 	regionCount := request.Columns * request.Rows
 	regions := make([]imageprocessor.ImageRegion, regionCount)
@@ -179,6 +238,11 @@ func (s *imageGenerationServiceStub) Generate(
 		Size:            request.Size,
 		Params:          request.Params,
 		MaxAttempts:     request.MaxAttempts,
+	}
+	s.requests = append(s.requests, s.request)
+	call := len(s.requests) - 1
+	if call < len(s.results) {
+		return s.results[call], s.err
 	}
 	return s.result, s.err
 }

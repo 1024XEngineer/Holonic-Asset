@@ -7,6 +7,7 @@ import { useRecordQuery } from "@/model";
 import type { AssetWorkspaceData } from "@/model";
 
 import { AssetCanvasEditorMode } from "./EditorModes/asset-canvas-editor-mode";
+import { SceneryEditorMode } from "./EditorModes/scenery-editor-mode";
 import { SpriteEditorMode } from "./EditorModes/sprite-editor-mode";
 import { useEditorWorkspace } from "./use-editor-workspace";
 
@@ -54,17 +55,6 @@ export function EditorWorkspace({
     );
   }
 
-  if (recordQuery.data.record.mode === "audio") {
-    return (
-      <EditorStatus
-        icon={<AlertTriangle className="size-5" />}
-        title={t("editorUnavailable")}
-        description={t("audioUnavailable")}
-        action={<Button onClick={onBack}>{t("backToLibraryButton")}</Button>}
-      />
-    );
-  }
-
   return (
     <EditorWorkspaceContent
       key={`${projectId}:${assetId}`}
@@ -85,6 +75,8 @@ function EditorWorkspaceContent({
     <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-muted/30 text-foreground selection:bg-primary/20">
       {data.record.mode === "character" || data.record.mode === "object" ? (
         <SpriteEditorWorkspace data={data} onBack={onBack} />
+      ) : data.record.mode === "scenery" ? (
+        <SceneryEditorMode data={data} onBack={onBack} />
       ) : (
         <AssetCanvasEditorMode data={data} onBack={onBack} />
       )}

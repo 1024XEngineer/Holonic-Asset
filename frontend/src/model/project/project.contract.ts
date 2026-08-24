@@ -11,10 +11,10 @@ export type CreateProjectRequest =
   operations["createProject"]["requestBody"]["content"]["application/json"];
 export type CreateProjectResponse =
   operations["createProject"]["responses"][200]["content"]["application/json"]["data"];
-export type GenerateProjectReferenceRequest =
-  operations["generateProjectReference"]["requestBody"]["content"]["application/json"];
-export type GenerateProjectReferenceResponse =
-  operations["generateProjectReference"]["responses"][200]["content"]["application/json"]["data"];
+export type GenerateReferenceRequest =
+  operations["generateReference"]["requestBody"]["content"]["application/json"];
+export type GenerateReferenceResponse =
+  operations["generateReference"]["responses"][200]["content"]["application/json"]["data"];
 export type ListProjectsResponse =
   operations["listProjects"]["responses"][200]["content"]["application/json"]["data"];
 export type ProjectDetailResponse =

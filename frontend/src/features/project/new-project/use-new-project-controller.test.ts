@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     | undefined,
   generateReference: vi.fn(),
   navigate: vi.fn(),
-  readFileAsDataUrl: vi.fn(),
+  uploadFile: vi.fn(),
   stateIndex: 0,
   stateOverrides: new Map<number, unknown>(),
   setters: [] as ReturnType<typeof vi.fn>[],
@@ -52,8 +52,8 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/model", () => ({
   useCreateProjectMutation: () => ({ mutateAsync: mocks.createProject }),
 }));
-vi.mock("@/lib/read-file-as-data-url", () => ({
-  readFileAsDataUrl: mocks.readFileAsDataUrl,
+vi.mock("@/model/upload", () => ({
+  uploadFile: mocks.uploadFile,
 }));
 vi.mock("@/components/ui/toast", () => ({ toast: mocks.toast }));
 vi.mock("@/model/project", () => ({
@@ -84,7 +84,10 @@ beforeEach(() => {
   mocks.createProject.mockResolvedValue({ id: "project-7" });
   mocks.generateReference.mockResolvedValue("generated.png");
   mocks.navigate.mockResolvedValue(undefined);
-  mocks.readFileAsDataUrl.mockResolvedValue("data:image/png;base64,preview");
+  mocks.uploadFile.mockResolvedValue({
+    objectKey: "uploads/preview.png",
+    objectURL: "https://cdn.example/preview.png?token=signed",
+  });
 });
 
 describe("useNewProjectController", () => {
@@ -168,7 +171,7 @@ describe("useNewProjectController", () => {
 
     controller.preview.generate();
     await vi.waitFor(() =>
-      expect(mocks.setters[9]).toHaveBeenCalledWith(
+      expect(mocks.setters[10]).toHaveBeenCalledWith(
         "We couldn't generate that reference. Try again.",
       ),
     );
@@ -198,20 +201,19 @@ describe("useNewProjectController", () => {
     );
   });
 
-  it("reads uploaded previews and clears them", async () => {
+  it("uploads previews and clears them", async () => {
     const controller = useNewProjectController();
     const file = new File(["preview"], "preview.png", { type: "image/png" });
 
     controller.preview.setFile(file);
     await vi.waitFor(() =>
-      expect(mocks.form.setFieldValue).toHaveBeenCalledWith(
-        "reference",
-        "data:image/png;base64,preview",
+      expect(mocks.setters[7]).toHaveBeenCalledWith(
+        "https://cdn.example/preview.png?token=signed",
       ),
     );
     controller.preview.clear();
 
-    expect(mocks.readFileAsDataUrl).toHaveBeenCalledWith(
+    expect(mocks.uploadFile).toHaveBeenCalledWith(
       file,
       expect.any(AbortSignal),
     );
@@ -220,8 +222,8 @@ describe("useNewProjectController", () => {
 
   it("keeps the form reference synchronized with the selected preview", async () => {
     mocks.stateOverrides.set(6, "generated.png");
-    mocks.stateOverrides.set(7, "uploaded.png");
-    mocks.stateOverrides.set(10, "upload");
+    mocks.stateOverrides.set(7, "https://cdn.example/uploaded.png");
+    mocks.stateOverrides.set(11, "upload");
     const controller = useNewProjectController();
 
     controller.preview.selectGenerate();
@@ -234,11 +236,11 @@ describe("useNewProjectController", () => {
     );
     expect(mocks.form.setFieldValue).toHaveBeenCalledWith(
       "reference",
-      "uploaded.png",
+      "https://cdn.example/uploaded.png",
     );
     expect(mocks.createProject).toHaveBeenCalledWith({
       name: "Project",
-      reference: "uploaded.png",
+      reference: "https://cdn.example/uploaded.png",
     });
   });
 

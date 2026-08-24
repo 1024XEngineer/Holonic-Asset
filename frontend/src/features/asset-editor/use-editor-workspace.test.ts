@@ -129,9 +129,9 @@ beforeEach(() => {
 describe("useEditorWorkspace", () => {
   it("returns null for records without a sprite editor", () => {
     mocks.session.snapshot = snapshot({
-      mode: "audio",
-      prompt: "Theme",
-      audio: {},
+      mode: "uiset",
+      prompt: "Inventory",
+      uiset: { components: [] },
     });
     mocks.stateValues.push(null, null);
 

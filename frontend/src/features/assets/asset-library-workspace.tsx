@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GenerationQueue } from "@/features/generation/generation-queue";
+import { GenerationQueue } from "@/features/generation";
 
 import { AssetCard } from "./asset-card";
 import { AssetEditDialog } from "./asset-edit-dialog";
@@ -141,14 +141,27 @@ export function AssetLibraryWorkspace({
 
 function AssetLibrarySkeleton() {
   const { t } = useTranslation("assets");
+  const skeletonIds = [
+    "skeleton-1",
+    "skeleton-2",
+    "skeleton-3",
+    "skeleton-4",
+    "skeleton-5",
+    "skeleton-6",
+    "skeleton-7",
+    "skeleton-8",
+  ];
   return (
     <div
       className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       aria-label={t("loading")}
       role="status"
     >
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="overflow-hidden rounded-lg border bg-card">
+      {skeletonIds.map((skeletonId) => (
+        <div
+          key={skeletonId}
+          className="overflow-hidden rounded-lg border bg-card"
+        >
           <div className="aspect-[4/3] animate-pulse bg-muted" />
           <div className="space-y-3 p-3.5">
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />

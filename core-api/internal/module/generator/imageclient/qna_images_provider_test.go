@@ -92,6 +92,31 @@ func TestQNAImagesProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T
 	}
 }
 
+func TestQNAImagesProviderPreservesValidCustomImageSize(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			Size string `json:"size"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request payload: %v", err)
+		}
+		if payload.Size != "1504x1024" {
+			t.Fatalf("custom size = %q, want 1504x1024", payload.Size)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":[{"b64_json":"image"}]}`))
+	}))
+	defer server.Close()
+
+	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
+	if _, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
+		Prompt: "direction sheet",
+		Size:   "1504x1024",
+	}); err != nil {
+		t.Fatalf("generate custom-size image: %v", err)
+	}
+}
+
 func TestQNAImagesProviderEditSendsReferenceImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/images/edits" {

@@ -14,6 +14,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
@@ -22,7 +25,10 @@ import (
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
-const maxSceneryLayerGenerationAttempts = 3
+const (
+	maxSceneryLayerGenerationAttempts = 3
+	maxSceneryLLMAttempts             = 10
+)
 
 func (e *executor) planSceneryLayers(
 	ctx context.Context,
@@ -31,7 +37,6 @@ func (e *executor) planSceneryLayers(
 	prompt := prompts.SceneryPlan(prompts.SceneryPlanInput{
 		AssetName:          payload.AssetName,
 		CreativeBrief:      payload.CreativeBrief,
-		Style:              payload.Style,
 		Perspective:        payload.Perspective,
 		ProjectName:        payload.ProjectContext.Name,
 		GameType:           payload.ProjectContext.GameType,
@@ -41,7 +46,8 @@ func (e *executor) planSceneryLayers(
 		Height:             payload.Dimensions.Height,
 	})
 	completion, err := e.llm.Complete(ctx, &llmclient.CompletionRequest{
-		Prompt: prompt,
+		Prompt:      prompt,
+		MaxAttempts: maxSceneryLLMAttempts,
 		ResponseSchema: llmclient.JSONSchema{
 			Name:   sceneryLayerPlanSchemaName,
 			Schema: append([]byte(nil), sceneryLayerPlanJSONSchema...),
@@ -57,25 +63,62 @@ func (e *executor) planSceneryLayers(
 }
 
 func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPayload) (json.RawMessage, error) {
+	startedAt := time.Now()
+	e.logSceneryStage("generate scenery started", payload, "start", startedAt)
+
+	stageStartedAt := time.Now()
 	plan, err := e.planSceneryLayers(ctx, payload)
 	if err != nil {
+		e.logSceneryFailure(payload, "plan_layers", stageStartedAt, err)
 		return nil, err
 	}
+	e.logSceneryStage("scenery layers planned", payload, "plan_layers", stageStartedAt,
+		logger.Int("layer_count", len(plan)),
+	)
+
+	stageStartedAt = time.Now()
 	layers, err := e.generateSceneryLayers(ctx, payload, plan)
 	if err != nil {
+		e.logSceneryFailure(payload, "generate_layers", stageStartedAt, err)
 		return nil, err
 	}
+	e.logSceneryStage("scenery layers generated", payload, "generate_layers", stageStartedAt,
+		logger.Int("layer_count", len(layers)),
+	)
+
+	stageStartedAt = time.Now()
 	laidOut, err := e.analyzeSceneryLayout(ctx, payload, layers)
 	if err != nil {
+		e.logSceneryFailure(payload, "analyze_layout", stageStartedAt, err,
+			logger.Int("layer_count", len(layers)),
+		)
 		return nil, err
 	}
-	return e.persistScenery(ctx, payload, laidOut)
+	e.logSceneryStage("scenery layout analyzed", payload, "analyze_layout", stageStartedAt,
+		logger.Int("layer_count", len(laidOut)),
+	)
+
+	stageStartedAt = time.Now()
+	result, err := e.persistScenery(ctx, payload, laidOut)
+	if err != nil {
+		e.logSceneryFailure(payload, "persist", stageStartedAt, err,
+			logger.Int("layer_count", len(laidOut)),
+		)
+		return nil, err
+	}
+	e.logSceneryStage("generate scenery completed", payload, "complete", startedAt,
+		logger.Int("layer_count", len(laidOut)),
+	)
+	return result, nil
 }
 
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {
 	references := []string(nil)
-	if payload.Reference != "" {
-		reference := payload.Reference
+	reference := payload.CreatingReference
+	if reference == "" {
+		reference = payload.ProjectReference
+	}
+	if reference != "" {
 		if e.references != nil {
 			resolved, err := e.references.ResolveReference(ctx, reference)
 			if err != nil {
@@ -109,7 +152,7 @@ func (e *executor) generateSceneryLayer(
 	references []string,
 ) (*ProcessedSceneryLayer, error) {
 	prompt := prompts.SceneryLayer(prompts.SceneryLayerInput{
-		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style,
+		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief,
 		Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType,
 		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
 		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, LayerID: layer.ID,
@@ -231,7 +274,7 @@ func (e *executor) analyzeSceneryLayout(
 		images[index] = llmclient.ImageInput{URL: "data:" + layer.MediaType + ";base64," + layer.ImageBase64}
 	}
 	prompt := prompts.SceneryLayoutAnalysis(prompts.SceneryLayoutAnalysisInput{
-		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief, Style: payload.Style,
+		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief,
 		Perspective: payload.Perspective, ProjectName: payload.ProjectContext.Name, GameType: payload.ProjectContext.GameType,
 		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
 		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, Layers: promptLayers,
@@ -239,6 +282,7 @@ func (e *executor) analyzeSceneryLayout(
 	completion, err := e.llm.Complete(ctx, &llmclient.CompletionRequest{
 		Prompt:         prompt,
 		Images:         images,
+		MaxAttempts:    maxSceneryLLMAttempts,
 		ResponseSchema: llmclient.JSONSchema{Name: sceneryLayerLayoutSchemaName, Schema: append([]byte(nil), sceneryLayerLayoutJSONSchema...)},
 	})
 	if err != nil {
