@@ -13,8 +13,18 @@ import {
 import { withI18n } from "@/testing/with-i18n";
 
 const mutations = vi.hoisted(() => ({
-  delete: { error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() },
-  retry: { error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() },
+  delete: {
+    error: null as Error | null,
+    isPending: false,
+    mutate: vi.fn(),
+    reset: vi.fn(),
+  },
+  retry: {
+    error: null as Error | null,
+    isPending: false,
+    mutate: vi.fn(),
+    reset: vi.fn(),
+  },
 }));
 
 vi.mock("@/model/generation", () => ({
