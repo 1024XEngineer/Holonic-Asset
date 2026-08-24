@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,7 +15,7 @@ afterEach(cleanup);
 describe("GenerationTaskDropdown", () => {
   it("renders nothing without generation tasks", () => {
     const { container } = render(
-      withI18n(<GenerationTaskDropdown tasks={[]} />),
+      withProviders(<GenerationTaskDropdown tasks={[]} />),
     );
 
     expect(container.innerHTML).toBe("");
@@ -22,7 +23,7 @@ describe("GenerationTaskDropdown", () => {
 
   it("shows a failed task without an active loading spinner", () => {
     const html = renderToStaticMarkup(
-      withI18n(
+      withProviders(
         <GenerationTaskDropdown
           tasks={[
             {
@@ -41,17 +42,17 @@ describe("GenerationTaskDropdown", () => {
     expect(html).not.toContain("animate-spin");
   });
 
-  it("shows queued, processing, and failed task details", async () => {
+  it("shows pending, processing, and failed task details", async () => {
     const user = userEvent.setup();
     render(
-      withI18n(
+      withProviders(
         <GenerationTaskDropdown
           tasks={[
             {
               id: "run-1",
               name: "Walk",
               prompt: "A relaxed walk",
-              status: "queued",
+              status: "pending",
             },
             {
               id: "run-2",
@@ -65,6 +66,7 @@ describe("GenerationTaskDropdown", () => {
               prompt: "A high jump",
               status: "failed",
               error: "Video provider rejected the request",
+              projectId: "7",
             },
           ]}
         />,
@@ -77,11 +79,23 @@ describe("GenerationTaskDropdown", () => {
     expect(trigger.innerHTML).toContain("animate-spin");
     await user.click(trigger);
 
-    expect(await screen.findByText("Queued")).toBeTruthy();
-    expect(screen.getByText("Generating")).toBeTruthy();
+    expect(await screen.findByText("Pending")).toBeTruthy();
+    expect(screen.getByText("Processing")).toBeTruthy();
     expect(screen.getByText("Failed")).toBeTruthy();
     expect(
       screen.getByText("Video provider rejected the request"),
     ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry Jump" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Delete Jump" }));
+    expect(await screen.findByText("Delete failed task “Jump”?")).toBeTruthy();
   });
 });
+
+function withProviders(element: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+  });
+  return withI18n(
+    <QueryClientProvider client={queryClient}>{element}</QueryClientProvider>,
+  );
+}

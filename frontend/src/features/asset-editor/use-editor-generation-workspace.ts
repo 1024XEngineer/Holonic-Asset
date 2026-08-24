@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useGenerationEditFlow } from "@/features/generation";
+import {
+  type GenerationTaskListItem,
+  useGenerationEditFlow,
+} from "@/features/generation";
 import { useTimeout } from "@/hooks/use-timeout";
 import type {
   AssetRecord,
@@ -8,7 +11,6 @@ import type {
   CreateGenerationRequest,
 } from "@/model";
 
-import type { EditorGenerationTask } from "./Header/editor-header";
 import { getEditorStatus } from "./editor-status";
 import { useEditorSession } from "./state";
 
@@ -16,7 +18,7 @@ type EditorGenerationWorkspaceInput<Content> = {
   data: AssetWorkspaceData;
   onBack: () => void;
   toCandidateRecord: (record: AssetRecord, content: Content) => AssetRecord;
-  additionalTasks?: EditorGenerationTask[];
+  additionalTasks?: GenerationTaskListItem[];
   isAdditionalGenerationPending?: boolean;
 };
 
@@ -61,7 +63,7 @@ export function useEditorGenerationWorkspace<Content>({
     scheduleNoticeReset(() => setNotice(null), 2400);
   };
 
-  const generationTasks = useMemo<EditorGenerationTask[]>(
+  const generationTasks = useMemo<GenerationTaskListItem[]>(
     () => [
       ...generation.runs.flatMap((run) =>
         run.status === "pending" ||
@@ -72,20 +74,24 @@ export function useEditorGenerationWorkspace<Content>({
                 id: run.id,
                 name: run.name,
                 prompt: run.prompt,
-                status:
-                  run.status === "pending"
-                    ? "queued"
-                    : run.status === "failed"
-                      ? "failed"
-                      : "processing",
+                status: run.status,
+                projectId: run.projectId,
+                kind: run.kind,
                 ...(run.error ? { error: run.error } : {}),
-              } satisfies EditorGenerationTask,
+              } satisfies GenerationTaskListItem,
             ]
           : [],
       ),
       ...additionalTasks,
       ...(generation.submittedTask
-        ? [{ ...generation.submittedTask, status: "processing" as const }]
+        ? [
+            {
+              ...generation.submittedTask,
+              status: "processing" as const,
+              projectId: asset.projectId,
+              kind: asset.kind,
+            },
+          ]
         : []),
     ],
     [additionalTasks, generation.runs, generation.submittedTask],
