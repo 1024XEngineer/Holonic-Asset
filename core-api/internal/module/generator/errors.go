@@ -20,6 +20,7 @@ var (
 		"generator: animation reference store is required",
 	)
 	ErrImageProcessorRequired = errors.New("generator: image processor is required")
+	ErrAssetReaderRequired    = errors.New("generator: asset reader is required")
 	ErrAssetWriterRequired    = errors.New("generator: asset writer is required")
 	ErrAssetReaderRequired    = errors.New("generator: asset reader is required for Nexus References")
 	ErrImageResultRequired    = errors.New("generator: image result is required")

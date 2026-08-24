@@ -44,9 +44,15 @@ type ExecutionResult struct {
 	GeneratedResources []string        `json:"generated_resources,omitempty"`
 }
 
+// AssetReader is the subset of Workspace asset operations used to validate
+// generation requests against existing assets.
+type AssetReader interface {
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
+}
+
 // AssetWriter is the subset of Workspace asset operations used by generation.
 type AssetWriter interface {
-	GetDetail(context.Context, uint) (assetdomain.Asset, error)
+	AssetReader
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateSceneryAsset(context.Context, *assetdomain.Asset) (uint, error)
@@ -206,6 +212,15 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateTileSet(ctx, request)
+	case AddTilesetItem:
+		if err := e.requireTileSetDependencies(); err != nil {
+			return nil, err
+		}
+		request := AddTilesetItemPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.addTileSetItem(ctx, request)
 	case EditTiles:
 		if err := e.requireTileSetDependencies(); err != nil {
 			return nil, err

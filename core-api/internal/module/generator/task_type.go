@@ -14,6 +14,7 @@ const (
 	EditAnimation     TaskType = "edit_animation"
 	GenerateScenery   TaskType = "generate_scenery"
 	GenerateTileSet   TaskType = "generate_tileset"
+	AddTilesetItem    TaskType = "add_tileset_item"
 	EditTilesetItem   TaskType = "edit_tileset_item"
 	EditTiles         TaskType = "edit_tiles"
 )
@@ -34,6 +35,7 @@ func (t TaskType) AwaitsApplication() bool {
 		EditFrames,
 		GenerateAnimation,
 		EditAnimation,
+		AddTilesetItem,
 		EditTilesetItem,
 		EditTiles:
 		return true
@@ -53,6 +55,7 @@ func TaskTypes() []TaskType {
 		EditAnimation,
 		GenerateScenery,
 		GenerateTileSet,
+		AddTilesetItem,
 		EditTilesetItem,
 		EditTiles,
 	}

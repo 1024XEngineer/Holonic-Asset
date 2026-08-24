@@ -13,6 +13,7 @@ type Engine struct {
 	reader     *RunReader
 	tasks      taskdomain.Manager
 	executor   Executor
+	assets     AssetReader
 	projects   ProjectReader
 	assets     AssetReader
 	references ReferenceStore
@@ -33,6 +34,7 @@ type AssetReader interface {
 // EngineDependencies keeps storage and project lookup optional for lightweight
 // callers and existing tests.
 type EngineDependencies struct {
+	Assets     AssetReader
 	Projects   ProjectReader
 	Assets     AssetReader
 	References ReferenceStore
@@ -51,6 +53,7 @@ func NewEngine(
 		executor: executor,
 	}
 	if len(dependencies) > 0 {
+		engine.assets = dependencies[0].Assets
 		engine.projects = dependencies[0].Projects
 		engine.assets = dependencies[0].Assets
 		engine.references = dependencies[0].References

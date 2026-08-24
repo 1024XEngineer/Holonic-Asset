@@ -388,17 +388,7 @@ func (e *executor) publishTileSet(
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode Tileset dimensions: %w", err))
 	}
-	contentItems := make([]assetdomain.TileSetItem, len(items))
-	for _, upload := range uploads {
-		if contentItems[upload.itemIndex].Name == "" {
-			contentItems[upload.itemIndex].Name = items[upload.itemIndex].Name
-		}
-		key := upload.objectKey
-		contentItems[upload.itemIndex].Tiles = append(contentItems[upload.itemIndex].Tiles, assetdomain.Tile{
-			URL:      &key,
-			Position: assetdomain.TilePosition{X: upload.position[0], Y: upload.position[1]},
-		})
-	}
+	contentItems := buildTileSetContentItems(items, uploads)
 	content, err := assetdomain.EncodeContent(assetdomain.AssetContent{Items: contentItems})
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode Tileset content: %w", err))
@@ -422,6 +412,24 @@ func (e *executor) publishTileSet(
 		return nil, cleanup(fmt.Errorf("generator: create Tileset asset: empty ID"))
 	}
 	return encodeExecutionResult(ExecutionResult{AssetID: assetID, Version: 1})
+}
+
+func buildTileSetContentItems(
+	items []processedTileSetItem,
+	uploads []tileSetTileUpload,
+) []assetdomain.TileSetItem {
+	contentItems := make([]assetdomain.TileSetItem, len(items))
+	for _, upload := range uploads {
+		if contentItems[upload.itemIndex].Name == "" {
+			contentItems[upload.itemIndex].Name = items[upload.itemIndex].Name
+		}
+		key := upload.objectKey
+		contentItems[upload.itemIndex].Tiles = append(contentItems[upload.itemIndex].Tiles, assetdomain.Tile{
+			URL:      &key,
+			Position: assetdomain.TilePosition{X: upload.position[0], Y: upload.position[1]},
+		})
+	}
+	return contentItems
 }
 
 func buildTileSetUploads(

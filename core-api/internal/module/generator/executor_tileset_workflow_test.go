@@ -167,6 +167,72 @@ func TestTileSetEditReturnsCandidateWithoutMutatingPersistedState(t *testing.T) 
 	}
 }
 
+func TestAddTileSetItemReturnsCandidateWithoutMutatingPersistedState(t *testing.T) {
+	existing := "uploads/existing.png"
+	content := assetdomain.AssetContent{Items: []assetdomain.TileSetItem{{
+		Name:  "Pot",
+		Tiles: []assetdomain.Tile{{URL: &existing, Position: assetdomain.TilePosition{X: 0, Y: 0}}},
+	}}}
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets := &tileSetWorkflowAssets{
+		asset: assetdomain.Asset{
+			ID: 100, ProjectID: 42, Type: assetdomain.AssetTypeTileSet, Version: 3,
+			Perspective: assetdomain.PerspectiveTopDown,
+			Dimensions:  json.RawMessage(`{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":4,"rows":2}}`),
+			Content:     encoded,
+		},
+		content: content,
+	}
+	references := &tileSetWorkflowReferences{objects: map[string]string{existing: "existing"}}
+	executor := &executor{
+		images: &tileSetWorkflowImages{}, processor: imageprocessor.NewProcessor(), assets: assets,
+		projects: &tileSetGenerationProjectStub{project: &projectdomain.Project{
+			ID: 42, Name: "Ruins", Perspective: projectdomain.PerspectiveTopDown,
+		}},
+		references: references,
+	}
+	payload, err := json.Marshal(AddTilesetItemPayload{
+		AssetID: 100, ProjectID: 42, CreativeBrief: "add observatory furniture",
+		Item: &AddTileSetItemDefinition{
+			Name: "Bench", Description: "two-cell brass bench", Shape: []TileSetCoordinate{{0, 0}, {1, 0}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultRaw, err := executor.Generate(context.Background(), AddTilesetItem, payload)
+	if err != nil {
+		t.Fatalf("add Tileset Item candidate: %v", err)
+	}
+	var result ExecutionResult
+	if err := json.Unmarshal(resultRaw, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.AssetID != 100 || result.Version != 3 || len(result.GeneratedResources) != 2 {
+		t.Fatalf("unexpected Item addition result: %+v", result)
+	}
+	candidate, err := (assetdomain.Asset{Type: assetdomain.AssetTypeTileSet, Content: result.Content}).DecodeContent()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidate.Items) != 1 || candidate.Items[0].Name != "Bench" || len(candidate.Items[0].Tiles) != 2 {
+		t.Fatalf("unexpected Item candidate: %+v", candidate.Items)
+	}
+	wantPositions := []assetdomain.TilePosition{{X: 1, Y: 0}, {X: 2, Y: 0}}
+	for index, tile := range candidate.Items[0].Tiles {
+		if tile.Position != wantPositions[index] || tile.URL == nil || *tile.URL == existing {
+			t.Fatalf("unexpected candidate Tile %d: %+v", index, tile)
+		}
+	}
+	if assets.asset.Version != 3 || len(assets.content.Items) != 1 || assets.content.Items[0].Name != "Pot" {
+		t.Fatalf("Item candidate mutated persisted state: asset=%+v content=%+v", assets.asset, assets.content)
+	}
+}
+
 func TestStabilizeTileSetTileEditPreservesAlphaAndSeamEdge(t *testing.T) {
 	original := image.NewRGBA(image.Rect(0, 0, 4, 4))
 	generated := image.NewRGBA(image.Rect(0, 0, 4, 4))
