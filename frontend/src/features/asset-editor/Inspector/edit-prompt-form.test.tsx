@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { withI18n } from "@/testing/with-i18n";
 
 import { EditPromptForm } from "./edit-prompt-form";
+import type { useEditPrompt } from "./use-inspector-edit";
 
 afterEach(cleanup);
 
@@ -28,7 +29,7 @@ function controller(overrides: Record<string, unknown> = {}) {
     isUploadingCreatingReference: false,
     canSubmit: true,
     ...overrides,
-  } as never;
+  } as unknown as ReturnType<typeof useEditPrompt>;
 }
 
 describe("EditPromptForm", () => {

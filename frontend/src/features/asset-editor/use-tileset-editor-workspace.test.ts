@@ -326,10 +326,13 @@ describe("useTilesetEditorWorkspace", () => {
         },
       },
     };
-    mocks.candidateRecordOverride = () => ({
-      ...tilesetRecord(),
-      tileset: { ...tilesetRecord().tileset, items: [] },
-    });
+    mocks.candidateRecordOverride = () => {
+      const record = tilesetRecord() as Extract<
+        AssetRecord,
+        { mode: "tileset" }
+      >;
+      return { ...record, tileset: { ...record.tileset, items: [] } };
+    };
 
     const editor = useTilesetEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),

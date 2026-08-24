@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     history: [],
     prompt: "",
     isSubmitting: false,
-    review: undefined,
+    review: undefined as { items: never[]; isResolving: boolean } | undefined,
     onPromptChange: vi.fn(),
     onSubmit: vi.fn(),
     onResolveReview: vi.fn(),
