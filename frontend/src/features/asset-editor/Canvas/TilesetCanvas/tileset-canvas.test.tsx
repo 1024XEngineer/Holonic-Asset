@@ -124,6 +124,74 @@ describe("TilesetCanvas", () => {
     });
   });
 
+  it("routes grid selection and closes a review from its dialog", () => {
+    const onEvent = vi.fn();
+    const item = items[0]!;
+    const view = render(
+      withI18n(
+        <TilesetCanvas
+          model={{
+            gridSize: 4,
+            items: [item],
+            selectedCellIndexes: [],
+            review: {
+              items: [
+                {
+                  itemId: item.id,
+                  currentItem: item,
+                  candidateItem: item,
+                },
+              ],
+              isResolving: false,
+            },
+          }}
+          onEvent={onEvent}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Tile 1" }));
+    expect(onEvent).toHaveBeenCalledWith({
+      type: "cell.selection.toggled",
+      gridCellIndex: 0,
+    });
+
+    const reviewButton = screen.getByRole("button", {
+      name: "Review Sofa changes",
+    });
+    expect(reviewButton).toBeTruthy();
+    fireEvent.click(reviewButton);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    view.rerender(
+      withI18n(
+        <TilesetCanvas
+          model={{
+            gridSize: 4,
+            items: [item],
+            selectedCellIndexes: [],
+            review: {
+              items: [
+                {
+                  itemId: item.id,
+                  currentItem: item,
+                  candidateItem: { ...item, tiles: [[99, 99]] },
+                },
+              ],
+              isResolving: false,
+            },
+          }}
+          onEvent={onEvent}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Review Sofa changes" }),
+    ).toBeNull();
+  });
+
   it("disables review decisions while resolving", () => {
     const currentItem = items[4]!;
     render(

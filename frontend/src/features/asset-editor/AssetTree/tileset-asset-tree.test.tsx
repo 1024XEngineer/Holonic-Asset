@@ -123,4 +123,23 @@ describe("TilesetAssetTree", () => {
 
     expect(html).toContain("No tileset items");
   });
+
+  it("does not render a grid for an item without tiles", () => {
+    render(
+      withI18n(
+        <TilesetAssetTree
+          items={[{ id: "empty", label: "Empty", tiles: [] }]}
+          selectedItemIds={[]}
+          isTileSelected={() => false}
+          onToggleItem={vi.fn()}
+          onToggleTile={vi.fn()}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Empty" }));
+
+    expect(screen.getByText("Empty")).toBeTruthy();
+    expect(screen.queryByRole("grid")).toBeNull();
+  });
 });
