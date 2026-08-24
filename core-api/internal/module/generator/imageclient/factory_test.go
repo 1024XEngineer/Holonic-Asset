@@ -96,3 +96,9 @@ func TestFactoryNewImageProviderAutoSelection(t *testing.T) {
 		}
 	})
 }
+
+func TestIsChatProtocolModelRoutesGoogleNamespace(t *testing.T) {
+	if !imageclient.IsChatProtocolModel("google/imagen-4.0-generate-001") {
+		t.Fatal("google/* model was not routed through Chat Completions")
+	}
+}

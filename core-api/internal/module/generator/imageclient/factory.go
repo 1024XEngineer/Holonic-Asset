@@ -92,7 +92,8 @@ func createProviderForModel(protocol, model string, cfg FactoryConfig) ImageProv
 // IsChatProtocolModel reports whether modelName targets a chat-based multimodal image model.
 func IsChatProtocolModel(modelName string) bool {
 	lower := strings.ToLower(strings.TrimSpace(modelName))
-	return strings.Contains(lower, "gemini") ||
+	return strings.HasPrefix(lower, "google/") ||
+		strings.Contains(lower, "gemini") ||
 		strings.Contains(lower, "banana") ||
 		strings.Contains(lower, "chat")
 }
