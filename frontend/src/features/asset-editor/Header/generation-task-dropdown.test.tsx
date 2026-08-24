@@ -6,6 +6,10 @@ import userEvent from "@testing-library/user-event";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  GenerationRunRecoveryActions,
+  GenerationTaskList,
+} from "@/features/generation";
 import { withI18n } from "@/testing/with-i18n";
 
 const mutations = vi.hoisted(() => ({
@@ -19,8 +23,6 @@ vi.mock("@/model/generation", () => ({
 }));
 
 import { GenerationTaskDropdown } from "./generation-task-dropdown";
-import { GenerationRunRecoveryActions } from "@/features/generation/generation-run-recovery-actions";
-import { GenerationTaskList } from "@/features/generation/generation-task-list";
 
 afterEach(cleanup);
 
