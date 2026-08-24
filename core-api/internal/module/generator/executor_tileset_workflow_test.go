@@ -49,7 +49,7 @@ func TestTileSetWorkflowGeneratesEditsTileAndEditsCompleteItem(t *testing.T) {
 		t.Fatalf("generate Tileset workflow: %v", err)
 	}
 	assertTileSetWorkflowResult(t, generated, 100, 1)
-	if assets.asset.Version != 1 || len(assets.content.Items) != 2 || len(references.objects) != 9 {
+	if assets.asset.Version != 1 || len(assets.content.Items) != 2 || len(references.objects) != 11 {
 		t.Fatalf("unexpected generated state: asset=%+v content=%+v objects=%d", assets.asset, assets.content, len(references.objects))
 	}
 	beforeTileEdit := tileSetWorkflowURLs(assets.content)
@@ -212,7 +212,7 @@ func TestAddTileSetItemReturnsCandidateWithoutMutatingPersistedState(t *testing.
 	if err := json.Unmarshal(resultRaw, &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.AssetID != 100 || result.Version != 3 || len(result.GeneratedResources) != 2 {
+	if result.AssetID != 100 || result.Version != 3 || len(result.GeneratedResources) != 3 {
 		t.Fatalf("unexpected Item addition result: %+v", result)
 	}
 	candidate, err := (assetdomain.Asset{Type: assetdomain.AssetTypeTileSet, Content: result.Content}).DecodeContent()

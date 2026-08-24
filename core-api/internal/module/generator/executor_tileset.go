@@ -25,15 +25,17 @@ const (
 )
 
 type processedTileSetItem struct {
-	Index       int
-	Name        string
-	Columns     int
-	Rows        int
-	ImageBase64 string
-	MIMEType    string
-	LocalShape  []TileSetCoordinate
-	Tiles       []imageprocessor.ImageRegion
-	Perspective assetdomain.Perspective
+	Index          int
+	Name           string
+	Columns        int
+	Rows           int
+	ImageBase64    string
+	MIMEType       string
+	RawImageBase64 string
+	RawMediaType   string
+	LocalShape     []TileSetCoordinate
+	Tiles          []imageprocessor.ImageRegion
+	Perspective    assetdomain.Perspective
 }
 
 func (e *executor) generateTileSet(
@@ -344,24 +346,28 @@ func (e *executor) processTileSetItemCandidate(
 		tiles[coordinateIndex] = split.Regions[coordinate[1]*columns+coordinate[0]]
 	}
 	return &processedTileSetItem{
-		Index:       index,
-		Name:        item.Name,
-		Columns:     columns,
-		Rows:        rows,
-		ImageBase64: aligned,
-		MIMEType:    resized.MIMEType,
-		LocalShape:  localShape,
-		Tiles:       tiles,
-		Perspective: perspective,
+		Index:          index,
+		Name:           item.Name,
+		Columns:        columns,
+		Rows:           rows,
+		ImageBase64:    aligned,
+		MIMEType:       resized.MIMEType,
+		RawImageBase64: candidate.Base64,
+		RawMediaType:   candidate.MediaType,
+		LocalShape:     localShape,
+		Tiles:          tiles,
+		Perspective:    perspective,
 	}, nil
 }
 
 type tileSetTileUpload struct {
-	itemIndex int
-	tileIndex int
-	position  TileSetCoordinate
-	region    imageprocessor.ImageRegion
-	objectKey string
+	itemIndex      int
+	tileIndex      int
+	position       TileSetCoordinate
+	region         imageprocessor.ImageRegion
+	objectKey      string
+	rawImageBase64 string
+	rawMediaType   string
 }
 
 func (e *executor) publishTileSet(
@@ -460,9 +466,14 @@ func buildTileSetUploads(
 				return nil, fmt.Errorf("generator: allocate Tileset Item %d Tile %d key: duplicate object key %q", itemIndex, tileIndex, key)
 			}
 			allocated[key] = struct{}{}
+			var rawB64, rawMIME string
+			if tileIndex == 0 {
+				rawB64 = item.RawImageBase64
+				rawMIME = item.RawMediaType
+			}
 			uploads = append(uploads, tileSetTileUpload{
 				itemIndex: itemIndex, tileIndex: tileIndex, position: placement.Positions[tileIndex],
-				region: region, objectKey: key,
+				region: region, objectKey: key, rawImageBase64: rawB64, rawMediaType: rawMIME,
 			})
 		}
 	}
@@ -497,14 +508,32 @@ func (e *executor) persistTileSetUploads(
 				})
 				return
 			}
+			if upload.rawImageBase64 != "" {
+				rawType := upload.rawMediaType
+				if rawType == "" {
+					rawType = "image/png"
+				}
+				unprocessedKey := addObjectKeySuffix(upload.objectKey, "-unprocessed")
+				unprocessedDataURL := "data:" + rawType + ";base64," + upload.rawImageBase64
+				if err := e.references.PersistReferenceAt(ctx, unprocessedKey, unprocessedDataURL); err != nil {
+					errOnce.Do(func() {
+						firstErr = fmt.Errorf("generator: upload Tileset Item %d unprocessed: %w", upload.itemIndex, err)
+						cancel()
+					})
+					return
+				}
+			}
 			uploaded[index] = true
 		})
 	}
 	group.Wait()
-	keys := make([]string, 0, len(uploads))
+	keys := make([]string, 0, len(uploads)*2)
 	for index, ok := range uploaded {
 		if ok {
 			keys = append(keys, uploads[index].objectKey)
+			if uploads[index].rawImageBase64 != "" {
+				keys = append(keys, addObjectKeySuffix(uploads[index].objectKey, "-unprocessed"))
+			}
 		}
 	}
 	if firstErr != nil {

@@ -54,8 +54,12 @@ func (e *executor) addTileSetItem(
 	if err != nil {
 		return nil, err
 	}
+	creatingReference := strings.TrimSpace(request.CreatingReference)
+	if creatingReference == "" {
+		creatingReference = resolveTileSetUnprocessedReference(addition.content)
+	}
 	references, err := e.resolveTileSetContextReferences(
-		ctx, AddTilesetItem, addition.project, request.CreatingReference,
+		ctx, AddTilesetItem, addition.project, creatingReference,
 	)
 	if err != nil {
 		return nil, err
@@ -63,8 +67,16 @@ func (e *executor) addTileSetItem(
 	definition := TileSetItemDefinition{
 		Name: request.Item.Name, Description: request.Item.Description, Shape: request.Item.Shape,
 	}
+	creativeBrief := strings.TrimSpace(request.CreativeBrief)
+	if assetDesc := strings.TrimSpace(addition.asset.Description); assetDesc != "" {
+		if creativeBrief != "" {
+			creativeBrief = assetDesc + "; " + creativeBrief
+		} else {
+			creativeBrief = assetDesc
+		}
+	}
 	createRequest := CreateTileSetPayload{
-		ProjectID: request.ProjectID, CreativeBrief: request.CreativeBrief,
+		ProjectID: request.ProjectID, CreativeBrief: creativeBrief,
 		Dimensions: addition.dimensions, Items: []TileSetItemDefinition{definition},
 	}
 	processed, err := e.processTileSetItem(
@@ -74,6 +86,17 @@ func (e *executor) addTileSetItem(
 		return nil, err
 	}
 	return e.publishAddedTileSetItem(ctx, request.AssetID, addition.asset.Version, *processed, placement)
+}
+
+func resolveTileSetUnprocessedReference(content assetdomain.AssetContent) string {
+	for _, item := range content.Items {
+		for _, tile := range item.Tiles {
+			if tile.URL != nil && strings.TrimSpace(*tile.URL) != "" {
+				return addObjectKeySuffix(*tile.URL, "-unprocessed")
+			}
+		}
+	}
+	return ""
 }
 
 func (e *executor) publishAddedTileSetItem(
