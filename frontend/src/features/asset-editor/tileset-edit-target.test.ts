@@ -22,6 +22,42 @@ const items: TilesetItem[] = [
 ];
 
 describe("resolveTilesetEditTarget", () => {
+  it("rejects invalid grid sizes and invalid item coordinates", () => {
+    expect(
+      resolveTilesetEditTarget({
+        selectedCellIndexes: [0],
+        items,
+        gridSize: 0,
+      }),
+    ).toEqual({ target: null, error: "missing" });
+
+    expect(
+      resolveTilesetEditTarget({
+        selectedCellIndexes: [0],
+        items: [
+          {
+            id: "invalid",
+            label: "Invalid",
+            tiles: [
+              [-1, 0],
+              [0, 0],
+            ],
+          },
+        ],
+        gridSize: 4,
+      }),
+    ).toEqual({
+      target: {
+        kind: "item",
+        itemId: "invalid",
+        label: "Invalid",
+        position: [0, 0],
+        positions: [[0, 0]],
+      },
+      error: null,
+    });
+  });
+
   it("resolves one complete item to an item edit", () => {
     expect(
       resolveTilesetEditTarget({

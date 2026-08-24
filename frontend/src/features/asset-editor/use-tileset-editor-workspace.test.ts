@@ -254,6 +254,44 @@ describe("useTilesetEditorWorkspace", () => {
     );
     expect(mocks.session.dispatch).not.toHaveBeenCalled();
   });
+
+  it("rejects edits when the asset identifiers are not persisted", async () => {
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record, {
+        id: "asset-temp",
+        projectId: "project-temp",
+      }),
+      onBack: vi.fn(),
+    });
+
+    await expect(
+      editor?.onSubmit(
+        { prompt: "Add moss" },
+        {
+          kind: "item",
+          itemId: "ground",
+          label: "Ground",
+          position: [0, 0],
+          positions: [[0, 0]],
+        },
+      ),
+    ).rejects.toThrow("persisted identifiers");
+  });
+
+  it("returns no editor for a non-tileset session", () => {
+    mocks.session.snapshot = snapshot({
+      mode: "uiset",
+      prompt: "Menu",
+      uiset: { components: [] },
+    });
+
+    expect(
+      useTilesetEditorWorkspace({
+        data: workspace(mocks.session.snapshot.record),
+        onBack: vi.fn(),
+      }),
+    ).toBeNull();
+  });
 });
 
 function tilesetRecord(): AssetRecord {
@@ -287,12 +325,15 @@ function snapshot(record: AssetRecord) {
   };
 }
 
-function workspace(record: AssetRecord): AssetWorkspaceData {
+function workspace(
+  record: AssetRecord,
+  identifiers: { id?: string; projectId?: string } = {},
+): AssetWorkspaceData {
   return {
     projectName: "Project",
     asset: {
-      id: "8",
-      projectId: "7",
+      id: identifiers.id ?? "8",
+      projectId: identifiers.projectId ?? "7",
       kind: "tileset",
       name: "Asset",
       perspective: "Top-Down",
