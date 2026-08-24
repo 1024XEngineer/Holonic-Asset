@@ -17,9 +17,10 @@ func TestCharacterPrototypeIncludesFullBodyStyleAndDirectionLayout(t *testing.T)
 
 	for _, expected := range []string{
 		"complete full-body character",
-		"Reference image 1 is the project prototype image and is the Style Reference",
-		"Reference image 2 is the creating reference image",
-		"creating reference image is always a strong reference",
+		"Reference image 1 is the Project Reference (the project prototype image)",
+		"Reference image 2 is the Creating Reference (the user's subject or concept reference)",
+		"The Creating Reference is the user's reference for the object or subject being created",
+		"is always a strong reference",
 		"uniform, solid #00FF00 colour",
 		"exactly 2 direction views",
 		"1 row x 2 column sheet",

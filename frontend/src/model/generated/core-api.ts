@@ -360,7 +360,7 @@ export interface components {
             perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
-            tags: string[] | null;
+            tags: components["schemas"]["Tag"][] | null;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */
@@ -376,7 +376,7 @@ export interface components {
             perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
-            tags: string[] | null;
+            tags: components["schemas"]["Tag"][] | null;
             thumbnailUrl?: string;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
@@ -400,6 +400,7 @@ export interface components {
             creative_brief: string;
             /** @enum {string} */
             kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            /** @description Task-specific parameters. Prototype generation accepts tags as structured objects or legacy strings. */
             parameters?: unknown;
             targetAssetPaths?: string[] | null;
         };
@@ -831,6 +832,11 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        Tag: {
+            color?: string;
+            description?: string;
+            name: string;
+        };
         UpdateAssetRequest: {
             /** Format: int64 */
             assetId: number;
@@ -839,7 +845,11 @@ export interface components {
             name?: string;
             /** @enum {string} */
             perspective?: "Top-Down" | "Side-On" | "Isometric";
-            tags?: string[];
+            tags?: (string | {
+                color?: string;
+                description?: string;
+                name: string;
+            })[];
         };
         UpdateAssetResponse: {
             /** Format: int64 */
@@ -851,7 +861,7 @@ export interface components {
             perspective: "Top-Down" | "Side-On" | "Isometric";
             /** Format: int64 */
             projectId: number;
-            tags: string[] | null;
+            tags: components["schemas"]["Tag"][] | null;
             /** @enum {string} */
             type: "character" | "object" | "tileSet" | "audio" | "uiset" | "scenery";
             /** Format: int64 */

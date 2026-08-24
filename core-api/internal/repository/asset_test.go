@@ -61,7 +61,7 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 		ProjectID:   42,
 		Type:        "character",
 		Description: "main character",
-		Tags:        []string{"player", "hero"},
+		Tags:        []domain.Tag{{Name: "player"}, {Name: "hero", Description: "main role"}},
 		Perspective: "Top-Down",
 		Dimensions:  datatypes.JSON(dimensions),
 		Version:     3,
@@ -88,9 +88,9 @@ func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
 
 func TestAssetRepositoryFiltersAssetsByAllTagsAndTypes(t *testing.T) {
 	daoStub := &assetDaoStub{assets: []dao.Asset{
-		{ID: 1, ProjectID: 42, Name: "hero", Type: "character", Tags: []string{"hero", "player"}},
-		{ID: 2, ProjectID: 42, Type: "object", Tags: []string{"hero", "prop"}},
-		{ID: 3, ProjectID: 42, Type: "character", Tags: []string{"npc"}},
+		{ID: 1, ProjectID: 42, Name: "hero", Type: "character", Tags: []domain.Tag{{Name: "hero"}, {Name: "player"}}},
+		{ID: 2, ProjectID: 42, Type: "object", Tags: []domain.Tag{{Name: "hero"}, {Name: "prop"}}},
+		{ID: 3, ProjectID: 42, Type: "character", Tags: []domain.Tag{{Name: "npc"}}},
 	}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
 
@@ -124,12 +124,30 @@ func TestAssetRepositoryMatchesAssetQueryByNameOrDescription(t *testing.T) {
 	}
 }
 
+func TestAssetRepositoryMatchesAssetQueryByTagAttributes(t *testing.T) {
+	daoStub := &assetDaoStub{assets: []dao.Asset{
+		{ID: 1, ProjectID: 42, Tags: []domain.Tag{{Name: "knight", Description: "heavy armored guardian", Color: "#123456"}}},
+		{ID: 2, ProjectID: 42, Tags: []domain.Tag{{Name: "villager"}}},
+	}}
+	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
+
+	for _, query := range []string{"KNIGHT", "armored", "#123456"} {
+		got, err := repo.GetAssetsByProjectID(context.Background(), 42, domain.AssetListFilter{Query: query})
+		if err != nil {
+			t.Fatalf("filter assets by tag query %q: %v", query, err)
+		}
+		if len(got) != 1 || got[0].ID != 1 {
+			t.Fatalf("unexpected query results for %q: %+v", query, got)
+		}
+	}
+}
+
 func TestAssetRepositoryUpdatesAssetBasics(t *testing.T) {
 	name := "updated hero"
 	projectID := uint(42)
 	typeValue := domain.AssetTypeCharacter
 	description := "updated description"
-	tags := []string{"prop"}
+	tags := []domain.Tag{{Name: "prop", Description: "scene object", Color: "#123456"}}
 	perspective := domain.PerspectiveSideOn
 	dimensions := json.RawMessage(`{"width":64,"height":64}`)
 	version := uint(4)
@@ -206,7 +224,7 @@ func TestAssetRepositoryGetDetailMapsDAOResult(t *testing.T) {
 		ID:        7,
 		ProjectID: 42,
 		Type:      "object",
-		Tags:      []string{"prop"},
+		Tags:      []domain.Tag{{Name: "prop"}},
 	}}
 	repo := &repository.AssetRepositoryImpl{AssetDao: daoStub}
 

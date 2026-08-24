@@ -4,8 +4,46 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
+
+// AssetTagInput accepts the legacy string form while documenting the
+// structured form used by responses and new clients.
+type AssetTagInput domain.Tag
+
+func (t *AssetTagInput) UnmarshalJSON(data []byte) error {
+	var value domain.Tag
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*t = AssetTagInput(value)
+	return nil
+}
+
+func (AssetTagInput) Schema(huma.Registry) *huma.Schema {
+	return &huma.Schema{
+		Description: "A structured asset tag or a legacy tag name.",
+		OneOf: []*huma.Schema{
+			{Type: huma.TypeString},
+			{
+				Type: huma.TypeObject,
+				Properties: map[string]*huma.Schema{
+					"name":        {Type: huma.TypeString},
+					"description": {Type: huma.TypeString},
+					"color":       {Type: huma.TypeString},
+				},
+				Required:             []string{"name"},
+				AdditionalProperties: false,
+			},
+		},
+	}
+}
+
+func (t AssetTagInput) Domain() domain.Tag {
+	return domain.Tag(t)
+}
 
 type AssetListItemResponse struct {
 	AssetID      uint               `json:"assetId" minimum:"1"`
@@ -15,7 +53,7 @@ type AssetListItemResponse struct {
 	Description  string             `json:"description"`
 	Perspective  domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Dimensions   json.RawMessage    `json:"dimensions"`
-	Tags         []string           `json:"tags"`
+	Tags         []domain.Tag       `json:"tags"`
 	ThumbnailURL string             `json:"thumbnailUrl,omitempty"`
 	Version      uint               `json:"version"`
 }
@@ -43,7 +81,7 @@ type AssetDetailResponse struct {
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Dimensions  json.RawMessage    `json:"dimensions"`
-	Tags        []string           `json:"tags"`
+	Tags        []domain.Tag       `json:"tags"`
 	Content     json.RawMessage    `json:"content,omitempty"`
 	Version     uint               `json:"version"`
 }
@@ -90,7 +128,7 @@ type UpdateAssetRequest struct {
 	AssetID     uint                `json:"assetId" minimum:"1"`
 	Name        *string             `json:"name,omitempty"`
 	Description *string             `json:"description,omitempty"`
-	Tags        *[]string           `json:"tags,omitempty"`
+	Tags        *[]AssetTagInput    `json:"tags,omitempty"`
 	Perspective *domain.Perspective `json:"perspective,omitempty" enum:"Top-Down,Side-On,Isometric"`
 	Dimensions  *json.RawMessage    `json:"dimensions,omitempty"`
 }
@@ -103,7 +141,7 @@ type UpdateAssetResponse struct {
 	Description string             `json:"description"`
 	Perspective domain.Perspective `json:"perspective" enum:"Top-Down,Side-On,Isometric"`
 	Dimensions  json.RawMessage    `json:"dimensions"`
-	Tags        []string           `json:"tags"`
+	Tags        []domain.Tag       `json:"tags"`
 	Version     uint               `json:"version"`
 }
 

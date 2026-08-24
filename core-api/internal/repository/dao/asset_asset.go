@@ -2,12 +2,13 @@ package dao
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 type Asset struct {
@@ -16,7 +17,7 @@ type Asset struct {
 	ProjectID    uint `gorm:"index"`
 	Type         string
 	Description  string
-	Tags         []string `json:"tags" gorm:"serializer:asset_tags"`
+	Tags         []assetdomain.Tag `json:"tags" gorm:"-"`
 	Perspective  string
 	Dimensions   datatypes.JSON `gorm:"type:jsonb"`
 	ThumbnailURL string
@@ -28,7 +29,7 @@ type Asset struct {
 type AssetUpdate struct {
 	Name        *string
 	Description *string
-	Tags        *[]string
+	Tags        *[]assetdomain.Tag
 	Perspective *string
 	Dimensions  *datatypes.JSON
 }
@@ -59,10 +60,16 @@ func (a *AssetDaoImpl) GetAssetsByProjectID(ctx context.Context, projectID uint)
 	assets := make([]Asset, 0)
 	err := a.DB.WithContext(ctx).
 		Where("project_id = ?", projectID).
-		Select("id, name, project_id, type, description, tags, perspective, dimensions, thumbnail_url, version").
+		Select("id, name, project_id, type, description, perspective, dimensions, thumbnail_url, version").
 		Order("id ASC").
 		Find(&assets).Error
-	return assets, err
+	if err != nil {
+		return nil, err
+	}
+	if err := a.loadAssetTags(ctx, assets); err != nil {
+		return nil, err
+	}
+	return assets, nil
 }
 
 func (a *AssetDaoImpl) CreateAsset(ctx context.Context, asset *Asset) (Asset, error) {
@@ -72,44 +79,62 @@ func (a *AssetDaoImpl) CreateAsset(ctx context.Context, asset *Asset) (Asset, er
 	if asset.Version == 0 {
 		asset.Version = 1
 	}
+	tags := append([]assetdomain.Tag(nil), asset.Tags...)
 	if err := a.DB.WithContext(ctx).Create(asset).Error; err != nil {
 		return Asset{}, fmt.Errorf("dao: create asset: %w", err)
 	}
+	storedTags, err := a.replaceAssetTags(ctx, asset.ID, asset.ProjectID, tags)
+	if err != nil {
+		return Asset{}, err
+	}
+	asset.Tags = storedTags
 	return *asset, nil
 }
 
 func (a *AssetDaoImpl) GetAsset(ctx context.Context, id uint) (Asset, error) {
 	var asset Asset
-	err := a.DB.WithContext(ctx).First(&asset, id).Error
-	return asset, err
+	if err := a.DB.WithContext(ctx).First(&asset, id).Error; err != nil {
+		return Asset{}, err
+	}
+	assets := []Asset{asset}
+	if err := a.loadAssetTags(ctx, assets); err != nil {
+		return Asset{}, err
+	}
+	return assets[0], nil
 }
 
 func (a *AssetDaoImpl) GetAssetForUpdate(ctx context.Context, id uint) (Asset, error) {
 	var asset Asset
-	err := a.DB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).First(&asset, id).Error
-	return asset, err
+	if err := a.DB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).First(&asset, id).Error; err != nil {
+		return Asset{}, err
+	}
+	assets := []Asset{asset}
+	if err := a.loadAssetTags(ctx, assets); err != nil {
+		return Asset{}, err
+	}
+	return assets[0], nil
 }
 
 func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUpdate) (Asset, error) {
 	if update == nil {
 		return Asset{}, fmt.Errorf("dao: asset update is nil")
 	}
+	var updated Asset
+	err := a.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		updated, err = (&AssetDaoImpl{DB: tx}).updateAsset(ctx, id, update)
+		return err
+	})
+	return updated, err
+}
 
+func (a *AssetDaoImpl) updateAsset(ctx context.Context, id uint, update *AssetUpdate) (Asset, error) {
 	values := make(map[string]any)
 	if update.Name != nil {
 		values["name"] = *update.Name
 	}
 	if update.Description != nil {
 		values["description"] = *update.Description
-	}
-	if update.Tags != nil {
-		encoded, err := json.Marshal(*update.Tags)
-		if err != nil {
-			return Asset{}, fmt.Errorf("dao: encode asset tags: %w", err)
-		}
-		// Asset.Tags is a serialized text column. Map updates bypass GORM's
-		// field serializer, so pass the JSON representation explicitly.
-		values["tags"] = string(encoded)
 	}
 	if update.Perspective != nil {
 		values["perspective"] = *update.Perspective
@@ -129,6 +154,19 @@ func (a *AssetDaoImpl) UpdateAsset(ctx context.Context, id uint, update *AssetUp
 	var asset Asset
 	if err := a.DB.WithContext(ctx).First(&asset, id).Error; err != nil {
 		return Asset{}, fmt.Errorf("dao: get updated asset %d: %w", id, err)
+	}
+	if update.Tags != nil {
+		storedTags, err := a.replaceAssetTags(ctx, asset.ID, asset.ProjectID, *update.Tags)
+		if err != nil {
+			return Asset{}, err
+		}
+		asset.Tags = storedTags
+	} else {
+		assets := []Asset{asset}
+		if err := a.loadAssetTags(ctx, assets); err != nil {
+			return Asset{}, err
+		}
+		asset = assets[0]
 	}
 	return asset, nil
 }

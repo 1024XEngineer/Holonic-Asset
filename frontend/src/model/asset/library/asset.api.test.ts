@@ -26,7 +26,7 @@ describe("toAssetGroups", () => {
           perspective: "Top-Down",
           type: "object",
           version: 2,
-          tags: ["prop"],
+          tags: [{ name: "prop" }],
         },
         {
           assetId: 9,

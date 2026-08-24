@@ -505,7 +505,7 @@ func TestAssetRepositoryCopiesAssetWithAllRecordsAndContents(t *testing.T) {
 		ProjectID:    42,
 		Type:         "character",
 		Description:  "main character",
-		Tags:         []string{"hero", "player"},
+		Tags:         []domain.Tag{{Name: "hero"}, {Name: "player"}},
 		Perspective:  "Side-On",
 		Dimensions:   []byte(`{"width":64,"height":64}`),
 		ThumbnailURL: "uploads/hero.png",

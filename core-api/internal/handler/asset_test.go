@@ -118,7 +118,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 		Description:  "main character",
 		Perspective:  domain.PerspectiveTopDown,
 		Dimensions:   json.RawMessage(`{"width":64,"height":64}`),
-		Tags:         []string{"player"},
+		Tags:         []domain.Tag{{Name: "player", Description: "controllable hero", Color: "#4F46E5"}},
 		ThumbnailURL: "uploads/hero.png",
 		Version:      3,
 	}}}
@@ -143,7 +143,7 @@ func TestAssetHandlerGetAssetsMapsResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal response: %v", err)
 	}
-	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":["player"],"thumbnailUrl":"signed:uploads/hero.png","version":3}]}}` {
+	if string(payload) != `{"code":200,"message":"success","data":{"assets":[{"assetId":7,"name":"hero","projectId":42,"type":"character","description":"main character","perspective":"Top-Down","dimensions":{"width":64,"height":64},"tags":[{"name":"player","description":"controllable hero","color":"#4F46E5"}],"thumbnailUrl":"signed:uploads/hero.png","version":3}]}}` {
 		t.Fatalf("unexpected JSON response: %s", payload)
 	}
 }
@@ -192,7 +192,8 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 	projectID := uint(99)
 	typeValue := domain.AssetTypeObject
 	description := "updated description"
-	tags := []string{"prop"}
+	tags := []domain.Tag{{Name: "prop", Color: "#123456"}}
+	inputTags := []dto.AssetTagInput{{Name: "prop", Color: "#123456"}}
 	perspective := domain.PerspectiveSideOn
 	dimensions := json.RawMessage(`{"width":64,"height":64}`)
 	version := uint(4)
@@ -213,7 +214,7 @@ func TestAssetHandlerUpdatesAssetBasicsWithoutContent(t *testing.T) {
 		AssetID:     7,
 		Name:        &name,
 		Description: &description,
-		Tags:        &tags,
+		Tags:        &inputTags,
 		Perspective: &perspective,
 		Dimensions:  &dimensions,
 	})
@@ -478,7 +479,7 @@ func TestAssetHandlerDetailMapsResponse(t *testing.T) {
 		ProjectID:   42,
 		Type:        domain.AssetTypeObject,
 		Description: "prop",
-		Tags:        []string{"scene"},
+		Tags:        []domain.Tag{{Name: "scene"}},
 		Perspective: domain.PerspectiveTopDown,
 		Dimensions:  json.RawMessage(`{"width":64,"height":64}`),
 		Version:     2,

@@ -457,10 +457,19 @@ func (h *Handler) UpdateAsset(
 		return dto.SuccessResponse[dto.UpdateAssetResponse]{}, echo.ErrBadRequest
 	}
 
+	var tags *[]domain.Tag
+	if req.Tags != nil {
+		values := make([]domain.Tag, len(*req.Tags))
+		for index, tag := range *req.Tags {
+			values[index] = tag.Domain()
+		}
+		tags = &values
+	}
+
 	asset, err := h.AssetManager.UpdateAsset(ctx, req.AssetID, &domain.AssetUpdate{
 		Name:        req.Name,
 		Description: req.Description,
-		Tags:        req.Tags,
+		Tags:        tags,
 		Perspective: req.Perspective,
 		Dimensions:  req.Dimensions,
 	})

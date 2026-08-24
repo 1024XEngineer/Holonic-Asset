@@ -14,7 +14,7 @@ type CreateGenerationRequest struct {
 	Kind             generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,edit_tileset_item,edit_tiles"`
 	CreativeBrief    string             `json:"creative_brief" minLength:"1"`
 	TargetAssetPaths []string           `json:"targetAssetPaths,omitempty"`
-	Parameters       json.RawMessage    `json:"parameters,omitempty"`
+	Parameters       json.RawMessage    `json:"parameters,omitempty" doc:"Task-specific parameters. Prototype generation accepts tags as structured objects or legacy strings."`
 }
 
 type CreateGenerationResponse struct {
