@@ -105,7 +105,6 @@ function ItemComparisonPanel({
                 { length: bounds.width * bounds.height },
                 (_, index) => index,
               )}
-              onToggleCell={() => undefined}
               ariaLabel={label}
               className="size-full border border-border bg-white"
               cellClassName="border-border/70"
@@ -120,7 +119,6 @@ function ItemComparisonPanel({
 }
 
 function ItemImages({ item }: { item: TilesetItem }) {
-  if (item.tiles.length === 0) return null;
   const bounds = getGridBounds(item.tiles);
 
   if (item.tileUrls) {

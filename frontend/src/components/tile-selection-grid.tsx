@@ -7,7 +7,7 @@ export type TileSelectionGridProps = {
   rowCount?: number;
   selectedCellIndexes: readonly number[];
   disabledCellIndexes?: readonly number[];
-  onToggleCell: (cellIndex: number) => void;
+  onToggleCell?: (cellIndex: number) => void;
   ariaLabel: string;
   className?: string;
   cellClassName?: string;
@@ -70,7 +70,7 @@ export function TileSelectionGrid({
             disabled={disabled}
             aria-label={getCellAriaLabel(index, column, row)}
             aria-pressed={selected}
-            onClick={() => onToggleCell(index)}
+            onClick={() => onToggleCell?.(index)}
             style={{
               gridColumn: column + 1,
               gridRow: row + 1,
