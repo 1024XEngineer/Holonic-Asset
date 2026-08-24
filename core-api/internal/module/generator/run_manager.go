@@ -77,6 +77,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	preparePrototypeReferences := func(
 		creatingReference string,
 		tags []assetdomain.Tag,
+		targetType assetdomain.AssetType,
 	) (string, string, []string, error) {
 		projectReference := ""
 		if e.projects != nil && projectID != 0 {
@@ -105,6 +106,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 			ctx,
 			projectID,
 			tags,
+			targetType,
 			nexusLimit,
 			projectReference,
 			creatingReference,
@@ -142,12 +144,12 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	case CreateCharacterPrototypePayload:
 		var err error
 		value.ProjectReference, value.CreatingReference, value.NexusReferences, err =
-			preparePrototypeReferences(value.CreatingReference, value.Tags)
+			preparePrototypeReferences(value.CreatingReference, value.Tags, assetdomain.AssetTypeCharacter)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
 		value.ProjectReference, value.CreatingReference, value.NexusReferences, err =
-			preparePrototypeReferences(value.CreatingReference, value.Tags)
+			preparePrototypeReferences(value.CreatingReference, value.Tags, assetdomain.AssetTypeObject)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -207,6 +209,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 type scoredNexusReference struct {
 	reference string
 	score     int
+	sameType  bool
 	version   uint
 	assetID   uint
 }
@@ -215,6 +218,7 @@ func (e *Engine) selectNexusReferences(
 	ctx context.Context,
 	projectID uint,
 	tags []assetdomain.Tag,
+	targetType assetdomain.AssetType,
 	limit int,
 	excludedReferences ...string,
 ) ([]string, error) {
@@ -240,9 +244,11 @@ func (e *Engine) selectNexusReferences(
 		if reference == "" || score == 0 {
 			continue
 		}
+		sameType := asset.Type != "" && targetType != "" && asset.Type == targetType
 		candidates = append(candidates, scoredNexusReference{
 			reference: reference,
 			score:     score,
+			sameType:  sameType,
 			version:   asset.Version,
 			assetID:   asset.ID,
 		})
@@ -250,6 +256,9 @@ func (e *Engine) selectNexusReferences(
 	sort.SliceStable(candidates, func(i, j int) bool {
 		if candidates[i].score != candidates[j].score {
 			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].sameType != candidates[j].sameType {
+			return candidates[i].sameType
 		}
 		if candidates[i].version != candidates[j].version {
 			return candidates[i].version > candidates[j].version

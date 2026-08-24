@@ -90,7 +90,7 @@ func TestSelectNexusReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 		{Name: " knight "},
 		{Name: "player"},
 		{Name: "player"},
-	}, 3)
+	}, assetdomain.AssetTypeCharacter, 3)
 	if err != nil {
 		t.Fatalf("select Nexus References: %v", err)
 	}
@@ -106,6 +106,7 @@ func TestSelectNexusReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 		context.Background(),
 		42,
 		[]assetdomain.Tag{{Name: "knight"}, {Name: "player"}},
+		assetdomain.AssetTypeCharacter,
 		2,
 		"refs/four.png",
 	)
@@ -119,13 +120,13 @@ func TestSelectNexusReferencesRanksOverlapThenVersionThenAssetID(t *testing.T) {
 
 func TestSelectNexusReferencesRequiresReaderAndPropagatesListFailure(t *testing.T) {
 	tags := []assetdomain.Tag{{Name: "knight"}}
-	if _, err := (&Engine{}).selectNexusReferences(context.Background(), 42, tags, 3); !errors.Is(err, ErrAssetReaderRequired) {
+	if _, err := (&Engine{}).selectNexusReferences(context.Background(), 42, tags, assetdomain.AssetTypeCharacter, 3); !errors.Is(err, ErrAssetReaderRequired) {
 		t.Fatalf("expected asset reader error, got %v", err)
 	}
 
 	wantErr := errors.New("list failed")
 	engine := &Engine{assets: &tagAssetReaderStub{err: wantErr}}
-	if _, err := engine.selectNexusReferences(context.Background(), 42, tags, 3); !errors.Is(err, wantErr) {
+	if _, err := engine.selectNexusReferences(context.Background(), 42, tags, assetdomain.AssetTypeCharacter, 3); !errors.Is(err, wantErr) {
 		t.Fatalf("expected list error %v, got %v", wantErr, err)
 	}
 }
@@ -245,29 +246,70 @@ func TestPrepareObjectPrototypePayloadPersistsNexusReferences(t *testing.T) {
 	}
 }
 
+func TestSelectNexusReferencesRanksTagOverlapThenAssetTypeThenVersion(t *testing.T) {
+	assets := &tagAssetReaderStub{assets: []assetdomain.Asset{
+		// Match 2 tags, Object type, Version 10
+		{ID: 1, ProjectID: 42, Type: assetdomain.AssetTypeObject, Version: 10, ThumbnailURL: "refs/obj-score2.png", Tags: []assetdomain.Tag{{Name: "warrior"}, {Name: "sword"}}},
+		// Match 2 tags, Character type, Version 5
+		{ID: 2, ProjectID: 42, Type: assetdomain.AssetTypeCharacter, Version: 5, ThumbnailURL: "refs/char-score2.png", Tags: []assetdomain.Tag{{Name: "warrior"}, {Name: "sword"}}},
+		// Match 3 tags, Character type, Version 1
+		{ID: 3, ProjectID: 42, Type: assetdomain.AssetTypeCharacter, Version: 1, ThumbnailURL: "refs/char-score3.png", Tags: []assetdomain.Tag{{Name: "warrior"}, {Name: "sword"}, {Name: "shield"}}},
+		// Match 1 tag, Character type, Version 8
+		{ID: 4, ProjectID: 42, Type: assetdomain.AssetTypeCharacter, Version: 8, ThumbnailURL: "refs/char-score1-v8.png", Tags: []assetdomain.Tag{{Name: "warrior"}}},
+		// Match 1 tag, Object type, Version 9
+		{ID: 5, ProjectID: 42, Type: assetdomain.AssetTypeObject, Version: 9, ThumbnailURL: "refs/obj-score1-v9.png", Tags: []assetdomain.Tag{{Name: "warrior"}}},
+		// Match 1 tag, Character type, Version 2
+		{ID: 6, ProjectID: 42, Type: assetdomain.AssetTypeCharacter, Version: 2, ThumbnailURL: "refs/char-score1-v2.png", Tags: []assetdomain.Tag{{Name: "warrior"}}},
+	}}
+	engine := &Engine{assets: assets}
+
+	got, err := engine.selectNexusReferences(
+		context.Background(),
+		42,
+		[]assetdomain.Tag{{Name: "warrior"}, {Name: "sword"}, {Name: "shield"}},
+		assetdomain.AssetTypeCharacter,
+		6,
+	)
+	if err != nil {
+		t.Fatalf("select Nexus References: %v", err)
+	}
+
+	want := []string{
+		"refs/char-score3.png",    // Score 3 (Character)
+		"refs/char-score2.png",    // Score 2 (Character beats Object despite lower version)
+		"refs/obj-score2.png",     // Score 2 (Object beats score 1)
+		"refs/char-score1-v8.png", // Score 1 (Character beats Object despite lower version)
+		"refs/char-score1-v2.png", // Score 1 (Character beats Object v9)
+		"refs/obj-score1-v9.png",  // Score 1 (Object v9)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected references order: got %v want %v", got, want)
+	}
+}
+
 func TestSelectNexusReferencesZeroAndEdgeInputs(t *testing.T) {
 	engine := &Engine{assets: &tagAssetReaderStub{}}
 
 	// projectID == 0
-	got, err := engine.selectNexusReferences(context.Background(), 0, []assetdomain.Tag{{Name: "tag"}}, 3)
+	got, err := engine.selectNexusReferences(context.Background(), 0, []assetdomain.Tag{{Name: "tag"}}, assetdomain.AssetTypeCharacter, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for zero project ID, got %v, %v", got, err)
 	}
 
 	// len(tags) == 0
-	got, err = engine.selectNexusReferences(context.Background(), 42, nil, 3)
+	got, err = engine.selectNexusReferences(context.Background(), 42, nil, assetdomain.AssetTypeCharacter, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for empty tags, got %v, %v", got, err)
 	}
 
 	// blank tag names only
-	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "  "}, {Name: ""}}, 3)
+	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "  "}, {Name: ""}}, assetdomain.AssetTypeCharacter, 3)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for blank tag names, got %v, %v", got, err)
 	}
 
 	// limit <= 0
-	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "tag"}}, 0)
+	got, err = engine.selectNexusReferences(context.Background(), 42, []assetdomain.Tag{{Name: "tag"}}, assetdomain.AssetTypeCharacter, 0)
 	if err != nil || got != nil {
 		t.Fatalf("expected nil for zero limit, got %v, %v", got, err)
 	}
