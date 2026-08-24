@@ -27,7 +27,7 @@ func main() {
 	server := router.Register(
 		handler.NewHandler(nil),
 		handler.NewProjectHandler(nil),
-		handler.NewGenerationHandler(nil, nil),
+		handler.NewGenerationHandler(nil),
 		handler.NewUploadHandler(nil),
 		router.Authentication{
 			Router:     handler.NewAuthHandler(nil),

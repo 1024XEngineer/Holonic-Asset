@@ -135,7 +135,6 @@ type HTTPHandlers struct {
 func InitHandlers(
 	workspaceModule *workspace.Workspace,
 	generatorEngine generator.RunManager,
-	tasks task.Manager,
 	uploadManager upload.Manager,
 	references ...upload.ReferenceResolver,
 ) HTTPHandlers {
@@ -146,7 +145,7 @@ func InitHandlers(
 	return HTTPHandlers{
 		Asset:      handler.NewHandler(workspaceModule.Assets, resolver),
 		Project:    handler.NewProjectHandler(workspaceModule.Projects, resolver),
-		Generation: handler.NewGenerationHandler(generatorEngine, tasks, resolver),
+		Generation: handler.NewGenerationHandler(generatorEngine, resolver),
 		Upload:     handler.NewUploadHandler(uploadManager),
 	}
 }
