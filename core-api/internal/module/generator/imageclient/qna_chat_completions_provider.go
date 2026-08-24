@@ -1,7 +1,6 @@
 package imageclient
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/qnasdk"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
@@ -21,7 +21,7 @@ const (
 	// DefaultQNAChatCompletionsModel is used when no chat-completions model is configured.
 	DefaultQNAChatCompletionsModel = "google/nano-banana-2"
 
-	chatCompletionsProviderName = "gemini_chat"
+	chatCompletionsProviderName = "chat_completions"
 	chatCompletionsPath         = "/chat/completions"
 	maxChatErrorBodyBytes       = 1 << 20
 	maxGeneratedImageBytes      = 32 << 20
@@ -39,18 +39,20 @@ type QNAChatCompletionsConfig struct {
 	APIKey       string
 	DefaultModel string
 	HTTPClient   *http.Client
+	SDKClient    *qnasdk.Client
 	// DownloadHTTPClient overrides the secure client used for model-returned image URLs.
 	// It is intended for tests and other trusted transports.
 	DownloadHTTPClient *http.Client
 	Logger             logger.Logger
 }
 
-// QNAChatCompletionsProvider calls QNA's Chat Completions endpoint for Gemini image models.
+// QNAChatCompletionsProvider calls QNA's OpenAI-compatible Chat Completions endpoint.
 type QNAChatCompletionsProvider struct {
 	baseURL            string
 	apiKey             string
 	defaultModel       string
 	httpClient         *http.Client
+	sdkClient          *qnasdk.Client
 	downloadHTTPClient *http.Client
 	logger             logger.Logger
 }
@@ -75,12 +77,17 @@ func NewQNAChatCompletionsProvider(config QNAChatCompletionsConfig) *QNAChatComp
 	if downloadHTTPClient == nil {
 		downloadHTTPClient = newGeneratedImageHTTPClient()
 	}
+	sdkClient := config.SDKClient
+	if sdkClient == nil {
+		sdkClient = qnasdk.NewClient(baseURL, config.APIKey, httpClient)
+	}
 
 	return &QNAChatCompletionsProvider{
 		baseURL:            baseURL,
 		apiKey:             config.APIKey,
 		defaultModel:       defaultModel,
 		httpClient:         httpClient,
+		sdkClient:          sdkClient,
 		downloadHTTPClient: downloadHTTPClient,
 		logger:             config.Logger,
 	}
@@ -158,65 +165,15 @@ func (p *QNAChatCompletionsProvider) call(
 		Stream: false,
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, newChatProviderError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"encode chat image request",
-			err,
-		)
-	}
-
-	endpoint := p.endpointURL()
-	httpRequest, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		endpoint,
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return nil, newChatProviderError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"create chat image request",
-			err,
-		)
-	}
-
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-	httpRequest.Header.Set("Accept", "application/json")
-
-	response, err := p.httpClient.Do(httpRequest)
-	if err != nil {
-		return nil, classifyChatRequestError(ctx, err)
-	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, chatStatusError(response)
-	}
-
 	var decoded chatCompletionResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		return nil, newChatProviderError(
-			ErrorKindInvalidResponse,
-			response.StatusCode,
-			true,
-			"decode chat completion response",
-			err,
-		)
+	if err := p.sdkClient.Execute(ctx, http.MethodPost, "chat/completions", payload, &decoded); err != nil {
+		return nil, classifyChatSDKError(ctx, err)
 	}
 
 	if len(decoded.Choices) == 0 {
 		return nil, newChatProviderError(
 			ErrorKindInvalidResponse,
-			response.StatusCode,
+			http.StatusOK,
 			true,
 			"chat completion response contains no choices",
 			nil,
@@ -230,7 +187,7 @@ func (p *QNAChatCompletionsProvider) call(
 	if len(images) == 0 {
 		return nil, newChatProviderError(
 			ErrorKindInvalidResponse,
-			response.StatusCode,
+			http.StatusOK,
 			true,
 			"chat completion response contains no image data in choices",
 			nil,

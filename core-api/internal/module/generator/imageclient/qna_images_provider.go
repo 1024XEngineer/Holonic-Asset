@@ -1,7 +1,6 @@
 package imageclient
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/qnasdk"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
@@ -33,6 +33,7 @@ type QNAImagesConfig struct {
 	APIKey       string
 	DefaultModel string
 	HTTPClient   *http.Client
+	SDKClient    *qnasdk.Client
 	Logger       logger.Logger
 }
 
@@ -42,6 +43,7 @@ type QNAImagesProvider struct {
 	apiKey       string
 	defaultModel string
 	httpClient   *http.Client
+	sdkClient    *qnasdk.Client
 	logger       logger.Logger
 }
 
@@ -61,12 +63,17 @@ func NewQNAImagesProvider(config QNAImagesConfig) *QNAImagesProvider {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: defaultQNAHTTPTimeout}
 	}
+	sdkClient := config.SDKClient
+	if sdkClient == nil {
+		sdkClient = qnasdk.NewClient(baseURL, config.APIKey, httpClient)
+	}
 
 	return &QNAImagesProvider{
 		baseURL:      baseURL,
 		apiKey:       config.APIKey,
 		defaultModel: defaultModel,
 		httpClient:   httpClient,
+		sdkClient:    sdkClient,
 		logger:       config.Logger,
 	}
 }
@@ -134,62 +141,14 @@ func (p *QNAImagesProvider) call(
 		Size:    providerSize,
 		Quality: request.Params["quality"],
 	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"encode image request",
-			err,
-		)
-	}
-
-	httpRequest, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		p.baseURL+path,
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"create image request",
-			err,
-		)
-	}
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-	httpRequest.Header.Set("Accept", "application/json")
-
-	response, err := p.httpClient.Do(httpRequest)
-	if err != nil {
-		return nil, classifyQNARequestError(ctx, err)
-	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, qnaStatusError(response)
-	}
-
 	var decoded qnaImageResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidResponse,
-			response.StatusCode,
-			true,
-			"decode image response",
-			err,
-		)
+	if err := p.sdkClient.Execute(ctx, http.MethodPost, strings.TrimPrefix(path, "/v1/"), payload, &decoded); err != nil {
+		return nil, classifyQNAImageSDKError(ctx, err)
 	}
 	if len(decoded.Data) == 0 {
 		return nil, newQNAError(
 			ErrorKindInvalidResponse,
-			response.StatusCode,
+			http.StatusOK,
 			true,
 			"image response contains no data",
 			nil,
@@ -201,7 +160,7 @@ func (p *QNAImagesProvider) call(
 		if image.Base64 == "" {
 			return nil, newQNAError(
 				ErrorKindInvalidResponse,
-				response.StatusCode,
+				http.StatusOK,
 				true,
 				"image response contains an empty b64_json field",
 				nil,

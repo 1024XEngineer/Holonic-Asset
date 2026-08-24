@@ -9,6 +9,40 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 )
 
+func TestFactoryChatCompletionsProtocolNames(t *testing.T) {
+	const imageData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	for name, protocol := range map[string]string{
+		"new protocol name":    "chat_completions",
+		"legacy protocol name": "gemini_chat",
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/chat/completions" {
+					t.Fatalf("expected /v1/chat/completions, got %s", r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"` + imageData + `"}}]}`))
+			}))
+			defer server.Close()
+
+			provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+				BaseURL:      server.URL,
+				DefaultModel: "arbitrary-chat-image-model",
+				Provider:     protocol,
+			})
+
+			result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result.Images) != 1 {
+				t.Fatalf("expected 1 image, got %d", len(result.Images))
+			}
+		})
+	}
+}
+
 func TestFactoryNewImageProviderAutoSelection(t *testing.T) {
 	t.Run("selects QNA Chat Completions for google models", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

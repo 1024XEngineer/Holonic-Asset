@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/qnasdk"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
@@ -16,8 +17,12 @@ const (
 	ProviderTypeAuto ProviderType = "auto"
 	// ProviderTypeOpenAIImages uses the /v1/images/* endpoint format.
 	ProviderTypeOpenAIImages ProviderType = "openai_images"
-	// ProviderTypeChatCompletions uses QNA's Gemini Chat Completions format.
-	ProviderTypeChatCompletions ProviderType = "gemini_chat"
+	// ProviderTypeChatCompletions uses QNA's /v1/chat/completions format.
+	ProviderTypeChatCompletions ProviderType = "chat_completions"
+
+	// providerTypeLegacyGeminiChat is accepted for existing deployments. The
+	// value is intentionally not used for new configuration or diagnostics.
+	providerTypeLegacyGeminiChat ProviderType = "gemini_chat"
 )
 
 // FactoryConfig provides parameters to initialize an ImageProvider.
@@ -35,7 +40,8 @@ type FactoryConfig struct {
 // FallbackModel is set, transient primary-model failures fall back to a second
 // model through the same endpoint and credentials.
 func NewImageProvider(cfg FactoryConfig) ImageProvider {
-	primary := createProviderForModel(cfg.Provider, cfg.DefaultModel, cfg)
+	sdkClient := qnasdk.NewClient(cfg.BaseURL, cfg.APIKey, cfg.HTTPClient)
+	primary := createProviderForModel(cfg.Provider, cfg.DefaultModel, cfg, sdkClient)
 
 	fallbackModel := strings.TrimSpace(cfg.FallbackModel)
 	if fallbackModel == "" || strings.EqualFold(fallbackModel, cfg.DefaultModel) {
@@ -48,7 +54,7 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 		DefaultModel: fallbackModel,
 		HTTPClient:   cfg.HTTPClient,
 		Logger:       cfg.Logger,
-	})
+	}, sdkClient)
 
 	return NewModelFallbackProvider(ModelFallbackConfig{
 		Primary:       primary,
@@ -59,8 +65,11 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 	})
 }
 
-func createProviderForModel(protocol, model string, cfg FactoryConfig) ImageProvider {
+func createProviderForModel(protocol, model string, cfg FactoryConfig, sdkClient *qnasdk.Client) ImageProvider {
 	selected := ProviderType(strings.ToLower(strings.TrimSpace(protocol)))
+	if selected == providerTypeLegacyGeminiChat {
+		selected = ProviderTypeChatCompletions
+	}
 	if selected == "" || selected == ProviderTypeAuto {
 		if IsChatProtocolModel(model) {
 			selected = ProviderTypeChatCompletions
@@ -76,6 +85,7 @@ func createProviderForModel(protocol, model string, cfg FactoryConfig) ImageProv
 			APIKey:       cfg.APIKey,
 			DefaultModel: model,
 			HTTPClient:   cfg.HTTPClient,
+			SDKClient:    sdkClient,
 			Logger:       cfg.Logger,
 		})
 	default:
@@ -84,6 +94,7 @@ func createProviderForModel(protocol, model string, cfg FactoryConfig) ImageProv
 			APIKey:       cfg.APIKey,
 			DefaultModel: model,
 			HTTPClient:   cfg.HTTPClient,
+			SDKClient:    sdkClient,
 			Logger:       cfg.Logger,
 		})
 	}
