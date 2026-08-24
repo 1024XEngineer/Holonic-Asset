@@ -22,7 +22,7 @@ type ProviderResult struct {
 	Usage        Usage
 }
 
-// ImageProvider encapsulates the protocol details of an upstream model vendor.
+// ImageProvider encapsulates one upstream image API protocol.
 type ImageProvider interface {
 	Generate(context.Context, *ProviderRequest) (*ProviderResult, error)
 	Edit(context.Context, *ProviderRequest) (*ProviderResult, error)

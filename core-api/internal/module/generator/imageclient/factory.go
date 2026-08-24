@@ -7,16 +7,17 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
-// ProviderType specifies the image client communication protocol.
+// ProviderType selects the QNA image API format. The name is retained for
+// configuration compatibility; its values describe protocols, not vendors.
 type ProviderType string
 
 const (
-	// ProviderTypeAuto automatically determines protocol from the model name.
+	// ProviderTypeAuto determines the API format from the configured model name.
 	ProviderTypeAuto ProviderType = "auto"
 	// ProviderTypeOpenAIImages uses the /v1/images/* endpoint format.
 	ProviderTypeOpenAIImages ProviderType = "openai_images"
-	// ProviderTypeGeminiChat uses the /v1/chat/completions multimodal endpoint format.
-	ProviderTypeGeminiChat ProviderType = "gemini_chat"
+	// ProviderTypeChatCompletions uses QNA's Gemini Chat Completions format.
+	ProviderTypeChatCompletions ProviderType = "gemini_chat"
 )
 
 // FactoryConfig provides parameters to initialize an ImageProvider.
@@ -30,8 +31,9 @@ type FactoryConfig struct {
 	Logger        logger.Logger
 }
 
-// NewImageProvider constructs an ImageProvider based on configuration,
-// automatically wiring primary and fallback failover providers.
+// NewImageProvider constructs an ImageProvider for one gateway endpoint. When
+// FallbackModel is set, transient primary-model failures fall back to a second
+// model through the same endpoint and credentials.
 func NewImageProvider(cfg FactoryConfig) ImageProvider {
 	primary := createProviderForModel(cfg.Provider, cfg.DefaultModel, cfg)
 
@@ -48,7 +50,7 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 		Logger:       cfg.Logger,
 	})
 
-	return NewFailoverImageProvider(FailoverConfig{
+	return NewModelFallbackProvider(ModelFallbackConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  cfg.DefaultModel,
@@ -57,19 +59,19 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 	})
 }
 
-func createProviderForModel(providerType, model string, cfg FactoryConfig) ImageProvider {
-	pt := ProviderType(strings.ToLower(strings.TrimSpace(providerType)))
-	if pt == "" || pt == ProviderTypeAuto {
+func createProviderForModel(protocol, model string, cfg FactoryConfig) ImageProvider {
+	selected := ProviderType(strings.ToLower(strings.TrimSpace(protocol)))
+	if selected == "" || selected == ProviderTypeAuto {
 		if IsChatProtocolModel(model) {
-			pt = ProviderTypeGeminiChat
+			selected = ProviderTypeChatCompletions
 		} else {
-			pt = ProviderTypeOpenAIImages
+			selected = ProviderTypeOpenAIImages
 		}
 	}
 
-	switch pt {
-	case ProviderTypeGeminiChat:
-		return NewGeminiChatProvider(GeminiChatConfig{
+	switch selected {
+	case ProviderTypeChatCompletions:
+		return NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{
 			BaseURL:      cfg.BaseURL,
 			APIKey:       cfg.APIKey,
 			DefaultModel: model,
@@ -77,7 +79,7 @@ func createProviderForModel(providerType, model string, cfg FactoryConfig) Image
 			Logger:       cfg.Logger,
 		})
 	default:
-		return NewQNAProvider(QNAConfig{
+		return NewQNAImagesProvider(QNAImagesConfig{
 			BaseURL:      cfg.BaseURL,
 			APIKey:       cfg.APIKey,
 			DefaultModel: model,

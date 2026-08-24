@@ -10,7 +10,7 @@ import (
 )
 
 func TestFactoryNewImageProviderAutoSelection(t *testing.T) {
-	t.Run("selects GeminiChat for gemini/banana models", func(t *testing.T) {
+	t.Run("selects QNA Chat Completions for google models", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path != "/v1/chat/completions" {
 				t.Fatalf("expected /v1/chat/completions, got %s", r.URL.Path)

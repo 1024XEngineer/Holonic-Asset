@@ -26,7 +26,7 @@ func (s *imageProviderLoggerStub) Warn(message string, fields ...logger.Field) {
 func (*imageProviderLoggerStub) Error(string, ...logger.Field) {}
 func (*imageProviderLoggerStub) Sync() error                   { return nil }
 
-func TestQNAProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
+func TestQNAImagesProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/images/generations" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
@@ -59,7 +59,7 @@ func TestQNAProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
+	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{
 		BaseURL:      server.URL,
 		APIKey:       "test-key",
 		DefaultModel: "configured-model",
@@ -92,7 +92,7 @@ func TestQNAProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 	}
 }
 
-func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
+func TestQNAImagesProviderEditSendsReferenceImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/images/edits" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
@@ -116,7 +116,7 @@ func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "test-key"})
+	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
 
 	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
 		Prompt:          "make it blue",
@@ -132,7 +132,7 @@ func TestQNAProviderEditSendsReferenceImages(t *testing.T) {
 	}
 }
 
-func TestQNAProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
+func TestQNAImagesProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
 	requests := 0
 	providerLogger := &imageProviderLoggerStub{}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -159,7 +159,7 @@ func TestQNAProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t 
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
+	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{
 		BaseURL: server.URL, APIKey: "test-key", Logger: providerLogger,
 	})
 	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
@@ -179,7 +179,7 @@ func TestQNAProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t 
 	}
 }
 
-func TestQNAProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
+func TestQNAImagesProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		requests++
@@ -189,7 +189,7 @@ func TestQNAProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "test-key"})
+	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
 	_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
 		Prompt:          "edit",
 		ReferenceImages: []string{"data:image/png;base64,ref"},
@@ -200,7 +200,7 @@ func TestQNAProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	}
 }
 
-func TestQNAProviderClassifiesStatusCodes(t *testing.T) {
+func TestQNAImagesProviderClassifiesStatusCodes(t *testing.T) {
 	tests := []struct {
 		statusCode int
 		body       string
@@ -222,7 +222,7 @@ func TestQNAProviderClassifiesStatusCodes(t *testing.T) {
 			writer.WriteHeader(tt.statusCode)
 			_, _ = writer.Write([]byte(tt.body))
 		}))
-		provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "key"})
+		provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "key"})
 		_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 		server.Close()
 
@@ -238,7 +238,7 @@ func TestQNAProviderClassifiesStatusCodes(t *testing.T) {
 	}
 }
 
-func TestQNAProviderHandlesInvalidResponsePayloads(t *testing.T) {
+func TestQNAImagesProviderHandlesInvalidResponsePayloads(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
@@ -256,7 +256,7 @@ func TestQNAProviderHandlesInvalidResponsePayloads(t *testing.T) {
 			}))
 			defer server.Close()
 
-			provider := imageclient.NewQNAProvider(imageclient.QNAConfig{BaseURL: server.URL, APIKey: "key"})
+			provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "key"})
 			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 			if err == nil {
 				t.Fatalf("expected error for %s, got nil", tt.name)
@@ -268,7 +268,7 @@ func TestQNAProviderHandlesInvalidResponsePayloads(t *testing.T) {
 	}
 }
 
-func TestQNAProviderErrorMethods(t *testing.T) {
+func TestQNAImagesProviderErrorMethods(t *testing.T) {
 	var nilErr *imageclient.ProviderError
 	if nilErr.Error() != "" || nilErr.Unwrap() != nil {
 		t.Fatalf("expected empty for nil error")

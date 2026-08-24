@@ -48,7 +48,7 @@ func (m *mockImageProvider) Edit(ctx context.Context, req *imageclient.ProviderR
 	return &imageclient.ProviderResult{Images: []string{"img1"}}, nil
 }
 
-func TestFailoverProviderPrimarySuccess(t *testing.T) {
+func TestModelFallbackProviderPrimarySuccess(t *testing.T) {
 	primary := &mockImageProvider{
 		generateFunc: func(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 			if req.Model != "primary-model" {
@@ -59,7 +59,7 @@ func TestFailoverProviderPrimarySuccess(t *testing.T) {
 	}
 	fallback := &mockImageProvider{}
 
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  "primary-model",
@@ -80,7 +80,7 @@ func TestFailoverProviderPrimarySuccess(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderFailsOverOnTransientError(t *testing.T) {
+func TestModelFallbackProviderFailsOverOnTransientError(t *testing.T) {
 	primary := &mockImageProvider{
 		generateFunc: func(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 			return nil, &imageclient.ProviderError{
@@ -100,7 +100,7 @@ func TestFailoverProviderFailsOverOnTransientError(t *testing.T) {
 		},
 	}
 
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  "primary-model",
@@ -121,7 +121,7 @@ func TestFailoverProviderFailsOverOnTransientError(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderDoesNotFailOverOnPermanentError(t *testing.T) {
+func TestModelFallbackProviderDoesNotFailOverOnPermanentError(t *testing.T) {
 	primary := &mockImageProvider{
 		generateFunc: func(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 			return nil, &imageclient.ProviderError{
@@ -134,7 +134,7 @@ func TestFailoverProviderDoesNotFailOverOnPermanentError(t *testing.T) {
 	}
 	fallback := &mockImageProvider{}
 
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  "primary-model",
@@ -156,7 +156,7 @@ func TestFailoverProviderDoesNotFailOverOnPermanentError(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *testing.T) {
+func TestModelFallbackProviderPreservesBothErrorsAndUsesFallbackClassification(t *testing.T) {
 	primaryErr := &imageclient.ProviderError{
 		Provider: "primary", Kind: imageclient.ErrorKindUnavailable, Transient: true,
 	}
@@ -175,7 +175,7 @@ func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *tes
 		},
 	}
 	providerLogger := &failoverLoggerStub{}
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model", Logger: providerLogger,
 	})
 
@@ -203,7 +203,7 @@ func TestFailoverProviderPreservesBothErrorsAndUsesFallbackClassification(t *tes
 	}
 }
 
-func TestFailoverProviderEditPreservesTransientFallbackError(t *testing.T) {
+func TestModelFallbackProviderEditPreservesTransientFallbackError(t *testing.T) {
 	primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindTimeout, Transient: true}
 	fallbackErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
 	primary := &mockImageProvider{
@@ -216,7 +216,7 @@ func TestFailoverProviderEditPreservesTransientFallbackError(t *testing.T) {
 			return nil, fallbackErr
 		},
 	}
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary: primary, Fallback: fallback, FallbackModel: "fallback-model",
 	})
 
@@ -229,7 +229,7 @@ func TestFailoverProviderEditPreservesTransientFallbackError(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderSkipsFallbackAfterCancellation(t *testing.T) {
+func TestModelFallbackProviderSkipsFallbackAfterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	primary := &mockImageProvider{
@@ -238,7 +238,7 @@ func TestFailoverProviderSkipsFallbackAfterCancellation(t *testing.T) {
 		},
 	}
 	fallback := &mockImageProvider{}
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{Primary: primary, Fallback: fallback})
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{Primary: primary, Fallback: fallback})
 
 	_, err := provider.Generate(ctx, &imageclient.ProviderRequest{Prompt: "test"})
 	if err == nil || fallback.calls != 0 {
@@ -246,7 +246,7 @@ func TestFailoverProviderSkipsFallbackAfterCancellation(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderEditFailover(t *testing.T) {
+func TestModelFallbackProviderEditFailover(t *testing.T) {
 	primary := &mockImageProvider{
 		editFunc: func(ctx context.Context, req *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 			return nil, &imageclient.ProviderError{
@@ -264,7 +264,7 @@ func TestFailoverProviderEditFailover(t *testing.T) {
 	}
 	providerLogger := &failoverLoggerStub{}
 
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 		Primary:       primary,
 		Fallback:      fallback,
 		PrimaryModel:  "primary-model",
@@ -287,7 +287,7 @@ func TestFailoverProviderEditFailover(t *testing.T) {
 	}
 }
 
-func TestFailoverProviderEditTerminalBranches(t *testing.T) {
+func TestModelFallbackProviderEditTerminalBranches(t *testing.T) {
 	t.Run("primary success", func(t *testing.T) {
 		primary := &mockImageProvider{
 			editFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
@@ -295,7 +295,7 @@ func TestFailoverProviderEditTerminalBranches(t *testing.T) {
 			},
 		}
 		fallback := &mockImageProvider{}
-		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+		provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 			Primary: primary, Fallback: fallback, PrimaryModel: "primary-model",
 		})
 
@@ -316,7 +316,7 @@ func TestFailoverProviderEditTerminalBranches(t *testing.T) {
 			},
 		}
 		fallback := &mockImageProvider{}
-		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+		provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 			Primary: primary, Fallback: fallback,
 		})
 
@@ -340,7 +340,7 @@ func TestFailoverProviderEditTerminalBranches(t *testing.T) {
 			},
 		}
 		providerLogger := &failoverLoggerStub{}
-		provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{
+		provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{
 			Primary: primary, Fallback: fallback, FallbackModel: "fallback-model", Logger: providerLogger,
 		})
 
@@ -354,14 +354,14 @@ func TestFailoverProviderEditTerminalBranches(t *testing.T) {
 	})
 }
 
-func TestFailoverProviderWithoutFallbackReturnsPrimaryError(t *testing.T) {
+func TestModelFallbackProviderWithoutFallbackReturnsPrimaryError(t *testing.T) {
 	primaryErr := &imageclient.ProviderError{Kind: imageclient.ErrorKindUnavailable, Transient: true}
 	primary := &mockImageProvider{
 		generateFunc: func(context.Context, *imageclient.ProviderRequest) (*imageclient.ProviderResult, error) {
 			return nil, primaryErr
 		},
 	}
-	provider := imageclient.NewFailoverImageProvider(imageclient.FailoverConfig{Primary: primary})
+	provider := imageclient.NewModelFallbackProvider(imageclient.ModelFallbackConfig{Primary: primary})
 
 	_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 	if !errors.Is(err, primaryErr) {

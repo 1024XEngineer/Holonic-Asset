@@ -18,14 +18,14 @@ import (
 )
 
 const (
-	// DefaultGeminiChatModel is the default multimodal image generation model.
-	DefaultGeminiChatModel = "google/nano-banana-2"
+	// DefaultQNAChatCompletionsModel is used when no chat-completions model is configured.
+	DefaultQNAChatCompletionsModel = "google/nano-banana-2"
 
-	geminiChatProviderName = "gemini_chat"
-	chatCompletionsPath    = "/chat/completions"
-	maxChatErrorBodyBytes  = 1 << 20
-	maxGeneratedImageBytes = 32 << 20
-	defaultChatHTTPTimeout = 5 * time.Minute
+	chatCompletionsProviderName = "gemini_chat"
+	chatCompletionsPath         = "/chat/completions"
+	maxChatErrorBodyBytes       = 1 << 20
+	maxGeneratedImageBytes      = 32 << 20
+	defaultChatHTTPTimeout      = 5 * time.Minute
 )
 
 var (
@@ -33,8 +33,8 @@ var (
 	httpURLRegex       = regexp.MustCompile(`https?://[^\s"'>)]+`)
 )
 
-// GeminiChatConfig configures the Gemini chat image provider.
-type GeminiChatConfig struct {
+// QNAChatCompletionsConfig configures QNA's OpenAI-compatible Chat Completions adapter.
+type QNAChatCompletionsConfig struct {
 	BaseURL      string
 	APIKey       string
 	DefaultModel string
@@ -45,8 +45,8 @@ type GeminiChatConfig struct {
 	Logger             logger.Logger
 }
 
-// GeminiChatProvider calls Modelink/OpenAI-compatible Chat Completions API for image generation.
-type GeminiChatProvider struct {
+// QNAChatCompletionsProvider calls QNA's Chat Completions endpoint for Gemini image models.
+type QNAChatCompletionsProvider struct {
 	baseURL            string
 	apiKey             string
 	defaultModel       string
@@ -55,8 +55,8 @@ type GeminiChatProvider struct {
 	logger             logger.Logger
 }
 
-// NewGeminiChatProvider creates a provider targeting /v1/chat/completions.
-func NewGeminiChatProvider(config GeminiChatConfig) *GeminiChatProvider {
+// NewQNAChatCompletionsProvider creates a provider targeting /v1/chat/completions.
+func NewQNAChatCompletionsProvider(config QNAChatCompletionsConfig) *QNAChatCompletionsProvider {
 	baseURL := strings.TrimRight(config.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = DefaultQNABaseURL
@@ -64,7 +64,7 @@ func NewGeminiChatProvider(config GeminiChatConfig) *GeminiChatProvider {
 
 	defaultModel := config.DefaultModel
 	if defaultModel == "" {
-		defaultModel = DefaultGeminiChatModel
+		defaultModel = DefaultQNAChatCompletionsModel
 	}
 
 	httpClient := config.HTTPClient
@@ -76,7 +76,7 @@ func NewGeminiChatProvider(config GeminiChatConfig) *GeminiChatProvider {
 		downloadHTTPClient = newGeneratedImageHTTPClient()
 	}
 
-	return &GeminiChatProvider{
+	return &QNAChatCompletionsProvider{
 		baseURL:            baseURL,
 		apiKey:             config.APIKey,
 		defaultModel:       defaultModel,
@@ -87,7 +87,7 @@ func NewGeminiChatProvider(config GeminiChatConfig) *GeminiChatProvider {
 }
 
 // Generate calls Chat Completions endpoint for text-to-image generation.
-func (p *GeminiChatProvider) Generate(
+func (p *QNAChatCompletionsProvider) Generate(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -95,14 +95,14 @@ func (p *GeminiChatProvider) Generate(
 }
 
 // Edit calls Chat Completions endpoint with reference images for image-to-image or editing.
-func (p *GeminiChatProvider) Edit(
+func (p *QNAChatCompletionsProvider) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
 	return p.call(ctx, request, request.ReferenceImages)
 }
 
-func (p *GeminiChatProvider) call(
+func (p *QNAChatCompletionsProvider) call(
 	ctx context.Context,
 	request *ProviderRequest,
 	referenceImages []string,
@@ -127,7 +127,7 @@ func (p *GeminiChatProvider) call(
 		}
 	}
 
-	// Add optional mask image
+	// Chat Completions has no native mask field, so pass a mask as another image input.
 	if request.MaskImage != "" {
 		formattedMask := formatChatImageRef(request.MaskImage)
 		if formattedMask != "" {
@@ -251,7 +251,7 @@ func (p *GeminiChatProvider) call(
 	}, nil
 }
 
-func (p *GeminiChatProvider) endpointURL() string {
+func (p *QNAChatCompletionsProvider) endpointURL() string {
 	baseURL := strings.TrimRight(p.baseURL, "/")
 	if strings.HasSuffix(baseURL, "/v1") {
 		return baseURL + chatCompletionsPath
@@ -259,10 +259,10 @@ func (p *GeminiChatProvider) endpointURL() string {
 	return baseURL + "/v1" + chatCompletionsPath
 }
 
-func (p *GeminiChatProvider) extractImages(ctx context.Context, choices []chatChoice) ([]string, error) {
+func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices []chatChoice) ([]string, error) {
 	images := make([]string, 0, len(choices))
 	for _, choice := range choices {
-		// 1. Check choice.Message.Images (returned by Modelink/Gemini Chat image API)
+		// QNA documents generated images in choice.Message.Images.
 		for _, imgPart := range choice.Message.Images {
 			if imgPart.ImageURL != nil && imgPart.ImageURL.URL != "" {
 				b64, err := p.resolveImageToB64(ctx, imgPart.ImageURL.URL)
@@ -327,7 +327,7 @@ func (p *GeminiChatProvider) extractImages(ctx context.Context, choices []chatCh
 	return images, nil
 }
 
-func (p *GeminiChatProvider) resolveImageToB64(ctx context.Context, rawURL string) (string, error) {
+func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawURL string) (string, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if strings.HasPrefix(rawURL, "data:image/") {
 		return stripDataURLPrefix(rawURL), nil
@@ -443,7 +443,7 @@ func newChatProviderError(
 	cause error,
 ) *ProviderError {
 	return &ProviderError{
-		Provider:   geminiChatProviderName,
+		Provider:   chatCompletionsProviderName,
 		Kind:       kind,
 		StatusCode: statusCode,
 		Transient:  transient,

@@ -36,9 +36,9 @@ func (zeroReader) Read(buffer []byte) (int, error) {
 	return len(buffer), nil
 }
 
-func TestNewGeminiChatProviderDefaults(t *testing.T) {
-	provider := NewGeminiChatProvider(GeminiChatConfig{})
-	if provider.baseURL != DefaultQNABaseURL || provider.defaultModel != DefaultGeminiChatModel {
+func TestNewQNAChatCompletionsProviderDefaults(t *testing.T) {
+	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{})
+	if provider.baseURL != DefaultQNABaseURL || provider.defaultModel != DefaultQNAChatCompletionsModel {
 		t.Fatalf("unexpected defaults: base=%q model=%q", provider.baseURL, provider.defaultModel)
 	}
 	if provider.httpClient.Timeout != defaultChatHTTPTimeout || provider.downloadHTTPClient == nil {
@@ -46,8 +46,8 @@ func TestNewGeminiChatProviderDefaults(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderRejectsInvalidEndpoint(t *testing.T) {
-	provider := NewGeminiChatProvider(GeminiChatConfig{BaseURL: "://invalid"})
+func TestQNAChatCompletionsProviderRejectsInvalidEndpoint(t *testing.T) {
+	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{BaseURL: "://invalid"})
 	_, err := provider.Generate(context.Background(), &ProviderRequest{Prompt: "test"})
 	var providerErr *ProviderError
 	if !errors.As(err, &providerErr) || providerErr.Kind != ErrorKindInvalidRequest {
@@ -201,7 +201,7 @@ func TestChatMessageUnmarshalShapes(t *testing.T) {
 	}
 }
 
-func TestGeminiChatImageReferenceHelpers(t *testing.T) {
+func TestChatCompletionsImageReferenceHelpers(t *testing.T) {
 	raw := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32)))
 	if got := formatChatImageRef(""); got != "" {
 		t.Fatalf("empty reference = %q", got)
@@ -220,9 +220,9 @@ func TestGeminiChatImageReferenceHelpers(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderImageResolutionFailures(t *testing.T) {
-	baseProvider := func(roundTrip internalRoundTripFunc) *GeminiChatProvider {
-		return NewGeminiChatProvider(GeminiChatConfig{
+func TestQNAChatCompletionsProviderImageResolutionFailures(t *testing.T) {
+	baseProvider := func(roundTrip internalRoundTripFunc) *QNAChatCompletionsProvider {
+		return NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{
 			BaseURL:            "https://api.example",
 			DownloadHTTPClient: &http.Client{Transport: roundTrip},
 		})
@@ -290,8 +290,8 @@ func TestGeminiChatProviderImageResolutionFailures(t *testing.T) {
 	})
 }
 
-func TestGeminiChatProviderExtractImageBranches(t *testing.T) {
-	provider := NewGeminiChatProvider(GeminiChatConfig{
+func TestQNAChatCompletionsProviderExtractImageBranches(t *testing.T) {
+	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{
 		BaseURL: "https://api.example",
 		DownloadHTTPClient: &http.Client{Transport: internalRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 			return &http.Response{

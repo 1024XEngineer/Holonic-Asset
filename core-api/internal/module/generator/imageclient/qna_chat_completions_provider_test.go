@@ -22,7 +22,7 @@ func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) 
 	return f(request)
 }
 
-func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
+func TestQNAChatCompletionsProviderGenerateSuccessMarkdownURL(t *testing.T) {
 	imageBytes := []byte("fake-png-content-data")
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 	}))
 	defer apiServer.Close()
 
-	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+	provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 		BaseURL:      apiServer.URL,
 		APIKey:       "test-key",
 		DefaultModel: "google/nano-banana-2",
@@ -119,14 +119,14 @@ func TestGeminiChatProviderGenerateSuccessMarkdownURL(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderRejectsPrivateGeneratedImageURL(t *testing.T) {
+func TestQNAChatCompletionsProviderRejectsPrivateGeneratedImageURL(t *testing.T) {
 	downloadCalled := false
 	apiServer := newChatResponseServer(t, `{
 		"choices":[{"message":{"content":"http://127.0.0.1/internal.png"}}]
 	}`)
 	defer apiServer.Close()
 
-	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+	provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 		BaseURL: apiServer.URL,
 		DownloadHTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			downloadCalled = true
@@ -145,7 +145,7 @@ func TestGeminiChatProviderRejectsPrivateGeneratedImageURL(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderBoundsGeneratedImageDownloads(t *testing.T) {
+func TestQNAChatCompletionsProviderBoundsGeneratedImageDownloads(t *testing.T) {
 	tests := []struct {
 		name          string
 		statusCode    int
@@ -167,7 +167,7 @@ func TestGeminiChatProviderBoundsGeneratedImageDownloads(t *testing.T) {
 			}`)
 			defer apiServer.Close()
 
-			provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+			provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 				BaseURL: apiServer.URL,
 				DownloadHTTPClient: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 					return &http.Response{
@@ -189,7 +189,7 @@ func TestGeminiChatProviderBoundsGeneratedImageDownloads(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderParsesStructuredImageResponses(t *testing.T) {
+func TestQNAChatCompletionsProviderParsesStructuredImageResponses(t *testing.T) {
 	fakeB64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 	apiServer := newChatResponseServer(t, `{
 		"choices":[
@@ -199,7 +199,7 @@ func TestGeminiChatProviderParsesStructuredImageResponses(t *testing.T) {
 	}`)
 	defer apiServer.Close()
 
-	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{BaseURL: apiServer.URL})
+	provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{BaseURL: apiServer.URL})
 	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 	if err != nil {
 		t.Fatalf("generate structured images: %v", err)
@@ -209,7 +209,7 @@ func TestGeminiChatProviderParsesStructuredImageResponses(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderRejectsInvalidSuccessResponses(t *testing.T) {
+func TestQNAChatCompletionsProviderRejectsInvalidSuccessResponses(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		body string
@@ -222,7 +222,7 @@ func TestGeminiChatProviderRejectsInvalidSuccessResponses(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			server := newChatResponseServer(t, test.body)
 			defer server.Close()
-			provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{BaseURL: server.URL + "/v1"})
+			provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{BaseURL: server.URL + "/v1"})
 			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("generate error = %v, want %q", err, test.want)
@@ -242,7 +242,7 @@ func newChatResponseServer(t *testing.T, responseBody string) *httptest.Server {
 	}))
 }
 
-func TestGeminiChatProviderEditMultiReferenceAndMask(t *testing.T) {
+func TestQNAChatCompletionsProviderEditMultiReferenceAndMask(t *testing.T) {
 	fakeB64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +302,7 @@ func TestGeminiChatProviderEditMultiReferenceAndMask(t *testing.T) {
 	}))
 	defer apiServer.Close()
 
-	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+	provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 		BaseURL: apiServer.URL,
 		APIKey:  "test-key",
 	})
@@ -323,7 +323,7 @@ func TestGeminiChatProviderEditMultiReferenceAndMask(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderStatusErrors(t *testing.T) {
+func TestQNAChatCompletionsProviderStatusErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
@@ -369,7 +369,7 @@ func TestGeminiChatProviderStatusErrors(t *testing.T) {
 			}))
 			defer server.Close()
 
-			provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+			provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 				BaseURL: server.URL,
 				APIKey:  "key",
 			})
@@ -393,13 +393,13 @@ func TestGeminiChatProviderStatusErrors(t *testing.T) {
 	}
 }
 
-func TestGeminiChatProviderTimeout(t *testing.T) {
+func TestQNAChatCompletionsProviderTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewGeminiChatProvider(imageclient.GeminiChatConfig{
+	provider := imageclient.NewQNAChatCompletionsProvider(imageclient.QNAChatCompletionsConfig{
 		BaseURL: server.URL,
 		APIKey:  "key",
 	})

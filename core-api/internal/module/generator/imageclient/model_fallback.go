@@ -8,8 +8,8 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
-// FailoverConfig configures a primary image provider with an automatic fallback.
-type FailoverConfig struct {
+// ModelFallbackConfig configures a primary model with an automatic fallback model.
+type ModelFallbackConfig struct {
 	Primary       ImageProvider
 	Fallback      ImageProvider
 	PrimaryModel  string
@@ -17,9 +17,8 @@ type FailoverConfig struct {
 	Logger        logger.Logger
 }
 
-// FailoverImageProvider executes image operations on the primary provider,
-// automatically failing over to the fallback provider when transient failures occur.
-type FailoverImageProvider struct {
+// ModelFallbackProvider retries transient primary-model failures with a fallback model.
+type ModelFallbackProvider struct {
 	primary       ImageProvider
 	fallback      ImageProvider
 	primaryModel  string
@@ -27,9 +26,9 @@ type FailoverImageProvider struct {
 	logger        logger.Logger
 }
 
-// NewFailoverImageProvider creates a failover provider wrapping primary and fallback.
-func NewFailoverImageProvider(config FailoverConfig) *FailoverImageProvider {
-	return &FailoverImageProvider{
+// NewModelFallbackProvider creates a model-level fallback wrapper.
+func NewModelFallbackProvider(config ModelFallbackConfig) *ModelFallbackProvider {
+	return &ModelFallbackProvider{
 		primary:       config.Primary,
 		fallback:      config.Fallback,
 		primaryModel:  config.PrimaryModel,
@@ -39,7 +38,7 @@ func NewFailoverImageProvider(config FailoverConfig) *FailoverImageProvider {
 }
 
 // Generate executes text-to-image with automatic failover on transient errors.
-func (p *FailoverImageProvider) Generate(
+func (p *ModelFallbackProvider) Generate(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -84,7 +83,7 @@ func (p *FailoverImageProvider) Generate(
 }
 
 // Edit executes image-to-image or editing with automatic failover on transient errors.
-func (p *FailoverImageProvider) Edit(
+func (p *ModelFallbackProvider) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -128,7 +127,7 @@ func (p *FailoverImageProvider) Edit(
 	return fbResult, nil
 }
 
-func (p *FailoverImageProvider) shouldFailover(ctx context.Context, err error) bool {
+func (p *ModelFallbackProvider) shouldFailover(ctx context.Context, err error) bool {
 	if p.fallback == nil || err == nil {
 		return false
 	}
