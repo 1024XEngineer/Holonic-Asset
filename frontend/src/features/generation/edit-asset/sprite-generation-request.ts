@@ -1,11 +1,22 @@
 import type { CreateGenerationRequest, SpriteAssetKind } from "@/model";
 
-import type { InspectorSubmitRequest } from "./Inspector/inspector.types";
+type SpriteEditGenerationRequest = {
+  prompt: string;
+  creatingReference?: {
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+  };
+  target: {
+    nodeIds: string[];
+    frames: Array<{ nodeId: string; index: number }>;
+  };
+};
 
-export function buildInspectorGenerationRequest(
+export function buildSpriteGenerationRequest(
   assetKind: SpriteAssetKind,
   assetId: number,
-  request: InspectorSubmitRequest,
+  request: SpriteEditGenerationRequest,
 ): CreateGenerationRequest {
   const selectedNode = request.target.nodeIds[0];
   const hasSelectedFrames = request.target.frames.length > 0;
