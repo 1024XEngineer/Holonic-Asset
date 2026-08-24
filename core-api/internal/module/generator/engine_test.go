@@ -1134,6 +1134,17 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 	}
 }
 
+func TestTaskTypeValidity(t *testing.T) {
+	for _, taskType := range generator.TaskTypes() {
+		if !taskType.Valid() {
+			t.Fatalf("expected registered task type %q to be valid", taskType)
+		}
+	}
+	if generator.TaskType("unknown").Valid() {
+		t.Fatal("expected unknown task type to be invalid")
+	}
+}
+
 func TestHandleCharacterPrototypeReturnsExecutorResult(t *testing.T) {
 	payload := json.RawMessage(`{"asset_name":"hero","creative_brief":"pixel knight","dimensions":{"width":64,"height":64},"perspective":"Top-Down","creating_reference":"media-1","project_id":42}`)
 	tasks := &taskManagerStub{}
