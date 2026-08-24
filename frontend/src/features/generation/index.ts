@@ -4,5 +4,6 @@ export { CreateAnimationTrigger } from "./create-animation-trigger";
 export { GenerationQueue } from "./generation-queue";
 export {
   buildSpriteGenerationRequest,
+  buildTilesetGenerationRequest,
   useGenerationEditFlow,
 } from "./edit-asset";
