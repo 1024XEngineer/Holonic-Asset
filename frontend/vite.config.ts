@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import rehypeSlug from "rehype-slug";
 
+import { fileURLToPath } from "node:url";
+
 // https://vite.dev/config/
 export default defineConfig({
   envPrefix: "PUBLIC_",
@@ -22,9 +24,9 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@components": new URL("./src/components", import.meta.url).pathname,
-      "@/lib": new URL("./src/lib", import.meta.url).pathname,
-      "@": new URL("./src", import.meta.url).pathname,
+      "@components": fileURLToPath(new URL("./src/components", import.meta.url)),
+      "@/lib": fileURLToPath(new URL("./src/lib", import.meta.url)),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   test: {

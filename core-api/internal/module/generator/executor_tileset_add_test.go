@@ -569,3 +569,138 @@ func TestAddTileSetItemEndToEndVariations(t *testing.T) {
 		}
 	})
 }
+
+func TestAddTileSetItemReferenceSelection(t *testing.T) {
+	const tileSize = 16
+	tileImg := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
+	for y := range tileSize {
+		for x := range tileSize {
+			tileImg.SetRGBA(x, y, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+		}
+	}
+	tileB64, _ := imageprocessor.EncodePNGBase64(tileImg)
+
+	dimJSON := json.RawMessage(`{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":8,"rows":8}}`)
+	tileURL := "uploads/tiles/tile-1.png"
+	unprocessedURL := "uploads/tiles/tile-1-unprocessed.png"
+
+	t.Run("auto selects unprocessed style reference", func(t *testing.T) {
+		contentWithUnprocessed, _ := assetdomain.EncodeContent(assetdomain.AssetContent{
+			Items: []assetdomain.TileSetItem{
+				{
+					Name: "Desk",
+					Tiles: []assetdomain.Tile{
+						{URL: &tileURL, Position: assetdomain.TilePosition{X: 0, Y: 0}},
+					},
+				},
+			},
+		})
+
+		initialAsset := assetdomain.Asset{
+			ID:          101,
+			ProjectID:   42,
+			Type:        assetdomain.AssetTypeTileSet,
+			Version:     1,
+			Dimensions:  dimJSON,
+			Content:     contentWithUnprocessed,
+			Description: "Medieval fantasy workshop",
+		}
+
+		refStore := &tileSetWorkflowReferences{
+			objects: map[string]string{
+				unprocessedURL: "data:image/png;base64," + tileB64,
+			},
+		}
+
+		exec := &executor{
+			images:     &tileSetWorkflowImages{},
+			processor:  imageprocessor.NewProcessor(),
+			assets:     &tileSetWorkflowAssets{asset: initialAsset},
+			projects:   &tileSetGenerationProjectStub{project: &projectdomain.Project{ID: 42, Perspective: projectdomain.PerspectiveTopDown}},
+			references: refStore,
+		}
+
+		payload := AddTilesetItemPayload{
+			AssetID:       101,
+			ProjectID:     42,
+			CreativeBrief: "cozy furniture",
+			Item: &AddTileSetItemDefinition{
+				Name:        "Bookshelf",
+				Description: "wooden bookshelf",
+				Shape:       []TileSetCoordinate{{0, 0}},
+			},
+		}
+
+		resRaw, err := exec.addTileSetItem(context.Background(), payload)
+		if err != nil {
+			t.Fatalf("addTileSetItem failed: %v", err)
+		}
+		var result ExecutionResult
+		if err := json.Unmarshal(resRaw, &result); err != nil {
+			t.Fatalf("unmarshal result: %v", err)
+		}
+		if result.AssetID != 101 {
+			t.Fatalf("expected asset ID 101, got %d", result.AssetID)
+		}
+	})
+
+	t.Run("explicit reference overrides auto selection", func(t *testing.T) {
+		explicitRef := "uploads/custom/reference.png"
+		content, _ := assetdomain.EncodeContent(assetdomain.AssetContent{
+			Items: []assetdomain.TileSetItem{
+				{
+					Name:  "Chair",
+					Tiles: []assetdomain.Tile{{URL: &tileURL, Position: assetdomain.TilePosition{X: 0, Y: 0}}},
+				},
+			},
+		})
+
+		initialAsset := assetdomain.Asset{
+			ID:          102,
+			ProjectID:   42,
+			Type:        assetdomain.AssetTypeTileSet,
+			Version:     1,
+			Dimensions:  dimJSON,
+			Content:     content,
+			Description: "Dungeon furniture",
+		}
+
+		refStore := &tileSetWorkflowReferences{
+			objects: map[string]string{
+				explicitRef: "data:image/png;base64," + tileB64,
+			},
+		}
+
+		exec := &executor{
+			images:     &tileSetWorkflowImages{},
+			processor:  imageprocessor.NewProcessor(),
+			assets:     &tileSetWorkflowAssets{asset: initialAsset},
+			projects:   &tileSetGenerationProjectStub{project: &projectdomain.Project{ID: 42, Perspective: projectdomain.PerspectiveTopDown}},
+			references: refStore,
+		}
+
+		payload := AddTilesetItemPayload{
+			AssetID:           102,
+			ProjectID:         42,
+			CreativeBrief:     "dungeon interior",
+			CreatingReference: explicitRef,
+			Item: &AddTileSetItemDefinition{
+				Name:        "Table",
+				Description: "stone table",
+				Shape:       []TileSetCoordinate{{0, 0}},
+			},
+		}
+
+		resRaw, err := exec.addTileSetItem(context.Background(), payload)
+		if err != nil {
+			t.Fatalf("addTileSetItem failed: %v", err)
+		}
+		var result ExecutionResult
+		if err := json.Unmarshal(resRaw, &result); err != nil {
+			t.Fatalf("unmarshal result: %v", err)
+		}
+		if result.AssetID != 102 {
+			t.Fatalf("expected asset ID 102, got %d", result.AssetID)
+		}
+	})
+}

@@ -117,6 +117,16 @@ func (s *assetReaderStub) GetDetail(_ context.Context, _ uint) (assetdomain.Asse
 	return s.asset, s.err
 }
 
+func (s *assetReaderStub) GetAssets(_ context.Context, _ uint, _ assetdomain.AssetListFilter) ([]assetdomain.Asset, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.asset.ID != 0 {
+		return []assetdomain.Asset{s.asset}, nil
+	}
+	return nil, nil
+}
+
 var _ generator.AssetReader = (*assetReaderStub)(nil)
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {

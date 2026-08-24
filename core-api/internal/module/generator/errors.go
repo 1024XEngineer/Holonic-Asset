@@ -22,7 +22,6 @@ var (
 	ErrImageProcessorRequired = errors.New("generator: image processor is required")
 	ErrAssetReaderRequired    = errors.New("generator: asset reader is required")
 	ErrAssetWriterRequired    = errors.New("generator: asset writer is required")
-	ErrAssetReaderRequired    = errors.New("generator: asset reader is required for Nexus References")
 	ErrImageResultRequired    = errors.New("generator: image result is required")
 	ErrProjectReaderRequired  = errors.New("generator: project reader is required")
 	ErrReferenceStoreRequired = errors.New("generator: reference store is required")

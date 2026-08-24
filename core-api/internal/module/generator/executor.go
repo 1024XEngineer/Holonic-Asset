@@ -44,15 +44,9 @@ type ExecutionResult struct {
 	GeneratedResources []string        `json:"generated_resources,omitempty"`
 }
 
-// AssetReader is the subset of Workspace asset operations used to validate
-// generation requests against existing assets.
-type AssetReader interface {
-	GetDetail(context.Context, uint) (assetdomain.Asset, error)
-}
-
 // AssetWriter is the subset of Workspace asset operations used by generation.
 type AssetWriter interface {
-	AssetReader
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	CreateCharacterAsset(context.Context, *assetdomain.Asset) (*assetdomain.Asset, error)
 	CreateObjectAsset(context.Context, *assetdomain.Asset) (uint, error)
 	CreateSceneryAsset(context.Context, *assetdomain.Asset) (uint, error)

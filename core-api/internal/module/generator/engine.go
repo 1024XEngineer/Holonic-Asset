@@ -13,7 +13,6 @@ type Engine struct {
 	reader     *RunReader
 	tasks      taskdomain.Manager
 	executor   Executor
-	assets     AssetReader
 	projects   ProjectReader
 	assets     AssetReader
 	references ReferenceStore
@@ -26,15 +25,15 @@ type ProjectReader interface {
 }
 
 // AssetReader supplies the project-scoped list projection used for tag
-// reference selection. ThumbnailURL is the persisted first prototype image.
+// reference selection as well as detail lookup for asset validation.
 type AssetReader interface {
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	GetAssets(context.Context, uint, assetdomain.AssetListFilter) ([]assetdomain.Asset, error)
 }
 
 // EngineDependencies keeps storage and project lookup optional for lightweight
 // callers and existing tests.
 type EngineDependencies struct {
-	Assets     AssetReader
 	Projects   ProjectReader
 	Assets     AssetReader
 	References ReferenceStore
@@ -53,7 +52,6 @@ func NewEngine(
 		executor: executor,
 	}
 	if len(dependencies) > 0 {
-		engine.assets = dependencies[0].Assets
 		engine.projects = dependencies[0].Projects
 		engine.assets = dependencies[0].Assets
 		engine.references = dependencies[0].References
