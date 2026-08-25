@@ -206,6 +206,15 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateTileSet(ctx, request)
+	case AddTilesetItem:
+		if err := e.requireTileSetDependencies(); err != nil {
+			return nil, err
+		}
+		request := AddTilesetItemPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.addTileSetItem(ctx, request)
 	case EditTiles:
 		if err := e.requireTileSetDependencies(); err != nil {
 			return nil, err

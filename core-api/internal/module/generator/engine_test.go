@@ -12,6 +12,7 @@ import (
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -124,6 +125,29 @@ type referenceStoreStub struct {
 	persistErr error
 	deleteErr  error
 }
+
+type assetReaderStub struct {
+	asset assetdomain.Asset
+	err   error
+	calls int
+}
+
+func (s *assetReaderStub) GetDetail(_ context.Context, _ uint) (assetdomain.Asset, error) {
+	s.calls++
+	return s.asset, s.err
+}
+
+func (s *assetReaderStub) GetAssets(_ context.Context, _ uint, _ assetdomain.AssetListFilter) ([]assetdomain.Asset, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.asset.ID != 0 {
+		return []assetdomain.Asset{s.asset}, nil
+	}
+	return nil, nil
+}
+
+var _ generator.AssetReader = (*assetReaderStub)(nil)
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	return reference, nil
@@ -1236,6 +1260,11 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 				"dimensions":{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":8,"rows":8}},
 				"items":[{"name":"grass","description":"grass edge","shape":[[0,0]]}]
 			}`)
+		case generator.AddTilesetItem:
+			payload = json.RawMessage(`{
+				"asset_id":7,"project_id":11,"creative_brief":"add a tree",
+				"item":{"name":"tree","description":"old oak","shape":[[0,0]]}
+			}`)
 		case generator.EditTilesetItem:
 			payload = json.RawMessage(`{
 				"asset_id":7,"project_id":11,"creative_brief":"brighter",
@@ -1257,8 +1286,8 @@ func TestNewEngineRegistersAllTaskTypes(t *testing.T) {
 			t.Fatalf("dispatch task type %q: %v", taskType, err)
 		}
 	}
-	if executor.calls != 11 || len(tasks.statusUpdates) != 0 {
-		t.Fatalf("expected eleven implemented handler calls: calls=%d statuses=%+v",
+	if executor.calls != 12 || len(tasks.statusUpdates) != 0 {
+		t.Fatalf("expected twelve implemented handler calls: calls=%d statuses=%+v",
 			executor.calls, tasks.statusUpdates)
 	}
 }
@@ -1338,6 +1367,136 @@ func TestCreateBuildsCompleteTileSetPayload(t *testing.T) {
 	}
 	if len(references.persisted) != 0 {
 		t.Fatalf("Tileset creation must resolve the Project reference during execution: %v", references.persisted)
+	}
+}
+
+func TestCreateBuildsCompleteAddTilesetItemPayload(t *testing.T) {
+	assetID := uint(100)
+	tasks := &taskManagerStub{createID: 17}
+	references := &referenceStoreStub{}
+	assets := &assetReaderStub{asset: validExistingTileSetAsset(t, 4, 2)}
+	engine := generator.NewEngine(tasks, nil, generator.EngineDependencies{
+		Assets: assets, References: references,
+	})
+	request := &generator.Request{
+		ProjectID: 42, AssetID: &assetID, Kind: generator.AddTilesetItem,
+		CreativeBrief: "expand the observatory furniture set",
+		Parameters: json.RawMessage(`{
+			"creating_reference":"https://cdn.example/bench.png",
+			"item":{"name":"Bench","description":"two-cell brass bench","shape":[[0,0],[1,0]],"origin":{"x":1,"y":1}}
+		}`),
+	}
+
+	runID, err := engine.Create(context.Background(), request)
+	if err != nil {
+		t.Fatalf("create add Tileset Item task: %v", err)
+	}
+	if runID != 17 || tasks.createdTask == nil ||
+		tasks.createdTask.CompletionStatus != taskdomain.StatusAwaitingApplication {
+		t.Fatalf("unexpected Item addition task: run=%d task=%+v", runID, tasks.createdTask)
+	}
+	var payload generator.AddTilesetItemPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.AssetID != 100 || payload.ProjectID != 42 || payload.Item == nil ||
+		payload.Item.Name != "Bench" || len(payload.Item.Shape) != 2 ||
+		payload.Item.Origin == nil || *payload.Item.Origin.X != 1 || *payload.Item.Origin.Y != 1 ||
+		payload.CreatingReference != "uploads/generated-1.png" {
+		t.Fatalf("unexpected Item addition payload: %+v", payload)
+	}
+	if assets.calls != 1 || !reflect.DeepEqual(references.persisted, []string{"https://cdn.example/bench.png"}) {
+		t.Fatalf("unexpected preflight calls: assets=%d references=%v", assets.calls, references.persisted)
+	}
+}
+
+func TestCreateRejectsInvalidAddTilesetItemBeforePublishing(t *testing.T) {
+	assetID := uint(100)
+	x, y := 0, 0
+	nonTileSet := validExistingTileSetAsset(t, 4, 2)
+	nonTileSet.Type = assetdomain.AssetTypeObject
+	wrongProject := validExistingTileSetAsset(t, 4, 2)
+	wrongProject.ProjectID = 9
+	tests := []struct {
+		name       string
+		asset      assetdomain.Asset
+		assetID    *uint
+		parameters json.RawMessage
+		paths      []string
+		want       string
+	}{
+		{
+			name: "missing asset ID", asset: validExistingTileSetAsset(t, 4, 2),
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]}}`),
+			want:       "asset_id must be positive",
+		},
+		{
+			name: "duplicate name", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":" pot ","description":"duplicate","shape":[[0,0]]}}`),
+			want:       "already exists",
+		},
+		{
+			name: "occupied origin", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(fmt.Sprintf(
+				`{"item":{"name":"Bench","description":"bench","shape":[[0,0]],"origin":{"x":%d,"y":%d}}}`, x, y,
+			)),
+			want: "collides",
+		},
+		{
+			name: "incomplete origin", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]],"origin":{"x":1}}}`),
+			want:       "origin must contain x and y",
+		},
+		{
+			name: "shape outside grid", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[4,0]]}}`),
+			want:       "shape cannot fit inside tileAmount",
+		},
+		{
+			name: "full grid", asset: validExistingTileSetAsset(t, 1, 1), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]}}`),
+			want:       "does not fit",
+		},
+		{
+			name: "wrong asset type", asset: nonTileSet, assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]}}`),
+			want:       "must have type tileSet",
+		},
+		{
+			name: "wrong project", asset: wrongProject, assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]}}`),
+			want:       "does not belong to project",
+		},
+		{
+			name: "unknown field", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]},"reference":"legacy"}`),
+			want:       "unknown field",
+		},
+		{
+			name: "target paths", asset: validExistingTileSetAsset(t, 4, 2), assetID: &assetID,
+			parameters: json.RawMessage(`{"item":{"name":"Bench","description":"bench","shape":[[0,0]]}}`),
+			paths:      []string{"items"}, want: "does not accept targetAssetPaths",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tasks := &taskManagerStub{}
+			assets := &assetReaderStub{asset: test.asset}
+			_, err := generator.NewEngine(tasks, nil, generator.EngineDependencies{Assets: assets}).Create(
+				context.Background(),
+				&generator.Request{
+					ProjectID: 42, AssetID: test.assetID, Kind: generator.AddTilesetItem,
+					CreativeBrief: "add furniture", Parameters: test.parameters, TargetAssetPaths: test.paths,
+				},
+			)
+			if !errors.Is(err, generator.ErrInvalidTaskPayload) || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected invalid payload containing %q, got %v", test.want, err)
+			}
+			if tasks.createdTask != nil {
+				t.Fatalf("invalid Item addition published task: %+v", tasks.createdTask)
+			}
+		})
 	}
 }
 
@@ -1567,6 +1726,13 @@ func TestTilesetTaskHandlersRejectInvalidQueuedPayloads(t *testing.T) {
 			}`),
 		},
 		{
+			kind: generator.AddTilesetItem,
+			payload: json.RawMessage(`{
+				"asset_id":100,"project_id":42,"creative_brief":"add",
+				"item":{"name":"tree","description":"tree","shape":[]}
+			}`),
+		},
+		{
 			kind: generator.EditTiles,
 			payload: json.RawMessage(`{
 				"asset_id":100,"project_id":42,"creative_brief":"edit",
@@ -1615,6 +1781,29 @@ func validTileSetRequest() *generator.Request {
 		Kind:          generator.GenerateTileSet,
 		CreativeBrief: "A compact forest terrain set",
 		Parameters:    json.RawMessage(validTileSetParameters()),
+	}
+}
+
+func validExistingTileSetAsset(t *testing.T, columns, rows uint) assetdomain.Asset {
+	t.Helper()
+	existing := "uploads/pot.png"
+	content, err := assetdomain.EncodeContent(assetdomain.AssetContent{Items: []assetdomain.TileSetItem{{
+		Name:  "Pot",
+		Tiles: []assetdomain.Tile{{URL: &existing, Position: assetdomain.TilePosition{X: 0, Y: 0}}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dimensions, err := json.Marshal(assetdomain.TileSetDimensions{
+		TileSize:   assetdomain.Size{Width: 16, Height: 16},
+		TileAmount: assetdomain.TileAmount{Columns: columns, Rows: rows},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return assetdomain.Asset{
+		ID: 100, ProjectID: 42, Type: assetdomain.AssetTypeTileSet,
+		Dimensions: dimensions, Content: content, Version: 3,
 	}
 }
 
