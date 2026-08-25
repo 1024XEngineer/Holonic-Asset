@@ -50,8 +50,11 @@ func TestValidateDimensionsRejectsInvalidOrUnknownFields(t *testing.T) {
 		{"zero dimension", domain.AssetTypeObject, `{"width":0,"height":32}`},
 		{"unknown field", domain.AssetTypeUISet, `{"width":64,"height":64,"unit":"px"}`},
 		{"wrong tileset shape", domain.AssetTypeTileSet, `{"width":64,"height":64}`},
+		{"tileset with zero column", domain.AssetTypeTileSet, `{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":0,"rows":8}}`},
+		{"tileset with zero width", domain.AssetTypeTileSet, `{"tileSize":{"width":0,"height":16},"tileAmount":{"columns":10,"rows":8}}`},
 		{"non-null audio", domain.AssetTypeAudio, `{"width":64,"height":64}`},
 		{"trailing data", domain.AssetTypeScenery, `{"width":64,"height":64} {}`},
+		{"unsupported type", domain.AssetType("unsupported"), `{"width":64,"height":64}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
