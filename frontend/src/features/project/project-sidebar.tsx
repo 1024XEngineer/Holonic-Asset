@@ -47,36 +47,39 @@ export function ProjectSidebar({
     items.find((project) => project.id === editingProjectId);
 
   const isSelected = (projectId: string) => projectId === selectedId;
-  const projectButton = (project: ProjectSummary, compact = false) => (
-    <Button
-      key={project.id}
-      type="button"
-      aria-label={compact ? project.name : undefined}
-      aria-current={isSelected(project.id) ? "page" : undefined}
-      variant={
-        compact ? (isSelected(project.id) ? "default" : "outline") : "ghost"
-      }
-      size={compact ? "icon-lg" : undefined}
-      className={
-        compact
-          ? undefined
-          : "min-w-0 flex-1 justify-start rounded-md px-1.5 py-1"
-      }
-      onClick={() => void select(project.id)}
-    >
-      <Folder className="size-4 shrink-0 text-muted-foreground" />
-      {compact ? null : (
-        <span className="min-w-0 flex-1 text-left">
-          <span className="block truncate text-sm font-semibold">
-            {project.name}
+  const projectButton = (project: ProjectSummary, compact = false) => {
+    let variant: "default" | "outline" | "ghost" = "ghost";
+    if (compact) variant = isSelected(project.id) ? "default" : "outline";
+
+    return (
+      <Button
+        key={project.id}
+        type="button"
+        aria-label={compact ? project.name : undefined}
+        aria-current={isSelected(project.id) ? "page" : undefined}
+        variant={variant}
+        size={compact ? "icon-lg" : undefined}
+        className={
+          compact
+            ? undefined
+            : "min-w-0 flex-1 justify-start rounded-md px-1.5 py-1"
+        }
+        onClick={() => void select(project.id)}
+      >
+        <Folder className="size-4 shrink-0 text-muted-foreground" />
+        {compact ? null : (
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sm font-semibold">
+              {project.name}
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {project.style}
+            </span>
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {project.style}
-          </span>
-        </span>
-      )}
-    </Button>
-  );
+        )}
+      </Button>
+    );
+  };
 
   return (
     <aside

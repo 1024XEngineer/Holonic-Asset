@@ -4,7 +4,7 @@
  */
 
 import { ImagePlus } from "lucide-react";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 
 import { cn } from "@/lib/utils";
@@ -46,6 +46,27 @@ export function ImageDropzone({
       onDropAccepted: ([file]) => file && onChange(file),
     });
   const message = getRejectionMessage(fileRejections) ?? error;
+  let dropzoneContent: ReactNode;
+  if (previewUrl) {
+    dropzoneContent = (
+      <img
+        src={previewUrl}
+        alt="Selected image"
+        className="size-full rounded-[inherit] object-cover"
+      />
+    );
+  } else if (fileName) {
+    dropzoneContent = (
+      <span className="max-w-full truncate px-12">{fileName}</span>
+    );
+  } else {
+    dropzoneContent = (
+      <span className="flex items-center gap-2">
+        <ImagePlus className="size-4" />
+        {isDragActive ? "Drop image to attach" : label}
+      </span>
+    );
+  }
 
   return (
     <div className="grid gap-2">
@@ -70,20 +91,7 @@ export function ImageDropzone({
             "aria-invalid": message ? true : undefined,
           })}
         />
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Selected image"
-            className="size-full rounded-[inherit] object-cover"
-          />
-        ) : fileName ? (
-          <span className="max-w-full truncate px-12">{fileName}</span>
-        ) : (
-          <span className="flex items-center gap-2">
-            <ImagePlus className="size-4" />
-            {isDragActive ? "Drop image to attach" : label}
-          </span>
-        )}
+        {dropzoneContent}
       </div>
       {message ? (
         <p id={errorId} className="text-xs text-destructive" role="alert">

@@ -63,37 +63,34 @@ export function useEditorGenerationWorkspace<Content>({
     scheduleNoticeReset(() => setNotice(null), 2400);
   };
 
-  const generationTasks = useMemo<GenerationTaskListItem[]>(
-    () => [
-      ...generation.runs.flatMap((run) =>
-        run.status === "pending" ||
-        run.status === "processing" ||
-        run.status === "failed"
-          ? [
-              {
-                id: run.id,
-                name: run.name,
-                prompt: run.prompt,
-                status: run.status,
-                projectId: run.projectId,
-                kind: run.kind,
-                ...(run.error ? { error: run.error } : {}),
-              } satisfies GenerationTaskListItem,
-            ]
-          : [],
-      ),
-      ...additionalTasks,
-      ...(generation.submittedTask
-        ? [
-            {
-              ...generation.submittedTask,
-              status: "processing" as const,
-            },
-          ]
-        : []),
-    ],
-    [additionalTasks, generation.runs, generation.submittedTask],
-  );
+  const generationTasks = useMemo<GenerationTaskListItem[]>(() => {
+    const runTasks = generation.runs.flatMap((run) => {
+      if (
+        run.status !== "pending" &&
+        run.status !== "processing" &&
+        run.status !== "failed"
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          id: run.id,
+          name: run.name,
+          prompt: run.prompt,
+          status: run.status,
+          projectId: run.projectId,
+          kind: run.kind,
+          ...(run.error ? { error: run.error } : {}),
+        } satisfies GenerationTaskListItem,
+      ];
+    });
+    const submittedTask = generation.submittedTask
+      ? [{ ...generation.submittedTask, status: "processing" as const }]
+      : [];
+
+    return [...runTasks, ...additionalTasks, ...submittedTask];
+  }, [additionalTasks, generation.runs, generation.submittedTask]);
 
   const candidateRecord = useMemo(() => {
     if (generation.candidateContent === undefined) return null;

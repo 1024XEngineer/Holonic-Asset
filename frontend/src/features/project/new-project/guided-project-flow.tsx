@@ -20,6 +20,31 @@ export function GuidedProjectFlow({
   const { form, preview } = project;
   const { instance: newProjectForm, step } = form;
   const [previewImage, setPreviewImage] = useState<string>();
+  let generatedPreview: React.ReactNode = null;
+  if (preview.isGenerating) {
+    generatedPreview = (
+      <LoaderCircle
+        className="size-8 animate-spin text-muted-foreground"
+        role="status"
+        aria-label={t("generatePreview")}
+      />
+    );
+  } else if (preview.url) {
+    generatedPreview = (
+      <button
+        type="button"
+        className="size-full cursor-zoom-in"
+        aria-label={t("previewReference")}
+        onClick={() => setPreviewImage(preview.url)}
+      >
+        <img
+          src={preview.url}
+          alt={t("generatedReference")}
+          className="size-full object-cover"
+        />
+      </button>
+    );
+  }
 
   return (
     <form
@@ -119,26 +144,7 @@ export function GuidedProjectFlow({
           </TabsList>
           <TabsContent value="generate" className="grid gap-3">
             <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-              {preview.isGenerating ? (
-                <LoaderCircle
-                  className="size-8 animate-spin text-muted-foreground"
-                  role="status"
-                  aria-label={t("generatePreview")}
-                />
-              ) : preview.url ? (
-                <button
-                  type="button"
-                  className="size-full cursor-zoom-in"
-                  aria-label={t("previewReference")}
-                  onClick={() => setPreviewImage(preview.url)}
-                >
-                  <img
-                    src={preview.url}
-                    alt={t("generatedReference")}
-                    className="size-full object-cover"
-                  />
-                </button>
-              ) : null}
+              {generatedPreview}
             </div>
             <Button
               type="button"

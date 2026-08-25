@@ -31,11 +31,11 @@ vi.mock("react", async (importOriginal) => {
       const index = mocks.stateIndex++;
       const setter = vi.fn();
       mocks.setters.push(setter);
-      const value = mocks.stateOverrides.has(index)
-        ? mocks.stateOverrides.get(index)
-        : typeof initial === "function"
-          ? initial()
-          : initial;
+      let value: unknown;
+      if (mocks.stateOverrides.has(index))
+        value = mocks.stateOverrides.get(index);
+      else if (typeof initial === "function") value = initial();
+      else value = initial;
       return [value, setter];
     },
   };

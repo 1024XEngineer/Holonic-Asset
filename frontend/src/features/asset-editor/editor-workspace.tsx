@@ -71,15 +71,18 @@ function EditorWorkspaceContent({
   data: AssetWorkspaceData;
   onBack: () => void;
 }) {
+  let editorContent: React.ReactNode;
+  if (data.record.mode === "character" || data.record.mode === "object") {
+    editorContent = <SpriteEditorWorkspace data={data} onBack={onBack} />;
+  } else if (data.record.mode === "scenery") {
+    editorContent = <SceneryEditorMode data={data} onBack={onBack} />;
+  } else {
+    editorContent = <AssetCanvasEditorMode data={data} onBack={onBack} />;
+  }
+
   return (
     <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-muted/30 text-foreground selection:bg-primary/20">
-      {data.record.mode === "character" || data.record.mode === "object" ? (
-        <SpriteEditorWorkspace data={data} onBack={onBack} />
-      ) : data.record.mode === "scenery" ? (
-        <SceneryEditorMode data={data} onBack={onBack} />
-      ) : (
-        <AssetCanvasEditorMode data={data} onBack={onBack} />
-      )}
+      {editorContent}
     </div>
   );
 }

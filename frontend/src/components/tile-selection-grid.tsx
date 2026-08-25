@@ -62,6 +62,9 @@ export function TileSelectionGrid({
         const row = Math.floor(index / gridSize);
         const selected = selectedCells.has(index);
         const disabled = disabledCells.has(index);
+        let cellStateClassName = unselectedCellClassName;
+        if (disabled) cellStateClassName = disabledCellClassName;
+        else if (selected) cellStateClassName = selectedCellClassName;
 
         return (
           <button
@@ -78,11 +81,7 @@ export function TileSelectionGrid({
             className={cn(
               "relative z-20 aspect-square border-r border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               cellClassName,
-              disabled
-                ? disabledCellClassName
-                : selected
-                  ? selectedCellClassName
-                  : unselectedCellClassName,
+              cellStateClassName,
             )}
           />
         );

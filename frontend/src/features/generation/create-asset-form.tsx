@@ -68,6 +68,11 @@ export function CreateAssetForm({
     },
   });
   const draft = useStore(form.store, (state) => state.values.draft);
+  let promptPlaceholder = t("promptPlaceholder");
+  if (draft.kind === "audio") promptPlaceholder = t("audioPromptPlaceholder");
+  else if (draft.kind === "scenery") {
+    promptPlaceholder = t("sceneryPromptPlaceholder");
+  }
   const setDraft = (nextDraft: AssetCreationDraft<File>) => {
     setValidationError(undefined);
     setLocalSubmissionReady(false);
@@ -99,13 +104,7 @@ export function CreateAssetForm({
           <Textarea
             required
             className="min-h-28 resize-none"
-            placeholder={
-              draft.kind === "audio"
-                ? t("audioPromptPlaceholder")
-                : draft.kind === "scenery"
-                  ? t("sceneryPromptPlaceholder")
-                  : t("promptPlaceholder")
-            }
+            placeholder={promptPlaceholder}
             value={draft.prompt}
             onChange={(event) =>
               setDraft({ ...draft, prompt: event.target.value })

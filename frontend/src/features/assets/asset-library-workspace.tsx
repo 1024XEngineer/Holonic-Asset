@@ -64,6 +64,54 @@ export function AssetLibraryWorkspace({
     );
   }
 
+  let assetContent: React.ReactNode;
+  if (library.isLoading) {
+    assetContent = <AssetLibrarySkeleton />;
+  } else if (library.error) {
+    assetContent = (
+      <AssetLibraryError
+        message={library.error.message}
+        onRetry={library.retry}
+      />
+    );
+  } else if (library.filteredAssets.length > 0) {
+    assetContent = (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {library.filteredAssets.map((asset) => (
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            isCopying={library.copyingAssetIds.has(asset.id)}
+            isDeleting={library.deletingAssetIds.has(asset.id)}
+            onCopy={() => library.copyAsset(asset.id)}
+            onDelete={() => library.deleteAsset(asset.id)}
+            onEdit={() => library.openAssetEditor(asset.id)}
+            onOpenEditor={
+              asset.kind !== "audio"
+                ? () =>
+                    void navigate({
+                      to: "/projects/$projectId/assets/$assetId",
+                      params: {
+                        projectId: project.id,
+                        assetId: asset.id,
+                      },
+                    })
+                : undefined
+            }
+            projectId={project.id}
+          />
+        ))}
+      </div>
+    );
+  } else {
+    assetContent = (
+      <AssetLibraryEmptyState
+        hasAssets={library.totalAssets > 0}
+        onReset={library.clearFilters}
+      />
+    );
+  }
+
   return (
     <>
       <ScrollArea className="h-full">
@@ -82,48 +130,7 @@ export function AssetLibraryWorkspace({
             </div>
           ) : null}
 
-          <div className="pt-6">
-            {library.isLoading ? (
-              <AssetLibrarySkeleton />
-            ) : library.error ? (
-              <AssetLibraryError
-                message={library.error.message}
-                onRetry={library.retry}
-              />
-            ) : library.filteredAssets.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {library.filteredAssets.map((asset) => (
-                  <AssetCard
-                    key={asset.id}
-                    asset={asset}
-                    isCopying={library.copyingAssetIds.has(asset.id)}
-                    isDeleting={library.deletingAssetIds.has(asset.id)}
-                    onCopy={() => library.copyAsset(asset.id)}
-                    onDelete={() => library.deleteAsset(asset.id)}
-                    onEdit={() => library.openAssetEditor(asset.id)}
-                    onOpenEditor={
-                      asset.kind !== "audio"
-                        ? () =>
-                            void navigate({
-                              to: "/projects/$projectId/assets/$assetId",
-                              params: {
-                                projectId: project.id,
-                                assetId: asset.id,
-                              },
-                            })
-                        : undefined
-                    }
-                    projectId={project.id}
-                  />
-                ))}
-              </div>
-            ) : (
-              <AssetLibraryEmptyState
-                hasAssets={library.totalAssets > 0}
-                onReset={library.clearFilters}
-              />
-            )}
-          </div>
+          <div className="pt-6">{assetContent}</div>
         </div>
       </ScrollArea>
 

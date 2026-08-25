@@ -27,12 +27,11 @@ vi.mock("react", async (importOriginal) => {
       current: mocks.refValues.length > 0 ? mocks.refValues.shift() : initial,
     }),
     useState: (initial: unknown) => {
-      let current =
-        mocks.saveStateValue !== undefined
-          ? mocks.saveStateValue
-          : typeof initial === "function"
-            ? (initial as () => unknown)()
-            : initial;
+      let current: unknown;
+      if (mocks.saveStateValue !== undefined) current = mocks.saveStateValue;
+      else if (typeof initial === "function")
+        current = (initial as () => unknown)();
+      else current = initial;
       const setter = vi.fn((next: unknown) => {
         current =
           typeof next === "function"

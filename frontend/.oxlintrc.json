@@ -21,6 +21,7 @@
     "correctness": "error"
   },
   "rules": {
+    "no-nested-ternary": "error",
     "no-restricted-imports": [
       "error",
       {
