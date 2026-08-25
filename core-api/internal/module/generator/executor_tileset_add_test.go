@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
@@ -644,6 +645,48 @@ func TestAddTileSetItemReferenceSelection(t *testing.T) {
 		}
 	})
 
+	t.Run("legacy Tileset skips missing unprocessed reference", func(t *testing.T) {
+		content, err := assetdomain.EncodeContent(assetdomain.AssetContent{
+			Items: []assetdomain.TileSetItem{{
+				Name:  "Legacy desk",
+				Tiles: []assetdomain.Tile{{URL: &tileURL, Position: assetdomain.TilePosition{X: 0, Y: 0}}},
+			}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialAsset := assetdomain.Asset{
+			ID: 103, ProjectID: 42, Type: assetdomain.AssetTypeTileSet, Version: 1,
+			Dimensions: dimJSON, Content: content, Description: "Legacy workshop",
+		}
+		refStore := &tileSetWorkflowReferences{objects: make(map[string]string)}
+		exec := &executor{
+			images: &tileSetWorkflowImages{}, processor: imageprocessor.NewProcessor(),
+			assets: &tileSetWorkflowAssets{asset: initialAsset},
+			projects: &tileSetGenerationProjectStub{project: &projectdomain.Project{
+				ID: 42, Perspective: projectdomain.PerspectiveTopDown,
+			}},
+			references: refStore,
+		}
+
+		resultRaw, err := exec.addTileSetItem(context.Background(), AddTilesetItemPayload{
+			AssetID: 103, ProjectID: 42, CreativeBrief: "matching furniture",
+			Item: &AddTileSetItemDefinition{
+				Name: "Cabinet", Description: "wooden cabinet", Shape: []TileSetCoordinate{{0, 0}},
+			},
+		})
+		if err != nil {
+			t.Fatalf("add Item to legacy Tileset: %v", err)
+		}
+		var result ExecutionResult
+		if err := json.Unmarshal(resultRaw, &result); err != nil {
+			t.Fatal(err)
+		}
+		if result.AssetID != 103 {
+			t.Fatalf("unexpected legacy Tileset result: %+v", result)
+		}
+	})
+
 	t.Run("explicit reference overrides auto selection", func(t *testing.T) {
 		explicitRef := "uploads/custom/reference.png"
 		content, _ := assetdomain.EncodeContent(assetdomain.AssetContent{
@@ -701,6 +744,62 @@ func TestAddTileSetItemReferenceSelection(t *testing.T) {
 		}
 		if result.AssetID != 102 {
 			t.Fatalf("expected asset ID 102, got %d", result.AssetID)
+		}
+	})
+}
+
+func TestResolveExistingTileSetUnprocessedReference(t *testing.T) {
+	tileURL := "uploads/tiles/tile-1.png"
+	unprocessedURL := "uploads/tiles/tile-1-unprocessed.png"
+	content := assetdomain.AssetContent{Items: []assetdomain.TileSetItem{{
+		Name:  "Desk",
+		Tiles: []assetdomain.Tile{{URL: &tileURL}},
+	}}}
+
+	t.Run("returns existing reference", func(t *testing.T) {
+		exec := &executor{references: &tileSetWorkflowReferences{
+			objects: map[string]string{unprocessedURL: "data:image/png;base64,image"},
+		}}
+		got, err := exec.resolveExistingTileSetUnprocessedReference(context.Background(), content)
+		if err != nil || got != unprocessedURL {
+			t.Fatalf("reference = %q, err = %v", got, err)
+		}
+	})
+
+	t.Run("skips missing reference", func(t *testing.T) {
+		exec := &executor{references: &tileSetWorkflowReferences{objects: map[string]string{}}}
+		got, err := exec.resolveExistingTileSetUnprocessedReference(context.Background(), content)
+		if err != nil || got != "" {
+			t.Fatalf("reference = %q, err = %v", got, err)
+		}
+	})
+
+	t.Run("returns metadata lookup error", func(t *testing.T) {
+		metadataErr := errors.New("storage unavailable")
+		exec := &executor{references: &tileSetWorkflowReferences{
+			objects: map[string]string{}, metadataErr: metadataErr,
+		}}
+		got, err := exec.resolveExistingTileSetUnprocessedReference(context.Background(), content)
+		if got != "" || !errors.Is(err, metadataErr) {
+			t.Fatalf("reference = %q, err = %v", got, err)
+		}
+	})
+
+	t.Run("skips reference when existence cannot be verified", func(t *testing.T) {
+		exec := &executor{references: &mockReferenceStore{}}
+		got, err := exec.resolveExistingTileSetUnprocessedReference(context.Background(), content)
+		if err != nil || got != "" {
+			t.Fatalf("reference = %q, err = %v", got, err)
+		}
+	})
+
+	t.Run("recognizes wrapped not found", func(t *testing.T) {
+		exec := &executor{references: &tileSetWorkflowReferences{
+			objects: map[string]string{}, metadataErr: fmt.Errorf("stat: %w", upload.ErrObjectNotFound),
+		}}
+		got, err := exec.resolveExistingTileSetUnprocessedReference(context.Background(), content)
+		if err != nil || got != "" {
+			t.Fatalf("reference = %q, err = %v", got, err)
 		}
 	})
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
@@ -362,11 +363,27 @@ func (*tileSetWorkflowImages) Generate(
 }
 
 type tileSetWorkflowReferences struct {
-	mu         sync.Mutex
-	next       int
-	objects    map[string]string
-	deleted    []string
-	uploadFail error
+	mu          sync.Mutex
+	next        int
+	objects     map[string]string
+	deleted     []string
+	uploadFail  error
+	metadataErr error
+}
+
+func (s *tileSetWorkflowReferences) GetObjectMetadata(
+	_ context.Context,
+	reference string,
+) (*upload.ObjectMetadata, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.metadataErr != nil {
+		return nil, s.metadataErr
+	}
+	if _, ok := s.objects[reference]; !ok {
+		return nil, upload.ErrObjectNotFound
+	}
+	return &upload.ObjectMetadata{ObjectKey: reference}, nil
 }
 
 func (s *tileSetWorkflowReferences) ResolveReference(_ context.Context, reference string) (string, error) {
