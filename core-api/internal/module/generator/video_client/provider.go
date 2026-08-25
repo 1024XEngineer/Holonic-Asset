@@ -5,6 +5,7 @@ import "context"
 // ProviderRequest is the request passed from the call layer to a video provider.
 type ProviderRequest struct {
 	Prompt        string
+	Model         string
 	StartImageURL string
 	EndImageURL   string
 	Resolution    string
@@ -19,7 +20,7 @@ type ProviderResult struct {
 	VideoURL  string
 }
 
-// VideoProvider encapsulates the protocol details of an upstream video vendor.
+// VideoProvider normalizes access to one or more upstream video API protocols.
 type VideoProvider interface {
 	Generate(context.Context, *ProviderRequest) (*ProviderResult, error)
 	Download(context.Context, string) ([]byte, error)

@@ -11,6 +11,7 @@ type ReferenceImage struct {
 // the final frame for first/last-frame video generation.
 type GenerateRequest struct {
 	Prompt        string
+	Model         string
 	StartImage    ReferenceImage
 	EndImage      *ReferenceImage
 	Resolution    string

@@ -21,7 +21,7 @@ type ProviderResult struct {
 	Usage Usage
 }
 
-// LLMProvider isolates the protocol details of an upstream language-model API.
+// LLMProvider normalizes access to one or more upstream LLM API protocols.
 type LLMProvider interface {
 	Complete(context.Context, *ProviderRequest) (*ProviderResult, error)
 }

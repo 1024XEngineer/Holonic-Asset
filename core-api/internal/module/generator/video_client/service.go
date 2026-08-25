@@ -45,6 +45,7 @@ func (s *videoGenerationService) Generate(
 	}
 	providerResult, err := s.provider.Generate(ctx, &ProviderRequest{
 		Prompt:        prompt,
+		Model:         strings.TrimSpace(request.Model),
 		StartImageURL: startImageURL,
 		EndImageURL:   endImageURL,
 		Resolution:    request.Resolution,

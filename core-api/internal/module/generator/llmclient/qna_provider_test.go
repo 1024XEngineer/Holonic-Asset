@@ -62,7 +62,10 @@ func TestQNAProviderSendsMultimodalStructuredRequest(t *testing.T) {
 		BaseURL:      server.URL,
 		APIKey:       "test-key",
 		DefaultModel: "vision-model",
-		HTTPClient:   server.Client(),
+		Models: []llmclient.ModelConfig{
+			{Name: "vision-model", Protocol: "chat_completions"},
+		},
+		HTTPClient: server.Client(),
 	})
 	result, err := provider.Complete(context.Background(), &llmclient.ProviderRequest{
 		Prompt:    "arrange layers",
@@ -92,6 +95,60 @@ func TestQNAProviderSendsMultimodalStructuredRequest(t *testing.T) {
 	}
 	if result.ID != "completion-1" || result.Model != "vision-model" || string(result.JSON) != `{"layers":[{"id":1}]}` || result.Usage.TotalTokens != 28 {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestQNAProviderRejectsInvalidConfiguredModelRoutes(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    llmclient.QNAConfig
+		model     string
+		wantError string
+	}{
+		{
+			name: "unmapped model",
+			config: llmclient.QNAConfig{
+				DefaultModel: "unmapped-model",
+				Models: []llmclient.ModelConfig{
+					{Name: "configured-model", Protocol: "chat_completions"},
+				},
+			},
+			wantError: `no LLM protocol is configured for model "unmapped-model"`,
+		},
+		{
+			name: "unsupported protocol",
+			config: llmclient.QNAConfig{
+				DefaultModel: "model",
+				Models: []llmclient.ModelConfig{
+					{Name: "model", Protocol: "responses"},
+				},
+			},
+			wantError: `unsupported LLM protocol "responses" for model "model"`,
+		},
+		{
+			name: "duplicate model",
+			config: llmclient.QNAConfig{
+				DefaultModel: "model",
+				Models: []llmclient.ModelConfig{
+					{Name: "model", Protocol: "chat_completions"},
+					{Name: "model", Protocol: "chat_completions"},
+				},
+			},
+			wantError: `model "model" is assigned to multiple LLM protocols`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider := llmclient.NewQNAProvider(test.config)
+			request := validProviderRequest()
+			request.Model = test.model
+			_, err := provider.Complete(context.Background(), request)
+			assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+			if !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("error = %q, want it to contain %q", err, test.wantError)
+			}
+		})
 	}
 }
 
@@ -534,5 +591,61 @@ func TestQNAProviderRetriesInvalidJSONObjectResponse(t *testing.T) {
 	}
 	if len(prompts) != 3 || !strings.Contains(prompts[1], "Follow this JSON Schema exactly") || !strings.Contains(prompts[2], "previous response was not valid") {
 		t.Fatalf("unexpected fallback prompts: %#v", prompts)
+	}
+}
+
+func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
+	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token-a" {
+			t.Errorf("serverA auth = %q, want Bearer test-token-a", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"a\"}"}}]}`))
+	}))
+	defer serverA.Close()
+
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token-b" {
+			t.Errorf("serverB auth = %q, want Bearer test-token-b", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"b\"}"}}]}`))
+	}))
+	defer serverB.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		DefaultModel: "provider-a/vision",
+		Models: []llmclient.ModelConfig{
+			{
+				Name:     "provider-a/vision",
+				Protocol: "chat_completions",
+				BaseURL:  serverA.URL,
+				APIKey:   "test-token-a",
+			},
+			{
+				Name:     "provider-b/vision",
+				Protocol: "chat_completions",
+				BaseURL:  serverB.URL,
+				APIKey:   "test-token-b",
+			},
+		},
+	})
+
+	resA, err := provider.Complete(context.Background(), validProviderRequest())
+	if err != nil {
+		t.Fatalf("complete provider A: %v", err)
+	}
+	if string(resA.JSON) != `{"model":"a"}` {
+		t.Fatalf("resA JSON = %s", resA.JSON)
+	}
+
+	reqB := validProviderRequest()
+	reqB.Model = "provider-b/vision"
+	resB, err := provider.Complete(context.Background(), reqB)
+	if err != nil {
+		t.Fatalf("complete provider B: %v", err)
+	}
+	if string(resB.JSON) != `{"model":"b"}` {
+		t.Fatalf("resB JSON = %s", resB.JSON)
 	}
 }

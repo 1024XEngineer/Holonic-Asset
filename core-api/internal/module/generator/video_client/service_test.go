@@ -41,6 +41,7 @@ func TestVideoGenerationServiceBuildsStartAndEndReferenceDataURLs(t *testing.T) 
 
 	result, err := service.Generate(context.Background(), &videoclient.GenerateRequest{
 		Prompt:        "  fixed camera walk cycle  ",
+		Model:         "  bytedance/seedance-2.0  ",
 		StartImage:    videoclient.ReferenceImage{Base64: "cG5n", MediaType: "image/webp"},
 		EndImage:      &videoclient.ReferenceImage{Base64: "cG5nMg=="},
 		Resolution:    "1080p",
@@ -54,6 +55,7 @@ func TestVideoGenerationServiceBuildsStartAndEndReferenceDataURLs(t *testing.T) 
 
 	wantRequest := &videoclient.ProviderRequest{
 		Prompt:        "fixed camera walk cycle",
+		Model:         "bytedance/seedance-2.0",
 		StartImageURL: "data:image/webp;base64,cG5n",
 		EndImageURL:   "data:image/png;base64,cG5nMg==",
 		Resolution:    "1080p",
