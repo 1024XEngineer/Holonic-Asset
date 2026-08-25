@@ -379,8 +379,8 @@ func TestIsChatProtocolModelRoutesGoogleNamespace(t *testing.T) {
 
 func TestFactoryConfiguredModelsIndependentBaseURLAndAPIKey(t *testing.T) {
 	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer key-a" {
-			t.Errorf("serverA authorization = %q, want Bearer key-a", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-key-a" {
+			t.Errorf("serverA authorization = %q, want Bearer test-key-a", r.Header.Get("Authorization"))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -393,8 +393,8 @@ func TestFactoryConfiguredModelsIndependentBaseURLAndAPIKey(t *testing.T) {
 	defer serverA.Close()
 
 	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer key-b" {
-			t.Errorf("serverB authorization = %q, want Bearer key-b", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-key-b" {
+			t.Errorf("serverB authorization = %q, want Bearer test-key-b", r.Header.Get("Authorization"))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -413,13 +413,13 @@ func TestFactoryConfiguredModelsIndependentBaseURLAndAPIKey(t *testing.T) {
 				Name:     "provider-a/image-model",
 				Protocol: "openai_images",
 				BaseURL:  serverA.URL,
-				APIKey:   "key-a",
+				APIKey:   "test-key-a",
 			},
 			{
 				Name:     "provider-b/chat-model",
 				Protocol: "chat_completions",
 				BaseURL:  serverB.URL,
-				APIKey:   "key-b",
+				APIKey:   "test-key-b",
 			},
 		},
 	})
@@ -446,8 +446,8 @@ func TestFactoryConfiguredModelsIndependentBaseURLAndAPIKey(t *testing.T) {
 
 func TestFactoryFailoverAcrossIndependentEndpoints(t *testing.T) {
 	serverPrimary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer primary-key" {
-			t.Errorf("primary authorization = %q, want Bearer primary-key", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-primary-key" {
+			t.Errorf("primary authorization = %q, want Bearer test-primary-key", r.Header.Get("Authorization"))
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":{"message":"primary overloaded"}}`))
@@ -455,8 +455,8 @@ func TestFactoryFailoverAcrossIndependentEndpoints(t *testing.T) {
 	defer serverPrimary.Close()
 
 	serverFallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer fallback-key" {
-			t.Errorf("fallback authorization = %q, want Bearer fallback-key", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-fallback-key" {
+			t.Errorf("fallback authorization = %q, want Bearer test-fallback-key", r.Header.Get("Authorization"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"data:image/png;base64,ZmFsbGJhY2staW1hZ2U="}}]}`))
@@ -471,13 +471,13 @@ func TestFactoryFailoverAcrossIndependentEndpoints(t *testing.T) {
 				Name:     "vendor-a/model-1",
 				Protocol: "openai_images",
 				BaseURL:  serverPrimary.URL,
-				APIKey:   "primary-key",
+				APIKey:   "test-primary-key",
 			},
 			{
 				Name:     "vendor-b/model-2",
 				Protocol: "chat_completions",
 				BaseURL:  serverFallback.URL,
-				APIKey:   "fallback-key",
+				APIKey:   "test-fallback-key",
 			},
 		},
 	})

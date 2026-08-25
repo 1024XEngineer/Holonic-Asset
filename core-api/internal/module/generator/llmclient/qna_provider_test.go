@@ -596,8 +596,8 @@ func TestQNAProviderRetriesInvalidJSONObjectResponse(t *testing.T) {
 
 func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer llm-key-a" {
-			t.Errorf("serverA auth = %q, want Bearer llm-key-a", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-token-a" {
+			t.Errorf("serverA auth = %q, want Bearer test-token-a", r.Header.Get("Authorization"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"a\"}"}}]}`))
@@ -605,8 +605,8 @@ func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 	defer serverA.Close()
 
 	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer llm-key-b" {
-			t.Errorf("serverB auth = %q, want Bearer llm-key-b", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-token-b" {
+			t.Errorf("serverB auth = %q, want Bearer test-token-b", r.Header.Get("Authorization"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"b\"}"}}]}`))
@@ -620,13 +620,13 @@ func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 				Name:     "provider-a/vision",
 				Protocol: "chat_completions",
 				BaseURL:  serverA.URL,
-				APIKey:   "llm-key-a",
+				APIKey:   "test-token-a",
 			},
 			{
 				Name:     "provider-b/vision",
 				Protocol: "chat_completions",
 				BaseURL:  serverB.URL,
-				APIKey:   "llm-key-b",
+				APIKey:   "test-token-b",
 			},
 		},
 	})

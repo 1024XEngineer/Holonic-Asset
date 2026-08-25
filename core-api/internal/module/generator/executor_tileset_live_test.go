@@ -110,14 +110,21 @@ func TestLiveAddTilesetItemEndToEndGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load live image config: %v", err)
 	}
-	if imageCfg.BaseURL == "" || imageCfg.APIKey == "" {
-		t.Skip("image config is missing BaseURL or APIKey")
+	imageModels := make([]imageclient.ModelConfig, 0, len(imageCfg.Models))
+	for _, m := range imageCfg.Models {
+		imageModels = append(imageModels, imageclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
 	}
-
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      imageCfg.BaseURL,
-		APIKey:       imageCfg.APIKey,
-		DefaultModel: imageCfg.DefaultModel,
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       imageCfg.BaseURL,
+		APIKey:        imageCfg.APIKey,
+		DefaultModel:  imageCfg.DefaultModel,
+		FallbackModel: imageCfg.FallbackModel,
+		Models:        imageModels,
 	})
 	imageService := imageclient.NewImageGenerationService(provider)
 	processor := imageprocessor.NewProcessor()
@@ -368,14 +375,21 @@ func TestLiveSequentialTileSetItemGenerationWithUnprocessedReference(t *testing.
 	if err != nil {
 		t.Fatalf("load live image config: %v", err)
 	}
-	if imageCfg.BaseURL == "" || imageCfg.APIKey == "" {
-		t.Skip("image config is missing BaseURL or APIKey")
+	imageModels := make([]imageclient.ModelConfig, 0, len(imageCfg.Models))
+	for _, m := range imageCfg.Models {
+		imageModels = append(imageModels, imageclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
 	}
-
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      imageCfg.BaseURL,
-		APIKey:       imageCfg.APIKey,
-		DefaultModel: imageCfg.DefaultModel,
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       imageCfg.BaseURL,
+		APIKey:        imageCfg.APIKey,
+		DefaultModel:  imageCfg.DefaultModel,
+		FallbackModel: imageCfg.FallbackModel,
+		Models:        imageModels,
 	})
 	capturing := &capturingImageService{
 		inner: imageclient.NewImageGenerationService(provider),

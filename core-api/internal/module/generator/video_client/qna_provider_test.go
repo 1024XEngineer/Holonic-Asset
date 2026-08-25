@@ -691,8 +691,8 @@ func (l *recordingLogger) find(message string) (recordedLogEntry, bool) {
 
 func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer video-key-a" {
-			t.Errorf("serverA auth = %q, want Bearer video-key-a", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-video-key-a" {
+			t.Errorf("serverA auth = %q, want Bearer test-video-key-a", r.Header.Get("Authorization"))
 		}
 		if r.URL.Path != "/queue/provider-a/video-model/image-to-video" {
 			t.Errorf("serverA path = %q, want /queue/provider-a/video-model/image-to-video", r.URL.Path)
@@ -706,8 +706,8 @@ func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 	defer serverA.Close()
 
 	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer video-key-b" {
-			t.Errorf("serverB auth = %q, want Bearer video-key-b", r.Header.Get("Authorization"))
+		if r.Header.Get("Authorization") != "Bearer test-video-key-b" {
+			t.Errorf("serverB auth = %q, want Bearer test-video-key-b", r.Header.Get("Authorization"))
 		}
 		if r.URL.Path != "/queue/provider-b/video-model/image-to-video" {
 			t.Errorf("serverB path = %q, want /queue/provider-b/video-model/image-to-video", r.URL.Path)
@@ -726,13 +726,13 @@ func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 				Name:     "provider-a/video-model",
 				Protocol: "fal_queue",
 				BaseURL:  serverA.URL,
-				APIKey:   "video-key-a",
+				APIKey:   "test-video-key-a",
 			},
 			{
 				Name:     "provider-b/video-model",
 				Protocol: "fal_queue",
 				BaseURL:  serverB.URL,
-				APIKey:   "video-key-b",
+				APIKey:   "test-video-key-b",
 			},
 		},
 	})
