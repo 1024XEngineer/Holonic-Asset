@@ -192,6 +192,42 @@ describe("Inspector", () => {
     expect(html).toContain("History");
   });
 
+  it("requires an editable Tileset target and renders its summary", () => {
+    const empty = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="tileset"
+          prompt="Add moss"
+          history={[]}
+          target={null}
+          targetError="Select one or more generated tiles on the canvas to edit."
+          onPromptChange={vi.fn()}
+          onSubmit={vi.fn()}
+          onClearSelection={vi.fn()}
+        />,
+      ),
+    );
+    expect(empty).toContain("Select one or more generated tiles");
+    expect(empty).toContain("disabled");
+
+    const selected = renderToStaticMarkup(
+      withI18n(
+        <Inspector
+          kind="tileset"
+          prompt="Add moss"
+          history={[]}
+          target={{ label: "Ground", detail: "Selected on canvas" }}
+          targetError={null}
+          onPromptChange={vi.fn()}
+          onSubmit={vi.fn()}
+          onClearSelection={vi.fn()}
+        />,
+      ),
+    );
+    expect(selected).toContain("Ground");
+    expect(selected).toContain("Clear tile selection");
+  });
+
   it("renders scenery defaults when optional layer metadata is absent", () => {
     const html = renderToStaticMarkup(
       withI18n(

@@ -11,6 +11,7 @@ export type TilesetCanvasState = {
 
 export type TilesetCanvasStateEvent =
   | TilesetCanvasEvent
+  | { type: "selection.cleared" }
   | { type: "item.toggle"; itemId: string }
   | { type: "item-cell.toggle"; itemId: string; itemCellIndex: number };
 
@@ -80,6 +81,10 @@ function reduceTilesetCanvasWithIndex(
 
       return toggleCell(current, cellIndex);
     }
+    case "selection.cleared":
+      return withSelectedCells(current, new Set());
+    case "generation-review.resolved":
+      return current;
     case "cell.selection.toggled":
       if (!isTilesetCellIndex(event.gridCellIndex, index.gridSize))
         return current;

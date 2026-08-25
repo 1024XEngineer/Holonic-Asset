@@ -1,5 +1,8 @@
+// @vitest-environment happy-dom
+
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { TilesetItem } from "@/model";
@@ -153,6 +156,28 @@ describe("tileset canvas state", () => {
     ).toBe(state);
   });
 
+  it("clears the current selection explicitly", () => {
+    let state = createInitialTilesetCanvasState(items, 4);
+    state = reduceTilesetCanvas(
+      state,
+      { type: "cell.selection.toggled", gridCellIndex: 0 },
+      items,
+      4,
+    );
+    state = reduceTilesetCanvas(state, { type: "selection.cleared" }, items, 4);
+
+    expect(state.selectedCellIndexes).toEqual([]);
+
+    expect(
+      reduceTilesetCanvas(
+        state,
+        { type: "generation-review.resolved", applied: true },
+        items,
+        4,
+      ),
+    ).toBe(state);
+  });
+
   it("labels unowned cells and resets state against a new model", () => {
     let state = createInitialTilesetCanvasState(items, 4);
     state = reduceTilesetCanvas(
@@ -248,6 +273,14 @@ describe("tileset canvas state", () => {
       ),
     ).toContain("false");
   });
+
+  it("dispatches through the hook reducer", () => {
+    render(createElement(InteractiveProbe));
+
+    fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+
+    expect(screen.getByText("true")).toBeTruthy();
+  });
 });
 
 function SelectionProbe({
@@ -262,5 +295,23 @@ function SelectionProbe({
     "span",
     null,
     String(canvas.isCellSelected(itemId, itemCellIndex)),
+  );
+}
+
+function InteractiveProbe() {
+  const canvas = useTilesetCanvasStateMachine(items, 4);
+  return createElement(
+    "div",
+    null,
+    createElement(
+      "button",
+      {
+        type: "button",
+        onClick: () =>
+          canvas.send({ type: "cell.selection.toggled", gridCellIndex: 0 }),
+      },
+      "toggle",
+    ),
+    createElement("span", null, String(canvas.isCellSelected("sofa", 0))),
   );
 }
