@@ -346,6 +346,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List project tags */
+        get: operations["listProjectTags"];
+        put?: never;
+        /** Create a project tag */
+        post: operations["createProjectTag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a project tag */
+        get: operations["getProjectTag"];
+        /** Update a project tag */
+        put: operations["updateProjectTag"];
+        post?: never;
+        /** Delete a project tag */
+        delete: operations["deleteProjectTag"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/uploads": {
         parameters: {
             query?: never;
@@ -446,6 +483,14 @@ export interface components {
             /** Format: int64 */
             id: number;
         };
+        CreateProjectTagRequest: {
+            color?: string;
+            description?: string;
+            name: string;
+        };
+        CreateProjectTagResponse: {
+            tag: components["schemas"]["ProjectTagResponse"];
+        };
         CreateUploadTargetRequest: {
             /** Format: int64 */
             contentLength: number;
@@ -466,6 +511,9 @@ export interface components {
             projectID: number;
         };
         DeleteProjectResponse: {
+            success: boolean;
+        };
+        DeleteProjectTagResponse: {
             success: boolean;
         };
         ErrorDetail: {
@@ -571,6 +619,9 @@ export interface components {
             items: components["schemas"]["GenerationRunListItemResponse"][];
             nextCursor?: string;
         };
+        ListProjectTagsResponse: {
+            tags: components["schemas"]["ProjectTagResponse"][];
+        };
         ListProjectsResponse: {
             projects: components["schemas"]["ProjectResponse"][];
         };
@@ -609,6 +660,18 @@ export interface components {
             targetPlatform: "" | "PC" | "Mobile" | "Web";
             /** Format: int64 */
             userID: number;
+        };
+        ProjectTagDetailResponse: {
+            tag: components["schemas"]["ProjectTagResponse"];
+        };
+        ProjectTagResponse: {
+            color: string;
+            description?: string;
+            name: string;
+            /** Format: int64 */
+            projectId: number;
+            /** Format: int64 */
+            tagId: number;
         };
         RecordAssetRequest: {
             /** Format: int64 */
@@ -707,6 +770,16 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        SuccessResponseCreateProjectTagResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["CreateProjectTagResponse"];
+            /** @constant */
+            message: "success";
+        };
         SuccessResponseDeleteAssetResponse: {
             /**
              * Format: int64
@@ -734,6 +807,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["DeleteProjectResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseDeleteProjectTagResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["DeleteProjectTagResponse"];
             /** @constant */
             message: "success";
         };
@@ -787,6 +870,16 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        SuccessResponseListProjectTagsResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["ListProjectTagsResponse"];
+            /** @constant */
+            message: "success";
+        };
         SuccessResponseListProjectsResponse: {
             /**
              * Format: int64
@@ -814,6 +907,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["ProjectDetailResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseProjectTagDetailResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["ProjectTagDetailResponse"];
             /** @constant */
             message: "success";
         };
@@ -864,6 +967,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["UpdateProjectResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseUpdateProjectTagResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["UpdateProjectTagResponse"];
             /** @constant */
             message: "success";
         };
@@ -927,6 +1040,14 @@ export interface components {
         };
         UpdateProjectResponse: {
             success: boolean;
+        };
+        UpdateProjectTagRequest: {
+            color?: string;
+            description?: string;
+            name?: string;
+        };
+        UpdateProjectTagResponse: {
+            tag: components["schemas"]["ProjectTagResponse"];
         };
         UploadTarget: {
             objectKey: string;
@@ -2029,6 +2150,325 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listProjectTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseListProjectTagsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createProjectTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProjectTagRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseCreateProjectTagResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getProjectTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                tag_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseProjectTagDetailResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateProjectTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                tag_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectTagRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseUpdateProjectTagResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteProjectTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+                tag_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseDeleteProjectTagResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
