@@ -2,19 +2,16 @@ package dao
 
 import (
 	"context"
-	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func TestCreateProjectSeedsDefaultProjectTags(t *testing.T) {
+func TestCreateProjectDoesNotSeedProjectTags(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO "projects"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(42))
-	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO "project_tags"`)).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1).AddRow(2).AddRow(3).AddRow(4))
 	mock.ExpectCommit()
 
 	project := &Project{Name: "new project"}
