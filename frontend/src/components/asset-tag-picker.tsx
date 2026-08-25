@@ -57,6 +57,7 @@ export function AssetTagPicker({
 
   // Locally created or edited tags in this session
   const [localTags, setLocalTags] = useState<AssetTag[]>([]);
+  const [overriddenTagNames, setOverriddenTagNames] = useState<string[]>([]);
 
   // Form state for create / edit
   const [editingTarget, setEditingTarget] = useState<AssetTag | null>(null);
@@ -65,11 +66,15 @@ export function AssetTagPicker({
   const [formColor, setFormColor] = useState(defaultAssetTagColor);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
-  // Merge available, current, and locally created tags
-  const allOptions = useMemo(
-    () => mergeAssetTags(availableTags, localTags, tags),
-    [availableTags, localTags, tags],
-  );
+  // Merge available and current tags behind local edits from this session.
+  const allOptions = useMemo(() => {
+    const overriddenNames = new Set(overriddenTagNames);
+    const inheritedOptions = mergeAssetTags(availableTags, tags).filter(
+      (tag) => !overriddenNames.has(tag.name.toLocaleLowerCase()),
+    );
+
+    return mergeAssetTags(localTags, inheritedOptions);
+  }, [availableTags, localTags, overriddenTagNames, tags]);
 
   const selectedNames = useMemo(
     () => new Set(tags.map((tag) => tag.name.toLocaleLowerCase())),
@@ -144,11 +149,15 @@ export function AssetTagPicker({
       const updatedSelected = tags.map((item) =>
         item.name.toLocaleLowerCase() === oldNameLower ? normalized : item,
       );
-      // Update in local options
+      // Preserve the edit locally even when the source tag is not selected.
       setLocalTags((prev) =>
-        prev.map((item) =>
-          item.name.toLocaleLowerCase() === oldNameLower ? normalized : item,
+        mergeAssetTags(
+          [normalized],
+          prev.filter((item) => item.name.toLocaleLowerCase() !== oldNameLower),
         ),
+      );
+      setOverriddenTagNames((prev) =>
+        prev.includes(oldNameLower) ? prev : [...prev, oldNameLower],
       );
       onChange(updatedSelected);
     } else {

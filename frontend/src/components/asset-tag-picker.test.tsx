@@ -230,4 +230,80 @@ describe("AssetTagPicker", () => {
       },
     ]);
   });
+
+  it("preserves edits to an unselected available tag", () => {
+    const onChange = vi.fn();
+    render(
+      withI18n(
+        <AssetTagPicker
+          availableTags={[
+            {
+              name: "village",
+              description: "Old description",
+              color: "#0969DA",
+            },
+          ]}
+          id="asset-tags"
+          tags={[]}
+          onChange={onChange}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit tag" }));
+    fireEvent.change(screen.getByPlaceholderText("Optional description..."), {
+      target: { value: "Updated description" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByText("Updated description")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("option", { name: /village/i }));
+    expect(onChange).toHaveBeenLastCalledWith([
+      {
+        name: "village",
+        description: "Updated description",
+        color: "#0969DA",
+      },
+    ]);
+  });
+
+  it("replaces an unselected available tag when renaming it", () => {
+    const onChange = vi.fn();
+    render(
+      withI18n(
+        <AssetTagPicker
+          availableTags={[
+            {
+              name: "village",
+              description: "Village buildings",
+              color: "#0969DA",
+            },
+          ]}
+          id="asset-tags"
+          tags={[]}
+          onChange={onChange}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit tag" }));
+    fireEvent.change(screen.getByLabelText("Tag name"), {
+      target: { value: "hamlet" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.queryByRole("option", { name: /^village\b/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole("option", { name: /hamlet/i }));
+    expect(onChange).toHaveBeenLastCalledWith([
+      {
+        name: "hamlet",
+        description: "Village buildings",
+        color: "#0969DA",
+      },
+    ]);
+  });
 });
