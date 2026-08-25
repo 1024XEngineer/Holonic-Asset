@@ -48,7 +48,17 @@ describe("generationApi", () => {
       const reference = new File(["image"], "reference.png", {
         type: "image/png",
       });
-      const request = creationRequest({ kind, creatingReference: reference });
+      const request = creationRequest({
+        kind,
+        creatingReference: reference,
+        tags: [
+          {
+            name: "warriors",
+            description: "Warrior characters and combat units",
+            color: "#4F46E5",
+          },
+        ],
+      });
 
       await expect(toCreateGenerationRequest(request)).resolves.toEqual({
         kind: taskKind,
@@ -57,6 +67,13 @@ describe("generationApi", () => {
           asset_name: "Orchard Keeper",
           dimensions: { width: 48, height: 64 },
           perspective: "Isometric",
+          tags: [
+            {
+              name: "warriors",
+              description: "Warrior characters and combat units",
+              color: "#4F46E5",
+            },
+          ],
           creating_reference: "uploads/reference.png",
         },
       });

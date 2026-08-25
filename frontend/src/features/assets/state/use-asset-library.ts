@@ -24,7 +24,7 @@ export function filterAssetLibraryItems(
       item.version,
       item.canvasSize,
       item.perspective,
-      ...item.tags,
+      ...item.tags.flatMap((tag) => [tag.name, tag.description, tag.color]),
     ].some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
   });
 }

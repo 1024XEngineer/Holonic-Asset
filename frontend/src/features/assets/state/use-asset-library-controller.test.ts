@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     refetch: vi.fn(),
   },
-  collection: { find: vi.fn() },
+  collection: { find: vi.fn(), items: [] as AssetLibraryItem[] },
   copy: {
     error: null as Error | null,
     isError: false,
@@ -64,6 +64,7 @@ vi.mock("react", async (importOriginal) => {
 vi.mock("@/model/asset", () => ({
   assetKinds: ["character", "object", "tileset", "scenery", "uiset", "audio"],
   createAssetLibraryCollection: () => mocks.collection,
+  mergeAssetTags: (...collections: unknown[][]) => collections.flat(),
   useAssetLibraryQuery: () => mocks.assetQuery,
   useCopyAssetMutation: () => mocks.copy,
   useDeleteAssetMutation: () => mocks.delete,

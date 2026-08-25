@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AssetKindIcon } from "@/components/asset-kind";
+import { AssetTagBadge } from "@/components/asset-tag-badge";
 import type { AssetLibraryItem } from "@/model/asset";
 
 import { AssetPreview } from "./asset-preview";
@@ -88,13 +89,11 @@ export function AssetCard({
                   aria-label={t("tags")}
                 >
                   {asset.tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
+                    <AssetTagBadge
+                      key={tag.name.toLocaleLowerCase()}
+                      tag={tag}
                       className="h-4 rounded-sm px-1 text-[10px] font-medium leading-none"
-                    >
-                      {tag}
-                    </Badge>
+                    />
                   ))}
                 </div>
               ) : null}

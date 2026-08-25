@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   assetKinds,
   createAssetLibraryCollection,
+  mergeAssetTags,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
@@ -13,6 +14,7 @@ import type {
   AssetKind,
   AssetLibraryItem,
   AssetMetadataUpdate,
+  AssetTag,
 } from "@/model/asset";
 import type { GenerationRun } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
@@ -26,6 +28,7 @@ export type AssetLibraryController = {
   counts: Record<AssetKind, number>;
   totalAssets: number;
   filteredAssets: AssetLibraryItem[];
+  availableTags: AssetTag[];
   generationRuns: GenerationRun[];
   editingAsset?: AssetLibraryItem;
   actionError?: Error;
@@ -94,6 +97,10 @@ export function useAssetLibraryController({
   const generationRuns = useMemo(
     () => generationsQuery.data ?? [],
     [generationsQuery.data],
+  );
+  const availableTags = useMemo(
+    () => mergeAssetTags(...assetCollection.items.map((asset) => asset.tags)),
+    [assetCollection],
   );
   const {
     counts,
@@ -221,6 +228,7 @@ export function useAssetLibraryController({
     counts,
     totalAssets,
     filteredAssets,
+    availableTags,
     generationRuns,
     editingAsset,
     actionError: copyMutation.error ?? deleteMutation.error ?? undefined,

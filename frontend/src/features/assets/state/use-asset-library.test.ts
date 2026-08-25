@@ -13,7 +13,10 @@ function asset(overrides: Partial<AssetLibraryItem> = {}): AssetLibraryItem {
     version: "v2",
     canvasSize: "64 x 64 px",
     perspective: "Top-Down",
-    tags: ["hero", "pixel-art"],
+    tags: [
+      { name: "hero", description: "", color: "#4F46E5" },
+      { name: "pixel-art", description: "", color: "#4F46E5" },
+    ],
     history: [],
     animations: [],
     ...overrides,
@@ -27,7 +30,10 @@ const items: AssetLibraryItem[] = [
     kind: "object",
     name: "Storage Barrel",
     description: "Wooden prop",
-    tags: ["storage", "wood"],
+    tags: [
+      { name: "storage", description: "", color: "#4F46E5" },
+      { name: "wood", description: "Wooden material", color: "#4F46E5" },
+    ],
   }),
 ];
 

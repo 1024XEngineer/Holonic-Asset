@@ -95,7 +95,10 @@ describe("assetApi Core routing", () => {
     await assetApi.update("42", "8", {
       name: "Large Barrel",
       description: "Updated prop",
-      tags: ["prop", "wood"],
+      tags: [
+        { name: "prop", description: "Props", color: "#4F46E5" },
+        { name: "wood", description: "Wooden", color: "#16A34A" },
+      ],
       canvasSize: "48 × 64 px",
       perspective: "Top-Down",
     });
@@ -104,7 +107,10 @@ describe("assetApi Core routing", () => {
       assetId: 8,
       name: "Large Barrel",
       description: "Updated prop",
-      tags: ["prop", "wood"],
+      tags: [
+        { name: "prop", description: "Props", color: "#4F46E5" },
+        { name: "wood", description: "Wooden", color: "#16A34A" },
+      ],
       perspective: "Top-Down",
       dimensions: { width: 48, height: 64 },
     });

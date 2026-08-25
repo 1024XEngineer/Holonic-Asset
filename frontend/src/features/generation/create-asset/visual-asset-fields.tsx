@@ -1,4 +1,5 @@
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
+import { AssetTagPicker } from "@/components/asset-tag-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { assetCanvasSizeOptions } from "@/model/asset";
+import { assetCanvasSizeOptions, type AssetTag } from "@/model/asset";
 import { ChevronDown } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -34,9 +35,11 @@ function positiveDigits(value: string) {
 }
 
 export function VisualAssetFields({
+  availableTags = [],
   draft,
   onChange,
 }: {
+  availableTags?: readonly AssetTag[];
   draft: VisualAssetCreationDraft<File>;
   onChange: (draft: VisualAssetCreationDraft<File>) => void;
 }) {
@@ -99,6 +102,13 @@ export function VisualAssetFields({
           onChange={updateCustomSize}
         />
       ) : null}
+
+      <AssetTagPicker
+        availableTags={availableTags}
+        id="generation-tags"
+        tags={draft.tags}
+        onChange={(tags) => onChange({ ...draft, tags })}
+      />
 
       <div className="grid gap-2 text-sm font-medium">
         <span>{t("creatingReference")}</span>

@@ -3,7 +3,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { CreateAssetForm } from "@/features/generation";
-import { assetKindSchema } from "@/model/asset";
+import {
+  assetKindSchema,
+  mergeAssetTags,
+  useAssetLibraryQuery,
+} from "@/model/asset";
 import { useEnqueueGenerationMutation } from "@/model/generation";
 import { useProjectListQuery } from "@/model/project";
 
@@ -17,6 +21,7 @@ export function CreateAssetPage({
   const { t } = useTranslation(["generation", "common", "projects"]);
   const navigate = useNavigate();
   const { data: projects = [] } = useProjectListQuery();
+  const { data: assetGroups = [] } = useAssetLibraryQuery(projectId);
   const {
     error: enqueueError,
     isPending: isEnqueuePending,
@@ -26,6 +31,9 @@ export function CreateAssetPage({
   const project = projects.find((item) => item.id === projectId);
   const kindResult = assetKindSchema.safeParse(rawKind);
   const kind = kindResult.success ? kindResult.data : undefined;
+  const availableTags = mergeAssetTags(
+    ...assetGroups.flatMap((group) => group.assets.map((asset) => asset.tags)),
+  );
 
   if (!project || !kind) return null;
 
@@ -53,6 +61,7 @@ export function CreateAssetPage({
         </header>
         <section className="mt-12 border bg-background p-7 shadow-sm sm:p-10 lg:mt-14 lg:p-10">
           <CreateAssetForm
+            availableTags={availableTags}
             kind={kind}
             onCancel={goBack}
             error={enqueueError}

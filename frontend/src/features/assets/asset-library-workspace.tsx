@@ -136,6 +136,7 @@ export function AssetLibraryWorkspace({
 
       <AssetEditDialog
         asset={library.editingAsset}
+        availableTags={library.availableTags}
         error={library.updateError}
         isSaving={library.isUpdatingAsset}
         onClose={library.closeAssetEditor}
