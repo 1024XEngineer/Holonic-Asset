@@ -24,12 +24,13 @@ func main() {
 		exitf("generate OpenAPI: -output is required")
 	}
 
-	server := router.Register(
+	server := router.RegisterWithExport(
 		handler.NewHandler(nil),
 		handler.NewProjectHandler(nil),
 		handler.NewGenerationHandler(nil),
 		handler.NewUploadHandler(nil),
 		handler.NewProjectTagHandler(nil),
+		handler.NewExportHandler(nil),
 		router.Authentication{
 			Router:     handler.NewAuthHandler(nil),
 			Middleware: func(next echo.HandlerFunc) echo.HandlerFunc { return next },

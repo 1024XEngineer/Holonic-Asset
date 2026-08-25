@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	qiniuclient "github.com/qiniu/go-sdk/v7/client"
 	qiniustorage "github.com/qiniu/go-sdk/v7/storage"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
@@ -218,6 +219,21 @@ func TestGetObjectMetadataUsesBucketManager(t *testing.T) {
 		t.Fatalf("unexpected metadata: %+v", metadata)
 	}
 	assertQiniuPrivateURL(t, metadata.ObjectURL, "https://cdn.example.com/uploads/object.webp")
+}
+
+func TestGetObjectMetadataClassifiesMissingObject(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	store.bucketManager = &bucketManagerStub{statErr: &qiniuclient.ErrorInfo{
+		Code: 612,
+		Err:  "no such file or directory",
+	}}
+
+	if _, err := store.GetObjectMetadata(context.Background(), "uploads/missing.png"); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("expected object-not-found error, got %v", err)
+	}
 }
 
 func TestReferenceNormalizationAndResolutionUsesManagedStorage(t *testing.T) {
@@ -460,4 +476,50 @@ func decodeUploadPolicy(t *testing.T, token string) qiniustorage.PutPolicy {
 		t.Fatalf("unmarshal upload policy: %v", err)
 	}
 	return policy
+}
+
+func TestPutArtifactValidatesAndUploadsArtifact(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := store.PutArtifact(cancelled, "exports/result.zip", "application/zip", []byte("zip")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled context error = %v", err)
+	}
+
+	for _, test := range []struct {
+		name  string
+		key   string
+		type_ string
+		data  []byte
+		want  error
+	}{
+		{name: "missing key", key: "", type_: "application/zip", data: []byte("zip"), want: ErrInvalidUploadRequest},
+		{name: "invalid media type", key: "exports/result.zip", type_: ";", data: []byte("zip"), want: ErrInvalidObjectData},
+		{name: "empty data", key: "exports/result.zip", type_: "application/zip", want: ErrInvalidObjectData},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := store.PutArtifact(context.Background(), test.key, test.type_, test.data); !errors.Is(err, test.want) {
+				t.Fatalf("PutArtifact error = %v, want %v", err, test.want)
+			}
+		})
+	}
+
+	uploader := &formUploaderStub{}
+	store.uploader = uploader
+	if err := store.PutArtifact(context.Background(), " exports/result.zip ", "application/zip; charset=binary", []byte("zip")); err != nil {
+		t.Fatalf("PutArtifact success error = %v", err)
+	}
+	if uploader.key != "exports/result.zip" || string(uploader.data) != "zip" || uploader.extra == nil || uploader.extra.MimeType != "application/zip" {
+		t.Fatalf("unexpected artifact upload: key=%q data=%q extra=%+v", uploader.key, uploader.data, uploader.extra)
+	}
+
+	putErr := errors.New("upload unavailable")
+	uploader.err = putErr
+	if err := store.PutArtifact(context.Background(), "exports/result.zip", "application/zip", []byte("zip")); !errors.Is(err, putErr) {
+		t.Fatalf("PutArtifact uploader error = %v, want %v", err, putErr)
+	}
 }

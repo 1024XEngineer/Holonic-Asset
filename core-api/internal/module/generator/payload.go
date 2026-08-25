@@ -242,6 +242,31 @@ type CreateTileSetPayload struct {
 	Items         []TileSetItemDefinition       `json:"items"`
 }
 
+// AddTileSetItemDefinition describes one Item to append to an existing
+// Tileset. Origin is a global grid coordinate; when omitted, execution chooses
+// the first available row-major placement.
+type AddTileSetItemDefinition struct {
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Shape       []TileSetCoordinate `json:"shape"`
+	Origin      *TileSetOrigin      `json:"origin,omitempty"`
+}
+
+type TileSetOrigin struct {
+	X *int `json:"x"`
+	Y *int `json:"y"`
+}
+
+// AddTilesetItemPayload is the complete input consumed by an Item addition
+// task. Dimensions and occupied positions are always loaded from the Asset.
+type AddTilesetItemPayload struct {
+	AssetID           uint                      `json:"asset_id"`
+	ProjectID         uint                      `json:"project_id"`
+	CreativeBrief     string                    `json:"creative_brief"`
+	CreatingReference string                    `json:"creating_reference,omitempty"`
+	Item              *AddTileSetItemDefinition `json:"item"`
+}
+
 // EditTilesetItemPayload is the complete input consumed by an Item edit task.
 type EditTilesetItemPayload struct {
 	AssetID           uint               `json:"asset_id"`
@@ -309,16 +334,7 @@ func validateCreateTileSetPayload(payload *CreateTileSetPayload) error {
 	for itemIndex := range payload.Items {
 		item := &payload.Items[itemIndex]
 		prefix := fmt.Sprintf("items[%d]", itemIndex)
-		if err := validateRequiredText(prefix+".name", item.Name, maxItemNameLength); err != nil {
-			return err
-		}
-		if err := validateRequiredText(prefix+".description", item.Description, maxItemDescriptionLength); err != nil {
-			return err
-		}
-		if len(item.Shape) == 0 || len(item.Shape) > maxTilesPerItem {
-			return invalidTaskPayload("%s.shape must contain between 1 and %d coordinates", prefix, maxTilesPerItem)
-		}
-		if err := validateItemShape(prefix, item.Shape, payload); err != nil {
+		if err := validateTileSetItemDefinition(prefix, *item, payload.Dimensions); err != nil {
 			return err
 		}
 		totalTiles += len(item.Shape)
@@ -349,7 +365,28 @@ func tileSetGridCapacity(payload *CreateTileSetPayload) uint64 {
 	return uint64(payload.Dimensions.TileAmount.Columns) * uint64(payload.Dimensions.TileAmount.Rows)
 }
 
-func validateItemShape(prefix string, shape []TileSetCoordinate, payload *CreateTileSetPayload) error {
+func validateTileSetItemDefinition(
+	prefix string,
+	item TileSetItemDefinition,
+	dimensions assetdomain.TileSetDimensions,
+) error {
+	if err := validateRequiredText(prefix+".name", item.Name, maxItemNameLength); err != nil {
+		return err
+	}
+	if err := validateRequiredText(prefix+".description", item.Description, maxItemDescriptionLength); err != nil {
+		return err
+	}
+	if len(item.Shape) == 0 || len(item.Shape) > maxTilesPerItem {
+		return invalidTaskPayload("%s.shape must contain between 1 and %d coordinates", prefix, maxTilesPerItem)
+	}
+	return validateItemShape(prefix, item.Shape, dimensions)
+}
+
+func validateItemShape(
+	prefix string,
+	shape []TileSetCoordinate,
+	dimensions assetdomain.TileSetDimensions,
+) error {
 	seen := make(map[TileSetCoordinate]struct{}, len(shape))
 	minX, minY := shape[0][0], shape[0][1]
 	maxX, maxY := minX, minY
@@ -358,8 +395,8 @@ func validateItemShape(prefix string, shape []TileSetCoordinate, payload *Create
 		if x < 0 || y < 0 {
 			return invalidTaskPayload("%s.shape contains a negative coordinate", prefix)
 		}
-		if uint64(x) >= uint64(payload.Dimensions.TileAmount.Columns) ||
-			uint64(y) >= uint64(payload.Dimensions.TileAmount.Rows) {
+		if uint64(x) >= uint64(dimensions.TileAmount.Columns) ||
+			uint64(y) >= uint64(dimensions.TileAmount.Rows) {
 			return invalidTaskPayload("%s.shape cannot fit inside tileAmount", prefix)
 		}
 		if _, duplicate := seen[coordinate]; duplicate {
@@ -372,10 +409,46 @@ func validateItemShape(prefix string, shape []TileSetCoordinate, payload *Create
 
 	// Coordinates and Tile edges have already been bounded above, so these
 	// conversions cannot overflow uint64.
-	boundingWidth := uint64(maxX-minX+1) * uint64(payload.Dimensions.TileSize.Width)   //nolint:gosec // Values are nonnegative and bounded.
-	boundingHeight := uint64(maxY-minY+1) * uint64(payload.Dimensions.TileSize.Height) //nolint:gosec // Values are nonnegative and bounded.
+	boundingWidth := uint64(maxX-minX+1) * uint64(dimensions.TileSize.Width)   //nolint:gosec // Values are nonnegative and bounded.
+	boundingHeight := uint64(maxY-minY+1) * uint64(dimensions.TileSize.Height) //nolint:gosec // Values are nonnegative and bounded.
 	if boundingWidth > maxGeneratedItemImageEdge || boundingHeight > maxGeneratedItemImageEdge {
 		return invalidTaskPayload("%s.shape produces an image larger than %d pixels per edge", prefix, maxGeneratedItemImageEdge)
+	}
+	return nil
+}
+
+func validateAddTilesetItemPayload(payload *AddTilesetItemPayload) error {
+	if payload == nil {
+		return invalidTaskPayload("Tileset Item addition payload is required")
+	}
+	if err := validateEditPayloadBase(payload.ProjectID, payload.AssetID, payload.CreativeBrief); err != nil {
+		return err
+	}
+	if err := validateOptionalCreatingReference(payload.CreatingReference); err != nil {
+		return err
+	}
+	if payload.Item == nil {
+		return invalidTaskPayload("item is required")
+	}
+	if err := validateRequiredText("item.name", payload.Item.Name, maxItemNameLength); err != nil {
+		return err
+	}
+	if err := validateRequiredText("item.description", payload.Item.Description, maxItemDescriptionLength); err != nil {
+		return err
+	}
+	if len(payload.Item.Shape) == 0 || len(payload.Item.Shape) > maxTilesPerItem {
+		return invalidTaskPayload("item.shape must contain between 1 and %d coordinates", maxTilesPerItem)
+	}
+	if _, err := normalizeTileSetShape(payload.Item.Shape); err != nil {
+		return invalidTaskPayload("item.shape is invalid: %v", err)
+	}
+	if payload.Item.Origin != nil {
+		if payload.Item.Origin.X == nil || payload.Item.Origin.Y == nil {
+			return invalidTaskPayload("item.origin must contain x and y")
+		}
+		if *payload.Item.Origin.X < 0 || *payload.Item.Origin.Y < 0 {
+			return invalidTaskPayload("item.origin must contain nonnegative coordinates")
+		}
 	}
 	return nil
 }

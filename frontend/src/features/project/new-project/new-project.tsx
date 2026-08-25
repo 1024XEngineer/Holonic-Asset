@@ -16,6 +16,42 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
   const { selectedStart } = form;
   const isBlank = selectedStart === "blank";
   const hasCenteredForm = isBlank || selectedStart === "idea";
+  let title = t("startTitle");
+  let description = t("startPrompt");
+  if (selectedStart === "blank") {
+    title = t("startBlankTitle");
+    description = t("blankPrompt");
+  } else if (selectedStart) {
+    title = t("tellGameTitle");
+    description = t("detailsPrompt");
+  }
+
+  let formContent: React.ReactNode;
+  if (!selectedStart) {
+    formContent = (
+      <div className="flex flex-1 items-center">
+        <div className="mx-auto grid w-full max-w-6xl gap-x-4 gap-y-8 sm:grid-cols-3">
+          <ExistingGameFlow active={false} project={project} />
+          <IdeaProjectFlow active={false} project={project} />
+          <BlankProjectFlow active={false} project={project} />
+        </div>
+      </div>
+    );
+  } else if (selectedStart === "existing") {
+    formContent = <ExistingGameFlow active project={project} />;
+  } else if (selectedStart === "idea") {
+    formContent = (
+      <div className="flex flex-1 items-center">
+        <IdeaProjectFlow active project={project} />
+      </div>
+    );
+  } else {
+    formContent = (
+      <div className="flex flex-1 items-center">
+        <BlankProjectFlow active project={project} />
+      </div>
+    );
+  }
 
   return (
     <main className="relative min-h-screen bg-background">
@@ -35,41 +71,13 @@ export function NewProjectWorkspace({ project }: NewProjectWorkspaceProps) {
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              {selectedStart
-                ? isBlank
-                  ? t("startBlankTitle")
-                  : t("tellGameTitle")
-                : t("startTitle")}
+              {title}
             </h1>
-            <p className="mt-2 text-muted-foreground">
-              {selectedStart
-                ? isBlank
-                  ? t("blankPrompt")
-                  : t("detailsPrompt")
-                : t("startPrompt")}
-            </p>
+            <p className="mt-2 text-muted-foreground">{description}</p>
           </div>
         </div>
 
-        {!selectedStart ? (
-          <div className="flex flex-1 items-center">
-            <div className="mx-auto grid w-full max-w-6xl gap-x-4 gap-y-8 sm:grid-cols-3">
-              <ExistingGameFlow active={false} project={project} />
-              <IdeaProjectFlow active={false} project={project} />
-              <BlankProjectFlow active={false} project={project} />
-            </div>
-          </div>
-        ) : selectedStart === "existing" ? (
-          <ExistingGameFlow active project={project} />
-        ) : selectedStart === "idea" ? (
-          <div className="flex flex-1 items-center">
-            <IdeaProjectFlow active project={project} />
-          </div>
-        ) : (
-          <div className="flex flex-1 items-center">
-            <BlankProjectFlow active project={project} />
-          </div>
-        )}
+        {formContent}
       </div>
     </main>
   );

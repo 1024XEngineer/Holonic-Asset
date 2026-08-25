@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/asset/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export an asset */
+        post: operations["createAssetExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/asset/rollback": {
         parameters: {
             query?: never;
@@ -134,6 +151,23 @@ export interface paths {
         put?: never;
         /** Log in */
         post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an asset export */
+        get: operations["getAssetExport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -454,7 +488,7 @@ export interface components {
             assetId?: number;
             creative_brief: string;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "add_tileset_item" | "edit_tileset_item" | "edit_tiles";
             /** @description Task-specific parameters. Prototype generation accepts tags as structured objects or legacy strings. */
             parameters?: unknown;
             targetAssetPaths?: string[] | null;
@@ -490,6 +524,19 @@ export interface components {
         };
         CreateProjectTagResponse: {
             tag: components["schemas"]["ProjectTagResponse"];
+        };
+        CreateRequest: {
+            /** Format: int64 */
+            assetId: number;
+            /** Format: int64 */
+            version?: number;
+        };
+        CreateResponse: {
+            /** Format: int64 */
+            exportId: number;
+            status: string;
+            /** Format: int64 */
+            taskId: number;
         };
         CreateUploadTargetRequest: {
             /** Format: int64 */
@@ -557,6 +604,23 @@ export interface components {
              */
             type: string;
         };
+        ExportResponse: {
+            /** Format: int64 */
+            assetId: number;
+            downloadUrl?: string;
+            error?: string;
+            /** Format: int64 */
+            exportId: number;
+            fileName?: string;
+            /** Format: int64 */
+            fileSize?: number;
+            /** Format: int64 */
+            recordId?: number;
+            sha256?: string;
+            status: string;
+            /** Format: int64 */
+            version: number;
+        };
         GenerateReferenceRequest: {
             description?: string;
             gameType?: string;
@@ -589,7 +653,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "add_tileset_item" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             /** @enum {string} */
@@ -608,7 +672,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             /** @enum {string} */
-            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "edit_tileset_item" | "edit_tiles";
+            kind: "generate_character_prototype" | "edit_character_prototype" | "edit_frames" | "generate_object_prototype" | "edit_object_prototype" | "generate_animation" | "edit_animation" | "generate_scenery" | "generate_tileset" | "add_tileset_item" | "edit_tileset_item" | "edit_tiles";
             /** Format: int64 */
             projectId: number;
             result?: components["schemas"]["GenerationResult"];
@@ -780,6 +844,16 @@ export interface components {
             /** @constant */
             message: "success";
         };
+        SuccessResponseCreateResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["CreateResponse"];
+            /** @constant */
+            message: "success";
+        };
         SuccessResponseDeleteAssetResponse: {
             /**
              * Format: int64
@@ -817,6 +891,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["DeleteProjectTagResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseExportResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["ExportResponse"];
             /** @constant */
             message: "success";
         };
@@ -1166,6 +1250,66 @@ export interface operations {
             };
         };
     };
+    createAssetExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseCreateResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     rollbackAsset: {
         parameters: {
             query?: never;
@@ -1441,6 +1585,64 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getAssetExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseExportResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

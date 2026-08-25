@@ -1,10 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AssetRecord, AssetWorkspaceData } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
+
+vi.mock("@/model/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/model/auth")>()),
+  readAuthenticatedUserId: () => 1,
+}));
 
 describe("AssetCanvasEditorMode", () => {
   it.each([
@@ -16,6 +22,8 @@ describe("AssetCanvasEditorMode", () => {
         tileset: { gridSize: 8, items: [] },
       },
       "Tileset canvas",
+      "All changes saved",
+      "Asset tree",
     ],
     [
       "uiset",
@@ -25,24 +33,29 @@ describe("AssetCanvasEditorMode", () => {
         uiset: { components: [] },
       },
       "UI Set canvas",
+      "Preview ready",
+      "UI Set canvas",
     ],
   ] satisfies Array<
-    [AssetWorkspaceData["asset"]["kind"], AssetRecord, string]
+    [AssetWorkspaceData["asset"]["kind"], AssetRecord, string, string, string]
   >)(
     "renders the %s record in its editor canvas",
-    (kind, record, canvasLabel) => {
+    (kind, record, canvasLabel, status, modeContent) => {
       const html = renderToStaticMarkup(
         withI18n(
-          <AssetCanvasEditorMode
-            data={workspaceData(kind, record)}
-            onBack={() => undefined}
-          />,
+          <QueryClientProvider client={new QueryClient()}>
+            <AssetCanvasEditorMode
+              data={workspaceData(kind, record)}
+              onBack={() => undefined}
+            />
+          </QueryClientProvider>,
         ),
       );
 
       expect(html).toContain(`${kind} editor`);
       expect(html).toContain(`aria-label="${canvasLabel}"`);
-      expect(html).toContain("Preview ready");
+      expect(html).toContain(status);
+      expect(html).toContain(modeContent);
     },
   );
 });

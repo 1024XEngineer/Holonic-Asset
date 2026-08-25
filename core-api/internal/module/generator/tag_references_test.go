@@ -44,6 +44,15 @@ func (s *tagAssetReaderStub) GetAssets(
 	return s.assets, s.err
 }
 
+func (s *tagAssetReaderStub) GetDetail(_ context.Context, id uint) (assetdomain.Asset, error) {
+	for _, a := range s.assets {
+		if a.ID == id {
+			return a, nil
+		}
+	}
+	return assetdomain.Asset{}, s.err
+}
+
 func TestBuildPrototypePayloadAcceptsLegacyAndStructuredTags(t *testing.T) {
 	request := &Request{
 		ProjectID:     42,

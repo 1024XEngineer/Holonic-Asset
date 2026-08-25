@@ -29,13 +29,107 @@ import {
   saveCoreAssetRevision,
 } from "./core-asset-record";
 import { toCoreSceneryAssetWorkspace } from "./core-scenery-record";
-import { toCoreTilesetAssetWorkspace } from "./core-tileset-record";
+import {
+  getCoreTilesetCandidateItemIds,
+  toCoreTilesetAssetWorkspace,
+  toCoreTilesetCandidateRecord,
+} from "./core-tileset-record";
 import { toCoreUISetAssetWorkspace } from "./core-uiset-record";
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.projectDetail.mockResolvedValue({ name: "Demo" });
   mocks.assetRecords.mockResolvedValue({ records: [] });
+});
+
+describe("Tileset candidates", () => {
+  it("merges partial candidates by global position and preserves other tiles", () => {
+    const record = {
+      mode: "tileset" as const,
+      prompt: "Forest",
+      tileset: {
+        gridSize: 4,
+        items: [
+          {
+            id: "first",
+            label: "Duplicate",
+            tiles: [
+              [0, 0],
+              [1, 0],
+            ] as [number, number][],
+            tileUrls: ["/old-0.png", "/old-1.png"],
+          },
+          {
+            id: "second",
+            label: "Duplicate",
+            tiles: [[3, 3]] as [number, number][],
+            tileUrls: ["/old-15.png"],
+          },
+        ],
+      },
+    };
+    const patch = {
+      items: [
+        {
+          name: "Duplicate",
+          tiles: [
+            { position: { x: 1, y: 0 }, url: "/new-1.png" },
+            { position: { x: 3, y: 3 }, url: "/new-15.png" },
+            { position: { x: 0, y: 0 } },
+            { position: { x: 2, y: 2 }, url: "/unknown.png" },
+          ],
+        },
+      ],
+    };
+
+    expect(toCoreTilesetCandidateRecord(record, patch)).toEqual({
+      ...record,
+      tileset: {
+        ...record.tileset,
+        items: [
+          {
+            ...record.tileset.items[0],
+            tileUrls: ["/old-0.png", "/new-1.png"],
+          },
+          { ...record.tileset.items[1], tileUrls: ["/new-15.png"] },
+        ],
+      },
+    });
+    expect(
+      getCoreTilesetCandidateItemIds(patch, record.tileset.items, 4),
+    ).toEqual(["first", "second"]);
+  });
+
+  it("rejects non-Tileset records and ignores unusable review positions", () => {
+    expect(() =>
+      toCoreTilesetCandidateRecord(
+        {
+          mode: "uiset",
+          prompt: "Menu",
+          uiset: { components: [] },
+        },
+        {},
+      ),
+    ).toThrow("require a Tileset asset");
+    expect(
+      getCoreTilesetCandidateItemIds(
+        {
+          items: [
+            {
+              name: "Invalid",
+              tiles: [
+                { position: { x: -1, y: 0 }, url: "/negative.png" },
+                { position: { x: 4, y: 0 }, url: "/outside.png" },
+                { position: { x: 0, y: 0 }, url: "" },
+              ],
+            },
+          ],
+        },
+        [],
+        4,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("loadCoreAssetWorkspace", () => {

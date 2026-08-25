@@ -21,6 +21,31 @@ func Register(
 	tr ProjectTagRouter,
 	authentication ...Authentication,
 ) *echo.Echo {
+	return register(as, pr, gr, ur, tr, nil, authentication...)
+}
+
+// RegisterWithExport assembles the API including the asynchronous export routes.
+func RegisterWithExport(
+	as AssetRouter,
+	pr ProjectRouter,
+	gr GenerationRouter,
+	ur UploadRouter,
+	tr ProjectTagRouter,
+	er ExportRouter,
+	authentication ...Authentication,
+) *echo.Echo {
+	return register(as, pr, gr, ur, tr, er, authentication...)
+}
+
+func register(
+	as AssetRouter,
+	pr ProjectRouter,
+	gr GenerationRouter,
+	ur UploadRouter,
+	tr ProjectTagRouter,
+	er ExportRouter,
+	authentication ...Authentication,
+) *echo.Echo {
 	e := echo.New()
 	api := e.Group(apiBasePath)
 	secured := len(authentication) > 0 && authentication[0].Middleware != nil
@@ -50,6 +75,9 @@ func Register(
 	}
 	if ur != nil {
 		RegisterUploadRoutes(openAPI, ur)
+	}
+	if er != nil {
+		RegisterExportRoutes(openAPI, er)
 	}
 	return e
 }
