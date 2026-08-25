@@ -20,22 +20,23 @@ export function buildSpriteGenerationRequest(
 ): CreateGenerationRequest {
   const selectedNode = request.target.nodeIds[0];
   const hasSelectedFrames = request.target.frames.length > 0;
-  const kind = hasSelectedFrames
-    ? "edit_frames"
-    : selectedNode && selectedNode !== "prototype"
-      ? "edit_animation"
-      : assetKind === "character"
-        ? "edit_character_prototype"
-        : "edit_object_prototype";
-  const targetAssetPaths = hasSelectedFrames
-    ? request.target.frames.map(
-        (frame) => `animations.${frame.nodeId}.frames.${frame.index}`,
-      )
-    : selectedNode === "prototype"
-      ? ["prototype"]
-      : selectedNode
-        ? [`animations.${selectedNode}`]
-        : undefined;
+  let kind: CreateGenerationRequest["kind"];
+  if (hasSelectedFrames) kind = "edit_frames";
+  else if (selectedNode && selectedNode !== "prototype")
+    kind = "edit_animation";
+  else if (assetKind === "character") kind = "edit_character_prototype";
+  else kind = "edit_object_prototype";
+
+  let targetAssetPaths: string[] | undefined;
+  if (hasSelectedFrames) {
+    targetAssetPaths = request.target.frames.map(
+      (frame) => `animations.${frame.nodeId}.frames.${frame.index}`,
+    );
+  } else if (selectedNode === "prototype") {
+    targetAssetPaths = ["prototype"];
+  } else if (selectedNode) {
+    targetAssetPaths = [`animations.${selectedNode}`];
+  }
 
   return {
     assetId,
