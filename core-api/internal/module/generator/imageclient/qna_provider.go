@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/qnasdk"
 )
 
 const qnaProviderName = "qna"
@@ -22,7 +20,7 @@ type QNAProvider struct {
 	adapters     map[string]protocolAdapter
 }
 
-func newQNAProvider(cfg FactoryConfig, sdkClient *qnasdk.Client) ImageProvider {
+func newQNAProvider(cfg FactoryConfig) ImageProvider {
 	routes := make(map[string]protocolAdapter)
 	for _, modelConfig := range cfg.Models {
 		model := strings.TrimSpace(modelConfig.Name)
@@ -36,7 +34,7 @@ func newQNAProvider(cfg FactoryConfig, sdkClient *qnasdk.Client) ImageProvider {
 			)
 			continue
 		}
-		routes[key] = createProtocolAdapter(modelConfig.Protocol, model, cfg, sdkClient)
+		routes[key] = createProtocolAdapter(modelConfig.Protocol, model, cfg, modelConfig.BaseURL, modelConfig.APIKey)
 	}
 
 	return &QNAProvider{

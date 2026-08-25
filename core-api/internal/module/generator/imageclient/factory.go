@@ -25,10 +25,12 @@ const (
 	protocolTypeLegacyGeminiChat ProtocolType = "gemini_chat"
 )
 
-// ModelConfig assigns one model on the shared gateway to its wire protocol.
+// ModelConfig assigns one model to its wire protocol and endpoint settings.
 type ModelConfig struct {
 	Name     string
 	Protocol string
+	BaseURL  string
+	APIKey   string
 }
 
 // FactoryConfig provides parameters to initialize an ImageProvider.
@@ -44,13 +46,12 @@ type FactoryConfig struct {
 	Logger     logger.Logger
 }
 
-// NewImageProvider constructs an ImageProvider for one gateway endpoint. When
-// FallbackModel is set, transient primary-model failures fall back to a second
-// model through the same endpoint and credentials.
+// NewImageProvider constructs an ImageProvider for one or more model endpoints.
+// When FallbackModel is set, transient primary-model failures fall back to a
+// second model.
 func NewImageProvider(cfg FactoryConfig) ImageProvider {
-	sdkClient := qnasdk.NewClient(cfg.BaseURL, cfg.APIKey, cfg.HTTPClient)
 	if len(cfg.Models) > 0 {
-		provider := newQNAProvider(cfg, sdkClient)
+		provider := newQNAProvider(cfg)
 		fallbackModel := strings.TrimSpace(cfg.FallbackModel)
 		if fallbackModel == "" || strings.EqualFold(fallbackModel, cfg.DefaultModel) {
 			return provider
@@ -64,7 +65,7 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 		})
 	}
 
-	primary := createProtocolAdapter(cfg.Provider, cfg.DefaultModel, cfg, sdkClient)
+	primary := createProtocolAdapter(cfg.Provider, cfg.DefaultModel, cfg, cfg.BaseURL, cfg.APIKey)
 
 	fallbackModel := strings.TrimSpace(cfg.FallbackModel)
 	if fallbackModel == "" || strings.EqualFold(fallbackModel, cfg.DefaultModel) {
@@ -77,7 +78,7 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 		DefaultModel: fallbackModel,
 		HTTPClient:   cfg.HTTPClient,
 		Logger:       cfg.Logger,
-	}, sdkClient)
+	}, cfg.BaseURL, cfg.APIKey)
 
 	return NewModelFallbackProvider(ModelFallbackConfig{
 		Primary:       primary,
@@ -88,7 +89,21 @@ func NewImageProvider(cfg FactoryConfig) ImageProvider {
 	})
 }
 
-func createProtocolAdapter(protocol, model string, cfg FactoryConfig, sdkClient *qnasdk.Client) protocolAdapter {
+func createProtocolAdapter(
+	protocol, model string,
+	cfg FactoryConfig,
+	modelBaseURL, modelAPIKey string,
+) protocolAdapter {
+	baseURL := strings.TrimSpace(modelBaseURL)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(cfg.BaseURL)
+	}
+	apiKey := strings.TrimSpace(modelAPIKey)
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(cfg.APIKey)
+	}
+	sdkClient := qnasdk.NewClient(baseURL, apiKey, cfg.HTTPClient)
+
 	selected := ProtocolType(strings.ToLower(strings.TrimSpace(protocol)))
 	if selected == protocolTypeLegacyGeminiChat {
 		selected = ProtocolTypeChatCompletions
@@ -104,8 +119,8 @@ func createProtocolAdapter(protocol, model string, cfg FactoryConfig, sdkClient 
 	switch selected {
 	case ProtocolTypeChatCompletions:
 		return NewQNAChatCompletionsAdapter(QNAChatCompletionsAdapterConfig{
-			BaseURL:      cfg.BaseURL,
-			APIKey:       cfg.APIKey,
+			BaseURL:      baseURL,
+			APIKey:       apiKey,
 			DefaultModel: model,
 			HTTPClient:   cfg.HTTPClient,
 			SDKClient:    sdkClient,
@@ -113,8 +128,8 @@ func createProtocolAdapter(protocol, model string, cfg FactoryConfig, sdkClient 
 		})
 	case ProtocolTypeOpenAIImages:
 		return NewQNAImagesAdapter(QNAImagesAdapterConfig{
-			BaseURL:      cfg.BaseURL,
-			APIKey:       cfg.APIKey,
+			BaseURL:      baseURL,
+			APIKey:       apiKey,
 			DefaultModel: model,
 			HTTPClient:   cfg.HTTPClient,
 			SDKClient:    sdkClient,

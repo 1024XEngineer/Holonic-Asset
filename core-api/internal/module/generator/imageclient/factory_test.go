@@ -376,3 +376,117 @@ func TestIsChatProtocolModelRoutesGoogleNamespace(t *testing.T) {
 		t.Fatal("google/* model was not routed through Chat Completions")
 	}
 }
+
+func TestFactoryConfiguredModelsIndependentBaseURLAndAPIKey(t *testing.T) {
+	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer key-a" {
+			t.Errorf("serverA authorization = %q, want Bearer key-a", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path != "/v1/images/generations" {
+			t.Errorf("serverA path = %q, want /v1/images/generations", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"aW1hZ2UtYQ=="}]}`))
+	}))
+	defer serverA.Close()
+
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer key-b" {
+			t.Errorf("serverB authorization = %q, want Bearer key-b", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("serverB path = %q, want /v1/chat/completions", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"data:image/png;base64,aW1hZ2UtYg=="}}]}`))
+	}))
+	defer serverB.Close()
+
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		DefaultModel: "provider-a/image-model",
+		Models: []imageclient.ModelConfig{
+			{
+				Name:     "provider-a/image-model",
+				Protocol: "openai_images",
+				BaseURL:  serverA.URL,
+				APIKey:   "key-a",
+			},
+			{
+				Name:     "provider-b/chat-model",
+				Protocol: "chat_completions",
+				BaseURL:  serverB.URL,
+				APIKey:   "key-b",
+			},
+		},
+	})
+
+	resA, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test A"})
+	if err != nil {
+		t.Fatalf("generate on provider A: %v", err)
+	}
+	if len(resA.Images) != 1 || resA.Images[0] != "aW1hZ2UtYQ==" {
+		t.Fatalf("unexpected resA: %+v", resA)
+	}
+
+	resB, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
+		Prompt: "test B",
+		Model:  "provider-b/chat-model",
+	})
+	if err != nil {
+		t.Fatalf("generate on provider B: %v", err)
+	}
+	if len(resB.Images) != 1 || resB.Images[0] != "aW1hZ2UtYg==" {
+		t.Fatalf("unexpected resB: %+v", resB)
+	}
+}
+
+func TestFactoryFailoverAcrossIndependentEndpoints(t *testing.T) {
+	serverPrimary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer primary-key" {
+			t.Errorf("primary authorization = %q, want Bearer primary-key", r.Header.Get("Authorization"))
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary overloaded"}}`))
+	}))
+	defer serverPrimary.Close()
+
+	serverFallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer fallback-key" {
+			t.Errorf("fallback authorization = %q, want Bearer fallback-key", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"data:image/png;base64,ZmFsbGJhY2staW1hZ2U="}}]}`))
+	}))
+	defer serverFallback.Close()
+
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		DefaultModel:  "vendor-a/model-1",
+		FallbackModel: "vendor-b/model-2",
+		Models: []imageclient.ModelConfig{
+			{
+				Name:     "vendor-a/model-1",
+				Protocol: "openai_images",
+				BaseURL:  serverPrimary.URL,
+				APIKey:   "primary-key",
+			},
+			{
+				Name:     "vendor-b/model-2",
+				Protocol: "chat_completions",
+				BaseURL:  serverFallback.URL,
+				APIKey:   "fallback-key",
+			},
+		},
+	})
+
+	res, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test failover"})
+	if err != nil {
+		t.Fatalf("generate failover: %v", err)
+	}
+	if len(res.Images) != 1 || res.Images[0] != "ZmFsbGJhY2staW1hZ2U=" {
+		t.Fatalf("unexpected failover image: %+v", res)
+	}
+}
