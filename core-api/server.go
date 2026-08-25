@@ -16,6 +16,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
 	"github.com/1024XEngineer/Holonic-Asset/internal/middleware"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/export"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
@@ -140,6 +141,11 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	if candidate, ok := uploadStore.(upload.ResourceStore); ok {
 		resources = candidate
 	}
+	artifactStore, ok := uploadStore.(upload.ArtifactStore)
+	if !ok {
+		cleanupInitialization(db, appLogger)
+		return nil, errors.New("app: artifact storage is not configured")
+	}
 	taskManager, err := InitTask(ctx, cfg.Queue, taskStore)
 	if err != nil {
 		cleanupInitialization(db, appLogger)
@@ -173,20 +179,25 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	)
 	generatorEngine := generator.NewEngine(taskManager, generatorExecutor, generator.EngineDependencies{
 		Projects:   workspaceModule.Projects,
+		Assets:     workspaceModule.Assets,
 		References: references,
 	})
+	exportManager := export.NewManager(workspaceModule.Assets, references, artifactStore, taskManager)
+	taskManager.Register(string(export.TaskType), exportManager)
 
 	// Transport.
 	assetHandler := handler.NewHandler(workspaceModule.Assets, references)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
 	generationHandler := handler.NewGenerationHandler(generatorEngine, references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
+	exportHandler := handler.NewExportHandler(exportManager)
 	authHandler := handler.NewAuthHandler(authService)
-	httpEngine := router.Register(
+	httpEngine := router.RegisterWithExport(
 		assetHandler,
 		projectHandler,
 		generationHandler,
 		uploadHandler,
+		exportHandler,
 		router.Authentication{
 			Router:         authHandler,
 			Middleware:     middleware.JWT(authService),

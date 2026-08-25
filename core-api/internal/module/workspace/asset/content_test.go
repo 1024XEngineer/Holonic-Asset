@@ -23,6 +23,19 @@ func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) 
 			URL:      new("https://cdn.example/walk-01.png"),
 			Duration: 100,
 		}},
+		Generation: &domain.AnimationGenerationConfig{
+			Direction:   "south",
+			Style:       "pixel",
+			Action:      "walk",
+			FrameCount:  6,
+			Columns:     6,
+			FrameWidth:  32,
+			FrameHeight: 32,
+			FPS:         10,
+			Resolution:  "192x32",
+			Duration:    600,
+			AspectRatio: "6:1",
+		},
 	}}
 
 	payload, err := domain.EncodeContent(content)
@@ -43,6 +56,9 @@ func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) 
 	if len(decoded.Animations) != 1 || len(decoded.Animations[0].Frames) != 1 || decoded.Animations[0].Frames[0].ID != 2201 {
 		t.Fatalf("animation frames were not preserved: %+v", decoded.Animations)
 	}
+	if decoded.Animations[0].Generation == nil || decoded.Animations[0].Generation.Direction != "south" {
+		t.Fatalf("animation generation config was not preserved: %+v", decoded.Animations[0].Generation)
+	}
 	if string(payload) == "" || json.Valid(payload) == false {
 		t.Fatalf("invalid encoded content: %s", payload)
 	}
@@ -56,12 +72,85 @@ func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) 
 }
 
 func TestAssetDecodeContentInitializesMissingContent(t *testing.T) {
-	content, err := (domain.Asset{Type: domain.AssetTypeObject}).DecodeContent()
-	if err != nil {
-		t.Fatalf("decode missing content: %v", err)
+	types := []struct {
+		assetType       domain.AssetType
+		expectPrototype bool
+	}{
+		{assetType: domain.AssetTypeCharacter, expectPrototype: true},
+		{assetType: domain.AssetTypeObject, expectPrototype: true},
+		{assetType: domain.AssetTypeTileSet, expectPrototype: false},
+		{assetType: domain.AssetTypeUISet, expectPrototype: false},
+		{assetType: domain.AssetTypeScenery, expectPrototype: false},
 	}
-	if content.Prototype == nil {
-		t.Fatalf("unexpected initialized content: %+v", content)
+
+	for _, tc := range types {
+		t.Run(string(tc.assetType), func(t *testing.T) {
+			content, err := (domain.Asset{Type: tc.assetType}).DecodeContent()
+			if err != nil {
+				t.Fatalf("decode missing content for %s: %v", tc.assetType, err)
+			}
+			if tc.expectPrototype && content.Prototype == nil {
+				t.Fatalf("expected prototype to be initialized for %s, got nil", tc.assetType)
+			}
+			if !tc.expectPrototype && content.Prototype != nil {
+				t.Fatalf("expected nil prototype for %s, got %+v", tc.assetType, content.Prototype)
+			}
+		})
+	}
+}
+
+func TestAssetDecodeContentReturnsErrorOnMalformedJSON(t *testing.T) {
+	asset := domain.Asset{
+		Type:    domain.AssetTypeCharacter,
+		Content: json.RawMessage(`{malformed json`),
+	}
+	_, err := asset.DecodeContent()
+	if err == nil {
+		t.Fatal("expected error decoding malformed JSON content, got nil")
+	}
+}
+
+func TestAssetContentPreservesUIComponentsAndSceneryLayers(t *testing.T) {
+	opacity := 0.85
+	zIndex := 3
+	visible := true
+	content := domain.AssetContent{
+		Components: []domain.UIComponent{{
+			ID:       1,
+			Name:     "HealthBar",
+			Size:     domain.Size{Width: 100, Height: 20},
+			Position: domain.Position{X: 10.5, Y: 20.5},
+			Anchor:   &domain.Position{X: 0, Y: 0},
+			Pivot:    &domain.Position{X: 0.5, Y: 0.5},
+			Opacity:  &opacity,
+		}},
+		Layers: []domain.SceneryLayer{{
+			ID:       10,
+			Name:     "Background",
+			Resource: "res-bg-1",
+			Position: domain.Position{X: 0, Y: 0},
+			Visible:  &visible,
+			Opacity:  &opacity,
+			ZIndex:   &zIndex,
+		}},
+	}
+
+	payload, err := domain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode content: %v", err)
+	}
+
+	asset := domain.Asset{Type: domain.AssetTypeUISet, Content: payload}
+	decoded, err := asset.DecodeContent()
+	if err != nil {
+		t.Fatalf("decode content: %v", err)
+	}
+
+	if len(decoded.Components) != 1 || decoded.Components[0].Name != "HealthBar" {
+		t.Fatalf("unexpected components: %+v", decoded.Components)
+	}
+	if len(decoded.Layers) != 1 || decoded.Layers[0].Resource != "res-bg-1" {
+		t.Fatalf("unexpected layers: %+v", decoded.Layers)
 	}
 }
 
@@ -149,5 +238,15 @@ func TestAssetContentPreservesTileGridPositionWithoutDimensions(t *testing.T) {
 	}
 	if _, exists := raw["tileSize"]; exists {
 		t.Fatalf("tileSize belongs to asset dimensions: %s", payload)
+	}
+}
+
+func TestEncodeContentReturnsErrorForUnsupportedMetadataValue(t *testing.T) {
+	content := domain.AssetContent{
+		Metadata: map[string]any{"unsupported": make(chan int)},
+	}
+
+	if _, err := domain.EncodeContent(content); err == nil {
+		t.Fatal("expected encoding unsupported metadata value to fail")
 	}
 }

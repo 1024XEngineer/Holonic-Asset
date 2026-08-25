@@ -11,10 +11,10 @@ type GenerationStatus string
 type CreateGenerationRequest struct {
 	ProjectID        uint               `param:"project_id" path:"project_id" json:"-" minimum:"1"`
 	AssetID          *uint              `json:"assetId,omitempty" minimum:"1"`
-	Kind             generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,edit_tileset_item,edit_tiles"`
+	Kind             generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,add_tileset_item,edit_tileset_item,edit_tiles"`
 	CreativeBrief    string             `json:"creative_brief" minLength:"1"`
 	TargetAssetPaths []string           `json:"targetAssetPaths,omitempty"`
-	Parameters       json.RawMessage    `json:"parameters,omitempty"`
+	Parameters       json.RawMessage    `json:"parameters,omitempty" doc:"Task-specific parameters. Prototype generation accepts tags as structured objects or legacy strings."`
 }
 
 type CreateGenerationResponse struct {
@@ -33,7 +33,7 @@ type GenerationRunListItemResponse struct {
 	ID        generator.RunID    `json:"id" minimum:"1"`
 	ProjectID uint               `json:"projectId" minimum:"1"`
 	AssetID   *uint              `json:"assetId,omitempty" minimum:"1"`
-	Kind      generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,edit_tileset_item,edit_tiles"`
+	Kind      generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,add_tileset_item,edit_tileset_item,edit_tiles"`
 	Status    GenerationStatus   `json:"status" enum:"pending,processing,awaiting_application,completed,failed,cancelled"`
 }
 
@@ -57,7 +57,7 @@ type GetGenerationResponse struct {
 	ID        generator.RunID    `json:"id" minimum:"1"`
 	ProjectID uint               `json:"projectId" minimum:"1"`
 	AssetID   *uint              `json:"assetId,omitempty" minimum:"1"`
-	Kind      generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,edit_tileset_item,edit_tiles"`
+	Kind      generator.TaskType `json:"kind" enum:"generate_character_prototype,edit_character_prototype,edit_frames,generate_object_prototype,edit_object_prototype,generate_animation,edit_animation,generate_scenery,generate_tileset,add_tileset_item,edit_tileset_item,edit_tiles"`
 	Status    GenerationStatus   `json:"status" enum:"pending,processing,awaiting_application,completed,failed,cancelled"`
 	Result    *GenerationResult  `json:"result,omitempty"`
 	Error     string             `json:"error,omitempty"`
@@ -69,6 +69,22 @@ type CancelGenerationRequest struct {
 
 type CancelGenerationResponse struct {
 	Cancelled bool `json:"cancelled"`
+}
+
+type RetryGenerationRequest struct {
+	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
+}
+
+type RetryGenerationResponse struct {
+	GenerationRunID generator.RunID `json:"generationRunId" minimum:"1"`
+}
+
+type DeleteGenerationRequest struct {
+	GenerationRunID generator.RunID `param:"run_id" path:"run_id" json:"-" minimum:"1"`
+}
+
+type DeleteGenerationResponse struct {
+	Deleted bool `json:"deleted"`
 }
 
 type ResolveGenerationApplicationRequest struct {

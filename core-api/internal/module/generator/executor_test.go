@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
 	"reflect"
+	"strings"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -20,6 +23,7 @@ type imageGenerationServiceStub struct {
 	result   *imageclient.GenerateResult
 	results  []*imageclient.GenerateResult
 	err      error
+	errors   []error
 }
 
 type animationGenerationServiceStub struct {
@@ -171,7 +175,7 @@ func (s *imageProcessorStub) FlipHorizontal(
 		return nil, s.err
 	}
 	return &imageprocessor.FlipHorizontalResult{
-		ImageBase64: "mirrored:" + request.ImageBase64,
+		ImageBase64: request.ImageBase64,
 		MIMEType:    "image/png",
 	}, nil
 }
@@ -218,10 +222,31 @@ func (s *imageProcessorStub) SplitImage(
 	regions := make([]imageprocessor.ImageRegion, regionCount)
 	for index := range regions {
 		regions[index] = imageprocessor.ImageRegion{
-			Index: index, ImageBase64: fmt.Sprintf("direction-%d", index), MIMEType: "image/png",
+			Index: index, ImageBase64: prototypeTestFrameBase64(index), MIMEType: "image/png",
 		}
 	}
 	return &imageprocessor.SplitImageResult{Regions: regions}, nil
+}
+
+func prototypeTestFrameBase64(index int) string {
+	frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	colours := []color.RGBA{
+		{R: 80, G: 120, B: 160, A: 255},
+		{R: 97, G: 131, B: 167, A: 255},
+		{R: 114, G: 142, B: 174, A: 255},
+		{R: 131, G: 153, B: 181, A: 255},
+	}
+	colour := colours[index%len(colours)]
+	for y := range 2 {
+		for x := range 2 {
+			frame.SetRGBA(x, y, colour)
+		}
+	}
+	encoded, err := imageprocessor.EncodePNGBase64(frame)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
 
 func (s *imageGenerationServiceStub) Generate(
@@ -229,7 +254,7 @@ func (s *imageGenerationServiceStub) Generate(
 	request *imageclient.GenerateRequest,
 ) (*imageclient.GenerateResult, error) {
 	*s.events = append(*s.events, "generate_image")
-	s.request = &imageclient.GenerateRequest{
+	requestCopy := &imageclient.GenerateRequest{
 		Prompt:          request.Prompt,
 		ReferenceImages: append([]string(nil), request.ReferenceImages...),
 		MaskImage:       request.MaskImage,
@@ -239,12 +264,21 @@ func (s *imageGenerationServiceStub) Generate(
 		Params:          request.Params,
 		MaxAttempts:     request.MaxAttempts,
 	}
-	s.requests = append(s.requests, s.request)
-	call := len(s.requests) - 1
-	if call < len(s.results) {
-		return s.results[call], s.err
+	if s.request == nil {
+		s.request = requestCopy
 	}
-	return s.result, s.err
+	s.requests = append(s.requests, requestCopy)
+	call := len(s.requests) - 1
+	var err error
+	if call < len(s.errors) {
+		err = s.errors[call]
+	} else {
+		err = s.err
+	}
+	if call < len(s.results) {
+		return s.results[call], err
+	}
+	return s.result, err
 }
 
 type generationAssetWriterStub struct {
@@ -385,7 +419,7 @@ func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset, wantCount 
 	prototype := *content.Prototype
 	for index, resource := range prototype {
 		if resource.ID != uint(index+1) || resource.URL == nil ||
-			*resource.URL != fmt.Sprintf("data:image/png;base64,direction-%d", index) {
+			!strings.HasPrefix(*resource.URL, "data:image/png;base64,") {
 			t.Fatalf("unexpected prototype resource at %d: %+v", index, resource)
 		}
 	}

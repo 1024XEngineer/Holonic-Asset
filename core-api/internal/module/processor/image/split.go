@@ -40,39 +40,54 @@ const (
 // Background is nil for opaque input, its matte colour is detected from the
 // source edges automatically.
 type SplitImageRequest struct {
-	ImageBase64               string          `json:"image_base64"`
-	Mode                      ImageSplitMode  `json:"mode,omitempty"`
-	Columns                   int             `json:"columns,omitempty"`
-	Rows                      int             `json:"rows,omitempty"`
-	ForceProportionalGrid     bool            `json:"force_proportional_grid,omitempty"`
-	DetectGridBounds          bool            `json:"detect_grid_bounds,omitempty"`
-	AlphaThreshold            uint8           `json:"alpha_threshold,omitempty"`
-	MinComponentPixels        int             `json:"min_component_pixels,omitempty"`
-	MinBandSize               int             `json:"min_band_size,omitempty"`
-	ProjectionMergeGap        int             `json:"projection_merge_gap,omitempty"`
-	CropToContent             bool            `json:"crop_to_content,omitempty"`
-	AllowEmptyRegions         bool            `json:"allow_empty_regions,omitempty"`
-	RejectGridBoundaryContent bool            `json:"reject_grid_boundary_content,omitempty"`
-	GridBoundaryMargin        int             `json:"grid_boundary_margin,omitempty"`
-	FrameCount                int             `json:"frame_count,omitempty"`
-	FrameWidth                int             `json:"frame_width,omitempty"`
-	FrameHeight               int             `json:"frame_height,omitempty"`
-	Margin                    int             `json:"margin,omitempty"`
-	CropPadding               int             `json:"crop_padding,omitempty"`
-	Anchor                    AnimationAnchor `json:"anchor,omitempty"`
-	PreserveHorizontalMotion  bool            `json:"preserve_horizontal_motion,omitempty"`
-	PreserveVerticalMotion    bool            `json:"preserve_vertical_motion,omitempty"`
+	ImageBase64               string         `json:"image_base64"`
+	Mode                      ImageSplitMode `json:"mode,omitempty"`
+	Columns                   int            `json:"columns,omitempty"`
+	Rows                      int            `json:"rows,omitempty"`
+	ForceProportionalGrid     bool           `json:"force_proportional_grid,omitempty"`
+	DetectGridBounds          bool           `json:"detect_grid_bounds,omitempty"`
+	AlphaThreshold            uint8          `json:"alpha_threshold,omitempty"`
+	MinComponentPixels        int            `json:"min_component_pixels,omitempty"`
+	MinBandSize               int            `json:"min_band_size,omitempty"`
+	ProjectionMergeGap        int            `json:"projection_merge_gap,omitempty"`
+	CropToContent             bool           `json:"crop_to_content,omitempty"`
+	AllowEmptyRegions         bool           `json:"allow_empty_regions,omitempty"`
+	RejectGridBoundaryContent bool           `json:"reject_grid_boundary_content,omitempty"`
+	GridBoundaryMargin        int            `json:"grid_boundary_margin,omitempty"`
+	FrameCount                int            `json:"frame_count,omitempty"`
+	FrameWidth                int            `json:"frame_width,omitempty"`
+	FrameHeight               int            `json:"frame_height,omitempty"`
+	// RenderScale renders animation frames on a supersampled intermediate
+	// canvas. The caller can then reduce those frames once with the final
+	// pixel-art resampler instead of hardening an already tiny silhouette.
+	RenderScale              int             `json:"render_scale,omitempty"`
+	Margin                   int             `json:"margin,omitempty"`
+	CropPadding              int             `json:"crop_padding,omitempty"`
+	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
+	PreserveHorizontalMotion bool            `json:"preserve_horizontal_motion,omitempty"`
+	PreserveVerticalMotion   bool            `json:"preserve_vertical_motion,omitempty"`
 	// NormalizeContentScale rescales each visible foreground region to the median
 	// source content height before anchor registration. It keeps regions with
 	// inconsistent apparent sizes on one fixed output canvas.
 	NormalizeContentScale bool `json:"normalize_content_scale,omitempty"`
+	// NormalizeContentArea rescales each visible foreground region to the median
+	// source alpha area before anchor registration. It is intended for static
+	// object direction sheets where views can have different aspect ratios but
+	// should occupy the same visual amount of the frame. It is mutually exclusive
+	// with NormalizeContentScale.
+	NormalizeContentArea bool `json:"normalize_content_area,omitempty"`
 	// PreserveSourceCellScale keeps the source grid-cell canvas as the
 	// coordinate system for output frames. Without it, animation mode scales
 	// the sequence-wide foreground union to the target frame, so differences in
 	// individual frame extents can change apparent foreground scale.
-	PreserveSourceCellScale bool                        `json:"preserve_source_cell_scale,omitempty"`
-	MaxStabilizationShift   int                         `json:"max_stabilization_shift,omitempty"`
-	Background              *AnimationBackgroundOptions `json:"background,omitempty"`
+	PreserveSourceCellScale bool `json:"preserve_source_cell_scale,omitempty"`
+	// CenterContent is a static-prototype postcondition. It moves each
+	// rendered foreground bbox to the centre of its fixed frame without
+	// changing scale or shape. It must not be enabled for animation frames
+	// whose intentional motion needs to be preserved.
+	CenterContent         bool                        `json:"center_content,omitempty"`
+	MaxStabilizationShift int                         `json:"max_stabilization_shift,omitempty"`
+	Background            *AnimationBackgroundOptions `json:"background,omitempty"`
 }
 
 // ImageRegion is one independently encoded PNG region. SourceBounds are
@@ -312,12 +327,15 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 	result, err := normalizeAnimationImage(normalizationInput, normalizeAnimationRequest{
 		Columns: request.Columns, Rows: request.Rows, FrameCount: request.FrameCount,
 		FrameWidth: request.FrameWidth, FrameHeight: request.FrameHeight,
-		Margin: request.Margin, CropPadding: request.CropPadding,
+		RenderScale: request.RenderScale,
+		Margin:      request.Margin, CropPadding: request.CropPadding,
 		AlphaThreshold: request.AlphaThreshold, Anchor: request.Anchor,
 		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
 		PreserveVerticalMotion:   request.PreserveVerticalMotion,
 		NormalizeContentScale:    request.NormalizeContentScale,
+		NormalizeContentArea:     request.NormalizeContentArea,
 		PreserveSourceCellScale:  request.PreserveSourceCellScale,
+		CenterContent:            request.CenterContent,
 		MaxStabilizationShift:    request.MaxStabilizationShift,
 		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,
 		AllowEmptyFrames:         request.AllowEmptyRegions,

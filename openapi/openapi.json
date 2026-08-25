@@ -32,7 +32,7 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Tag"
             },
             "type": [
               "array",
@@ -99,7 +99,7 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Tag"
             },
             "type": [
               "array",
@@ -202,12 +202,15 @@
               "edit_animation",
               "generate_scenery",
               "generate_tileset",
+              "add_tileset_item",
               "edit_tileset_item",
               "edit_tiles"
             ],
             "type": "string"
           },
-          "parameters": {},
+          "parameters": {
+            "description": "Task-specific parameters. Prototype generation accepts tags as structured objects or legacy strings."
+          },
           "targetAssetPaths": {
             "items": {
               "type": "string"
@@ -301,6 +304,49 @@
         ],
         "type": "object"
       },
+      "CreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "CreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "exportId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "exportId",
+          "taskId",
+          "status"
+        ],
+        "type": "object"
+      },
       "CreateUploadTargetRequest": {
         "additionalProperties": false,
         "properties": {
@@ -343,6 +389,18 @@
         },
         "required": [
           "success"
+        ],
+        "type": "object"
+      },
+      "DeleteGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
         ],
         "type": "object"
       },
@@ -442,6 +500,57 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ExportResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "exportId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "recordId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "exportId",
+          "assetId",
+          "version",
+          "status"
+        ],
         "type": "object"
       },
       "GenerateReferenceRequest": {
@@ -545,6 +654,7 @@
               "edit_animation",
               "generate_scenery",
               "generate_tileset",
+              "add_tileset_item",
               "edit_tileset_item",
               "edit_tiles"
             ],
@@ -632,6 +742,7 @@
               "edit_animation",
               "generate_scenery",
               "generate_tileset",
+              "add_tileset_item",
               "edit_tileset_item",
               "edit_tiles"
             ],
@@ -932,6 +1043,20 @@
         ],
         "type": "object"
       },
+      "RetryGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "generationRunId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generationRunId"
+        ],
+        "type": "object"
+      },
       "RollBackAssetRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1103,6 +1228,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseDeleteAssetResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1128,6 +1278,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseDeleteGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteGenerationResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseDeleteProjectResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1140,6 +1315,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/DeleteProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseExportResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExportResponse"
           },
           "message": {
             "const": "success",
@@ -1378,6 +1578,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseRetryGenerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RetryGenerationResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseRollBackAssetResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1478,6 +1703,24 @@
         ],
         "type": "object"
       },
+      "Tag": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "UpdateAssetRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1503,7 +1746,30 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "description": "A structured asset tag or a legacy tag name.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                }
+              ]
             },
             "type": "array"
           }
@@ -1543,7 +1809,7 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Tag"
             },
             "type": [
               "array",
@@ -1807,6 +2073,82 @@
         "summary": "Delete an asset",
         "tags": [
           "Assets"
+        ]
+      }
+    },
+    "/asset/export": {
+      "post": {
+        "operationId": "createAssetExport",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseCreateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Export an asset",
+        "tags": [
+          "Exports"
         ]
       }
     },
@@ -2205,7 +2547,151 @@
         ]
       }
     },
+    "/export/{export_id}": {
+      "get": {
+        "operationId": "getAssetExport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseExportResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get an asset export",
+        "tags": [
+          "Exports"
+        ]
+      }
+    },
     "/generation-runs/{run_id}": {
+      "delete": {
+        "operationId": "deleteGenerationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseDeleteGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a failed generation run",
+        "tags": [
+          "Generation"
+        ]
+      },
       "get": {
         "operationId": "getGenerationRun",
         "parameters": [
@@ -2377,6 +2863,74 @@
           }
         ],
         "summary": "Cancel a generation run",
+        "tags": [
+          "Generation"
+        ]
+      }
+    },
+    "/generation-runs/{run_id}/retry": {
+      "post": {
+        "operationId": "retryGenerationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseRetryGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retry a failed generation run",
         "tags": [
           "Generation"
         ]

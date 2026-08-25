@@ -99,6 +99,20 @@ func (e *Engine) handleTileSet(
 	return e.execute(ctx, GenerateTileSet, message.Payload)
 }
 
+func (e *Engine) handleAddTilesetItem(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := AddTilesetItemPayload{}
+	if err := decodeTileSetTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	if err := validateAddTilesetItemPayload(&payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, AddTilesetItem, message.Payload)
+}
+
 func (e *Engine) handleEditTilesetItem(
 	ctx context.Context,
 	message *taskdomain.Task,
@@ -179,6 +193,7 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(GenerateScenery), taskdomain.HandlerFunc(e.handleScenery))
 	manager.Register(string(EditAnimation), taskdomain.HandlerFunc(e.handleEditAnimation))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))
+	manager.Register(string(AddTilesetItem), taskdomain.HandlerFunc(e.handleAddTilesetItem))
 	manager.Register(string(EditTilesetItem), taskdomain.HandlerFunc(e.handleEditTilesetItem))
 	manager.Register(string(EditTiles), taskdomain.HandlerFunc(e.handleEditTiles))
 	manager.Register(string(EditFrames), taskdomain.HandlerFunc(e.handleEditFrames))

@@ -6,8 +6,7 @@ import type {
   CharacterAnimation,
   GenerationTaskType,
 } from "@/model";
-
-import type { EditorGenerationTask } from "./Header/editor-header";
+import type { GenerationTaskListItem } from "@/features/generation";
 
 const mocks = vi.hoisted(() => ({
   animationMutation: {
@@ -35,6 +34,7 @@ const mocks = vi.hoisted(() => ({
     name: string;
     prompt: string;
     status: string;
+    projectId?: string;
     error?: string;
   }>,
   rememberGenerationRunMetadata: vi.fn(),
@@ -61,12 +61,11 @@ vi.mock("react", async (importOriginal) => {
     useEffect: (effect: () => void) => effect(),
     useMemo: (factory: () => unknown) => factory(),
     useState: (initial: unknown) => {
-      let current =
-        mocks.stateValues.length > 0
-          ? mocks.stateValues.shift()
-          : typeof initial === "function"
-            ? (initial as () => unknown)()
-            : initial;
+      let current: unknown;
+      if (mocks.stateValues.length > 0) current = mocks.stateValues.shift();
+      else if (typeof initial === "function")
+        current = (initial as () => unknown)();
+      else current = initial;
       const setter = vi.fn((next: unknown) => {
         current =
           typeof next === "function"
@@ -159,6 +158,7 @@ describe("useEditorWorkspace", () => {
         prompt: "Four",
         status: "failed",
         error: "Video provider rejected the request",
+        projectId: "7",
       },
     ];
     mocks.stateValues.push(null, null, null);
@@ -190,7 +190,7 @@ describe("useEditorWorkspace", () => {
         id: "pending",
         name: "Pending",
         prompt: "One",
-        status: "queued",
+        status: "pending",
       },
       {
         id: "processing",
@@ -204,6 +204,7 @@ describe("useEditorWorkspace", () => {
         prompt: "Four",
         status: "failed",
         error: "Video provider rejected the request",
+        projectId: "7",
       },
     ]);
     expect(onBack).toHaveBeenCalledOnce();
@@ -245,13 +246,13 @@ describe("useEditorWorkspace", () => {
   });
 
   it("includes local tasks and blocks duplicate prompt submission", async () => {
-    const animationTask: EditorGenerationTask = {
+    const animationTask: GenerationTaskListItem = {
       id: "animation-local",
       name: "Jump",
       prompt: "Jump",
       status: "processing",
     };
-    const promptTask: EditorGenerationTask = {
+    const promptTask: GenerationTaskListItem = {
       id: "prompt-local",
       name: "Edit hero",
       prompt: "Edit",

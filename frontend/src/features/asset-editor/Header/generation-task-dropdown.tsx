@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
+import { AlertCircle, ChevronDown, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -7,25 +7,19 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-export type EditorGenerationTask = {
-  id: string;
-  name: string;
-  prompt: string;
-  status: "queued" | "processing" | "failed";
-  error?: string;
-};
+import {
+  GenerationTaskList,
+  type GenerationTaskListItem,
+} from "@/features/generation";
 
 export function GenerationTaskDropdown({
   tasks,
 }: {
-  tasks: EditorGenerationTask[];
+  tasks: GenerationTaskListItem[];
 }) {
   const { t } = useTranslation("editor");
   if (tasks.length === 0) return null;
-  const hasActiveTasks = tasks.some(
-    (task) => task.status === "queued" || task.status === "processing",
-  );
+  const hasActiveTasks = tasks.some((task) => task.status !== "failed");
 
   return (
     <DropdownMenu>
@@ -50,47 +44,7 @@ export function GenerationTaskDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" sideOffset={8} className="w-80 p-0">
         <div className="max-h-72 overflow-y-auto p-1.5">
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex min-w-0 items-start gap-3 rounded-md px-2 py-2.5"
-            >
-              <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
-                {task.status === "failed" ? (
-                  <AlertCircle className="size-3.5 text-destructive" />
-                ) : (
-                  <Sparkles className="size-3.5" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate text-xs font-semibold">
-                    {task.name}
-                  </p>
-                  <Badge
-                    variant={
-                      task.status === "failed" ? "destructive" : "outline"
-                    }
-                    className="shrink-0 text-[10px] text-muted-foreground"
-                  >
-                    {task.status === "queued"
-                      ? t("queued")
-                      : task.status === "failed"
-                        ? t("failed")
-                        : t("generating")}
-                  </Badge>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                  {task.prompt}
-                </p>
-                {task.error ? (
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-destructive">
-                    {task.error}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          ))}
+          <GenerationTaskList tasks={tasks} variant="dropdown" />
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

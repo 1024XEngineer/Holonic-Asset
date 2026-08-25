@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -24,8 +25,13 @@ type runManagerStub struct {
 	listPage      *generator.RunListPage
 	listErr       error
 	run           *generator.Run
+	runErr        error
 	cancelID      generator.RunID
 	cancelErr     error
+	retryID       generator.RunID
+	retryErr      error
+	deleteID      generator.RunID
+	deleteErr     error
 	resolveID     generator.RunID
 	resolved      bool
 	resolveErr    error
@@ -42,7 +48,7 @@ func (s *runManagerStub) Create(
 func TestCreateMapsInvalidTaskPayloadToBadRequest(t *testing.T) {
 	wantErr := fmt.Errorf("%w: invalid target", generator.ErrInvalidTaskPayload)
 	stub := &runManagerStub{createErr: wantErr}
-	_, err := handler.NewGenerationHandler(stub).Create(
+	_, err := handler.NewGenerationHandler(stub, nil).Create(
 		context.Background(),
 		dto.CreateGenerationRequest{Kind: generator.EditTiles, CreativeBrief: "edit"},
 	)
@@ -65,12 +71,22 @@ func (s *runManagerStub) List(
 }
 
 func (s *runManagerStub) Get(context.Context, generator.RunID) (*generator.Run, error) {
-	return s.run, nil
+	return s.run, s.runErr
 }
 
 func (s *runManagerStub) Cancel(_ context.Context, runID generator.RunID) error {
 	s.cancelID = runID
 	return s.cancelErr
+}
+
+func (s *runManagerStub) Retry(_ context.Context, runID generator.RunID) (generator.RunID, error) {
+	s.retryID = runID
+	return runID, s.retryErr
+}
+
+func (s *runManagerStub) Delete(_ context.Context, runID generator.RunID) error {
+	s.deleteID = runID
+	return s.deleteErr
 }
 
 func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.RunID, applied bool) error {
@@ -82,7 +98,7 @@ func (s *runManagerStub) ResolveApplication(_ context.Context, runID generator.R
 func TestCreateMapsTransportRequest(t *testing.T) {
 	assetID := uint(3)
 	stub := &runManagerStub{}
-	generationHandler := handler.NewGenerationHandler(stub)
+	generationHandler := handler.NewGenerationHandler(stub, nil)
 	parameters := json.RawMessage(`{"size":{"width":64,"height":64}}`)
 	request := dto.CreateGenerationRequest{
 		ProjectID:        2,
@@ -121,7 +137,7 @@ func TestGetMapsTaskBackedGeneration(t *testing.T) {
 		Result:    json.RawMessage(`{"asset_id":3,"version":2}`),
 	}}
 
-	response, err := handler.NewGenerationHandler(stub).Get(
+	response, err := handler.NewGenerationHandler(stub, nil).Get(
 		context.Background(),
 		dto.GetGenerationRequest{GenerationRunID: 7},
 	)
@@ -199,7 +215,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 		Limit:     10,
 		Cursor:    "cursor",
 	}
-	response, err := handler.NewGenerationHandler(stub).List(context.Background(), query)
+	response, err := handler.NewGenerationHandler(stub, nil).List(context.Background(), query)
 	if err != nil {
 		t.Fatalf("list generation runs: %v", err)
 	}
@@ -216,7 +232,7 @@ func TestListMapsTaskBackedRuns(t *testing.T) {
 
 func TestListRejectsUnsupportedStatus(t *testing.T) {
 	stub := &runManagerStub{listErr: generator.ErrInvalidRunListStatus}
-	_, err := handler.NewGenerationHandler(stub).List(
+	_, err := handler.NewGenerationHandler(stub, nil).List(
 		context.Background(),
 		dto.ListGenerationRunsRequest{Status: "completed"},
 	)
@@ -227,7 +243,7 @@ func TestListRejectsUnsupportedStatus(t *testing.T) {
 
 func TestListRejectsInvalidCursor(t *testing.T) {
 	stub := &runManagerStub{listErr: generator.ErrInvalidRunListCursor}
-	_, err := handler.NewGenerationHandler(stub).List(
+	_, err := handler.NewGenerationHandler(stub, nil).List(
 		context.Background(),
 		dto.ListGenerationRunsRequest{Cursor: "invalid"},
 	)
@@ -238,7 +254,7 @@ func TestListRejectsInvalidCursor(t *testing.T) {
 
 func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	stub := &runManagerStub{}
-	response, err := handler.NewGenerationHandler(stub).Cancel(
+	response, err := handler.NewGenerationHandler(stub, nil).Cancel(
 		context.Background(),
 		dto.CancelGenerationRequest{GenerationRunID: 7},
 	)
@@ -247,9 +263,105 @@ func TestCancelForwardsTaskBackedRunID(t *testing.T) {
 	}
 }
 
+func TestRetryForwardsTaskBackedRunID(t *testing.T) {
+	stub := &runManagerStub{}
+	response, err := handler.NewGenerationHandler(stub).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || response.Data.GenerationRunID != 7 || stub.retryID != 7 {
+		t.Fatalf("unexpected retry response: %+v, id=%d, err=%v", response, stub.retryID, err)
+	}
+}
+
+func TestDeleteForwardsTaskBackedRunID(t *testing.T) {
+	stub := &runManagerStub{}
+	response, err := handler.NewGenerationHandler(stub).Delete(
+		context.Background(),
+		dto.DeleteGenerationRequest{GenerationRunID: 7},
+	)
+	if err != nil || !response.Data.Deleted || stub.deleteID != 7 {
+		t.Fatalf("unexpected delete response: %+v, id=%d, err=%v", response, stub.deleteID, err)
+	}
+}
+
+func TestRetryAndDeleteRejectNonFailedRuns(t *testing.T) {
+	for _, operation := range []struct {
+		name string
+		run  func(*handler.GenerationHandler) error
+	}{
+		{name: "retry", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+		{name: "delete", run: func(generationHandler *handler.GenerationHandler) error {
+			_, err := generationHandler.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+			return err
+		}},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			stub := &runManagerStub{retryErr: generator.ErrRunNotFailed, deleteErr: generator.ErrRunNotFailed}
+			err := operation.run(handler.NewGenerationHandler(stub))
+			var httpErr *echo.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.Code != http.StatusConflict ||
+				!errors.Is(err, generator.ErrRunNotFailed) {
+				t.Fatalf("expected conflict, got %v", err)
+			}
+		})
+	}
+}
+
+func TestRetryReturnsUnexpectedManagerError(t *testing.T) {
+	wantErr := errors.New("retry unavailable")
+	stub := &runManagerStub{retryErr: wantErr}
+	_, err := handler.NewGenerationHandler(stub).Retry(
+		context.Background(),
+		dto.RetryGenerationRequest{GenerationRunID: 7},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected manager error, got %v", err)
+	}
+}
+
+func TestRetryAndDeleteRejectUnavailableRunManagerOrRun(t *testing.T) {
+	lookupErr := errors.New("run lookup failed")
+	for _, test := range []struct {
+		name string
+		run  func(*handler.GenerationHandler) error
+		h    *handler.GenerationHandler
+		want string
+	}{
+		{
+			name: "retry lookup failure",
+			h:    handler.NewGenerationHandler(&runManagerStub{retryErr: lookupErr}),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Retry(context.Background(), dto.RetryGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: lookupErr.Error(),
+		},
+		{
+			name: "delete lookup failure",
+			h:    handler.NewGenerationHandler(&runManagerStub{deleteErr: lookupErr}),
+			run: func(h *handler.GenerationHandler) error {
+				_, err := h.Delete(context.Background(), dto.DeleteGenerationRequest{GenerationRunID: 7})
+				return err
+			},
+			want: lookupErr.Error(),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.run(test.h)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected error containing %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
 func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 	stub := &runManagerStub{}
-	err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub, nil).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7, Applied: true},
 	)
@@ -261,7 +373,7 @@ func TestResolveApplicationForwardsTaskBackedRun(t *testing.T) {
 func TestResolveApplicationReturnsManagerError(t *testing.T) {
 	wantErr := errors.New("transition failed")
 	stub := &runManagerStub{resolveErr: wantErr}
-	err := handler.NewGenerationHandler(stub).ResolveApplication(
+	err := handler.NewGenerationHandler(stub, nil).ResolveApplication(
 		context.Background(),
 		dto.ResolveGenerationApplicationRequest{GenerationRunID: 7},
 	)

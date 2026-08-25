@@ -323,14 +323,15 @@ func TestAnimationGenerationRetriesMissingRequestedEdit(t *testing.T) {
 	visibleEdit := append([]image.Image(nil), original...)
 	visibleEdit[1] = animationContinuityGestureFrame(29, 36, 70, foreground)
 	videos := &animationVideoServiceStub{}
+	processorForeground := animationTestForeground(t)
 	processor := &animationProcessorStub{
-		foregroundBase64: animationTestForeground(t),
+		foregroundBase64: processorForeground,
 		splitResult: &imageprocessor.SplitImageResult{
 			ImageBase64: "sheet", MIMEType: "image/png",
 			Regions: []imageprocessor.ImageRegion{
-				{Index: 0, ImageBase64: "frame-1"},
-				{Index: 1, ImageBase64: "frame-2"},
-				{Index: 2, ImageBase64: "frame-3"},
+				{Index: 0, ImageBase64: processorForeground},
+				{Index: 1, ImageBase64: processorForeground},
+				{Index: 2, ImageBase64: processorForeground},
 			},
 		},
 	}
@@ -388,14 +389,15 @@ func TestAnimationGenerationRetriesContinuityFailure(t *testing.T) {
 		original[2],
 	}
 	videos := &animationVideoServiceStub{}
+	processorForeground := animationTestForeground(t)
 	processor := &animationProcessorStub{
-		foregroundBase64: animationTestForeground(t),
+		foregroundBase64: processorForeground,
 		splitResult: &imageprocessor.SplitImageResult{
 			ImageBase64: "sheet", MIMEType: "image/png",
 			Regions: []imageprocessor.ImageRegion{
-				{Index: 0, ImageBase64: "frame-1"},
-				{Index: 1, ImageBase64: "frame-2"},
-				{Index: 2, ImageBase64: "frame-3"},
+				{Index: 0, ImageBase64: processorForeground},
+				{Index: 1, ImageBase64: processorForeground},
+				{Index: 2, ImageBase64: processorForeground},
 			},
 		},
 	}

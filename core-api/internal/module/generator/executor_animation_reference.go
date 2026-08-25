@@ -63,7 +63,7 @@ func (s *animationGenerationService) prepareGreenReference(
 	// Use the same padded canonical-frame layout as prototype sprites. The
 	// animation reference must not be made smaller by an extra safety margin;
 	// the margin is part of the shared prototype/animation canvas contract.
-	resizeOptions := imageprocessor.AnimationFrameResizeOptions(animationReferenceSize, animationReferenceSize)
+	resizeOptions := AnimationFrameResizeOptions(animationReferenceSize, animationReferenceSize)
 	resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 		ImageBase64: foregroundBase64,
 		Options:     resizeOptions,

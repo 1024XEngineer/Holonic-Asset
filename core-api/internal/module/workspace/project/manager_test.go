@@ -3,6 +3,7 @@ package project_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,28 +12,53 @@ import (
 )
 
 type projectStoreStub struct {
-	insertCalls int
-	inserted    *domain.Project
-	update      *domain.ProjectUpdate
+	insertCalls  int
+	inserted     *domain.Project
+	insertErr    error
+	findByIDErr  error
+	findByIDRes  *domain.Project
+	findByUIDErr error
+	findByUIDRes []*domain.Project
+	update       *domain.ProjectUpdate
+	updateErr    error
+	removeErr    error
+	removeID     uint
 }
 
 func (s *projectStoreStub) Insert(_ context.Context, project *domain.Project) error {
 	s.insertCalls++
 	s.inserted = project
-	return nil
+	return s.insertErr
 }
 
-func (*projectStoreStub) FindByID(context.Context, uint) (*domain.Project, error) {
-	return &domain.Project{}, nil
+func (s *projectStoreStub) FindByID(_ context.Context, id uint) (*domain.Project, error) {
+	if s.findByIDErr != nil {
+		return nil, s.findByIDErr
+	}
+	if s.findByIDRes != nil {
+		return s.findByIDRes, nil
+	}
+	return &domain.Project{ID: id}, nil
 }
 
-func (*projectStoreStub) FindByUserID(context.Context, uint) ([]*domain.Project, error) {
+func (s *projectStoreStub) FindByUserID(_ context.Context, userID uint) ([]*domain.Project, error) {
+	if s.findByUIDErr != nil {
+		return nil, s.findByUIDErr
+	}
+	if s.findByUIDRes != nil {
+		return s.findByUIDRes, nil
+	}
 	return []*domain.Project{}, nil
 }
 
 func (s *projectStoreStub) Update(_ context.Context, update *domain.ProjectUpdate) error {
 	s.update = update
-	return nil
+	return s.updateErr
+}
+
+func (s *projectStoreStub) Remove(_ context.Context, id uint) error {
+	s.removeID = id
+	return s.removeErr
 }
 
 type referenceStoreStub struct {
@@ -41,11 +67,16 @@ type referenceStoreStub struct {
 	resolveCall  string
 	resolveCalls []string
 	persistCall  string
+	persistErr   error
+	resolveErr   error
 }
 
 func (s *referenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	s.resolveCall = reference
 	s.resolveCalls = append(s.resolveCalls, reference)
+	if s.resolveErr != nil {
+		return "", s.resolveErr
+	}
 	if s.resolved != "" {
 		return s.resolved, nil
 	}
@@ -54,13 +85,163 @@ func (s *referenceStoreStub) ResolveReference(_ context.Context, reference strin
 
 func (s *referenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
 	s.persistCall = reference
+	if s.persistErr != nil {
+		return "", s.persistErr
+	}
 	if s.persisted != "" {
 		return s.persisted, nil
 	}
 	return "key:" + reference, nil
 }
 
-func (*projectStoreStub) Remove(context.Context, uint) error { return nil }
+func TestManagerListByUID(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("invalid userID rejected", func(t *testing.T) {
+		manager := domain.NewManager(&projectStoreStub{}, nil)
+		_, err := manager.ListByUID(ctx, 0)
+		if !errors.Is(err, domain.ErrInvalidProject) {
+			t.Fatalf("expected ErrInvalidProject, got %v", err)
+		}
+	})
+
+	t.Run("valid userID returns projects", func(t *testing.T) {
+		expected := []*domain.Project{{ID: 1, UserID: 10, Name: "Proj1"}}
+		store := &projectStoreStub{findByUIDRes: expected}
+		manager := domain.NewManager(store, nil)
+
+		res, err := manager.ListByUID(ctx, 10)
+		if err != nil {
+			t.Fatalf("list by UID: %v", err)
+		}
+		if !reflect.DeepEqual(res, expected) {
+			t.Fatalf("unexpected result: %+v", res)
+		}
+	})
+
+	t.Run("store error propagates", func(t *testing.T) {
+		wantErr := errors.New("db error")
+		store := &projectStoreStub{findByUIDErr: wantErr}
+		manager := domain.NewManager(store, nil)
+
+		_, err := manager.ListByUID(ctx, 10)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected error %v, got %v", wantErr, err)
+		}
+	})
+}
+
+func TestManagerGetDetail(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("invalid projectID rejected", func(t *testing.T) {
+		manager := domain.NewManager(&projectStoreStub{}, nil)
+		_, err := manager.GetDetail(ctx, 0)
+		if !errors.Is(err, domain.ErrInvalidProject) {
+			t.Fatalf("expected ErrInvalidProject, got %v", err)
+		}
+	})
+
+	t.Run("valid projectID returns detail", func(t *testing.T) {
+		expected := &domain.Project{ID: 42, Name: "DetailProj"}
+		store := &projectStoreStub{findByIDRes: expected}
+		manager := domain.NewManager(store, nil)
+
+		res, err := manager.GetDetail(ctx, 42)
+		if err != nil {
+			t.Fatalf("get detail: %v", err)
+		}
+		if res != expected {
+			t.Fatalf("unexpected detail: %+v", res)
+		}
+	})
+
+	t.Run("store error propagates", func(t *testing.T) {
+		wantErr := errors.New("not found")
+		store := &projectStoreStub{findByIDErr: wantErr}
+		manager := domain.NewManager(store, nil)
+
+		_, err := manager.GetDetail(ctx, 42)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected error %v, got %v", wantErr, err)
+		}
+	})
+}
+
+func TestManagerDelete(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("invalid projectID rejected", func(t *testing.T) {
+		manager := domain.NewManager(&projectStoreStub{}, nil)
+		err := manager.Delete(ctx, 0)
+		if !errors.Is(err, domain.ErrInvalidProject) {
+			t.Fatalf("expected ErrInvalidProject, got %v", err)
+		}
+	})
+
+	t.Run("valid projectID removes project", func(t *testing.T) {
+		store := &projectStoreStub{}
+		manager := domain.NewManager(store, nil)
+
+		err := manager.Delete(ctx, 42)
+		if err != nil {
+			t.Fatalf("delete project: %v", err)
+		}
+		if store.removeID != 42 {
+			t.Fatalf("expected removeID 42, got %d", store.removeID)
+		}
+	})
+
+	t.Run("store error propagates", func(t *testing.T) {
+		wantErr := errors.New("delete failed")
+		store := &projectStoreStub{removeErr: wantErr}
+		manager := domain.NewManager(store, nil)
+
+		err := manager.Delete(ctx, 42)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("expected error %v, got %v", wantErr, err)
+		}
+	})
+}
+
+func TestManagerCreateErrors(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("invalid project rejected", func(t *testing.T) {
+		manager := domain.NewManager(&projectStoreStub{}, nil)
+		err := manager.Create(ctx, &domain.Project{})
+		if !errors.Is(err, domain.ErrInvalidProject) {
+			t.Fatalf("expected ErrInvalidProject, got %v", err)
+		}
+	})
+
+	t.Run("reference persistence error propagates", func(t *testing.T) {
+		refErr := errors.New("persist ref error")
+		refs := &referenceStoreStub{persistErr: refErr}
+		manager := domain.NewManager(&projectStoreStub{}, nil, refs)
+		p := validProject()
+		p.UserID = 1
+		p.Reference = "https://example.com/img.png"
+
+		err := manager.Create(ctx, p)
+		if !errors.Is(err, refErr) {
+			t.Fatalf("expected ref error, got %v", err)
+		}
+	})
+
+	t.Run("store insert error propagates", func(t *testing.T) {
+		insertErr := errors.New("insert error")
+		store := &projectStoreStub{insertErr: insertErr}
+		manager := domain.NewManager(store, nil)
+		p := validProject()
+		p.UserID = 1
+
+		err := manager.Create(ctx, p)
+		if !errors.Is(err, insertErr) {
+			t.Fatalf("expected insert error, got %v", err)
+		}
+	})
+}
 
 func TestUpdateForwardsPartialProjectUpdate(t *testing.T) {
 	reference := "https://media.example/project-previews/new.png"
@@ -73,6 +254,77 @@ func TestUpdateForwardsPartialProjectUpdate(t *testing.T) {
 	}
 	if store.update != update {
 		t.Fatalf("expected update pointer %p, got %p", update, store.update)
+	}
+}
+
+func TestManagerUpdateErrors(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("invalid update rejected", func(t *testing.T) {
+		manager := domain.NewManager(&projectStoreStub{}, nil)
+		err := manager.Update(ctx, &domain.ProjectUpdate{ID: 0})
+		if !errors.Is(err, domain.ErrInvalidProject) {
+			t.Fatalf("expected ErrInvalidProject, got %v", err)
+		}
+	})
+
+	t.Run("reference persistence error propagates", func(t *testing.T) {
+		refErr := errors.New("persist ref error")
+		refs := &referenceStoreStub{persistErr: refErr}
+		manager := domain.NewManager(&projectStoreStub{}, nil, refs)
+		ref := "https://example.com/new.png"
+		update := &domain.ProjectUpdate{ID: 42, Reference: &ref}
+
+		err := manager.Update(ctx, update)
+		if !errors.Is(err, refErr) {
+			t.Fatalf("expected ref error, got %v", err)
+		}
+	})
+
+	t.Run("empty reference in update does not persist", func(t *testing.T) {
+		refs := &referenceStoreStub{persisted: "should-not-be-used"}
+		store := &projectStoreStub{}
+		manager := domain.NewManager(store, nil, refs)
+		emptyRef := ""
+		update := &domain.ProjectUpdate{ID: 42, Reference: &emptyRef}
+
+		err := manager.Update(ctx, update)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if refs.persistCall != "" {
+			t.Fatalf("expected no persist call for empty reference, got %q", refs.persistCall)
+		}
+	})
+
+	t.Run("store update error propagates", func(t *testing.T) {
+		updateErr := errors.New("update db error")
+		store := &projectStoreStub{updateErr: updateErr}
+		manager := domain.NewManager(store, nil)
+		name := "NewName"
+		update := &domain.ProjectUpdate{ID: 42, Name: &name}
+
+		err := manager.Update(ctx, update)
+		if !errors.Is(err, updateErr) {
+			t.Fatalf("expected update error, got %v", err)
+		}
+	})
+}
+
+func TestManagerUpdatePersistsNonEmptyReference(t *testing.T) {
+	reference := "https://example.com/new-reference.png"
+	update := &domain.ProjectUpdate{ID: 42, Reference: &reference}
+	store := &projectStoreStub{}
+	references := &referenceStoreStub{persisted: "projects/42/reference.png"}
+
+	if err := domain.NewManager(store, nil, references).Update(context.Background(), update); err != nil {
+		t.Fatalf("update project reference: %v", err)
+	}
+	if store.update != update {
+		t.Fatalf("expected update to reach store, got %+v", store.update)
+	}
+	if update.Reference == nil || *update.Reference != "projects/42/reference.png" {
+		t.Fatalf("expected persisted reference key, got %+v", update.Reference)
 	}
 }
 
@@ -117,6 +369,32 @@ func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
 	}
 }
 
+func TestGenerateReferencePropagatesReferenceStorageErrors(t *testing.T) {
+	project := validProject()
+	project.Reference = "https://example.com/input.png"
+	service := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
+		Images: []imageclient.GeneratedImage{{Base64: "generated"}},
+	}}
+	resolveInputErr := errors.New("resolve input reference")
+	_, err := domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{resolveErr: resolveInputErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, resolveInputErr) || !strings.Contains(err.Error(), "resolve reference") {
+		t.Fatalf("expected input reference error, got %v", err)
+	}
+
+	project.Reference = ""
+	persistErr := errors.New("persist generated reference")
+	_, err = domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{persistErr: persistErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, persistErr) || !strings.Contains(err.Error(), "persist generated reference") {
+		t.Fatalf("expected generated persistence error, got %v", err)
+	}
+
+	resolveGeneratedErr := errors.New("resolve generated reference")
+	_, err = domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{resolveErr: resolveGeneratedErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, resolveGeneratedErr) || !strings.Contains(err.Error(), "resolve generated reference") {
+		t.Fatalf("expected generated resolution error, got %v", err)
+	}
+}
+
 type imageGenerationServiceStub struct {
 	request *imageclient.GenerateRequest
 	result  *imageclient.GenerateResult
@@ -129,6 +407,91 @@ func (s *imageGenerationServiceStub) Generate(
 ) (*imageclient.GenerateResult, error) {
 	s.request = request
 	return s.result, s.err
+}
+
+func TestGenerateReferencePromptVariants(t *testing.T) {
+	tests := []struct {
+		name        string
+		perspective domain.Perspective
+		platform    domain.PlatformType
+		expected    []string
+	}{
+		{
+			name:        "web platform and side-on perspective",
+			perspective: domain.PerspectiveSideOn,
+			platform:    domain.PlatformTypeWeb,
+			expected: []string{
+				"Side-On 2D pixel-art gameplay perspective",
+				"web;",
+			},
+		},
+		{
+			name:        "unspecified platform and isometric perspective",
+			perspective: domain.PerspectiveIsometric,
+			platform:    domain.PlatformType(""),
+			expected: []string{
+				"Isometric 2D pixel-art gameplay perspective",
+				"an unspecified target platform;",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			project := &domain.Project{
+				Name:           "Test",
+				Perspective:    tc.perspective,
+				TargetPlatform: tc.platform,
+			}
+			images := &imageGenerationServiceStub{
+				result: &imageclient.GenerateResult{
+					Images: []imageclient.GeneratedImage{{Base64: "dGVzdA==", MediaType: "image/png"}},
+				},
+			}
+			manager := domain.NewManager(&projectStoreStub{}, images)
+
+			_, err := manager.GenerateReference(context.Background(), project)
+			if err != nil {
+				t.Fatalf("generate reference: %v", err)
+			}
+			prompt := images.request.Prompt
+			for _, frag := range tc.expected {
+				if !strings.Contains(prompt, frag) {
+					t.Errorf("expected prompt to contain %q, prompt:\n%s", frag, prompt)
+				}
+			}
+		})
+	}
+
+	t.Run("empty mediaType and empty style/description fallback", func(t *testing.T) {
+		project := &domain.Project{
+			Name:        "BlankDetails",
+			Perspective: domain.PerspectiveTopDown,
+		}
+		images := &imageGenerationServiceStub{
+			result: &imageclient.GenerateResult{
+				Images: []imageclient.GeneratedImage{{Base64: "dGVzdA==", MediaType: ""}},
+			},
+		}
+		refs := &referenceStoreStub{persisted: "proj/generated.png"}
+		manager := domain.NewManager(&projectStoreStub{}, images, refs)
+
+		_, err := manager.GenerateReference(context.Background(), project)
+		if err != nil {
+			t.Fatalf("generate reference: %v", err)
+		}
+		if refs.persistCall != "data:image/png;base64,dGVzdA==" {
+			t.Fatalf("expected fallback to image/png data url, got %q", refs.persistCall)
+		}
+		for _, frag := range []string{
+			"a clear, restrained 2D pixel-art style",
+			"Show one ordinary playable moment that makes the game's main activity understandable.",
+		} {
+			if !strings.Contains(images.request.Prompt, frag) {
+				t.Errorf("expected fallback prompt %q", frag)
+			}
+		}
+	})
 }
 
 func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.T) {

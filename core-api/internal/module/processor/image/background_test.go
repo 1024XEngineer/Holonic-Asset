@@ -87,3 +87,53 @@ func TestExtractChromaStillRemovesBorderConnectedMatte(t *testing.T) {
 		t.Fatalf("subject alpha = %d, want opaque subject preserved", alpha)
 	}
 }
+
+func TestExtractBorderConnectedChromaPreservesBrightMatteColouredSubject(t *testing.T) {
+	t.Parallel()
+
+	matte := MatteColor{0, 255, 0}
+	source := image.NewNRGBA(image.Rect(0, 0, 48, 48))
+	fillRect(source, source.Bounds(), color.NRGBA{G: 255, A: 255})
+	// The dark outline isolates the subject from the green screen. The body
+	// intentionally uses the exact matte colour, which is a valid case for a
+	// green character or prop and cannot be solved by global colour distance.
+	fillRect(source, image.Rect(14, 10, 34, 38), color.NRGBA{R: 10, G: 30, B: 20, A: 255})
+	fillRect(source, image.Rect(17, 13, 31, 35), color.NRGBA{G: 255, A: 255})
+
+	result := extractBorderConnectedChromaOnly(source, matte, ChromaSettings{})
+	body := result.RGBAAt(24, 24)
+	if body.A != 255 || body.R != 0 || body.G != 255 || body.B != 0 {
+		t.Fatalf("bright green subject = %#v, want opaque source colour", body)
+	}
+	if alpha := result.RGBAAt(1, 1).A; alpha != 0 {
+		t.Fatalf("border matte alpha = %d, want 0", alpha)
+	}
+}
+
+func TestExtractBorderConnectedChromaPreservesDistantGreenSubjectColour(t *testing.T) {
+	t.Parallel()
+
+	matte := MatteColor{0, 243, 0}
+	source := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	fillRect(source, source.Bounds(), color.NRGBA{G: 243, A: 255})
+
+	// This is deliberately a saturated yellow-green foreground colour. It is
+	// recognisably green, but it is far enough from the matte that dominance
+	// based spill cleanup must not desaturate it.
+	outline := color.NRGBA{R: 24, G: 43, B: 28, A: 255}
+	body := color.NRGBA{R: 181, G: 213, B: 54, A: 255}
+	fillRect(source, image.Rect(18, 14, 46, 50), outline)
+	fillRect(source, image.Rect(21, 17, 43, 47), body)
+
+	result := extractBorderConnectedChromaOnly(source, matte, ChromaSettings{})
+	pixel := result.RGBAAt(32, 30)
+	if pixel.A != 255 {
+		t.Fatalf("green subject alpha = %d, want 255", pixel.A)
+	}
+	if pixel.R != body.R || pixel.G != body.G || pixel.B != body.B {
+		t.Fatalf("green subject RGB = (%d,%d,%d), want source colour (%d,%d,%d)", pixel.R, pixel.G, pixel.B, body.R, body.G, body.B)
+	}
+	if alpha := result.RGBAAt(0, 0).A; alpha != 0 {
+		t.Fatalf("border matte alpha = %d, want 0", alpha)
+	}
+}

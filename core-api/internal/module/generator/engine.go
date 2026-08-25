@@ -4,6 +4,7 @@ import (
 	"context"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -13,6 +14,7 @@ type Engine struct {
 	tasks      taskdomain.Manager
 	executor   Executor
 	projects   ProjectReader
+	assets     AssetReader
 	references ReferenceStore
 }
 
@@ -22,10 +24,18 @@ type ProjectReader interface {
 	GetDetail(context.Context, uint) (*projectdomain.Project, error)
 }
 
+// AssetReader supplies the project-scoped list projection used for tag
+// reference selection as well as detail lookup for asset validation.
+type AssetReader interface {
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
+	GetAssets(context.Context, uint, assetdomain.AssetListFilter) ([]assetdomain.Asset, error)
+}
+
 // EngineDependencies keeps storage and project lookup optional for lightweight
 // callers and existing tests.
 type EngineDependencies struct {
 	Projects   ProjectReader
+	Assets     AssetReader
 	References ReferenceStore
 }
 
@@ -43,6 +53,7 @@ func NewEngine(
 	}
 	if len(dependencies) > 0 {
 		engine.projects = dependencies[0].Projects
+		engine.assets = dependencies[0].Assets
 		engine.references = dependencies[0].References
 	}
 	if tasks != nil {

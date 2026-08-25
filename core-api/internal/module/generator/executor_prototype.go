@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"math"
 	"net/http"
@@ -41,19 +42,21 @@ func (e *executor) generateCharacterPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.CreatingReference, payload.NexusReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateCharacterProtoType,
 		prompts.CharacterPrototype(
 			payload.CreativeBrief,
 			payload.Perspective,
+			payload.Dimensions,
 			prompts.AdaptiveMatteBackground(),
-			prototypeReferenceState(payload.ProjectReference, payload.CreatingReference),
+			referenceState,
 		),
 		payload.Dimensions,
 		perspective,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.CreatingReference),
+		references,
 	)
 	if err != nil {
 		return nil, err
@@ -63,6 +66,7 @@ func (e *executor) generateCharacterPrototype(
 		payload.AssetName,
 		payload.ProjectID,
 		payload.CreativeBrief,
+		payload.Tags,
 		perspective,
 		payload.Dimensions,
 		directionCount,
@@ -122,6 +126,7 @@ func (e *executor) editCharacterPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
+			dimensions,
 			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,
@@ -158,6 +163,7 @@ func (e *executor) generateObjectPrototype(
 		return nil, err
 	}
 	directionCount := perspective.CharacterDirectionCount()
+	references, referenceState := prototypeReferenceInputs(payload.ProjectReference, payload.CreatingReference, payload.NexusReferences)
 	resources, err := e.generatePrototypeResources(
 		ctx,
 		GenerateObjectProtoType,
@@ -166,12 +172,12 @@ func (e *executor) generateObjectPrototype(
 			payload.Perspective,
 			payload.Dimensions,
 			prompts.AdaptiveMatteBackground(),
-			prototypeReferenceState(payload.ProjectReference, payload.CreatingReference),
+			referenceState,
 		),
 		payload.Dimensions,
 		perspective,
 		directionCount,
-		referenceImages(payload.ProjectReference, payload.CreatingReference),
+		references,
 	)
 	if err != nil {
 		return nil, err
@@ -181,6 +187,7 @@ func (e *executor) generateObjectPrototype(
 		payload.AssetName,
 		payload.ProjectID,
 		payload.CreativeBrief,
+		payload.Tags,
 		perspective,
 		payload.Dimensions,
 		directionCount,
@@ -232,19 +239,18 @@ func (e *executor) generatePrototypeResources(
 			Prompt:          prompt,
 			ReferenceImages: resolvedReferences,
 			Size:            sheet.Size,
+			Params:          imageclient.Params{"quality": "high"},
 			MaxAttempts:     3,
 		})
 		if generateErr != nil {
 			return nil, fmt.Errorf("generator: generate %s images: %w", taskType, generateErr)
 		}
-		if result == nil || len(result.Images) == 0 {
-			return nil, fmt.Errorf("generator: generate %s images: %w", taskType, ErrImageResultRequired)
-		}
-		if len(result.Images) != 1 {
-			return nil, fmt.Errorf("generator: generate %s images: expected one direction sheet, got %d", taskType, len(result.Images))
+		generatedImage, sheetErr := singlePrototypeSheet(taskType, "generated", result)
+		if sheetErr != nil {
+			return nil, sheetErr
 		}
 		backgroundRemoved, removeErr := e.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-			ImageBase64: result.Images[0].Base64,
+			ImageBase64: generatedImage.Base64,
 			MatteColor:  "auto",
 		})
 		if removeErr != nil {
@@ -264,9 +270,13 @@ func (e *executor) generatePrototypeResources(
 			ForceProportionalGrid:     true,
 			FrameWidth:                int(dimensions.Width),
 			FrameHeight:               int(dimensions.Height),
-			Margin:                    imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			RenderScale:               imageprocessor.PrototypeRenderScale,
+			Margin:                    AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			AlphaThreshold:            imageprocessor.PixelAlphaThreshold,
 			Anchor:                    imageprocessor.AnimationAnchorCenter,
-			NormalizeContentScale:     true,
+			NormalizeContentScale:     !isObjectPrototypeTask(taskType),
+			NormalizeContentArea:      isObjectPrototypeTask(taskType),
+			CenterContent:             isObjectPrototypeTask(taskType),
 			RejectGridBoundaryContent: true,
 			GridBoundaryMargin:        sheet.GridBoundaryMargin,
 		})
@@ -285,6 +295,7 @@ func (e *executor) generatePrototypeResources(
 			)
 		}
 	}
+
 	if split == nil || len(split.Regions) != int(directionCount) {
 		got := 0
 		if split != nil {
@@ -304,38 +315,84 @@ func (e *executor) generatePrototypeResources(
 			return nil, fmt.Errorf("generator: allocate %s image key: %w", taskType, err)
 		}
 	}
-	resources := make([]assetdomain.ImageResource, 0, len(regions))
+	options := prototypePixelPostProcessOptions(
+		taskType,
+		int(dimensions.Width),
+		int(dimensions.Height),
+	)
+	processedFrames := make([]image.Image, 0, len(regions))
+	finalKeys := make([]string, len(regions))
 	for index, region := range regions {
 		if region.ImageBase64 == "" {
 			return nil, fmt.Errorf("generator: split %s direction %d is empty", taskType, index)
 		}
-		unprocessedURL := generatedImageDataURL(imageclient.GeneratedImage{
+		unprocessedImage := imageclient.GeneratedImage{
 			Base64:    region.ImageBase64,
 			MediaType: region.MIMEType,
-		})
-		finalKey := ""
+		}
+		unprocessedURL := generatedImageDataURL(unprocessedImage)
 		if e.references != nil {
-			finalKey = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
+			finalKeys[index] = addObjectKeySuffix(baseKey, fmt.Sprintf("-%d", index))
 			if err := e.references.PersistReferenceAt(
 				ctx,
-				addObjectKeySuffix(finalKey, "-unprocessed"),
+				addObjectKeySuffix(finalKeys[index], "-unprocessed"),
 				unprocessedURL,
 			); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d unprocessed image: %w", taskType, index, err)
 			}
 		}
+	}
 
-		// Animation-mode splitting has already produced the final canonical PNG
-		// at the requested dimensions. Persist those bytes directly. Running the
-		// frame through Resize again performs a redundant raster resample, which
-		// can damage fine seams and asymmetric details even when the canvas size
-		// does not change.
-		finalURL := unprocessedURL
+	for index, region := range regions {
+		// Each direction is quantized independently inside Resize. This mirrors
+		// uploading one source image to the browser converter: every frame gets
+		// the complete palette budget, so a thin seam or accent in one direction
+		// cannot be displaced by colours that only occur in another direction.
+		resized, err := e.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+			ImageBase64: region.ImageBase64,
+			Options:     options,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: %w", taskType, index, err)
+		}
+		if resized == nil || resized.ImageBase64 == "" {
+			return nil, fmt.Errorf("generator: pixel-process %s direction %d image: empty result", taskType, index)
+		}
+		decoded, err := imageprocessor.DecodeBase64Image(resized.ImageBase64)
+		if err != nil {
+			return nil, fmt.Errorf("generator: decode %s direction %d processed image: %w", taskType, index, err)
+		}
+		processedFrames = append(processedFrames, decoded)
+	}
+
+	// The browser-equivalent conversion above keeps a full palette budget per
+	// frame. This final pass only collapses very close representatives across
+	// directions; it does not run another shared palette reduction.
+	harmonized, err := imageprocessor.HarmonizePrototypeDirectionColours(
+		processedFrames,
+		imageprocessor.PrototypeDirectionPaletteOptions{
+			PaletteSize: options.PaletteSize,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("generator: harmonize %s direction colours: %w", taskType, err)
+	}
+
+	resources := make([]assetdomain.ImageResource, 0, len(harmonized))
+	for index, frame := range harmonized {
+		encoded, err := imageprocessor.EncodePNGBase64(frame)
+		if err != nil {
+			return nil, fmt.Errorf("generator: encode %s direction %d image: %w", taskType, index, err)
+		}
+		finalURL := generatedImageDataURL(imageclient.GeneratedImage{
+			Base64:    encoded,
+			MediaType: "image/png",
+		})
 		if e.references != nil {
-			if err := e.references.PersistReferenceAt(ctx, finalKey, finalURL); err != nil {
+			if err := e.references.PersistReferenceAt(ctx, finalKeys[index], finalURL); err != nil {
 				return nil, fmt.Errorf("generator: persist %s direction %d image: %w", taskType, index, err)
 			}
-			finalURL = finalKey
+			finalURL = finalKeys[index]
 		}
 		resources = append(resources, assetdomain.ImageResource{
 			ID:  uint(index + 1),
@@ -386,6 +443,71 @@ func (e *executor) normalizeSideOnRegions(
 	regions[0] = left
 	regions[1].Index = 1
 	return regions, nil
+}
+
+func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imageprocessor.ResizeOptions {
+	var options imageprocessor.ResizeOptions
+	switch taskType {
+	case GenerateCharacterProtoType, EditCharacterProtoType:
+		options = CharacterPrototypePixelResizeOptions(width, height)
+	default:
+		options = PrototypePixelResizeOptions(width, height)
+	}
+	if isObjectPrototypeTask(taskType) {
+		// Objects need animation room too, but preserving the complete supersampled
+		// split frame makes the visible object much smaller than the intended
+		// drawable area. Refit the alpha content into the target canvas minus the
+		// canonical safety margin, matching the browser converter's content-fit
+		// geometry without allowing the object to touch the canvas edge.
+		options.Margin = AnimationFrameMargin(width, height)
+		options.CropContent = true
+		options.PreserveCanvasGeometry = false
+		return options
+	}
+
+	// Character prototype frames already encode the shared pose scale and the
+	// action/safety margin expected by animation generation. Preserve the whole
+	// frame rather than fitting each pose independently.
+	options.Margin = 0
+	options.CropContent = false
+	options.PreserveCanvasGeometry = true
+	return options
+}
+
+func isObjectPrototypeTask(taskType TaskType) bool {
+	return taskType != GenerateCharacterProtoType && taskType != EditCharacterProtoType
+}
+
+func singlePrototypeSheet(
+	taskType TaskType,
+	stage string,
+	result *imageclient.GenerateResult,
+) (imageclient.GeneratedImage, error) {
+	if result == nil || len(result.Images) == 0 {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: %w",
+			taskType,
+			stage,
+			ErrImageResultRequired,
+		)
+	}
+	if len(result.Images) != 1 {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: expected one direction sheet, got %d",
+			taskType,
+			stage,
+			len(result.Images),
+		)
+	}
+	if result.Images[0].Base64 == "" {
+		return imageclient.GeneratedImage{}, fmt.Errorf(
+			"generator: generate %s %s images: %w",
+			taskType,
+			stage,
+			ErrImageResultRequired,
+		)
+	}
+	return result.Images[0], nil
 }
 
 func parsePerspective(perspective string) (assetdomain.Perspective, error) {
@@ -507,11 +629,31 @@ func prototypeReferences(prototype *assetdomain.Prototype) ([]string, error) {
 	return references, nil
 }
 
-func prototypeReferenceState(projectReference, creatingReference string) prompts.PrototypeReferenceState {
-	return prompts.PrototypeReferenceState{
-		HasProjectReference:  strings.TrimSpace(projectReference) != "",
-		HasCreatingReference: strings.TrimSpace(creatingReference) != "",
+func prototypeReferenceInputs(
+	projectReference string,
+	creatingReference string,
+	nexusReferences []string,
+) ([]string, prompts.PrototypeReferenceState) {
+	references := make([]string, 0, maxPrototypeReferenceImages)
+	state := prompts.PrototypeReferenceState{}
+	if reference := strings.TrimSpace(projectReference); reference != "" {
+		references = append(references, reference)
+		state.HasProjectReference = true
 	}
+	if reference := strings.TrimSpace(creatingReference); reference != "" && len(references) < maxPrototypeReferenceImages {
+		references = append(references, reference)
+		state.HasCreatingReference = true
+	}
+	for _, reference := range nexusReferences {
+		if len(references) == maxPrototypeReferenceImages {
+			break
+		}
+		if reference = strings.TrimSpace(reference); reference != "" {
+			references = append(references, reference)
+			state.NexusReferenceCount++
+		}
+	}
+	return references, state
 }
 
 func referenceImages(references ...string) []string {
@@ -693,6 +835,7 @@ func newPrototypeAsset(
 	name string,
 	projectID uint,
 	description string,
+	tags []assetdomain.Tag,
 	perspective assetdomain.Perspective,
 	dimensions assetdomain.Size,
 	directionCount uint,
@@ -715,6 +858,7 @@ func newPrototypeAsset(
 		ProjectID:   projectID,
 		Type:        assetType,
 		Description: description,
+		Tags:        append([]assetdomain.Tag(nil), tags...),
 		Perspective: perspective,
 		Dimensions:  dimensionsValue,
 		Content:     encoded,
@@ -762,6 +906,7 @@ func (e *executor) editObjectPrototype(
 			payload.EditInstructions,
 			string(asset.Perspective),
 			uint(len(originalReferences)),
+			dimensions,
 			prompts.AdaptiveMatteBackground(),
 		),
 		dimensions,

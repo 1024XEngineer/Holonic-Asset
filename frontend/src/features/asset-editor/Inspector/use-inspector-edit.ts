@@ -13,8 +13,10 @@ import { getInspectorTargetSummary } from "./inspector-target";
 import {
   inspectorPromptSchema,
   inspectorSubmitRequestSchema,
-  type SpriteInspectorContentProps,
+  type EditPromptSubmitRequest,
   type InspectorCreatingReference,
+  type InspectorTargetSummary,
+  type SpriteInspectorContentProps,
 } from "./inspector.types";
 
 const imageAccept = {
@@ -43,6 +45,47 @@ export function useInspectorEdit({
   | "onSubmit"
   | "isSubmitting"
 >) {
+  const controller = useEditPrompt({
+    prompt,
+    onPromptChange,
+    onSubmit: async ({ prompt: submittedPrompt, creatingReference }) => {
+      const result = inspectorSubmitRequestSchema.safeParse({
+        prompt: submittedPrompt,
+        creatingReference,
+        target: { nodeIds: selectedNodes, frames: selectedFrames },
+      });
+      if (result.success) await onSubmit(result.data);
+    },
+    isSubmitting,
+    target: getInspectorTargetSummary(
+      selectedNodes,
+      selectedFrames,
+      animations,
+      prototype,
+    ),
+  });
+
+  return {
+    ...controller,
+    canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
+  };
+}
+
+export function useEditPrompt({
+  prompt,
+  onPromptChange,
+  onSubmit,
+  isSubmitting = false,
+  target,
+  canSubmitTarget = true,
+}: {
+  prompt: string;
+  onPromptChange: (value: string) => void;
+  onSubmit: (request: EditPromptSubmitRequest) => void | Promise<void>;
+  isSubmitting?: boolean;
+  target: InspectorTargetSummary | null;
+  canSubmitTarget?: boolean;
+}) {
   const [creatingReference, setCreatingReference] =
     useState<InspectorCreatingReference | null>(null);
   const [creatingReferenceError, setCreatingReferenceError] = useState<
@@ -77,13 +120,13 @@ export function useInspectorEdit({
     setCreatingReferenceError(null);
 
     try {
-      const target = await uploadFile(file, controller.signal);
+      const upload = await uploadFile(file, controller.signal);
       if (controller.signal.aborted) return;
       setCreatingReference({
         fileName: file.name,
         mimeType: file.type,
-        objectKey: target.objectKey,
-        previewUrl: target.objectURL,
+        objectKey: upload.objectKey,
+        previewUrl: upload.objectURL,
       });
     } catch {
       if (!controller.signal.aborted) {
@@ -95,16 +138,21 @@ export function useInspectorEdit({
   };
 
   const submit = async () => {
-    const result = inspectorSubmitRequestSchema.safeParse({
-      prompt,
-      creatingReference: creatingReference ?? undefined,
-      target: { nodeIds: selectedNodes, frames: selectedFrames },
-    });
-    if (!result.success || isSubmitting || isUploadingCreatingReference) return;
+    const result = inspectorPromptSchema.safeParse(prompt);
+    if (
+      !result.success ||
+      !canSubmitTarget ||
+      isSubmitting ||
+      isUploadingCreatingReference
+    )
+      return;
 
     setSubmitError(null);
     try {
-      await onSubmit(result.data);
+      await onSubmit({
+        prompt: result.data,
+        ...(creatingReference ? { creatingReference } : {}),
+      });
       setCreatingReference(null);
       setCreatingReferenceError(null);
     } catch {
@@ -143,9 +191,9 @@ export function useInspectorEdit({
   });
 
   return {
-    canClearSelection: selectedNodes.length > 0 || selectedFrames.length > 0,
     canSubmit:
       inspectorPromptSchema.safeParse(prompt).success &&
+      canSubmitTarget &&
       !isUploadingCreatingReference &&
       !isSubmitting,
     changePrompt,
@@ -157,11 +205,6 @@ export function useInspectorEdit({
     creatingReference,
     creatingReferenceError,
     submitError,
-    target: getInspectorTargetSummary(
-      selectedNodes,
-      selectedFrames,
-      animations,
-      prototype,
-    ),
+    target,
   };
 }

@@ -19,7 +19,9 @@ export type {
 } from "./library";
 export {
   describeAssetRecordChanges,
+  getCoreTilesetCandidateItemIds,
   toCoreSpriteCandidateRecord,
+  toCoreTilesetCandidateRecord,
   useRecordQuery,
   useSaveAssetRevisionMutation,
 } from "./record";

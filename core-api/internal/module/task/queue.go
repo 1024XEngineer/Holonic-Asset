@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	riverqueue "github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
@@ -34,10 +33,16 @@ func (w *queueWorker) Work(ctx context.Context, job *riverqueue.Job[queueTaskArg
 }
 
 type queue struct {
-	client   *riverqueue.Client[pgx.Tx]
+	client   queueClient
 	dbPool   *pgxpool.Pool
 	registry *registry
 	repo     TaskExecutionStore
+}
+
+type queueClient interface {
+	Insert(context.Context, riverqueue.JobArgs, *riverqueue.InsertOpts) (*rivertype.JobInsertResult, error)
+	Start(context.Context) error
+	Stop(context.Context) error
 }
 
 func newQueue(ctx context.Context, cfg config.QueueConfig, repo TaskExecutionStore) (*queue, error) {

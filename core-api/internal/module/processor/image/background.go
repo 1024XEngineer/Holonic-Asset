@@ -88,6 +88,38 @@ func ExtractChromaWithReport(input image.Image, matte *MatteColor, settings Chro
 	}
 }
 
+// extractBorderConnectedChromaWithReport is the conservative extraction mode
+// used for generated animation frames. It deliberately skips both the global
+// distance route and enclosed-component inclusion: a green subject enclosed by
+// a dark outline must remain opaque even when its pixels are close to the
+// sampled matte colour.
+func extractBorderConnectedChromaWithReport(input image.Image, matte *MatteColor, settings ChromaSettings) (*image.RGBA, ExtractionReport) {
+	settings = normalizeChromaSettings(settings)
+	var resolved MatteColor
+	source := "provided"
+	if matte == nil {
+		resolved = EstimateMatteColor(input)
+		source = "auto-sampled"
+	} else {
+		resolved = *matte
+	}
+	output := extractBorderConnectedChromaOnly(input, resolved, settings)
+	edgeNoisePixelsRemoved := RemoveSmallEdgeComponents(output)
+	ScrubTransparentRGB(output)
+	return output, ExtractionReport{
+		Method:                      MethodChroma,
+		MatteColor:                  ColorToHex(resolved),
+		MatteColorSource:            source,
+		Threshold:                   settings.Threshold,
+		Softness:                    settings.Softness,
+		SpillSuppression:            settings.SpillSuppression,
+		Material:                    settings.Material,
+		MatteDecontaminationApplied: true,
+		RGBScrubbed:                 true,
+		EdgeNoisePixelsRemoved:      edgeNoisePixelsRemoved,
+	}
+}
+
 func ExtractChroma(input image.Image, matte MatteColor, settings ChromaSettings) *image.RGBA {
 	settings = normalizeChromaSettings(settings)
 	if chromaHasHighForegroundKeyOverlap(input, matte, settings) {
@@ -495,6 +527,23 @@ func extractBorderConnectedChroma(
 	matte MatteColor,
 	settings ChromaSettings,
 ) *image.RGBA {
+	return extractBorderConnectedChromaMode(input, matte, settings, true)
+}
+
+func extractBorderConnectedChromaOnly(
+	input image.Image,
+	matte MatteColor,
+	settings ChromaSettings,
+) *image.RGBA {
+	return extractBorderConnectedChromaMode(input, matte, settings, false)
+}
+
+func extractBorderConnectedChromaMode(
+	input image.Image,
+	matte MatteColor,
+	settings ChromaSettings,
+	includeEnclosed bool,
+) *image.RGBA {
 	bounds := input.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
 	output := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -514,7 +563,14 @@ func extractBorderConnectedChroma(
 			rgb := MatteColor{colorChannel8(r), colorChannel8(g), colorChannel8(b)}
 			sourceAlpha := colorChannel8(a)
 			distance := chromaChannelDistance(rgb, matte)
-			keyLike := chromaLooksKeyColored(rgb, matte, distance)
+			// Dominance is useful for anti-aliased pixels near the matte, but it
+			// must not attenuate a real foreground colour that is already well
+			// outside the matte transition band. A green subject can still have
+			// green-channel dominance (for example, RGB 181/213/54) while being
+			// hundreds of colour units away from a green screen. Treating those
+			// pixels as spill turns the subject gray and makes the later hard-alpha
+			// pass delete it.
+			keyLike := distance <= opaqueThreshold && chromaLooksKeyColored(rgb, matte, distance)
 			distanceAlpha := chromaSoftAlpha(
 				distance,
 				transparentThreshold,
@@ -544,7 +600,9 @@ func extractBorderConnectedChroma(
 	}
 
 	connected := borderConnectedChromaMask(pixels, width, height)
-	includeEnclosedChromaComponents(pixels, connected, width, height)
+	if includeEnclosed {
+		includeEnclosedChromaComponents(pixels, connected, width, height)
+	}
 	for y := range height {
 		for x := range width {
 			index := y*width + x

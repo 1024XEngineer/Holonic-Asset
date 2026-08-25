@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
@@ -24,6 +25,8 @@ type RunManager interface {
 	Create(ctx context.Context, request *Request) (RunID, error)
 	List(ctx context.Context, query *RunListQuery) (*RunListPage, error)
 	Get(ctx context.Context, runID RunID) (*Run, error)
+	Retry(ctx context.Context, runID RunID) (RunID, error)
+	Delete(ctx context.Context, runID RunID) error
 	Cancel(ctx context.Context, runID RunID) error
 	ResolveApplication(ctx context.Context, runID RunID, applied bool) error
 }
@@ -73,12 +76,16 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		}
 		return persisted, nil
 	}
-	preparePrototypeReferences := func(creatingReference string) (string, string, error) {
+	preparePrototypeReferences := func(
+		creatingReference string,
+		tags []assetdomain.Tag,
+		targetType assetdomain.AssetType,
+	) (string, string, []string, error) {
 		projectReference := ""
 		if e.projects != nil && projectID != 0 {
 			project, err := e.projects.GetDetail(ctx, projectID)
 			if err != nil {
-				return "", "", fmt.Errorf("generator: load project %d reference: %w", projectID, err)
+				return "", "", nil, fmt.Errorf("generator: load project %d reference: %w", projectID, err)
 			}
 			if project != nil {
 				projectReference = project.Reference
@@ -87,22 +94,64 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		var err error
 		projectReference, err = persistReference("project", projectReference)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		creatingReference, err = persistReference("creating", creatingReference)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
-		return projectReference, creatingReference, nil
+		nexusLimit := 3
+		if strings.TrimSpace(creatingReference) != "" {
+			nexusLimit = 2
+		}
+		nexusReferences, err := e.selectNexusReferences(
+			ctx,
+			projectID,
+			tags,
+			targetType,
+			nexusLimit,
+			projectReference,
+			creatingReference,
+		)
+		if err != nil {
+			return "", "", nil, err
+		}
+		prepared := make([]string, 0, len(nexusReferences))
+		seen := map[string]struct{}{}
+		for _, reference := range []string{projectReference, creatingReference} {
+			if reference != "" {
+				seen[reference] = struct{}{}
+			}
+		}
+		for _, reference := range nexusReferences {
+			if len(prepared) == nexusLimit {
+				break
+			}
+			persisted, persistErr := persistReference("nexus", reference)
+			if persistErr != nil {
+				return "", "", nil, persistErr
+			}
+			if persisted == "" {
+				continue
+			}
+			if _, duplicate := seen[persisted]; duplicate {
+				continue
+			}
+			seen[persisted] = struct{}{}
+			prepared = append(prepared, persisted)
+		}
+		return projectReference, creatingReference, prepared, nil
 	}
 	switch value := payload.(type) {
 	case CreateCharacterPrototypePayload:
 		var err error
-		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
+		value.ProjectReference, value.CreatingReference, value.NexusReferences, err =
+			preparePrototypeReferences(value.CreatingReference, value.Tags, assetdomain.AssetTypeCharacter)
 		return value, err
 	case CreateObjectPrototypePayload:
 		var err error
-		value.ProjectReference, value.CreatingReference, err = preparePrototypeReferences(value.CreatingReference)
+		value.ProjectReference, value.CreatingReference, value.NexusReferences, err =
+			preparePrototypeReferences(value.CreatingReference, value.Tags, assetdomain.AssetTypeObject)
 		return value, err
 	case CreateSceneryPayload:
 		if e.projects == nil {
@@ -146,6 +195,19 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return value, nil
 	case CreateTileSetPayload:
 		return value, nil
+	case AddTilesetItemPayload:
+		if e.assets == nil {
+			return nil, ErrAssetReaderRequired
+		}
+		asset, err := e.assets.GetDetail(ctx, value.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load Tileset asset %d for Item addition: %w", value.AssetID, err)
+		}
+		if err := validateAddTilesetItemAsset(asset, value); err != nil {
+			return nil, err
+		}
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
+		return value, err
 	case EditTilesetItemPayload:
 		var err error
 		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
@@ -157,6 +219,106 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 	default:
 		return payload, nil
 	}
+}
+
+type scoredNexusReference struct {
+	reference string
+	score     int
+	sameType  bool
+	version   uint
+	assetID   uint
+}
+
+func (e *Engine) selectNexusReferences(
+	ctx context.Context,
+	projectID uint,
+	tags []assetdomain.Tag,
+	targetType assetdomain.AssetType,
+	limit int,
+	excludedReferences ...string,
+) ([]string, error) {
+	requested := normalizedTagNameSet(tags)
+	if projectID == 0 || len(requested) == 0 || limit <= 0 {
+		return nil, nil
+	}
+	if e.assets == nil {
+		return nil, ErrAssetReaderRequired
+	}
+
+	assets, err := e.assets.GetAssets(ctx, projectID, assetdomain.AssetListFilter{})
+	if err != nil {
+		return nil, fmt.Errorf("generator: list project %d assets for Nexus References: %w", projectID, err)
+	}
+	candidates := make([]scoredNexusReference, 0, len(assets))
+	for _, asset := range assets {
+		if asset.ProjectID != 0 && asset.ProjectID != projectID {
+			continue
+		}
+		reference := strings.TrimSpace(asset.ThumbnailURL)
+		score := tagMatchScore(requested, asset.Tags)
+		if reference == "" || score == 0 {
+			continue
+		}
+		sameType := asset.Type != "" && targetType != "" && asset.Type == targetType
+		candidates = append(candidates, scoredNexusReference{
+			reference: reference,
+			score:     score,
+			sameType:  sameType,
+			version:   asset.Version,
+			assetID:   asset.ID,
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].sameType != candidates[j].sameType {
+			return candidates[i].sameType
+		}
+		if candidates[i].version != candidates[j].version {
+			return candidates[i].version > candidates[j].version
+		}
+		return candidates[i].assetID > candidates[j].assetID
+	})
+	seen := make(map[string]struct{}, len(excludedReferences)+limit)
+	for _, reference := range excludedReferences {
+		if reference = strings.TrimSpace(reference); reference != "" {
+			seen[reference] = struct{}{}
+		}
+	}
+	references := make([]string, 0, min(limit, len(candidates)))
+	for _, candidate := range candidates {
+		if _, duplicate := seen[candidate.reference]; duplicate {
+			continue
+		}
+		seen[candidate.reference] = struct{}{}
+		references = append(references, candidate.reference)
+		if len(references) == limit {
+			break
+		}
+	}
+	return references, nil
+}
+
+func normalizedTagNameSet(tags []assetdomain.Tag) map[string]struct{} {
+	names := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if name := strings.ToLower(strings.TrimSpace(tag.Name)); name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
+func tagMatchScore(requested map[string]struct{}, tags []assetdomain.Tag) int {
+	matched := make(map[string]struct{})
+	for _, tag := range tags {
+		name := strings.ToLower(strings.TrimSpace(tag.Name))
+		if _, ok := requested[name]; ok {
+			matched[name] = struct{}{}
+		}
+	}
+	return len(matched)
 }
 
 func referencePersistenceError(role string, err error) error {
@@ -297,6 +459,30 @@ func buildTaskPayload(request *Request) (any, error) {
 			Items:         parameters.Items,
 		}
 		if err := validateCreateTileSetPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case AddTilesetItem:
+		parameters := struct {
+			CreatingReference string                    `json:"creating_reference,omitempty"`
+			Item              *AddTileSetItemDefinition `json:"item"`
+		}{}
+		if len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("add_tileset_item does not accept targetAssetPaths")
+		}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := AddTilesetItemPayload{
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			CreatingReference: parameters.CreatingReference,
+			Item:              parameters.Item,
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if err := validateAddTilesetItemPayload(&payload); err != nil {
 			return nil, err
 		}
 		return payload, nil
@@ -470,6 +656,68 @@ func (e *Engine) Get(ctx context.Context, runID RunID) (*Run, error) {
 		return nil, err
 	}
 	return &run, nil
+}
+
+func (e *Engine) Retry(ctx context.Context, runID RunID) (RunID, error) {
+	message, kind, err := e.failedRunTask(ctx, runID)
+	if err != nil {
+		return 0, err
+	}
+
+	var completionStatus taskdomain.Status
+	if kind.AwaitsApplication() {
+		completionStatus = taskdomain.StatusAwaitingApplication
+	}
+	if err := e.tasks.RetryFailed(ctx, message.ID, completionStatus); err != nil {
+		if errors.Is(err, taskdomain.ErrTaskNotFailed) {
+			return 0, fmt.Errorf("%w: run %d changed status", ErrRunNotFailed, runID)
+		}
+		return 0, err
+	}
+	return runID, nil
+}
+
+func (e *Engine) Delete(ctx context.Context, runID RunID) error {
+	message, _, err := e.failedRunTask(ctx, runID)
+	if err != nil {
+		return err
+	}
+	if err := e.tasks.DeleteFailed(ctx, message.ID); err != nil {
+		if errors.Is(err, taskdomain.ErrTaskNotFailed) {
+			return fmt.Errorf("%w: run %d changed status", ErrRunNotFailed, runID)
+		}
+		return err
+	}
+	return nil
+}
+
+func (e *Engine) failedRunTask(
+	ctx context.Context,
+	runID RunID,
+) (*taskdomain.Task, TaskType, error) {
+	if e.tasks == nil {
+		return nil, "", ErrTaskManagerRequired
+	}
+	message, err := e.tasks.GetDetail(ctx, uint(runID))
+	if err != nil {
+		return nil, "", err
+	}
+	if message == nil {
+		return nil, "", fmt.Errorf("generator: run %d has no task", runID)
+	}
+	kind := TaskType(message.Type)
+	if !kind.Valid() {
+		return nil, "", fmt.Errorf("%w: %q", ErrUnsupportedTaskType, message.Type)
+	}
+	if message.Status != taskdomain.StatusFailed {
+		return nil, "", fmt.Errorf(
+			"%w: run %d has status %s",
+			ErrRunNotFailed,
+			runID,
+			message.Status,
+		)
+	}
+	return message, kind, nil
 }
 
 func (e *Engine) Cancel(ctx context.Context, runID RunID) error {
