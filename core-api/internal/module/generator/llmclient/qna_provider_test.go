@@ -62,7 +62,10 @@ func TestQNAProviderSendsMultimodalStructuredRequest(t *testing.T) {
 		BaseURL:      server.URL,
 		APIKey:       "test-key",
 		DefaultModel: "vision-model",
-		HTTPClient:   server.Client(),
+		Models: []llmclient.ModelConfig{
+			{Name: "vision-model", Protocol: "chat_completions"},
+		},
+		HTTPClient: server.Client(),
 	})
 	result, err := provider.Complete(context.Background(), &llmclient.ProviderRequest{
 		Prompt:    "arrange layers",
@@ -92,6 +95,60 @@ func TestQNAProviderSendsMultimodalStructuredRequest(t *testing.T) {
 	}
 	if result.ID != "completion-1" || result.Model != "vision-model" || string(result.JSON) != `{"layers":[{"id":1}]}` || result.Usage.TotalTokens != 28 {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestQNAProviderRejectsInvalidConfiguredModelRoutes(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    llmclient.QNAConfig
+		model     string
+		wantError string
+	}{
+		{
+			name: "unmapped model",
+			config: llmclient.QNAConfig{
+				DefaultModel: "unmapped-model",
+				Models: []llmclient.ModelConfig{
+					{Name: "configured-model", Protocol: "chat_completions"},
+				},
+			},
+			wantError: `no LLM protocol is configured for model "unmapped-model"`,
+		},
+		{
+			name: "unsupported protocol",
+			config: llmclient.QNAConfig{
+				DefaultModel: "model",
+				Models: []llmclient.ModelConfig{
+					{Name: "model", Protocol: "responses"},
+				},
+			},
+			wantError: `unsupported LLM protocol "responses" for model "model"`,
+		},
+		{
+			name: "duplicate model",
+			config: llmclient.QNAConfig{
+				DefaultModel: "model",
+				Models: []llmclient.ModelConfig{
+					{Name: "model", Protocol: "chat_completions"},
+					{Name: "model", Protocol: "chat_completions"},
+				},
+			},
+			wantError: `model "model" is assigned to multiple LLM protocols`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider := llmclient.NewQNAProvider(test.config)
+			request := validProviderRequest()
+			request.Model = test.model
+			_, err := provider.Complete(context.Background(), request)
+			assertProviderErrorKind(t, err, llmclient.ErrorKindInvalidRequest)
+			if !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("error = %q, want it to contain %q", err, test.wantError)
+			}
+		})
 	}
 }
 
