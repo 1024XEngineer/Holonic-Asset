@@ -11,6 +11,8 @@ export type {
   AssetContentBase,
   AssetContentByType,
   AssetContentMetadata,
+  BackendSpriteContent,
+  BackendSpriteContentPatch,
   CoreSpriteAssetContent,
   CoreSpriteAssetContentPatch,
   AssetImageResourceResponse,

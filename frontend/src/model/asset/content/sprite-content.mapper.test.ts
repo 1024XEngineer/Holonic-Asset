@@ -25,11 +25,11 @@ vi.mock("../../project", async (importOriginal) => ({
 }));
 
 import {
-  loadCoreSpriteAssetWorkspace,
-  saveCoreSpriteAssetRevision,
-  toCoreSpriteCandidateRecord,
-  toCoreSpriteAssetWorkspace,
-} from "./core-sprite-record";
+  loadSpriteAssetContent,
+  saveSpriteRevision,
+  toSpriteContentCandidate,
+  toSpriteAssetContent,
+} from "./sprite-content.mapper";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -51,13 +51,13 @@ const walkGeneration = {
   aspectRatio: "1:1",
 };
 
-describe("saveCoreSpriteAssetRevision", () => {
+describe("saveSpriteRevision", () => {
   it("persists a Core sprite revision with its loaded base version", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 4 });
     mocks.assetRecords.mockResolvedValue({ records: [] });
 
     await expect(
-      saveCoreSpriteAssetRevision({
+      saveSpriteRevision({
         projectId: "11",
         assetId: "9",
         version: "v3",
@@ -126,7 +126,7 @@ describe("saveCoreSpriteAssetRevision", () => {
       },
     };
 
-    const result = await saveCoreSpriteAssetRevision({
+    const result = await saveSpriteRevision({
       projectId: "11",
       assetId: "9",
       version: "draft",
@@ -178,17 +178,17 @@ describe("saveCoreSpriteAssetRevision", () => {
       },
     },
   ])("skips $name saves", async ({ input }) => {
-    await expect(saveCoreSpriteAssetRevision(input)).resolves.toBeUndefined();
+    await expect(saveSpriteRevision(input)).resolves.toBeUndefined();
     expect(mocks.assetRecord).not.toHaveBeenCalled();
   });
 });
 
-describe("loadCoreSpriteAssetWorkspace", () => {
+describe("loadSpriteAssetContent", () => {
   it.each(["draft", "0", "1.5"])(
     "skips a non-persisted asset ID: %s",
     async (assetId) => {
       await expect(
-        loadCoreSpriteAssetWorkspace({ projectId: "11", assetId }),
+        loadSpriteAssetContent({ projectId: "11", assetId }),
       ).resolves.toBeUndefined();
       expect(mocks.assetDetail).not.toHaveBeenCalled();
     },
@@ -198,7 +198,7 @@ describe("loadCoreSpriteAssetWorkspace", () => {
     mocks.assetDetail.mockResolvedValue(sceneryDetail());
 
     await expect(
-      loadCoreSpriteAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadSpriteAssetContent({ projectId: "11", assetId: "9" }),
     ).resolves.toBeUndefined();
     expect(mocks.projectDetail).not.toHaveBeenCalled();
     expect(mocks.assetRecords).not.toHaveBeenCalled();
@@ -208,7 +208,7 @@ describe("loadCoreSpriteAssetWorkspace", () => {
     mocks.assetDetail.mockResolvedValue(objectDetail());
 
     await expect(
-      loadCoreSpriteAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadSpriteAssetContent({ projectId: "11", assetId: "9" }),
     ).resolves.toMatchObject({
       projectName: "Demo",
       asset: { id: "9", kind: "object" },
@@ -220,9 +220,9 @@ describe("loadCoreSpriteAssetWorkspace", () => {
   });
 });
 
-describe("toCoreSpriteAssetWorkspace", () => {
+describe("toSpriteAssetContent", () => {
   it("maps Core animation frames into an editor sprite record", () => {
-    const workspace = toCoreSpriteAssetWorkspace({
+    const workspace = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: characterDetail(),
@@ -295,14 +295,14 @@ describe("toCoreSpriteAssetWorkspace", () => {
 
   it("preserves animation frame durations when saving", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 4 });
-    const workspace = toCoreSpriteAssetWorkspace({
+    const workspace = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: characterDetail(),
       records: [],
     });
 
-    await saveCoreSpriteAssetRevision({
+    await saveSpriteRevision({
       projectId: "11",
       assetId: "9",
       version: "v3",
@@ -327,7 +327,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
 
   it("rejects non-sprite Core assets", () => {
     expect(() =>
-      toCoreSpriteAssetWorkspace({
+      toSpriteAssetContent({
         projectId: "11",
         projectName: "Demo",
         detail: sceneryDetail(),
@@ -345,7 +345,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
       animations: [{ id: 8, name: "Idle", frames: [{ id: 2 }] }],
     };
 
-    const workspace = toCoreSpriteAssetWorkspace({
+    const workspace = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -380,7 +380,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
       },
     };
 
-    const workspace = toCoreSpriteAssetWorkspace({
+    const workspace = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -393,7 +393,7 @@ describe("toCoreSpriteAssetWorkspace", () => {
     });
 
     detail.content.metadata = { nodePositions: [] };
-    const withoutPositions = toCoreSpriteAssetWorkspace({
+    const withoutPositions = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -406,16 +406,16 @@ describe("toCoreSpriteAssetWorkspace", () => {
   });
 });
 
-describe("toCoreSpriteCandidateRecord", () => {
+describe("toSpriteContentCandidate", () => {
   it("overlays a generated patch while preserving unchanged sprite content", () => {
-    const current = toCoreSpriteAssetWorkspace({
+    const current = toSpriteAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: characterDetail(),
       records: [],
     }).record;
 
-    const candidate = toCoreSpriteCandidateRecord(current, "Top-Down", {
+    const candidate = toSpriteContentCandidate(current, "Top-Down", {
       prototype: [
         { id: 1, url: "/new-front.png" },
         { id: 2, url: "/new-right.png" },
