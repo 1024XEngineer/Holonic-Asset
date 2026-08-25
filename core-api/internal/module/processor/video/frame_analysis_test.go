@@ -139,3 +139,59 @@ func TestAnalyzeFramePairsValidatesSequences(t *testing.T) {
 		t.Fatal("expected mismatched frame pair lengths to be rejected")
 	}
 }
+
+func TestAutoDetectedChromaKeyFollowsFrameMatte(t *testing.T) {
+	base := ChromaKey{
+		HueMin: 30, HueMax: 90,
+		HighSaturationMin: 80, HighValueMin: 80,
+		BrightSaturationMin: 50, BrightValueMin: 180,
+		AutoDetect: true,
+	}
+	tests := []struct {
+		name       string
+		background color.NRGBA
+		wantHue    uint8
+		wantPixels int
+	}{
+		{name: "green", background: color.NRGBA{G: 255, A: 255}, wantHue: 60, wantPixels: 18 * 35},
+		{name: "magenta", background: color.NRGBA{R: 255, B: 255, A: 255}, wantHue: 150, wantPixels: 18 * 35},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
+			draw.Draw(frame, frame.Bounds(), &image.Uniform{C: test.background}, image.Point{}, draw.Src)
+			drawSubject(frame, image.Rect(30, 13, 66, 83))
+
+			resolved := resolveAutoDetectedChromaKey([]image.Image{frame}, base)
+			if resolved.AutoDetect {
+				t.Fatal("auto-detect flag should be cleared after resolving the matte")
+			}
+			if resolved.HueMin > test.wantHue || resolved.HueMax < test.wantHue {
+				t.Fatalf("resolved hue range = %d..%d, want to contain %d", resolved.HueMin, resolved.HueMax, test.wantHue)
+			}
+			descriptor := describeFrame(frame, resolved)
+			if descriptor.foreground != test.wantPixels {
+				t.Fatalf("foreground pixels = %d, want %d", descriptor.foreground, test.wantPixels)
+			}
+		})
+	}
+}
+
+func TestAutoDetectedChromaKeyAllowsDifferentMattesInFramePairs(t *testing.T) {
+	original := image.NewNRGBA(image.Rect(0, 0, 96, 96))
+	draw.Draw(original, original.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+	drawSubject(original, image.Rect(30, 18, 66, 88))
+	candidate := image.NewNRGBA(image.Rect(0, 0, 96, 96))
+	draw.Draw(candidate, candidate.Bounds(), &image.Uniform{C: color.NRGBA{R: 255, B: 255, A: 255}}, image.Point{}, draw.Src)
+	drawSubject(candidate, image.Rect(30, 18, 66, 88))
+
+	key := testGreenChromaKey
+	key.AutoDetect = true
+	differences, err := AnalyzeFramePairs([]image.Image{original}, []image.Image{candidate}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if differences[0].ForegroundMaskDifference != 0 || differences[0].AppearanceMSE != 0 {
+		t.Fatalf("different mattes should be ignored: %+v", differences[0])
+	}
+}

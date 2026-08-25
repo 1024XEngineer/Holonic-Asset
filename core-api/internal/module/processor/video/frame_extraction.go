@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
 	"os"
@@ -40,6 +41,8 @@ type ChromaKey struct {
 	HighValueMin        uint8
 	BrightSaturationMin uint8
 	BrightValueMin      uint8
+	// AutoDetect derives the matte hue from frame corners before analysis.
+	AutoDetect bool
 }
 
 // FrameSelector chooses source-frame indices from domain-neutral observations.
@@ -99,7 +102,11 @@ func (p *processor) Process(ctx context.Context, source []byte, options ProcessO
 	if err != nil {
 		return nil, err
 	}
-	if err := validateSelectedFrameBounds(frames, sourceIndices, options.ChromaKey); err != nil {
+	validationKey := options.ChromaKey
+	if validationKey.AutoDetect {
+		validationKey = resolveAutoDetectedChromaKey(frames, validationKey)
+	}
+	if err := validateSelectedFrameBounds(frames, sourceIndices, validationKey); err != nil {
 		return nil, err
 	}
 	return &Result{Frames: frames, SourceIndices: sourceIndices}, nil
@@ -249,12 +256,90 @@ func decodeFrameAnalyses(paths []string, chromaKey ChromaKey) ([]frameAnalysis, 
 			return nil, err
 		}
 		frame := frames[0]
+		if chromaKey.AutoDetect {
+			chromaKey = resolveAutoDetectedChromaKey([]image.Image{frame}, chromaKey)
+		}
 		analyses = append(analyses, frameAnalysis{
 			descriptor: describeFrame(frame, chromaKey),
 			safe:       frameInsideSafetyBand(frame, chromaKey),
 		})
 	}
 	return analyses, nil
+}
+
+// resolveAutoDetectedChromaKey samples the four corners of a frame. The
+// animation generator keeps the subject inside a safety band, so the corners
+// are a reliable matte reference even when the provider changes the requested
+// matte colour or applies mild video compression.
+func resolveAutoDetectedChromaKey(frames []image.Image, key ChromaKey) ChromaKey {
+	if !key.AutoDetect || len(frames) == 0 {
+		return key
+	}
+	frame := frames[0]
+	if frame == nil || frame.Bounds().Empty() {
+		return key
+	}
+	bounds := frame.Bounds()
+	spanX := maxInt(1, bounds.Dx()/20)
+	spanY := maxInt(1, bounds.Dy()/20)
+	var red, green, blue, count uint64
+	for _, corner := range []image.Rectangle{
+		image.Rect(bounds.Min.X, bounds.Min.Y, bounds.Min.X+spanX, bounds.Min.Y+spanY),
+		image.Rect(bounds.Max.X-spanX, bounds.Min.Y, bounds.Max.X, bounds.Min.Y+spanY),
+		image.Rect(bounds.Min.X, bounds.Max.Y-spanY, bounds.Min.X+spanX, bounds.Max.Y),
+		image.Rect(bounds.Max.X-spanX, bounds.Max.Y-spanY, bounds.Max.X, bounds.Max.Y),
+	} {
+		for y := maxInt(bounds.Min.Y, corner.Min.Y); y < minInt(bounds.Max.Y, corner.Max.Y); y++ {
+			for x := maxInt(bounds.Min.X, corner.Min.X); x < minInt(bounds.Max.X, corner.Max.X); x++ {
+				pixel := color.NRGBAModel.Convert(frame.At(x, y)).(color.NRGBA)
+				if pixel.A == 0 {
+					continue
+				}
+				red += uint64(pixel.R)
+				green += uint64(pixel.G)
+				blue += uint64(pixel.B)
+				count++
+			}
+		}
+	}
+	if count == 0 {
+		return key
+	}
+	hue, _, _ := rgbToOpenCVHSV(
+		averageColorChannel(red, count),
+		averageColorChannel(green, count),
+		averageColorChannel(blue, count),
+	)
+	const hueWindow uint8 = 18
+	key.AutoDetect = false
+	if hue > hueWindow {
+		key.HueMin = hue - hueWindow
+	} else {
+		key.HueMin = 0
+	}
+	key.HueMax = clampOpenCVHue(int(hue) + int(hueWindow))
+	return key
+}
+
+func averageColorChannel(sum, count uint64) uint8 {
+	if count == 0 {
+		return 0
+	}
+	value := sum / count
+	if value > 255 {
+		return 255
+	}
+	return uint8(value)
+}
+
+func clampOpenCVHue(value int) uint8 {
+	if value <= 0 {
+		return 0
+	}
+	if value >= 179 {
+		return 179
+	}
+	return uint8(value)
 }
 
 func decodeFrames(paths []string, label string) ([]image.Image, error) {

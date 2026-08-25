@@ -26,7 +26,7 @@ Reference image roles:
 
 Default production guidelines:
 - Render as unmistakable classic low-resolution pixel art with large, clearly visible square pixel blocks and a deliberately coarse pixel grid.
-- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional colour palette.
+- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, broad connected colour shapes, and a small intentional colour palette. Avoid dithering when it would become native-size speckle.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbour scaling. Never turn it into a high-definition illustration.
 - Generate direction views of one consistent object as the only subject. Every cell must depict the same object.
@@ -40,10 +40,14 @@ Default production guidelines:
 - Preserve the requested visual style without introducing an unrelated art style.
 - Make the result suitable for direct isolation and use as a game asset.
 
+%s
+
 Direction sheet layout rules:
 %s
 - Draw each object view at the exact centre of its assigned grid cell.
-- Fit the complete object's visible bounding box inside a centred area approximately %d%% of the cell's width and approximately %d%% of the cell's height. Preserve the object's proportions, so one occupied axis may be smaller, and leave the remaining space as evenly distributed matte background.
+- For compact objects, fit the complete object's visible bounding box inside a centred area approximately %d%% of the cell's width and approximately %d%% of the cell's height, preserving the object's proportions.
+- For elongated objects, do not apply that compact square occupancy to both axes: let the long axis use roughly 70-90%% of the available drawable length while keeping the short axis proportional and readable. The complete functional end, shaft/handle, and any indispensable attachment must remain visible as one connected silhouette; reduce decoration before reducing the main silhouette.
+- Leave the remaining space as evenly distributed matte background.
 - Keep equal gutters and equal margins on all four sides of every cell.
 - Do not allow any object pixel, attachment, shadow, or outline to cross a cell boundary. Keep the background uniform in every cell so the processor can split the sheet by its regular grid.
 
@@ -85,6 +89,7 @@ func ObjectPrototype(
 			references,
 			"object",
 		),
+		prototypeLogicalPixelRules(dimensions, "object"),
 		prototypeDirectionSheetRules,
 		contentPercent,
 		contentPercent,

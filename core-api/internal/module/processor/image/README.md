@@ -148,7 +148,7 @@ result, err := processor.SplitImage(ctx, &image.SplitImageRequest{
     FrameCount:  8,
     FrameWidth:  256,
     FrameHeight: 256,
-    Margin:      image.AnimationFrameMargin(256, 256),
+    Margin:      48, // caller-owned safety margin for this frame size
     Anchor:      image.AnimationAnchorFeet,
     PreserveSourceCellScale: true,
 })
@@ -173,14 +173,20 @@ one fixed cell-to-frame scale. It deliberately does **not** fit the union of all
 visible poses. Consequently, a sword, staff, or tool extending farther in one
 pose does not shrink the character in every returned frame.
 
-The canonical prototype and the video reference must use the same padded-frame
-contract. Prepare both with `AnimationFrameResizeOptions`; for example, a 64x64
-prototype uses a 16-pixel safety margin and its 1024x1024 video reference uses a
-256-pixel safety margin:
+When a caller needs a fixed padded frame, construct one generic
+`ResizeOptions` value for each target size and keep the margin policy in that
+caller. For example, a 64x64 frame with a 12-pixel safety margin and a
+1024x1024 frame with a 192-pixel safety margin can be represented as:
 
 ```go
-prototypeOptions := image.AnimationFrameResizeOptions(64, 64)
-referenceOptions := image.AnimationFrameResizeOptions(1024, 1024)
+frameOptions := image.ResizeOptions{
+    Width: 64, Height: 64, Margin: 12,
+    CropContent: true, Mode: image.RasterModeSmooth,
+}
+referenceOptions := image.ResizeOptions{
+    Width: 1024, Height: 1024, Margin: 192,
+    CropContent: true, Mode: image.RasterModeSmooth,
+}
 ```
 
 This space must be reserved before video generation. `SplitImage` can preserve
@@ -198,7 +204,15 @@ NormalizeContentScale: true,
 This rescales each visible cell to the median source content height before
 anchor registration, then returns the requested fixed-size canvases. It is not
 intended for action frames, where silhouette changes can be part of the motion.
-`NormalizeContentScale` and `PreserveSourceCellScale` are mutually exclusive.
+`NormalizeContentScale`, `NormalizeContentArea`, and `PreserveSourceCellScale`
+are mutually exclusive. Use `NormalizeContentScale` for characters and
+`NormalizeContentArea` for static objects whose directional views can have
+different aspect ratios but should occupy the same visual footprint. For a
+static object sheet, also set `CenterContent: true`: anchor registration alone
+can leave a direction's silhouette bbox off-centre when the generated views have
+different internal geometry. `CenterContent` only translates each final frame;
+it does not crop, rescale, recolour, or remove pixels, and must not be used for
+frames whose intentional action displacement needs to be preserved.
 
 The animation pipeline:
 
@@ -225,20 +239,58 @@ The normalization engine is private to the processor. There is no second
 public animation endpoint: callers always use
 `SplitImage(ImageSplitModeAnimation)`.
 
-### Static images and structural extraction
+For deterministic pixel-art conversion, callers can enable the dedicated
+`SpritePixelPipeline` together with a target-size palette budget. This profile
+intentionally does not run generic object contour repair, round-shape
+regularization, isolated component deletion, or colour-island consolidation.
+Those heuristics can make a basketball oval, erase a thin blade joint, or turn a
+valid internal line into a random colour block. Instead it follows the safer
+ordering used by dedicated pixel-art converters:
 
-The other modes intentionally do not change placement inside a source cell:
+1. hard-threshold the alpha channel at the converter's 128 cutoff;
+2. quantize the source colours with the same weighted median-cut and eight-pass
+   centroid refinement structure used by the browser converter;
+3. for standalone content conversion, crop to visible content and fit it on a
+   4x intermediate canvas; for a pre-padded prototype frame, preserve the
+   complete canvas geometry instead of refitting its alpha bounds;
+4. centre the intermediate result and reduce it with floor-based nearest
+   sampling; and
+5. scrub transparent RGB without inventing geometry.
 
-- `ImageSplitModeGrid`: fixed grid cells for independent tiles, icons, cards,
-  or other static assets.
-- `ImageSplitModeComponents`: one tight image per 8-connected visible region.
-- `ImageSplitModeProjection`: starts with alpha-connected components, expands
-  their bounds by `ProjectionMergeGap`, and uses union-find to merge nearby
-  body, weapon, shadow, or effect pieces. A zero gap selects a size-based
-  default; set it explicitly when generated object groups are densely packed.
+Callers with pre-padded frames should set `PreserveCanvasGeometry` and disable
+content cropping so the final pixel pass does not refit the alpha bounds. For
+standalone content, callers can crop to visible alpha bounds, fit the content
+inside the inner canvas (`target - 2*margin`), and then place it on the complete
+canvas with a transparent outer safety margin. Neither contract permits the
+subject to touch the final canvas edge.
 
-These modes are not animation stabilizers. `CropToContent` is valid for
-independent static assets, where each output does not need to share a playback
-coordinate system. If `mode` is omitted, the processor uses components mode
-unless `columns` or `rows` is provided, in which case it defaults to animation
-mode. Static grid callers must explicitly set `Mode: ImageSplitModeGrid`.
+Direction frames receive a final conservative colour canonicalization pass that
+merges only near-duplicate colours and never moves pixels or changes silhouette
+geometry.
+
+### Sprite-compatible pixel fitting
+
+The `SpritePixelPipeline` uses a dedicated conversion path rather than trying
+to repair the final image with object-specific contour heuristics. Its
+geometry stage is intentionally compatible with the public browser converter
+used as the reference implementation:
+
+- source alpha is made binary before palette reduction;
+- each direction is quantized independently, so every frame receives the full
+  palette budget and a thin direction-specific seam cannot be displaced by
+  colours from another frame;
+- visible content is fitted into a 4x intermediate canvas before final reduction;
+- nearest sampling uses the source-cell floor rule instead of the processor's
+  centre-sampling nearest rule; and
+- no isolated-component deletion, round-shape forcing, colour-island merging, or
+  contour regularization runs afterward.
+
+`RecoverPixelGrid` remains available for generic pixel callers and tests, but it
+is not the active geometry path when `SpritePixelPipeline` is enabled. This is
+deliberate: the browser converter does not infer a hidden logical grid from
+edge energy; it quantizes, fits, and nearest-resamples the visible image.
+
+This pass is intentionally limited to the sprite pixel profile. General image
+resizing and non-integral inputs retain the prior area behaviour. The sprite
+profile stops after quantization, grid/nearest sampling, and hard-alpha cleanup;
+it does not run shape-repair heuristics after sampling.

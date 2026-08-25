@@ -224,3 +224,139 @@ func TestNormalizeAnimationImageCanNormalizeStaticDirectionContentScale(t *testi
 		t.Fatalf("normalized baselines differ: %v", bottoms)
 	}
 }
+
+func TestNormalizeAnimationImageCentersStaticObjectFramesAfterSharedCrop(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 128, 128))
+	value := color.NRGBA{R: 220, G: 80, B: 30, A: 255}
+	// Deliberately put equal-sized views at unrelated positions inside the
+	// source cells. This mirrors a model-generated 2x2 prototype sheet and
+	// catches the old failure where each returned 128x128 frame inherited the
+	// source cell's off-centre placement.
+	localBounds := []image.Rectangle{
+		image.Rect(29, 20, 53, 43),
+		image.Rect(26, 20, 50, 46),
+		image.Rect(29, 5, 53, 28),
+		image.Rect(15, 18, 39, 41),
+	}
+	for index, bounds := range localBounds {
+		offset := image.Pt((index%2)*64, (index/2)*64)
+		fillRect(src, bounds.Add(offset), value)
+	}
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 2, FrameCount: 4,
+		FrameWidth: 32, FrameHeight: 32, RenderScale: 4,
+		Margin: animationFrameMarginForTest(32, 32),
+		Anchor: AnimationAnchorCenter, NormalizeContentArea: true,
+		CenterContent: true, AlphaThreshold: PixelAlphaThreshold,
+	})
+	if err != nil {
+		t.Fatalf("normalize static object frames: %v", err)
+	}
+	wantCenter := image.Point{X: 64, Y: 64}
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		bounds, ok := alphaBoundsNRGBA(toNRGBA(decoded), PixelAlphaThreshold)
+		if !ok {
+			t.Fatalf("frame %d has no visible content", index)
+		}
+		gotCenter := image.Point{
+			X: (bounds.Min.X + bounds.Max.X) / 2,
+			Y: (bounds.Min.Y + bounds.Max.Y) / 2,
+		}
+		if gotCenter != wantCenter {
+			t.Fatalf("frame %d bbox=%v center=%v, want center=%v", index, bounds, gotCenter, wantCenter)
+		}
+	}
+	if result.Report.OutputAnchorRange.X > 1 || result.Report.OutputAnchorRange.Y > 1 {
+		t.Fatalf("center postcondition left excessive anchor drift: %+v", result.Report.OutputAnchorRange)
+	}
+}
+
+func TestNormalizeAnimationImageCanNormalizeStaticObjectContentArea(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	value := color.NRGBA{R: 180, G: 100, B: 40, A: 255}
+	// Equal-area views with deliberately different aspect ratios. Height-based
+	// normalization would make the 10x20 view visibly larger than the 20x10
+	// view; object normalization should preserve their visual footprint instead.
+	fillRect(src, image.Rect(15, 10, 25, 30), value)
+	fillRect(src, image.Rect(50, 15, 70, 25), value)
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 64, FrameHeight: 64,
+		Anchor: AnimationAnchorCenter, NormalizeContentArea: true, CenterContent: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize object content area: %v", err)
+	}
+	if !result.Report.ContentAreaNormalized || result.Report.ContentAreaMedian != 200 {
+		t.Fatalf("unexpected area normalization report: %+v", result.Report)
+	}
+	if result.Report.RegistrationPolicy != "median_content_area_per_cell_scale_median_root_anchor_shared_union_crop_per_frame_center_postcondition" {
+		t.Fatalf("registration policy = %q", result.Report.RegistrationPolicy)
+	}
+
+	areas := make([]int, 0, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		areas = append(areas, animationOpaqueArea(toNRGBA(decoded), defaultImageSplitAlphaThreshold))
+	}
+	if len(areas) != 2 || absInt(areas[0]-areas[1]) > max(areas[0], areas[1])/10 {
+		t.Fatalf("normalized object areas differ too much: %v", areas)
+	}
+}
+
+func TestNormalizeAnimationImageRejectsTwoContentNormalizationPolicies(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 20, 10))
+	fillRect(src, image.Rect(1, 1, 9, 9), color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	fillRect(src, image.Rect(11, 1, 19, 9), color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	_, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 32, FrameHeight: 32,
+		Anchor: AnimationAnchorCenter, NormalizeContentScale: true,
+		NormalizeContentArea: true,
+	})
+	if err == nil {
+		t.Fatal("expected mutually exclusive content normalization policies to fail")
+	}
+}
+
+func TestNormalizeAnimationImagePreservesBrightGreenSubjectOnGreenMatte(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 48, 24))
+	fillRect(src, src.Bounds(), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(6, 4, 18, 20), color.NRGBA{R: 15, G: 25, B: 20, A: 255})
+	fillRect(src, image.Rect(9, 7, 15, 18), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(30, 4, 42, 20), color.NRGBA{R: 15, G: 25, B: 20, A: 255})
+	fillRect(src, image.Rect(33, 7, 39, 18), color.NRGBA{G: 255, A: 255})
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 32, FrameHeight: 32,
+		Background: &AnimationBackgroundOptions{MatteColor: "#00ff00", BorderConnectedOnly: true},
+	})
+	if err != nil {
+		t.Fatalf("normalize green-on-green animation: %v", err)
+	}
+	for index, frame := range result.Frames {
+		decoded, decodeErr := DecodeBase64Image(frame.ImageBase64)
+		if decodeErr != nil {
+			t.Fatalf("decode frame %d: %v", index, decodeErr)
+		}
+		foundGreen := false
+		for y := decoded.Bounds().Min.Y; y < decoded.Bounds().Max.Y; y++ {
+			for x := decoded.Bounds().Min.X; x < decoded.Bounds().Max.X; x++ {
+				pixel := color.NRGBAModel.Convert(decoded.At(x, y)).(color.NRGBA)
+				if pixel.A >= 250 && pixel.G >= 240 && pixel.R <= 10 && pixel.B <= 10 {
+					foundGreen = true
+				}
+			}
+		}
+		if !foundGreen {
+			t.Fatalf("frame %d lost bright green subject", index)
+		}
+	}
+}

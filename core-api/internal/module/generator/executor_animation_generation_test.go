@@ -81,11 +81,14 @@ func (*animationProcessorStub) NormalizeReference(
 }
 
 func (s *animationProcessorStub) Resize(
-	_ context.Context,
+	ctx context.Context,
 	request *imageprocessor.ResizeRequest,
 ) (*imageprocessor.ResizeResult, error) {
 	copy := *request
 	s.resizeRequests = append(s.resizeRequests, &copy)
+	if request.Options.SpritePixelPipeline && request.Options.PreserveCanvasGeometry {
+		return imageprocessor.NewProcessor().Resize(ctx, request)
+	}
 	return &imageprocessor.ResizeResult{
 		ImageBase64: s.foregroundBase64,
 		MIMEType:    "image/png",
@@ -332,10 +335,10 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 			ImageBase64: "spritesheet",
 			MIMEType:    "image/png",
 			Regions: []imageprocessor.ImageRegion{
-				{Index: 0, ImageBase64: "frame-1", MIMEType: "image/png"},
-				{Index: 1, ImageBase64: "frame-2", MIMEType: "image/png"},
-				{Index: 2, ImageBase64: "frame-3", MIMEType: "image/png"},
-				{Index: 3, ImageBase64: "frame-4", MIMEType: "image/png"},
+				{Index: 0, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 1, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 2, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 3, ImageBase64: foreground, MIMEType: "image/png"},
 			},
 		},
 	}
@@ -368,7 +371,8 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		t.Fatalf("quality retry was not issued: %+v", videos.requests)
 	}
 	if len(videoProcessor.options) != 2 || videoProcessor.options[1].AnalysisFPS != animationAnalysisFPS ||
-		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin {
+		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin ||
+		!videoProcessor.options[1].ChromaKey.AutoDetect {
 		t.Fatalf("executor did not supply media selection policy: %+v", videoProcessor.options)
 	}
 	if !strings.Contains(videos.requests[0].Prompt, action) ||
@@ -380,13 +384,14 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.removeRequests[0].MatteColor != "auto" {
 		t.Fatalf("parent prototype was not passed directly to background removal: %+v", processor.removeRequests)
 	}
-	if len(processor.resizeRequests) != 1 ||
+	if len(processor.resizeRequests) != 5 ||
 		processor.resizeRequests[0].ImageBase64 != foreground ||
 		processor.resizeRequests[0].Options.Width != animationReferenceSize ||
 		processor.resizeRequests[0].Options.Height != animationReferenceSize ||
-		processor.resizeRequests[0].Options.Margin != imageprocessor.AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
+		processor.resizeRequests[0].Options.Margin != AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
+	assertAnimationPixelResizeRequests(t, processor.resizeRequests[1:], 4, 64, 64)
 	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode video reference: %v", decodeErr)
@@ -399,13 +404,14 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Columns != 2 || processor.splitRequest.Rows != 2 ||
 		processor.splitRequest.FrameCount != 4 ||
 		processor.splitRequest.FrameWidth != 64 || processor.splitRequest.FrameHeight != 64 ||
-		processor.splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		processor.splitRequest.Margin != AnimationFrameMargin(64, 64) ||
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
 		!processor.splitRequest.PreserveVerticalMotion ||
 		!processor.splitRequest.PreserveSourceCellScale ||
 		processor.splitRequest.Background == nil ||
-		processor.splitRequest.Background.MatteColor != "auto" {
+		processor.splitRequest.Background.MatteColor != "auto" ||
+		!processor.splitRequest.Background.BorderConnectedOnly {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
 	}
 }
@@ -422,9 +428,9 @@ func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testi
 			ImageBase64: "spritesheet",
 			MIMEType:    "image/png",
 			Regions: []imageprocessor.ImageRegion{
-				{Index: 0, ImageBase64: "frame-1", MIMEType: "image/png"},
-				{Index: 1, ImageBase64: "frame-2", MIMEType: "image/png"},
-				{Index: 2, ImageBase64: "frame-3", MIMEType: "image/png"},
+				{Index: 0, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 1, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 2, ImageBase64: foreground, MIMEType: "image/png"},
 			},
 		},
 	}
@@ -458,9 +464,10 @@ func TestAnimationGenerationPreparesAndSendsBoundaryFramesIndependently(t *testi
 	if err != nil {
 		t.Fatalf("generate edited frame segment: %v", err)
 	}
-	if len(processor.removeRequests) != 2 || len(processor.resizeRequests) != 2 {
-		t.Fatalf("boundary references were not independently prepared: removes=%d resizes=%d", len(processor.removeRequests), len(processor.resizeRequests))
+	if len(processor.removeRequests) != 2 || len(processor.resizeRequests) != 5 {
+		t.Fatalf("boundary references or final frames were not processed: removes=%d resizes=%d", len(processor.removeRequests), len(processor.resizeRequests))
 	}
+	assertAnimationPixelResizeRequests(t, processor.resizeRequests[2:], 3, 64, 64)
 	if processor.removeRequests[0].ImageBase64 != startReference ||
 		processor.removeRequests[1].ImageBase64 != endReference {
 		t.Fatalf("boundary reference preparation order changed: %+v", processor.removeRequests)
@@ -540,6 +547,7 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 	if len(result.Frames) != 4 || result.Normalization == nil || result.Spritesheet == "" {
 		t.Fatalf("unexpected normalized result: %+v", result)
 	}
+	decodedFrames := make([]*image.RGBA, 0, len(result.Frames))
 	for index, frame := range result.Frames {
 		decoded, decodeErr := imageprocessor.DecodeBase64Image(frame.ImageBase64)
 		if decodeErr != nil {
@@ -547,6 +555,32 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 		}
 		if decoded.Bounds().Dx() != 64 || decoded.Bounds().Dy() != 64 {
 			t.Fatalf("frame %d has size %v", index, decoded.Bounds().Size())
+		}
+		for y := range 64 {
+			for x := range 64 {
+				alpha := decoded.RGBAAt(x, y).A
+				if alpha != 0 && alpha != 255 {
+					t.Fatalf("frame %d retained smooth alpha %d at (%d,%d)", index, alpha, x, y)
+				}
+			}
+		}
+		decodedFrames = append(decodedFrames, decoded)
+	}
+	sheet, decodeErr := imageprocessor.DecodeBase64Image(result.Spritesheet)
+	if decodeErr != nil {
+		t.Fatalf("decode rebuilt pixel spritesheet: %v", decodeErr)
+	}
+	if got := sheet.Bounds().Size(); got != image.Pt(128, 128) {
+		t.Fatalf("pixel spritesheet size = %v, want 128x128", got)
+	}
+	for index, frame := range decodedFrames {
+		offset := image.Pt((index%2)*64, (index/2)*64)
+		for y := range 64 {
+			for x := range 64 {
+				if got, want := sheet.RGBAAt(offset.X+x, offset.Y+y), frame.RGBAAt(x, y); got != want {
+					t.Fatalf("spritesheet frame %d differs at (%d,%d): got=%+v want=%+v", index, x, y, got, want)
+				}
+			}
 		}
 	}
 }
@@ -571,6 +605,28 @@ func TestProcessAnimationVideoAutoDetectsNonGreenMatte(t *testing.T) {
 	}
 	if result.Normalization.BackgroundRemovalReport.MatteColorSource != "auto-sampled" {
 		t.Fatalf("matte source = %q, want auto-sampled", result.Normalization.BackgroundRemovalReport.MatteColorSource)
+	}
+}
+
+func assertAnimationPixelResizeRequests(
+	t *testing.T,
+	requests []*imageprocessor.ResizeRequest,
+	wantCount, width, height int,
+) {
+	t.Helper()
+	if len(requests) != wantCount {
+		t.Fatalf("final animation pixel resize requests = %d, want %d", len(requests), wantCount)
+	}
+	for index, request := range requests {
+		options := request.Options
+		if options.Width != width || options.Height != height ||
+			options.Margin != 0 || options.CropContent ||
+			options.Mode != imageprocessor.RasterModePixel || !options.HardAlpha ||
+			!options.RecoverPixelGrid || !options.PrequantizeBeforeResize ||
+			!options.PreferNearestReduction || !options.SpritePixelPipeline ||
+			!options.PreserveCanvasGeometry {
+			t.Fatalf("final animation pixel resize request %d has unexpected options: %+v", index, options)
+		}
 	}
 }
 
