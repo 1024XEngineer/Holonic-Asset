@@ -89,6 +89,54 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The seed is idempotent by username and does not replace existing passwords.
 
+## Model Gateway Routing
+
+QNA/Modelink is the upstream gateway provider. `image`, `llm`, and `video`
+clients each configure that gateway once with a shared `baseURL` and credential.
+Their `models` arrays map model names to the wire protocol required by each API:
+
+```yaml
+image:
+  baseURL: "https://api.qnaigc.com"
+  apiKey: "..."
+  defaultModel: "openai/gpt-image-2"
+  fallbackModel: "google/gemini-3.1-flash-lite-image"
+  models:
+    - name: "openai/gpt-image-2"
+      protocol: openai_images
+    - name: "google/gemini-3.1-flash-lite-image"
+      protocol: chat_completions
+
+llm:
+  baseURL: "https://api.qnaigc.com"
+  apiKey: "..."
+  defaultModel: "google/gemini-3.7-flash"
+  models:
+    - name: "google/gemini-3.7-flash"
+      protocol: chat_completions
+
+video:
+  baseURL: "https://api.qnaigc.com"
+  apiKey: "..."
+  models: []
+```
+
+`openai_images` calls `/v1/images/generations` or `/v1/images/edits`, while
+`chat_completions` calls `/v1/chat/completions`. `fal_queue` derives video task
+paths from the selected model, for example
+`/queue/bytedance/seedance-2.0/image-to-video` and
+`/queue/bytedance/seedance-2.0/requests`.
+
+The provider owns the gateway connection and model routing; protocol adapters
+own request and response formats. The order of `models` does not select a
+default or control fallback. Each image or LLM `defaultModel` must name an entry
+in its client's `models` array. Video has no configured default model: an
+explicit request model is required when video `models` are configured. With an
+empty video `models` array, the existing fixed Fal Queue paths remain active.
+For images, `fallbackModel` is tried only after a transient primary failure. The
+legacy singular image `provider` setting remains supported only when no image
+`models` array is configured.
+
 ## Qiniu Uploads
 
 Configure `qiniu.accessKey`, `qiniu.secretKey`, `qiniu.bucket`, and
