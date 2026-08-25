@@ -6,10 +6,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -283,5 +287,183 @@ func TestBuildPackageRejectsMissingTile(t *testing.T) {
 	_, _, err := BuildPackage(context.Background(), snapshot, resolverStub{})
 	if err == nil || !strings.Contains(err.Error(), "has no image reference") {
 		t.Fatalf("expected missing tile error, got %v", err)
+	}
+}
+
+type resolverFunc func(context.Context, string) (string, error)
+
+func (f resolverFunc) ResolveReference(ctx context.Context, reference string) (string, error) {
+	return f(ctx, reference)
+}
+
+func TestBuildPackageValidationErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		snapshot Snapshot
+		resolver ReferenceResolver
+		want     string
+	}{
+		{
+			name:     "resolver required",
+			snapshot: Snapshot{Type: assetdomain.AssetTypeObject},
+			want:     "reference resolver is required",
+		},
+		{
+			name:     "unsupported asset",
+			snapshot: Snapshot{Type: assetdomain.AssetTypeAudio},
+			resolver: resolverStub{},
+			want:     ErrUnsupportedAsset.Error(),
+		},
+		{
+			name:     "invalid content",
+			snapshot: Snapshot{Type: assetdomain.AssetTypeObject, Content: json.RawMessage(`{"prototype":`)},
+			resolver: resolverStub{},
+			want:     "decode asset content",
+		},
+		{
+			name: string(assetdomain.AssetTypeCharacter) + " prototype reference required",
+			snapshot: Snapshot{
+				Type:    assetdomain.AssetTypeCharacter,
+				Content: json.RawMessage(`{"prototype":[{"id":1}]}`),
+			},
+			resolver: resolverStub{},
+			want:     "prototype 0 has no image reference",
+		},
+		{
+			name: "animation frame reference required",
+			snapshot: Snapshot{
+				Type:    assetdomain.AssetTypeObject,
+				Content: json.RawMessage(`{"animations":[{"name":"Idle","frames":[{}]}]}`),
+			},
+			resolver: resolverStub{},
+			want:     "animation \"Idle\" frame 0 has no image reference",
+		},
+		{
+			name: "tile reference required",
+			snapshot: Snapshot{
+				Type:    assetdomain.AssetTypeTileSet,
+				Content: json.RawMessage(`{"items":[{"tiles":[{}]}]}`),
+			},
+			resolver: resolverStub{},
+			want:     "tileSet item 0 tile 0 has no image reference",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, err := BuildPackage(context.Background(), test.snapshot, test.resolver)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("BuildPackage error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestFetchPNG(t *testing.T) {
+	validPNG := pngDataURL(t, color.RGBA{R: 255, A: 255})
+	validPNGData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(validPNG, "data:image/png;base64,"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ok.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(validPNGData)
+		case "/missing.png":
+			http.NotFound(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name      string
+		reference string
+		resolver  ReferenceResolver
+		want      string
+	}{
+		{name: "data URL", reference: validPNG, resolver: resolverStub{}},
+		{name: "resolver error", reference: "asset-key", resolver: resolverFunc(func(context.Context, string) (string, error) {
+			return "", errors.New("resolver unavailable")
+		}), want: "resolver unavailable"},
+		{name: "invalid resolved URL", reference: "asset-key", resolver: resolverFunc(func(context.Context, string) (string, error) {
+			return "://invalid", nil
+		}), want: "create resource request"},
+		{name: "HTTP error", reference: "asset-key", resolver: resolverFunc(func(context.Context, string) (string, error) {
+			return server.URL + "/missing.png", nil
+		}), want: "HTTP 404"},
+		{name: "HTTP success", reference: "asset-key", resolver: resolverFunc(func(context.Context, string) (string, error) {
+			return server.URL + "/ok.png", nil
+		})},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := fetchPNG(context.Background(), test.resolver, test.reference)
+			if test.want != "" {
+				if err == nil || !strings.Contains(err.Error(), test.want) {
+					t.Fatalf("fetchPNG error = %v, want substring %q", err, test.want)
+				}
+				return
+			}
+			if err != nil || len(data) == 0 {
+				t.Fatalf("fetchPNG returned %d bytes, err=%v", len(data), err)
+			}
+			if _, err := png.Decode(bytes.NewReader(data)); err != nil {
+				t.Fatalf("fetchPNG returned invalid PNG: %v", err)
+			}
+		})
+	}
+}
+
+func TestDecodeAndEncodePNGRejectsInvalidData(t *testing.T) {
+	for _, dataURL := range []string{
+		"data:image/png,not-base64",
+		"data:image/png;base64,%%%",
+		"data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("not an image")),
+		"not-a-data-url",
+	} {
+		t.Run(dataURL, func(t *testing.T) {
+			if _, err := decodeAndEncodePNG(dataURL); err == nil {
+				t.Fatal("expected invalid data URL error")
+			}
+		})
+	}
+	if _, err := encodePNG([]byte("not an image")); err == nil {
+		t.Fatal("expected image decode error")
+	}
+}
+
+func TestWriteZipFileRejectsUnsafePath(t *testing.T) {
+	for _, filePath := range []string{"", "/absolute.png", "../outside.png", "nested/../../outside.png"} {
+		t.Run(filePath, func(t *testing.T) {
+			zw := zip.NewWriter(io.Discard)
+			if err := writeZipFile(zw, packageFile{Path: filePath, Data: []byte("x")}); err == nil {
+				t.Fatal("expected invalid package path error")
+			}
+			_ = zw.Close()
+		})
+	}
+}
+
+func TestDirections(t *testing.T) {
+	tests := []struct {
+		name  string
+		value assetdomain.Perspective
+		count int
+		want  []string
+	}{
+		{name: "side on truncated", value: assetdomain.PerspectiveSideOn, count: 1, want: []string{"left"}},
+		{name: "isometric full", value: assetdomain.PerspectiveIsometric, count: 20, want: []string{"front", "front_right", "right", "back_right", "back", "back_left", "left", "front_left"}},
+		{name: "unknown", value: assetdomain.Perspective("unknown"), count: 2, want: nil},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := directions(test.value, test.count); !slices.Equal(got, test.want) {
+				t.Fatalf("directions() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }
