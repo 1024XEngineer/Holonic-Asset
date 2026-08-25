@@ -180,3 +180,57 @@ func TestProjectUpdateValidateRejectsEmptyOrInvalidUpdates(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectValidateReferenceGenerationAcceptsHTTPReferences(t *testing.T) {
+	for _, reference := range []string{
+		"",
+		"  ",
+		"http://media.example/reference.png",
+		"HTTPS://media.example/reference.png?token=abc",
+	} {
+		project := &domain.Project{
+			Name:           "Prototype",
+			GameType:       "RPG",
+			Perspective:    domain.PerspectiveTopDown,
+			TargetPlatform: domain.PlatformTypePC,
+			Reference:      reference,
+		}
+		if err := project.ValidateReferenceGeneration(); err != nil {
+			t.Errorf("reference %q should be accepted: %v", reference, err)
+		}
+	}
+}
+
+func TestProjectValidateReferenceGenerationRejectsNilAndInvalidReferences(t *testing.T) {
+	if err := (*domain.Project)(nil).ValidateReferenceGeneration(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected nil project error, got %v", err)
+	}
+	for _, reference := range []string{
+		"ftp://media.example/reference.png",
+		"https:///reference.png",
+		"data:image/png;base64,aGVsbG8=",
+		"reference.png",
+	} {
+		project := &domain.Project{
+			Name:           "Prototype",
+			GameType:       "RPG",
+			Perspective:    domain.PerspectiveTopDown,
+			TargetPlatform: domain.PlatformTypePC,
+			Reference:      reference,
+		}
+		if err := project.ValidateReferenceGeneration(); !errors.Is(err, domain.ErrInvalidProject) {
+			t.Errorf("reference %q should be rejected: %v", reference, err)
+		}
+	}
+}
+
+func TestProjectUpdateValidateRejectsInvalidPerspectiveAndPlatform(t *testing.T) {
+	invalidPerspective := domain.Perspective("FirstPerson")
+	if err := (&domain.ProjectUpdate{ID: 42, Perspective: &invalidPerspective}).Validate(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected invalid perspective error, got %v", err)
+	}
+	invalidPlatform := domain.PlatformType("Console")
+	if err := (&domain.ProjectUpdate{ID: 42, TargetPlatform: &invalidPlatform}).Validate(); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected invalid platform error, got %v", err)
+	}
+}

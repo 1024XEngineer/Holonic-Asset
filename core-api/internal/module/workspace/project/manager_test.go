@@ -311,6 +311,23 @@ func TestManagerUpdateErrors(t *testing.T) {
 	})
 }
 
+func TestManagerUpdatePersistsNonEmptyReference(t *testing.T) {
+	reference := "https://example.com/new-reference.png"
+	update := &domain.ProjectUpdate{ID: 42, Reference: &reference}
+	store := &projectStoreStub{}
+	references := &referenceStoreStub{persisted: "projects/42/reference.png"}
+
+	if err := domain.NewManager(store, nil, references).Update(context.Background(), update); err != nil {
+		t.Fatalf("update project reference: %v", err)
+	}
+	if store.update != update {
+		t.Fatalf("expected update to reach store, got %+v", store.update)
+	}
+	if update.Reference == nil || *update.Reference != "projects/42/reference.png" {
+		t.Fatalf("expected persisted reference key, got %+v", update.Reference)
+	}
+}
+
 func TestCreatePersistsReferenceAsObjectKey(t *testing.T) {
 	store := &projectStoreStub{}
 	references := &referenceStoreStub{persisted: "projects/7/reference.png"}
@@ -349,6 +366,32 @@ func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
 	}
 	if generated != references.resolved {
 		t.Fatalf("expected generated reference URL %q, got %q", references.resolved, generated)
+	}
+}
+
+func TestGenerateReferencePropagatesReferenceStorageErrors(t *testing.T) {
+	project := validProject()
+	project.Reference = "https://example.com/input.png"
+	service := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
+		Images: []imageclient.GeneratedImage{{Base64: "generated"}},
+	}}
+	resolveInputErr := errors.New("resolve input reference")
+	_, err := domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{resolveErr: resolveInputErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, resolveInputErr) || !strings.Contains(err.Error(), "resolve reference") {
+		t.Fatalf("expected input reference error, got %v", err)
+	}
+
+	project.Reference = ""
+	persistErr := errors.New("persist generated reference")
+	_, err = domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{persistErr: persistErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, persistErr) || !strings.Contains(err.Error(), "persist generated reference") {
+		t.Fatalf("expected generated persistence error, got %v", err)
+	}
+
+	resolveGeneratedErr := errors.New("resolve generated reference")
+	_, err = domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{resolveErr: resolveGeneratedErr}).GenerateReference(context.Background(), project)
+	if !errors.Is(err, resolveGeneratedErr) || !strings.Contains(err.Error(), "resolve generated reference") {
+		t.Fatalf("expected generated resolution error, got %v", err)
 	}
 }
 
