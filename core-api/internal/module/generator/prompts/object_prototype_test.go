@@ -39,6 +39,11 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 		"Top-Down",
 		"<direction_count>\n4\n</direction_count>",
 		"<asset_dimensions>\n{\"width\":48,\"height\":48}\n</asset_dimensions>",
+		"at most 30 x 30 drawable logical pixels",
+		"fixed 9-pixel safety margin",
+		"whole pixels",
+		"high-contrast color clusters",
+		"small object with 30 x 30 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)
@@ -117,6 +122,48 @@ func TestObjectPrototypeSideOnLocksBothViewsToOneScale(t *testing.T) {
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected side-on object prompt to contain %q: %s", expected, prompt)
+		}
+	}
+}
+
+func TestObjectPrototypeUsesDrawableGridForNominal32pxDetail(t *testing.T) {
+	prompt := prompts.ObjectPrototype(
+		"game object",
+		"Top-Down",
+		assetdomain.Size{Width: 32, Height: 32},
+		prompts.TransparentBackground(),
+		prompts.PrototypeReferenceState{},
+	)
+	for _, expected := range []string{
+		"Choose complexity from the 20 x 20 drawable region, not from the nominal 32 x 32 canvas",
+		"The requested final canvas has a short edge of 32 pixels or less",
+		"simplified, continuous, consistently coloured logical-pixel line",
+		"simplified continuous one-logical-pixel path",
+		"ultra-small object with only 20 x 20 drawable logical pixels",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected 32px object prompt to contain %q: %s", expected, prompt)
+		}
+	}
+}
+
+func TestObjectPrototypeProtectsElongatedObjectComposition(t *testing.T) {
+	prompt := prompts.ObjectPrototype(
+		"a long ceremonial weapon with a distinct functional head and handle",
+		"Side-On",
+		assetdomain.Size{Width: 32, Height: 32},
+		prompts.TransparentBackground(),
+		prompts.PrototypeReferenceState{},
+	)
+	for _, expected := range []string{
+		"For elongated objects, do not apply that compact square occupancy to both axes",
+		"let the long axis use roughly 70-90% of the available drawable length",
+		"complete functional end and the grip/shaft as one connected readable silhouette",
+		"do not compress the whole design into a thin centred line",
+		"Reserve enough short-axis pixels for the functional end",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected elongated-object rule to contain %q: %s", expected, prompt)
 		}
 	}
 }

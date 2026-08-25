@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"math"
 	"net/http"
 	"slices"
@@ -57,6 +55,8 @@ const (
 	animationMotionCoverageWeight    = 0.65
 	animationRecoveryWeight          = 0.35
 
+	// Green remains the default animation matte. AutoDetect allows generated
+	// videos to use an alternate matte when the subject contains green.
 	animationChromaHueMin              = 30
 	animationChromaHueMax              = 90
 	animationChromaHighSaturationMin   = 80
@@ -531,7 +531,7 @@ func (s *animationGenerationService) processVideo(
 		FrameCount:              request.FrameCount,
 		FrameWidth:              request.FrameWidth,
 		FrameHeight:             request.FrameHeight,
-		Margin:                  imageprocessor.AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
+		Margin:                  AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
 		Anchor:                  imageprocessor.AnimationAnchorFeet,
 		ForceProportionalGrid:   true,
 		PreserveVerticalMotion:  true,
@@ -542,7 +542,8 @@ func (s *animationGenerationService) processVideo(
 		// normalization may receive an entirely opaque sheet and cannot
 		// compute the character bounds.
 		Background: &imageprocessor.AnimationBackgroundOptions{
-			MatteColor: "auto",
+			MatteColor:          "auto",
+			BorderConnectedOnly: true,
 		},
 	})
 	if err != nil {
@@ -551,9 +552,19 @@ func (s *animationGenerationService) processVideo(
 	if normalized == nil || len(normalized.Regions) != request.FrameCount || strings.TrimSpace(normalized.ImageBase64) == "" {
 		return nil, fmt.Errorf("generator: normalize sampled animation frames: empty or incomplete result")
 	}
+	pixelFrames, pixelSpritesheet, err := s.pixelProcessAnimationFrames(
+		ctx,
+		normalized.Regions,
+		request.Columns,
+		request.FrameWidth,
+		request.FrameHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &AnimationGenerationResult{
-		Frames: normalized.Regions, RawFrames: rawFrames, Spritesheet: normalized.ImageBase64,
-		MIMEType: normalized.MIMEType, Normalization: normalized.AnimationReport,
+		Frames: pixelFrames, RawFrames: rawFrames, Spritesheet: pixelSpritesheet,
+		MIMEType: "image/png", Normalization: normalized.AnimationReport,
 		Loop: loop,
 	}, nil
 }
@@ -648,36 +659,6 @@ func animationLoopSelection(
 
 func roundAnimationValue(value float64) float64 {
 	return math.Round(value*1e6) / 1e6
-}
-
-func packAnimationVideoFrames(frames []image.Image, columns int) (*image.NRGBA, error) {
-	if len(frames) == 0 {
-		return nil, fmt.Errorf("generator: sampled animation frames are required")
-	}
-	if columns <= 0 {
-		return nil, fmt.Errorf("generator: animation columns must be positive")
-	}
-	bounds := frames[0].Bounds()
-	width, height := bounds.Dx(), bounds.Dy()
-	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("generator: sampled animation frame dimensions must be positive")
-	}
-	rows := animationRows(len(frames), columns)
-	sheet := image.NewNRGBA(image.Rect(0, 0, width*columns, height*rows))
-	draw.Draw(sheet, sheet.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
-	for index, frame := range frames {
-		if frame.Bounds().Dx() != width || frame.Bounds().Dy() != height {
-			return nil, fmt.Errorf("generator: sampled animation frame %d dimensions differ", index+1)
-		}
-		column, row := index%columns, index/columns
-		destination := image.Rect(column*width, row*height, (column+1)*width, (row+1)*height)
-		draw.Draw(sheet, destination, frame, frame.Bounds().Min, draw.Src)
-	}
-	return sheet, nil
-}
-
-func animationRows(frameCount, columns int) int {
-	return (frameCount + columns - 1) / columns
 }
 
 var _ AnimationGenerationService = (*animationGenerationService)(nil)

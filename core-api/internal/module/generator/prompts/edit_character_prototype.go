@@ -50,10 +50,12 @@ Character framing and style requirements:
 - Keep equal gutters and margins in every cell. Do not allow any character pixel, accessory, weapon, tail, shadow, or outline to cross a cell boundary. Keep the background uniform so the processor can split the sheet by its regular grid.
 - Match the original prototype's pixel density, palette, outlines, contrast, shading, lighting, materials, and perspective conventions unless the user explicitly requests a change to one of them.
 - Render as unmistakable classic low-resolution pixel art with large, clearly visible square pixel blocks and a deliberately coarse pixel grid.
-- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, selective dithering, and a small intentional color palette.
+- Use crisp 1-pixel hard edges, stepped silhouettes, blocky shapes, clustered pixels, broad connected color shapes, and a small intentional color palette. Avoid dithering when it would become native-size speckle.
 - Do not use anti-aliasing, smooth curves, gradients, soft shadows, glossy photographic highlights, painterly brushwork, 3D rendering, vector-like edges, or photorealistic detail.
 - Do not include other characters, people, creatures, scenery, ground planes, frames, borders, text, labels, logos, watermarks, UI elements, cast shadows, or unrelated objects.
 - Make the result suitable for direct isolation and use as a game character asset.
+
+%s
 
 User edit instructions:
 <edit_instructions>
@@ -68,7 +70,12 @@ User-selected perspective:
 Backend-derived direction count:
 <direction_count>
 %d
-</direction_count>`
+</direction_count>
+
+Backend-target per-direction asset dimensions:
+<asset_dimensions>
+{"width":%d,"height":%d}
+</asset_dimensions>`
 
 // EditCharacterPrototype combines the original character description and
 // direction references with user edit instructions.
@@ -77,6 +84,7 @@ func EditCharacterPrototype(
 	editInstructions string,
 	perspective string,
 	originalReferenceCount uint,
+	dimensions assetdomain.Size,
 	backgroundConstraint string,
 ) string {
 	directionCount := assetdomain.Perspective(perspective).CharacterDirectionCount()
@@ -86,8 +94,11 @@ func EditCharacterPrototype(
 		originalReferenceCount,
 		originalDescription,
 		prototypeDirectionSheetRules,
+		prototypeLogicalPixelRules(dimensions, "character"),
 		editInstructions,
 		perspective,
 		directionCount,
+		dimensions.Width,
+		dimensions.Height,
 	)
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/prompts"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testing.T) {
@@ -13,6 +14,7 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 		"change only the exposed scales to light blue",
 		"Side-On",
 		2,
+		assetdomain.Size{Width: 48, Height: 64},
 		prompts.SolidMatteBackground("#00FF00"),
 	)
 
@@ -33,6 +35,9 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 		"uniform, solid #00FF00 colour",
 		"change only the exposed scales to light blue",
 		"<direction_count>\n2\n</direction_count>",
+		"<asset_dimensions>\n{\"width\":48,\"height\":64}\n</asset_dimensions>",
+		"at most 30 x 46 drawable logical pixels",
+		"small character with 30 x 46 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected character edit prompt to contain %q: %s", expected, prompt)
@@ -78,6 +83,7 @@ func TestEditCharacterPrototypeDerivesDirectionLayoutFromPerspective(t *testing.
 				"change the cape to blue",
 				test.perspective,
 				test.originalReferences,
+				assetdomain.Size{Width: 32, Height: 32},
 				prompts.TransparentBackground(),
 			)
 			for _, expected := range test.expected {
@@ -89,5 +95,30 @@ func TestEditCharacterPrototypeDerivesDirectionLayoutFromPerspective(t *testing.
 				t.Fatalf("expected %s direction count in edit prompt: %s", test.direction, prompt)
 			}
 		})
+	}
+}
+
+func TestEditCharacterPrototypeUsesDrawableGridForSmallCharacterDetail(t *testing.T) {
+	prompt := prompts.EditCharacterPrototype(
+		"a player character",
+		"change the shirt color",
+		"Top-Down",
+		4,
+		assetdomain.Size{Width: 32, Height: 32},
+		prompts.TransparentBackground(),
+	)
+	for _, expected := range []string{
+		"ultra-small character with only 20 x 20 drawable logical pixels",
+		"The requested final canvas has a short edge of 32 pixels or less",
+		"few large connected regions",
+		"6-8 visually distinct color roles",
+		"narrower than three logical pixels",
+		"silhouette readability overrides anatomical separation",
+		"Avoid scattered single-pixel highlights",
+		"Avoid one-pixel-wide torsos or limbs",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("expected small character edit prompt to contain %q: %s", expected, prompt)
+		}
 	}
 }

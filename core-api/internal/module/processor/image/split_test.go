@@ -447,6 +447,39 @@ func TestProcessorSplitImageAnimationReturnsStabilizedFrames(t *testing.T) {
 	}
 }
 
+func TestProcessorSplitImageAnimationSupportsSupersampledRenderFrames(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+	fillRect(src, image.Rect(5, 5, 17, 35), color.NRGBA{R: 220, G: 70, B: 45, A: 255})
+	fillRect(src, image.Rect(45, 5, 77, 35), color.NRGBA{R: 220, G: 70, B: 45, A: 255})
+
+	result, err := NewProcessor().SplitImage(context.Background(), &SplitImageRequest{
+		ImageBase64: encodeImageForTest(t, src),
+		Mode:        ImageSplitModeAnimation,
+		Columns:     2,
+		Rows:        1,
+		FrameWidth:  32,
+		FrameHeight: 32,
+		RenderScale: 4,
+		Margin:      animationFrameMarginForTest(32, 32),
+		Anchor:      AnimationAnchorCenter,
+	})
+	if err != nil {
+		t.Fatalf("split supersampled animation: %v", err)
+	}
+	if result.FrameWidth != 128 || result.FrameHeight != 128 || result.OutputWidth != 256 || result.OutputHeight != 128 {
+		t.Fatalf("supersampled output = frame %dx%d sheet %dx%d, want frame 128x128 sheet 256x128", result.FrameWidth, result.FrameHeight, result.OutputWidth, result.OutputHeight)
+	}
+	for index, region := range result.Regions {
+		decoded, err := DecodeBase64Image(region.ImageBase64)
+		if err != nil {
+			t.Fatalf("decode supersampled region %d: %v", index, err)
+		}
+		if got := decoded.Bounds().Size(); got != image.Pt(128, 128) {
+			t.Errorf("supersampled region %d size = %v, want 128x128", index, got)
+		}
+	}
+}
+
 func TestProcessorSplitImageKnownGridDefaultsToAnimation(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 80, 40))
 	fillRect(src, image.Rect(5, 5, 17, 35), color.NRGBA{R: 255, A: 255})

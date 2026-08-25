@@ -16,7 +16,13 @@ func TestPrototypePromptsDescribeReferenceRoles(t *testing.T) {
 		{
 			name: "character",
 			build: func(state prompts.PrototypeReferenceState) string {
-				return prompts.CharacterPrototype("a hero", "Top-Down", prompts.TransparentBackground(), state)
+				return prompts.CharacterPrototype(
+					"a hero",
+					"Top-Down",
+					assetdomain.Size{Width: 32, Height: 32},
+					prompts.TransparentBackground(),
+					state,
+				)
 			},
 		},
 		{
@@ -174,7 +180,7 @@ func TestPrototypePromptsDescribeNexusReferenceRoles(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			prompt := prompts.CharacterPrototype("hero", "Top-Down", prompts.TransparentBackground(), test.state)
+			prompt := prompts.CharacterPrototype("hero", "Top-Down", assetdomain.Size{Width: 32, Height: 32}, prompts.TransparentBackground(), test.state)
 			for _, expected := range test.expected {
 				if !strings.Contains(prompt, expected) {
 					t.Fatalf("expected prompt to contain %q: %s", expected, prompt)
