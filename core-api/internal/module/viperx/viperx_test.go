@@ -32,15 +32,31 @@ log:
   maxBackups: 7
   maxAge: 14
   compress: true
+image:
+  baseURL: https://images.example.test
+  apiKey: test-image-key
+  defaultModel: openai/gpt-image-2
+  fallbackModel: google/gemini-image
+  models:
+    - name: openai/gpt-image-2
+      protocol: openai_images
+    - name: google/gemini-image
+      protocol: chat_completions
 llm:
   baseURL: https://llm.example.test
   apiKey: test-llm-key
   defaultModel: vision-model
+  models:
+    - name: vision-model
+      protocol: chat_completions
 pprof:
   enabled: true
 video:
   baseURL: https://video.example.test
   apiKey: test-video-key
+  models:
+    - name: bytedance/seedance-2.0
+      protocol: fal_queue
   pollInterval: 5s
   pollTimeout: 45s
   maxRetries: 3
@@ -77,10 +93,19 @@ qiniu:
 	if loaded.Log.Path != "./logs/app.log" || !loaded.Log.Compress {
 		t.Fatalf("unexpected log config: %+v", loaded.Log)
 	}
+	if len(loaded.Image.Models) != 2 ||
+		loaded.Image.Models[0].Protocol != "openai_images" ||
+		loaded.Image.Models[1].Name != "google/gemini-image" ||
+		loaded.Image.Models[1].Protocol != "chat_completions" {
+		t.Fatalf("unexpected image models: %+v", loaded.Image.Models)
+	}
 	if loaded.LLM.BaseURL != "https://llm.example.test" || loaded.LLM.APIKey != "test-llm-key" || loaded.LLM.DefaultModel != "vision-model" {
 		t.Fatalf("unexpected LLM config: %+v", loaded.LLM)
 	}
-	if loaded.Video.BaseURL != "https://video.example.test" || loaded.Video.APIKey != "test-video-key" || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
+	if len(loaded.LLM.Models) != 1 || loaded.LLM.Models[0].Protocol != "chat_completions" {
+		t.Fatalf("unexpected LLM models: %+v", loaded.LLM.Models)
+	}
+	if loaded.Video.BaseURL != "https://video.example.test" || loaded.Video.APIKey != "test-video-key" || len(loaded.Video.Models) != 1 || loaded.Video.Models[0].Protocol != "fal_queue" || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
 		t.Fatalf("unexpected video config: %+v", loaded.Video)
 	}
 	if loaded.QiNiu.AccessKey != "test-ak" || loaded.QiNiu.SecretKey != "test-sk" || loaded.QiNiu.Bucket != "asset-bucket" || loaded.QiNiu.Domain != "cdn.example.com" || loaded.QiNiu.UploadTokenExpiry != 45*time.Minute || loaded.QiNiu.DownloadURLExpiry != 20*time.Minute {
@@ -102,13 +127,16 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
 	}
+	if len(loaded.Image.Models) != 2 || loaded.Image.Models[1].Protocol != "chat_completions" {
+		t.Fatalf("unexpected example image models: %+v", loaded.Image.Models)
+	}
 	if loaded.Auth.TokenExpiry != 24*time.Hour {
 		t.Fatalf("unexpected auth config: %+v", loaded.Auth)
 	}
-	if loaded.LLM.BaseURL != "" || loaded.LLM.APIKey != "" || loaded.LLM.DefaultModel != "" {
-		t.Fatalf("expected example LLM config to be user-supplied: %+v", loaded.LLM)
+	if loaded.LLM.DefaultModel != "google/gemini-3.7-flash" || len(loaded.LLM.Models) != 1 || loaded.LLM.Models[0].Protocol != "chat_completions" {
+		t.Fatalf("unexpected example LLM config: %+v", loaded.LLM)
 	}
-	if loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
+	if len(loaded.Video.Models) != 0 || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
 		t.Fatalf("unexpected example video config: %+v", loaded.Video)
 	}
 	if loaded.QiNiu.UploadTokenExpiry != time.Hour || loaded.QiNiu.DownloadURLExpiry != 30*time.Minute {
