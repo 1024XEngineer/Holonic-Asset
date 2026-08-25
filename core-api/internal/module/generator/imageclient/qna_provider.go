@@ -1,357 +1,126 @@
 package imageclient
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
-	"time"
-
-	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
-const (
-	// DefaultQNABaseURL is the production endpoint documented by QNA.
-	DefaultQNABaseURL = "https://api.qnaigc.com"
-	// DefaultQNAModel is used when a request does not specify a model.
-	DefaultQNAModel = "openai/gpt-image-2"
+const qnaProviderName = "qna"
 
-	qnaProviderName       = "qna"
-	qnaGeneratePath       = "/v1/images/generations"
-	qnaEditPath           = "/v1/images/edits"
-	maxErrorBodyBytes     = 1 << 20
-	defaultQNAHTTPTimeout = 5 * time.Minute
-)
-
-// QNAConfig configures the QNA image provider.
-type QNAConfig struct {
-	BaseURL      string
-	APIKey       string
-	DefaultModel string
-	HTTPClient   *http.Client
-	Logger       logger.Logger
+type protocolAdapter interface {
+	Generate(context.Context, *ProviderRequest) (*ProviderResult, error)
+	Edit(context.Context, *ProviderRequest) (*ProviderResult, error)
 }
 
-// QNAProvider calls QNA's text-to-image and image-to-image APIs.
+// QNAProvider owns one Modelink/QNA gateway and routes each configured model
+// to the protocol adapter required by that model.
 type QNAProvider struct {
-	baseURL      string
-	apiKey       string
 	defaultModel string
-	httpClient   *http.Client
-	logger       logger.Logger
+	adapters     map[string]protocolAdapter
 }
 
-// NewQNAProvider creates a QNA provider with documented production defaults.
-func NewQNAProvider(config QNAConfig) *QNAProvider {
-	baseURL := strings.TrimRight(config.BaseURL, "/")
-	if baseURL == "" {
-		baseURL = DefaultQNABaseURL
-	}
-
-	defaultModel := config.DefaultModel
-	if defaultModel == "" {
-		defaultModel = DefaultQNAModel
-	}
-
-	httpClient := config.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: defaultQNAHTTPTimeout}
+func newQNAProvider(cfg FactoryConfig) ImageProvider {
+	routes := make(map[string]protocolAdapter)
+	for _, modelConfig := range cfg.Models {
+		model := strings.TrimSpace(modelConfig.Name)
+		if model == "" {
+			continue
+		}
+		key := strings.ToLower(model)
+		if _, duplicate := routes[key]; duplicate {
+			routes[key] = newInvalidProtocolAdapter(
+				fmt.Sprintf("model %q is assigned to multiple image protocols", model),
+			)
+			continue
+		}
+		routes[key] = createProtocolAdapter(modelConfig.Protocol, model, cfg, modelConfig.BaseURL, modelConfig.APIKey)
 	}
 
 	return &QNAProvider{
-		baseURL:      baseURL,
-		apiKey:       config.APIKey,
-		defaultModel: defaultModel,
-		httpClient:   httpClient,
-		logger:       config.Logger,
+		defaultModel: strings.TrimSpace(cfg.DefaultModel),
+		adapters:     routes,
 	}
 }
 
-// Generate calls QNA's text-to-image endpoint.
 func (p *QNAProvider) Generate(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
-	return p.call(ctx, qnaGeneratePath, request, nil)
+	adapter, routedRequest, err := p.route(request)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.Generate(ctx, routedRequest)
 }
 
-// Edit calls QNA's image-to-image endpoint.
 func (p *QNAProvider) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
-	result, err := p.call(ctx, qnaEditPath, request, request.ReferenceImages)
-	if !shouldRetryQNAEditWithoutMask(request, err) {
-		return result, err
+	adapter, routedRequest, err := p.route(request)
+	if err != nil {
+		return nil, err
 	}
-	if p.logger != nil {
-		p.logger.Warn(
-			"qna rejected the documented edit mask format; retrying without native mask",
-			logger.Error(err),
-		)
-	}
-	fallback := *request
-	fallback.MaskImage = ""
-	return p.call(ctx, qnaEditPath, &fallback, fallback.ReferenceImages)
+	return adapter.Edit(ctx, routedRequest)
 }
 
-func shouldRetryQNAEditWithoutMask(request *ProviderRequest, err error) bool {
-	if request == nil || strings.TrimSpace(request.MaskImage) == "" || err == nil {
-		return false
-	}
-	var providerErr *ProviderError
-	if !errors.As(err, &providerErr) || providerErr.Kind != ErrorKindInvalidRequest ||
-		providerErr.StatusCode != http.StatusBadRequest {
-		return false
-	}
-	message := strings.ToLower(providerErr.Message)
-	return strings.Contains(message, "mask must be an object") ||
-		strings.Contains(message, "unable to download content from the provided url")
-}
-
-func (p *QNAProvider) call(
-	ctx context.Context,
-	path string,
+func (p *QNAProvider) route(
 	request *ProviderRequest,
-	referenceImages []string,
-) (*ProviderResult, error) {
-	model := request.Model
+) (protocolAdapter, *ProviderRequest, error) {
+	if request == nil {
+		return nil, nil, newQNARoutingError("image request is required")
+	}
+
+	model := strings.TrimSpace(request.Model)
 	if model == "" {
 		model = p.defaultModel
 	}
-
-	providerSize := normalizeQNAImageSize(request.Size)
-	payload := qnaImageRequest{
-		Model:   model,
-		Prompt:  request.Prompt,
-		Image:   referenceImages,
-		Mask:    request.MaskImage,
-		N:       request.N,
-		Size:    providerSize,
-		Quality: request.Params["quality"],
+	if model == "" {
+		return nil, nil, newQNARoutingError("image model is required")
 	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"encode image request",
-			err,
+
+	adapter := p.adapters[strings.ToLower(model)]
+	if adapter == nil {
+		return nil, nil, newQNARoutingError(
+			fmt.Sprintf("no image protocol is configured for model %q", model),
 		)
 	}
 
-	httpRequest, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		p.baseURL+path,
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidRequest,
-			0,
-			false,
-			"create image request",
-			err,
-		)
-	}
-	httpRequest.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpRequest.Header.Set("Content-Type", "application/json")
-	httpRequest.Header.Set("Accept", "application/json")
-
-	response, err := p.httpClient.Do(httpRequest)
-	if err != nil {
-		return nil, classifyQNARequestError(ctx, err)
-	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, qnaStatusError(response)
-	}
-
-	var decoded qnaImageResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		return nil, newQNAError(
-			ErrorKindInvalidResponse,
-			response.StatusCode,
-			true,
-			"decode image response",
-			err,
-		)
-	}
-	if len(decoded.Data) == 0 {
-		return nil, newQNAError(
-			ErrorKindInvalidResponse,
-			response.StatusCode,
-			true,
-			"image response contains no data",
-			nil,
-		)
-	}
-
-	images := make([]string, 0, len(decoded.Data))
-	for _, image := range decoded.Data {
-		if image.Base64 == "" {
-			return nil, newQNAError(
-				ErrorKindInvalidResponse,
-				response.StatusCode,
-				true,
-				"image response contains an empty b64_json field",
-				nil,
-			)
-		}
-		images = append(images, image.Base64)
-	}
-
-	return &ProviderResult{
-		Images:       images,
-		OutputFormat: decoded.OutputFormat,
-		Size:         decoded.Size,
-		CreatedAt:    decoded.Created,
-		Usage: Usage{
-			TotalTokens:       decoded.Usage.TotalTokens,
-			InputTokens:       decoded.Usage.InputTokens,
-			OutputTokens:      decoded.Usage.OutputTokens,
-			TextToImageCount:  decoded.Usage.TextToImageCount,
-			ImageToImageCount: decoded.Usage.ImageToImageCount,
-			RequestCount:      decoded.Usage.RequestCount,
-		},
-	}, nil
+	routedRequest := *request
+	routedRequest.Model = model
+	return adapter, &routedRequest, nil
 }
 
-const minimumQNAImagePixels = 655_360
-
-func normalizeQNAImageSize(size string) string {
-	size = strings.TrimSpace(size)
-	if size == "" {
-		return size
-	}
-	var width, height int
-	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil || width <= 0 || height <= 0 {
-		return size
-	}
-	if int64(width)*int64(height) < minimumQNAImagePixels {
-		return "1024x1024"
-	}
-	return size
+type invalidProtocolAdapter struct {
+	message string
 }
 
-func classifyQNARequestError(ctx context.Context, err error) error {
-	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
-		return newQNAError(ErrorKindCanceled, 0, false, "request canceled", err)
-	}
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
-		return newQNAError(ErrorKindTimeout, 0, true, "request timed out", err)
-	}
-	return newQNAError(ErrorKindTransport, 0, true, "request failed", err)
+func newInvalidProtocolAdapter(message string) protocolAdapter {
+	return &invalidProtocolAdapter{message: message}
 }
 
-func qnaStatusError(response *http.Response) error {
-	body, readErr := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
-	message := qnaErrorMessage(body)
-	if message == "" {
-		message = response.Status
-	}
-
-	kind, transient := classifyQNAStatus(response.StatusCode)
-	return newQNAError(kind, response.StatusCode, transient, message, readErr)
+func (p *invalidProtocolAdapter) Generate(
+	context.Context,
+	*ProviderRequest,
+) (*ProviderResult, error) {
+	return nil, newQNARoutingError(p.message)
 }
 
-func classifyQNAStatus(statusCode int) (ErrorKind, bool) {
-	switch statusCode {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return ErrorKindAuthentication, false
-	case http.StatusRequestTimeout:
-		return ErrorKindTimeout, true
-	case http.StatusTooManyRequests:
-		return ErrorKindRateLimited, true
-	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return ErrorKindInvalidRequest, false
-	default:
-		if statusCode >= http.StatusInternalServerError {
-			return ErrorKindUnavailable, true
-		}
-		return ErrorKindInvalidRequest, false
-	}
+func (p *invalidProtocolAdapter) Edit(
+	context.Context,
+	*ProviderRequest,
+) (*ProviderResult, error) {
+	return nil, newQNARoutingError(p.message)
 }
 
-func qnaErrorMessage(body []byte) string {
-	var envelope struct {
-		Message string          `json:"message"`
-		Error   json.RawMessage `json:"error"`
-	}
-	if err := json.Unmarshal(body, &envelope); err == nil {
-		if envelope.Message != "" {
-			return envelope.Message
-		}
-		if len(envelope.Error) > 0 {
-			var nested struct {
-				Message string `json:"message"`
-			}
-			if err := json.Unmarshal(envelope.Error, &nested); err == nil && nested.Message != "" {
-				return nested.Message
-			}
-			var text string
-			if err := json.Unmarshal(envelope.Error, &text); err == nil && text != "" {
-				return text
-			}
-		}
-	}
-	return strings.TrimSpace(string(body))
-}
-
-func newQNAError(
-	kind ErrorKind,
-	statusCode int,
-	transient bool,
-	message string,
-	cause error,
-) *ProviderError {
-	if cause != nil && message == "" {
-		message = cause.Error()
-	}
+func newQNARoutingError(message string) *ProviderError {
 	return &ProviderError{
-		Provider:   qnaProviderName,
-		Kind:       kind,
-		StatusCode: statusCode,
-		Transient:  transient,
-		Message:    message,
-		Cause:      cause,
+		Provider:  qnaProviderName,
+		Kind:      ErrorKindInvalidRequest,
+		Transient: false,
+		Message:   message,
 	}
-}
-
-type qnaImageRequest struct {
-	Model   string   `json:"model"`
-	Prompt  string   `json:"prompt"`
-	Image   []string `json:"image,omitempty"`
-	Mask    string   `json:"mask,omitempty"`
-	N       int      `json:"n,omitempty"`
-	Size    string   `json:"size,omitempty"`
-	Quality string   `json:"quality,omitempty"`
-}
-
-type qnaImageResponse struct {
-	Created      int64  `json:"created"`
-	OutputFormat string `json:"output_format"`
-	Size         string `json:"size"`
-	Data         []struct {
-		Base64 string `json:"b64_json"`
-	} `json:"data"`
-	Usage struct {
-		TotalTokens       int `json:"total_tokens"`
-		InputTokens       int `json:"input_tokens"`
-		OutputTokens      int `json:"output_tokens"`
-		TextToImageCount  int `json:"ti_quantity"`
-		ImageToImageCount int `json:"ii_quantity"`
-		RequestCount      int `json:"req_count"`
-	} `json:"usage"`
 }
 
 var _ ImageProvider = (*QNAProvider)(nil)

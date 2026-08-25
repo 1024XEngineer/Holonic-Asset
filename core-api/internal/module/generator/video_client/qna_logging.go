@@ -9,7 +9,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 )
 
-func (p *QNAProvider) logRequestResult(
+func (p *qnaFalQueueAdapter) logRequestResult(
 	trace qnaRequestTrace,
 	method string,
 	endpoint string,
@@ -73,7 +73,7 @@ func (p *QNAProvider) logRequestResult(
 	p.logger.Warn(message, fields...)
 }
 
-func (p *QNAProvider) logRequestFailure(
+func (p *qnaFalQueueAdapter) logRequestFailure(
 	message string,
 	trace qnaRequestTrace,
 	method string,
@@ -109,7 +109,7 @@ func (p *QNAProvider) logRequestFailure(
 	p.logger.Warn(message, fields...)
 }
 
-func (p *QNAProvider) requestLogFields(
+func (p *qnaFalQueueAdapter) requestLogFields(
 	trace qnaRequestTrace,
 	method string,
 	endpoint string,

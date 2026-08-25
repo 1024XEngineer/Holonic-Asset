@@ -37,21 +37,35 @@ type LogConfig struct {
 	Compress   bool   `mapstructure:"compress" yaml:"compress"`
 }
 
+// ModelConfig maps one gateway model to its required wire protocol and endpoint settings.
+type ModelConfig struct {
+	Name     string `mapstructure:"name" yaml:"name"`
+	Protocol string `mapstructure:"protocol" yaml:"protocol"`
+	BaseURL  string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey   string `mapstructure:"apiKey" yaml:"apiKey"`
+}
+
 type ImageClientConfig struct {
-	BaseURL      string `mapstructure:"baseURL" yaml:"baseURL"`
-	APIKey       string `mapstructure:"apiKey" yaml:"apiKey"`
-	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
+	BaseURL       string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey        string `mapstructure:"apiKey" yaml:"apiKey"`
+	DefaultModel  string `mapstructure:"defaultModel" yaml:"defaultModel"`
+	FallbackModel string `mapstructure:"fallbackModel" yaml:"fallbackModel"`
+	// Provider is retained for configurations that predate model routing.
+	Provider string        `mapstructure:"provider" yaml:"provider"`
+	Models   []ModelConfig `mapstructure:"models" yaml:"models"`
 }
 
 type LLMClientConfig struct {
-	BaseURL      string `mapstructure:"baseURL" yaml:"baseURL"`
-	APIKey       string `mapstructure:"apiKey" yaml:"apiKey"`
-	DefaultModel string `mapstructure:"defaultModel" yaml:"defaultModel"`
+	BaseURL      string        `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey       string        `mapstructure:"apiKey" yaml:"apiKey"`
+	DefaultModel string        `mapstructure:"defaultModel" yaml:"defaultModel"`
+	Models       []ModelConfig `mapstructure:"models" yaml:"models"`
 }
 
 type VideoClientConfig struct {
 	BaseURL      string        `mapstructure:"baseURL" yaml:"baseURL"`
 	APIKey       string        `mapstructure:"apiKey" yaml:"apiKey"`
+	Models       []ModelConfig `mapstructure:"models" yaml:"models"`
 	PollInterval time.Duration `mapstructure:"pollInterval" yaml:"pollInterval"`
 	PollTimeout  time.Duration `mapstructure:"pollTimeout" yaml:"pollTimeout"`
 	MaxRetries   int           `mapstructure:"maxRetries" yaml:"maxRetries"`
