@@ -61,13 +61,13 @@ func classifyChatSDKError(ctx context.Context, err error) error {
 	}
 	if statusCode, message, ok := qnaSDKAPIError(err); ok {
 		kind, transient := classifyChatStatus(statusCode)
-		return newChatProviderError(kind, statusCode, transient, message, err)
+		return newChatProtocolError(kind, statusCode, transient, message, err)
 	}
 	if isQNASDKConfigurationError(err) {
-		return newChatProviderError(ErrorKindInvalidRequest, 0, false, "configure QNA SDK request", err)
+		return newChatProtocolError(ErrorKindInvalidRequest, 0, false, "configure QNA SDK request", err)
 	}
 	if isQNASDKResponseDecodeError(err) {
-		return newChatProviderError(ErrorKindInvalidResponse, 200, true, "decode chat completion response", err)
+		return newChatProtocolError(ErrorKindInvalidResponse, 200, true, "decode chat completion response", err)
 	}
 	return classifyChatRequestError(ctx, err)
 }

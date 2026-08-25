@@ -36,8 +36,8 @@ func (zeroReader) Read(buffer []byte) (int, error) {
 	return len(buffer), nil
 }
 
-func TestNewQNAChatCompletionsProviderDefaults(t *testing.T) {
-	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{})
+func TestNewQNAChatCompletionsAdapterDefaults(t *testing.T) {
+	provider := NewQNAChatCompletionsAdapter(QNAChatCompletionsAdapterConfig{})
 	if provider.baseURL != DefaultQNABaseURL || provider.defaultModel != DefaultQNAChatCompletionsModel {
 		t.Fatalf("unexpected defaults: base=%q model=%q", provider.baseURL, provider.defaultModel)
 	}
@@ -46,8 +46,8 @@ func TestNewQNAChatCompletionsProviderDefaults(t *testing.T) {
 	}
 }
 
-func TestQNAChatCompletionsProviderRejectsInvalidEndpoint(t *testing.T) {
-	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{BaseURL: "://invalid"})
+func TestQNAChatCompletionsAdapterRejectsInvalidEndpoint(t *testing.T) {
+	provider := NewQNAChatCompletionsAdapter(QNAChatCompletionsAdapterConfig{BaseURL: "://invalid"})
 	_, err := provider.Generate(context.Background(), &ProviderRequest{Prompt: "test"})
 	var providerErr *ProviderError
 	if !errors.As(err, &providerErr) || providerErr.Kind != ErrorKindInvalidRequest {
@@ -220,9 +220,9 @@ func TestChatCompletionsImageReferenceHelpers(t *testing.T) {
 	}
 }
 
-func TestQNAChatCompletionsProviderImageResolutionFailures(t *testing.T) {
-	baseProvider := func(roundTrip internalRoundTripFunc) *QNAChatCompletionsProvider {
-		return NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{
+func TestQNAChatCompletionsAdapterImageResolutionFailures(t *testing.T) {
+	baseProvider := func(roundTrip internalRoundTripFunc) *QNAChatCompletionsAdapter {
+		return NewQNAChatCompletionsAdapter(QNAChatCompletionsAdapterConfig{
 			BaseURL:            "https://api.example",
 			DownloadHTTPClient: &http.Client{Transport: roundTrip},
 		})
@@ -299,8 +299,8 @@ func TestQNAChatCompletionsProviderImageResolutionFailures(t *testing.T) {
 	})
 }
 
-func TestQNAChatCompletionsProviderExtractImageBranches(t *testing.T) {
-	provider := NewQNAChatCompletionsProvider(QNAChatCompletionsConfig{
+func TestQNAChatCompletionsAdapterExtractImageBranches(t *testing.T) {
+	provider := NewQNAChatCompletionsAdapter(QNAChatCompletionsAdapterConfig{
 		BaseURL: "https://api.example",
 		DownloadHTTPClient: &http.Client{Transport: internalRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 			return &http.Response{

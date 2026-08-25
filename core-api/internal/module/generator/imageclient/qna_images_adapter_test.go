@@ -26,7 +26,7 @@ func (s *imageProviderLoggerStub) Warn(message string, fields ...logger.Field) {
 func (*imageProviderLoggerStub) Error(string, ...logger.Field) {}
 func (*imageProviderLoggerStub) Sync() error                   { return nil }
 
-func TestQNAImagesProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
+func TestQNAImagesAdapterGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/images/generations" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
@@ -59,7 +59,7 @@ func TestQNAImagesProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{
 		BaseURL:      server.URL,
 		APIKey:       "test-key",
 		DefaultModel: "configured-model",
@@ -92,7 +92,7 @@ func TestQNAImagesProviderGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T
 	}
 }
 
-func TestQNAImagesProviderPreservesValidCustomImageSize(t *testing.T) {
+func TestQNAImagesAdapterPreservesValidCustomImageSize(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var payload struct {
 			Size string `json:"size"`
@@ -108,7 +108,7 @@ func TestQNAImagesProviderPreservesValidCustomImageSize(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "test-key"})
 	if _, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
 		Prompt: "direction sheet",
 		Size:   "1504x1024",
@@ -117,7 +117,7 @@ func TestQNAImagesProviderPreservesValidCustomImageSize(t *testing.T) {
 	}
 }
 
-func TestQNAImagesProviderEditSendsReferenceImages(t *testing.T) {
+func TestQNAImagesAdapterEditSendsReferenceImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/images/edits" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
@@ -141,7 +141,7 @@ func TestQNAImagesProviderEditSendsReferenceImages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "test-key"})
 
 	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
 		Prompt:          "make it blue",
@@ -157,7 +157,7 @@ func TestQNAImagesProviderEditSendsReferenceImages(t *testing.T) {
 	}
 }
 
-func TestQNAImagesProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
+func TestQNAImagesAdapterEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
 	requests := 0
 	providerLogger := &imageProviderLoggerStub{}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -184,7 +184,7 @@ func TestQNAImagesProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFor
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{
 		BaseURL: server.URL, APIKey: "test-key", Logger: providerLogger,
 	})
 	result, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
@@ -204,7 +204,7 @@ func TestQNAImagesProviderEditRetriesWithoutMaskWhenProviderRejectsDocumentedFor
 	}
 }
 
-func TestQNAImagesProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
+func TestQNAImagesAdapterEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		requests++
@@ -214,7 +214,7 @@ func TestQNAImagesProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "test-key"})
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "test-key"})
 	_, err := provider.Edit(context.Background(), &imageclient.ProviderRequest{
 		Prompt:          "edit",
 		ReferenceImages: []string{"data:image/png;base64,ref"},
@@ -225,7 +225,7 @@ func TestQNAImagesProviderEditDoesNotDropMaskForOtherBadRequests(t *testing.T) {
 	}
 }
 
-func TestQNAImagesProviderClassifiesStatusCodes(t *testing.T) {
+func TestQNAImagesAdapterClassifiesStatusCodes(t *testing.T) {
 	tests := []struct {
 		statusCode int
 		body       string
@@ -247,7 +247,7 @@ func TestQNAImagesProviderClassifiesStatusCodes(t *testing.T) {
 			writer.WriteHeader(tt.statusCode)
 			_, _ = writer.Write([]byte(tt.body))
 		}))
-		provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "key"})
+		provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "key"})
 		_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 		server.Close()
 
@@ -263,7 +263,7 @@ func TestQNAImagesProviderClassifiesStatusCodes(t *testing.T) {
 	}
 }
 
-func TestQNAImagesProviderHandlesInvalidResponsePayloads(t *testing.T) {
+func TestQNAImagesAdapterHandlesInvalidResponsePayloads(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
@@ -281,7 +281,7 @@ func TestQNAImagesProviderHandlesInvalidResponsePayloads(t *testing.T) {
 			}))
 			defer server.Close()
 
-			provider := imageclient.NewQNAImagesProvider(imageclient.QNAImagesConfig{BaseURL: server.URL, APIKey: "key"})
+			provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "key"})
 			_, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{Prompt: "test"})
 			if err == nil {
 				t.Fatalf("expected error for %s, got nil", tt.name)
@@ -293,7 +293,7 @@ func TestQNAImagesProviderHandlesInvalidResponsePayloads(t *testing.T) {
 	}
 }
 
-func TestQNAImagesProviderErrorMethods(t *testing.T) {
+func TestQNAImagesAdapterErrorMethods(t *testing.T) {
 	var nilErr *imageclient.ProviderError
 	if nilErr.Error() != "" || nilErr.Unwrap() != nil {
 		t.Fatalf("expected empty for nil error")

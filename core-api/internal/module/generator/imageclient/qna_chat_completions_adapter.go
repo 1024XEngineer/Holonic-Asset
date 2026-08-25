@@ -21,10 +21,9 @@ const (
 	// DefaultQNAChatCompletionsModel is used when no chat-completions model is configured.
 	DefaultQNAChatCompletionsModel = "google/nano-banana-2"
 
-	chatCompletionsProviderName = "chat_completions"
-	maxChatErrorBodyBytes       = 1 << 20
-	maxGeneratedImageBytes      = 32 << 20
-	defaultChatHTTPTimeout      = 5 * time.Minute
+	maxChatErrorBodyBytes  = 1 << 20
+	maxGeneratedImageBytes = 32 << 20
+	defaultChatHTTPTimeout = 5 * time.Minute
 )
 
 var (
@@ -32,8 +31,8 @@ var (
 	httpURLRegex       = regexp.MustCompile(`https?://[^\s"'>)]+`)
 )
 
-// QNAChatCompletionsConfig configures QNA's OpenAI-compatible Chat Completions adapter.
-type QNAChatCompletionsConfig struct {
+// QNAChatCompletionsAdapterConfig configures QNA's OpenAI-compatible Chat Completions adapter.
+type QNAChatCompletionsAdapterConfig struct {
 	BaseURL      string
 	APIKey       string
 	DefaultModel string
@@ -45,8 +44,8 @@ type QNAChatCompletionsConfig struct {
 	Logger             logger.Logger
 }
 
-// QNAChatCompletionsProvider calls QNA's OpenAI-compatible Chat Completions endpoint.
-type QNAChatCompletionsProvider struct {
+// QNAChatCompletionsAdapter calls QNA's OpenAI-compatible Chat Completions endpoint.
+type QNAChatCompletionsAdapter struct {
 	baseURL            string
 	apiKey             string
 	defaultModel       string
@@ -56,8 +55,8 @@ type QNAChatCompletionsProvider struct {
 	logger             logger.Logger
 }
 
-// NewQNAChatCompletionsProvider creates a provider targeting /v1/chat/completions.
-func NewQNAChatCompletionsProvider(config QNAChatCompletionsConfig) *QNAChatCompletionsProvider {
+// NewQNAChatCompletionsAdapter creates an adapter targeting /v1/chat/completions.
+func NewQNAChatCompletionsAdapter(config QNAChatCompletionsAdapterConfig) *QNAChatCompletionsAdapter {
 	baseURL := strings.TrimRight(config.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = DefaultQNABaseURL
@@ -81,7 +80,7 @@ func NewQNAChatCompletionsProvider(config QNAChatCompletionsConfig) *QNAChatComp
 		sdkClient = qnasdk.NewClient(baseURL, config.APIKey, httpClient)
 	}
 
-	return &QNAChatCompletionsProvider{
+	return &QNAChatCompletionsAdapter{
 		baseURL:            baseURL,
 		apiKey:             config.APIKey,
 		defaultModel:       defaultModel,
@@ -93,7 +92,7 @@ func NewQNAChatCompletionsProvider(config QNAChatCompletionsConfig) *QNAChatComp
 }
 
 // Generate calls Chat Completions endpoint for text-to-image generation.
-func (p *QNAChatCompletionsProvider) Generate(
+func (p *QNAChatCompletionsAdapter) Generate(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -101,14 +100,14 @@ func (p *QNAChatCompletionsProvider) Generate(
 }
 
 // Edit calls Chat Completions endpoint with reference images for image-to-image or editing.
-func (p *QNAChatCompletionsProvider) Edit(
+func (p *QNAChatCompletionsAdapter) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
 	return p.call(ctx, request, request.ReferenceImages)
 }
 
-func (p *QNAChatCompletionsProvider) call(
+func (p *QNAChatCompletionsAdapter) call(
 	ctx context.Context,
 	request *ProviderRequest,
 	referenceImages []string,
@@ -170,7 +169,7 @@ func (p *QNAChatCompletionsProvider) call(
 	}
 
 	if len(decoded.Choices) == 0 {
-		return nil, newChatProviderError(
+		return nil, newChatProtocolError(
 			ErrorKindInvalidResponse,
 			http.StatusOK,
 			true,
@@ -184,7 +183,7 @@ func (p *QNAChatCompletionsProvider) call(
 		return nil, err
 	}
 	if len(images) == 0 {
-		return nil, newChatProviderError(
+		return nil, newChatProtocolError(
 			ErrorKindInvalidResponse,
 			http.StatusOK,
 			true,
@@ -207,7 +206,7 @@ func (p *QNAChatCompletionsProvider) call(
 	}, nil
 }
 
-func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices []chatChoice) ([]string, error) {
+func (p *QNAChatCompletionsAdapter) extractImages(ctx context.Context, choices []chatChoice) ([]string, error) {
 	images := make([]string, 0, len(choices))
 	for _, choice := range choices {
 		// QNA documents generated images in choice.Message.Images.
@@ -278,12 +277,12 @@ func (p *QNAChatCompletionsProvider) extractImages(ctx context.Context, choices 
 	return images, nil
 }
 
-func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawURL string) (string, error) {
+func (p *QNAChatCompletionsAdapter) resolveImageToB64(ctx context.Context, rawURL string) (string, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if strings.HasPrefix(rawURL, "data:image/") {
 		b64, err := parseImageDataURL(rawURL)
 		if err != nil {
-			return "", newChatProviderError(
+			return "", newChatProtocolError(
 				ErrorKindInvalidResponse,
 				0,
 				false,
@@ -299,22 +298,22 @@ func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawU
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return "", newChatProviderError(ErrorKindTransport, 0, true, "create image download request: "+err.Error(), err)
+		return "", newChatProtocolError(ErrorKindTransport, 0, true, "create image download request: "+err.Error(), err)
 	}
 	if err := validateGeneratedImageURL(req.URL); err != nil {
-		return "", newChatProviderError(ErrorKindInvalidResponse, 0, false, "reject generated image URL", err)
+		return "", newChatProtocolError(ErrorKindInvalidResponse, 0, false, "reject generated image URL", err)
 	}
 
 	resp, err := p.downloadHTTPClient.Do(req)
 	if err != nil {
-		return "", newChatProviderError(ErrorKindTransport, 0, true, "download generated image: "+err.Error(), err)
+		return "", newChatProtocolError(ErrorKindTransport, 0, true, "download generated image: "+err.Error(), err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return "", newChatProviderError(
+		return "", newChatProtocolError(
 			ErrorKindTransport,
 			resp.StatusCode,
 			true,
@@ -323,7 +322,7 @@ func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawU
 		)
 	}
 	if resp.ContentLength > maxGeneratedImageBytes {
-		return "", newChatProviderError(
+		return "", newChatProtocolError(
 			ErrorKindInvalidResponse,
 			resp.StatusCode,
 			false,
@@ -333,7 +332,7 @@ func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawU
 	}
 	if contentType := resp.Header.Get("Content-Type"); contentType != "" &&
 		!strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		return "", newChatProviderError(
+		return "", newChatProtocolError(
 			ErrorKindInvalidResponse,
 			resp.StatusCode,
 			false,
@@ -344,10 +343,10 @@ func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawU
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxGeneratedImageBytes+1))
 	if err != nil {
-		return "", newChatProviderError(ErrorKindTransport, 0, true, "read downloaded image data: "+err.Error(), err)
+		return "", newChatProtocolError(ErrorKindTransport, 0, true, "read downloaded image data: "+err.Error(), err)
 	}
 	if len(data) > maxGeneratedImageBytes {
-		return "", newChatProviderError(
+		return "", newChatProtocolError(
 			ErrorKindInvalidResponse,
 			resp.StatusCode,
 			false,
@@ -356,7 +355,7 @@ func (p *QNAChatCompletionsProvider) resolveImageToB64(ctx context.Context, rawU
 		)
 	}
 	if len(data) == 0 {
-		return "", newChatProviderError(ErrorKindInvalidResponse, 0, true, "downloaded image is empty", nil)
+		return "", newChatProtocolError(ErrorKindInvalidResponse, 0, true, "downloaded image is empty", nil)
 	}
 
 	return base64.StdEncoding.EncodeToString(data), nil
@@ -405,7 +404,7 @@ func isLikelyBase64(s string) bool {
 	return err == nil
 }
 
-func newChatProviderError(
+func newChatProtocolError(
 	kind ErrorKind,
 	statusCode int,
 	transient bool,
@@ -413,7 +412,7 @@ func newChatProviderError(
 	cause error,
 ) *ProviderError {
 	return &ProviderError{
-		Provider:   chatCompletionsProviderName,
+		Provider:   qnaProviderName,
 		Kind:       kind,
 		StatusCode: statusCode,
 		Transient:  transient,
@@ -422,10 +421,12 @@ func newChatProviderError(
 	}
 }
 
+var _ protocolAdapter = (*QNAChatCompletionsAdapter)(nil)
+
 func classifyChatRequestError(ctx context.Context, err error) *ProviderError {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		if errors.Is(ctxErr, context.Canceled) {
-			return newChatProviderError(
+			return newChatProtocolError(
 				ErrorKindCanceled,
 				0,
 				false,
@@ -433,7 +434,7 @@ func classifyChatRequestError(ctx context.Context, err error) *ProviderError {
 				ctxErr,
 			)
 		}
-		return newChatProviderError(
+		return newChatProtocolError(
 			ErrorKindTimeout,
 			0,
 			true,
@@ -443,7 +444,7 @@ func classifyChatRequestError(ctx context.Context, err error) *ProviderError {
 	}
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) && urlErr.Timeout() {
-		return newChatProviderError(
+		return newChatProtocolError(
 			ErrorKindTimeout,
 			0,
 			true,
@@ -451,7 +452,7 @@ func classifyChatRequestError(ctx context.Context, err error) *ProviderError {
 			err,
 		)
 	}
-	return newChatProviderError(
+	return newChatProtocolError(
 		ErrorKindTransport,
 		0,
 		true,
@@ -487,7 +488,7 @@ func chatStatusError(response *http.Response) error {
 		message = response.Status
 	}
 	kind, transient := classifyChatStatus(response.StatusCode)
-	return newChatProviderError(kind, response.StatusCode, transient, message, readErr)
+	return newChatProtocolError(kind, response.StatusCode, transient, message, readErr)
 }
 
 func chatErrorMessage(body []byte) string {

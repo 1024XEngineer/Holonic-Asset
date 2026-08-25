@@ -18,14 +18,13 @@ const (
 	// DefaultQNAImagesModel is used when a request does not specify a model.
 	DefaultQNAImagesModel = "openai/gpt-image-2"
 
-	qnaProviderName       = "qna"
 	qnaGeneratePath       = "/v1/images/generations"
 	qnaEditPath           = "/v1/images/edits"
 	defaultQNAHTTPTimeout = 5 * time.Minute
 )
 
-// QNAImagesConfig configures QNA's OpenAI-compatible Images adapter.
-type QNAImagesConfig struct {
+// QNAImagesAdapterConfig configures QNA's OpenAI-compatible Images adapter.
+type QNAImagesAdapterConfig struct {
 	BaseURL      string
 	APIKey       string
 	DefaultModel string
@@ -34,8 +33,8 @@ type QNAImagesConfig struct {
 	Logger       logger.Logger
 }
 
-// QNAImagesProvider calls QNA's /v1/images generation and edit endpoints.
-type QNAImagesProvider struct {
+// QNAImagesAdapter calls QNA's /v1/images generation and edit endpoints.
+type QNAImagesAdapter struct {
 	baseURL      string
 	apiKey       string
 	defaultModel string
@@ -44,8 +43,8 @@ type QNAImagesProvider struct {
 	logger       logger.Logger
 }
 
-// NewQNAImagesProvider creates the QNA Images adapter with production defaults.
-func NewQNAImagesProvider(config QNAImagesConfig) *QNAImagesProvider {
+// NewQNAImagesAdapter creates the QNA Images adapter with production defaults.
+func NewQNAImagesAdapter(config QNAImagesAdapterConfig) *QNAImagesAdapter {
 	baseURL := strings.TrimRight(config.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = DefaultQNABaseURL
@@ -65,7 +64,7 @@ func NewQNAImagesProvider(config QNAImagesConfig) *QNAImagesProvider {
 		sdkClient = qnasdk.NewClient(baseURL, config.APIKey, httpClient)
 	}
 
-	return &QNAImagesProvider{
+	return &QNAImagesAdapter{
 		baseURL:      baseURL,
 		apiKey:       config.APIKey,
 		defaultModel: defaultModel,
@@ -76,7 +75,7 @@ func NewQNAImagesProvider(config QNAImagesConfig) *QNAImagesProvider {
 }
 
 // Generate calls QNA's text-to-image endpoint.
-func (p *QNAImagesProvider) Generate(
+func (p *QNAImagesAdapter) Generate(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -84,7 +83,7 @@ func (p *QNAImagesProvider) Generate(
 }
 
 // Edit calls QNA's image-to-image endpoint.
-func (p *QNAImagesProvider) Edit(
+func (p *QNAImagesAdapter) Edit(
 	ctx context.Context,
 	request *ProviderRequest,
 ) (*ProviderResult, error) {
@@ -117,7 +116,7 @@ func shouldRetryQNAEditWithoutMask(request *ProviderRequest, err error) bool {
 		strings.Contains(message, "unable to download content from the provided url")
 }
 
-func (p *QNAImagesProvider) call(
+func (p *QNAImagesAdapter) call(
 	ctx context.Context,
 	path string,
 	request *ProviderRequest,
@@ -274,4 +273,4 @@ type qnaImageResponse struct {
 	} `json:"usage"`
 }
 
-var _ ImageProvider = (*QNAImagesProvider)(nil)
+var _ protocolAdapter = (*QNAImagesAdapter)(nil)
