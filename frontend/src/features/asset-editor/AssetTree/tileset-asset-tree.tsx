@@ -64,11 +64,15 @@ function TilesetItemNode({
   const hasSelectedTile = item.tiles.some((_, tileIndex) =>
     isTileSelected(item.id, tileIndex),
   );
+  let itemStateClassName =
+    "text-muted-foreground hover:bg-muted/40 hover:text-foreground";
+  if (selected) itemStateClassName = "bg-muted text-foreground";
+  else if (hasSelectedTile) itemStateClassName = "bg-muted/50 text-foreground";
 
   return (
     <div>
       <div
-        className={`flex items-center rounded-lg transition-colors ${selected ? "bg-muted text-foreground" : hasSelectedTile ? "bg-muted/50 text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"}`}
+        className={`flex items-center rounded-lg transition-colors ${itemStateClassName}`}
       >
         <button
           type="button"

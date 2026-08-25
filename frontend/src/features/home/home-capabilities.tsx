@@ -104,51 +104,14 @@ export function HomeCapabilities() {
 
             <div className="grid flex-1 items-center gap-14 py-12 lg:grid-cols-[minmax(18rem,.8fr)_minmax(28rem,1fr)] lg:gap-24 lg:py-20">
               <div className="flex min-h-56 items-center justify-center lg:min-h-80">
-                {title === "Scenery" ? (
-                  <div className="w-[92%]">
-                    <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
-                      <img
-                        src="/assets/sky.png"
-                        alt={t("capabilities.scenery.alt")}
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        className="absolute inset-0 size-full object-cover"
-                      />
-                      <img
-                        src="/assets/wind-clean.png"
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        className="absolute inset-0 z-10 size-full origin-bottom scale-110 -translate-y-[38%] object-cover"
-                      />
-                      <img
-                        src="/assets/nearby-trees-clean.png"
-                        alt={t("capabilities.scenery.treesAlt")}
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        className="absolute -left-[6%] -bottom-[10%] h-auto w-[112%] max-w-none mix-blend-multiply"
-                      />
-                    </div>
-                  </div>
-                ) : preview ? (
-                  <img
-                    src={preview.src}
-                    alt={t(`capabilities.${key}.alt`)}
-                    loading="lazy"
-                    decoding="async"
-                    fetchPriority="low"
-                    className={`aspect-square object-contain [image-rendering:pixelated] ${title === "Objects" ? "w-[62%] sm:w-[68%]" : "w-[76%] sm:w-[82%]"}`}
-                  />
-                ) : (
-                  <Icon
-                    aria-hidden="true"
-                    className="size-28 text-cyan-700 sm:size-36"
-                    strokeWidth={1.25}
-                  />
-                )}
+                <CapabilityPreview
+                  title={title}
+                  preview={preview}
+                  Icon={Icon}
+                  imageAlt={t(`capabilities.${key}.alt`)}
+                  sceneryAlt={t("capabilities.scenery.alt")}
+                  sceneryTreesAlt={t("capabilities.scenery.treesAlt")}
+                />
               </div>
 
               <div className="max-w-2xl">
@@ -174,5 +137,81 @@ export function HomeCapabilities() {
         ),
       )}
     </section>
+  );
+}
+
+function CapabilityPreview({
+  title,
+  preview,
+  Icon,
+  imageAlt,
+  sceneryAlt,
+  sceneryTreesAlt,
+}: {
+  title: string;
+  preview: { readonly src: string; readonly alt: string } | undefined;
+  Icon: (props: {
+    className: string;
+    strokeWidth: number;
+    "aria-hidden": true;
+  }) => React.ReactNode;
+  imageAlt: string;
+  sceneryAlt: string;
+  sceneryTreesAlt: string;
+}) {
+  if (title === "Scenery") {
+    return (
+      <div className="w-[92%]">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
+          <img
+            src="/assets/sky.png"
+            alt={sceneryAlt}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute inset-0 size-full object-cover"
+          />
+          <img
+            src="/assets/wind-clean.png"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute inset-0 z-10 size-full origin-bottom scale-110 -translate-y-[38%] object-cover"
+          />
+          <img
+            src="/assets/nearby-trees-clean.png"
+            alt={sceneryTreesAlt}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute -left-[6%] -bottom-[10%] h-auto w-[112%] max-w-none mix-blend-multiply"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (preview) {
+    const widthClass =
+      title === "Objects" ? "w-[62%] sm:w-[68%]" : "w-[76%] sm:w-[82%]";
+    return (
+      <img
+        src={preview.src}
+        alt={imageAlt}
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
+        className={`aspect-square object-contain [image-rendering:pixelated] ${widthClass}`}
+      />
+    );
+  }
+
+  return (
+    <Icon
+      aria-hidden="true"
+      className="size-28 text-cyan-700 sm:size-36"
+      strokeWidth={1.25}
+    />
   );
 }

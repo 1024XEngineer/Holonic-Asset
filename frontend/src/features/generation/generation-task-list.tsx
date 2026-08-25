@@ -105,6 +105,20 @@ function TaskIcon({
   variant: "queue" | "dropdown";
 }) {
   const isDropdown = variant === "dropdown";
+  let icon: React.ReactNode;
+  if (task.kind) {
+    icon = (
+      <AssetKindIcon
+        kind={task.kind}
+        className={isDropdown ? "size-3.5" : "size-4"}
+      />
+    );
+  } else if (task.status === "failed") {
+    icon = <AlertCircle className="size-3.5 text-destructive" />;
+  } else {
+    icon = <Sparkles className="size-3.5" />;
+  }
+
   return (
     <span
       className={
@@ -113,16 +127,7 @@ function TaskIcon({
           : "grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"
       }
     >
-      {task.kind ? (
-        <AssetKindIcon
-          kind={task.kind}
-          className={isDropdown ? "size-3.5" : "size-4"}
-        />
-      ) : task.status === "failed" ? (
-        <AlertCircle className="size-3.5 text-destructive" />
-      ) : (
-        <Sparkles className="size-3.5" />
-      )}
+      {icon}
     </span>
   );
 }
@@ -136,6 +141,15 @@ function TaskStatusBadge({
 }) {
   const { t } = useTranslation("generation");
   const isFailed = task.status === "failed";
+  let statusIcon: React.ReactNode = null;
+  if (variant === "queue") {
+    statusIcon = isFailed ? (
+      <AlertCircle />
+    ) : (
+      <LoaderCircle className="animate-spin" />
+    );
+  }
+
   return (
     <Badge
       variant={isFailed ? "destructive" : "outline"}
@@ -145,13 +159,7 @@ function TaskStatusBadge({
           : undefined
       }
     >
-      {variant === "queue" ? (
-        isFailed ? (
-          <AlertCircle />
-        ) : (
-          <LoaderCircle className="animate-spin" />
-        )
-      ) : null}
+      {statusIcon}
       {t(`status.${task.status}`)}
     </Badge>
   );
