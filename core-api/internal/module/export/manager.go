@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrInvalidRequest   = errors.New("export: invalid request")
+	ErrNotFound         = errors.New("export: asset or version not found")
 	ErrUnsupportedAsset = errors.New("export: only character, object, tileSet, and scenery assets are supported")
 )
 
@@ -126,7 +127,7 @@ func (m *manager) snapshot(ctx context.Context, assetID, version uint) (Snapshot
 		return Snapshot{}, err
 	}
 	if asset.ID == 0 {
-		return Snapshot{}, fmt.Errorf("export: asset %d not found", assetID)
+		return Snapshot{}, fmt.Errorf("%w: asset %d", ErrNotFound, assetID)
 	}
 	if !isSupportedAssetType(asset.Type) {
 		return Snapshot{}, ErrUnsupportedAsset
@@ -143,7 +144,7 @@ func (m *manager) snapshot(ctx context.Context, assetID, version uint) (Snapshot
 			return Snapshot{AssetID: record.AssetID, ProjectID: asset.ProjectID, RecordID: record.ID, Version: record.Version, Name: record.Name, Description: record.Description, Type: asset.Type, Perspective: record.Perspective, Dimensions: append([]byte(nil), record.Dimensions...), Content: append([]byte(nil), record.Content...)}, nil
 		}
 	}
-	return Snapshot{}, fmt.Errorf("export: asset %d version %d not found", assetID, version)
+	return Snapshot{}, fmt.Errorf("%w: asset %d version %d", ErrNotFound, assetID, version)
 }
 
 func (m *manager) objectKey(snapshot Snapshot) (string, error) {

@@ -37,8 +37,12 @@ func exportHandlerError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, exportmodule.ErrInvalidRequest) || errors.Is(err, exportmodule.ErrUnsupportedAsset) {
+	switch {
+	case errors.Is(err, exportmodule.ErrInvalidRequest), errors.Is(err, exportmodule.ErrUnsupportedAsset):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
+	case errors.Is(err, exportmodule.ErrNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, err.Error()).SetInternal(err)
+	default:
+		return err
 	}
-	return err
 }

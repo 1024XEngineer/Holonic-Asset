@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/png"
 	"testing"
@@ -105,5 +106,33 @@ func TestManagerCreateSnapshotsRequestedVersionAndHandle(t *testing.T) {
 	}
 	if response.Status != "completed" || response.DownloadURL == "" || len(artifacts.data) == 0 {
 		t.Fatalf("unexpected export response: %+v", response)
+	}
+}
+
+func TestManagerCreateReturnsNotFoundForMissingAsset(t *testing.T) {
+	manager := NewManager(
+		assetReaderStub{},
+		managerResolverStub{},
+		&artifactStoreStub{},
+		&taskManagerStub{},
+	)
+
+	_, err := manager.Create(context.Background(), CreateRequest{AssetID: 7})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestManagerCreateReturnsNotFoundForMissingVersion(t *testing.T) {
+	manager := NewManager(
+		assetReaderStub{detail: assetdomain.Asset{ID: 7, Version: 3, Type: assetdomain.AssetTypeObject}},
+		managerResolverStub{},
+		&artifactStoreStub{},
+		&taskManagerStub{},
+	)
+
+	_, err := manager.Create(context.Background(), CreateRequest{AssetID: 7, Version: 2})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }

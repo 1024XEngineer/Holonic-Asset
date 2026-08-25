@@ -26,11 +26,11 @@ type getExportOutput struct {
 }
 
 func RegisterExportRoutes(api huma.API, r ExportRouter) {
-	huma.Register(api, huma.Operation{OperationID: "createAssetExport", Method: http.MethodPost, Path: "/asset/export", Summary: "Export an asset", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest}}, func(ctx context.Context, input *createExportInput) (*createExportOutput, error) {
+	huma.Register(api, huma.Operation{OperationID: "createAssetExport", Method: http.MethodPost, Path: "/asset/export", Summary: "Export an asset", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest, http.StatusNotFound}}, func(ctx context.Context, input *createExportInput) (*createExportOutput, error) {
 		response, err := r.Create(ctx, input.Body)
 		return &createExportOutput{Body: response}, openAPIError(err)
 	})
-	huma.Register(api, huma.Operation{OperationID: "getAssetExport", Method: http.MethodGet, Path: "/export/{export_id}", Summary: "Get an asset export", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest}}, func(ctx context.Context, input *getExportInput) (*getExportOutput, error) {
+	huma.Register(api, huma.Operation{OperationID: "getAssetExport", Method: http.MethodGet, Path: "/export/{export_id}", Summary: "Get an asset export", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest, http.StatusNotFound}}, func(ctx context.Context, input *getExportInput) (*getExportOutput, error) {
 		response, err := r.Get(ctx, input.ExportID)
 		return &getExportOutput{Body: response}, openAPIError(err)
 	})
