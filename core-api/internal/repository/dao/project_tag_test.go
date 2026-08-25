@@ -10,6 +10,18 @@ import (
 	"gorm.io/gorm"
 )
 
+type projectTagSQLStateError struct {
+	state string
+}
+
+func (e projectTagSQLStateError) Error() string {
+	return "database write failed"
+}
+
+func (e projectTagSQLStateError) SQLState() string {
+	return e.state
+}
+
 func TestProjectTagDaoCreateScopesTagToExistingProject(t *testing.T) {
 	db, mock := newMockTableDatabase(t)
 	expectProjectExists(mock, 42)
@@ -113,6 +125,83 @@ func TestProjectTagDaoMapsMissingRowsAndDuplicateWrites(t *testing.T) {
 
 	if got := normalizeProjectTagWriteError(gorm.ErrDuplicatedKey); !errors.Is(got, ErrProjectTagConflict) {
 		t.Fatalf("expected duplicate tag conflict, got %v", got)
+	}
+}
+
+func TestProjectTagDaoRejectsNilWrites(t *testing.T) {
+	dao := NewGormProjectTagDao(nil)
+	if err := dao.Create(context.Background(), nil); !errors.Is(err, ErrProjectTagNil) {
+		t.Fatalf("expected nil tag error, got %v", err)
+	}
+	if _, err := dao.Update(context.Background(), 42, 7, nil); !errors.Is(err, ErrProjectTagUpdateNil) {
+		t.Fatalf("expected nil update error, got %v", err)
+	}
+}
+
+func TestProjectTagDaoMapsMissingMutations(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	name := "hero"
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "project_tags" SET "name"=$1 WHERE project_id = $2 AND id = $3`)).
+		WithArgs(name, uint(42), uint(999)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+	if _, err := NewGormProjectTagDao(db).Update(
+		context.Background(),
+		42,
+		999,
+		&ProjectTagUpdate{Name: &name},
+	); !errors.Is(err, ErrProjectTagNotFound) {
+		t.Fatalf("expected missing update error, got %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "project_tags" WHERE project_id = $1 AND id = $2`)).
+		WithArgs(uint(42), uint(999)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+	if err := NewGormProjectTagDao(db).Delete(context.Background(), 42, 999); !errors.Is(err, ErrProjectTagNotFound) {
+		t.Fatalf("expected missing delete error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestProjectTagDaoReturnsExistingTagForEmptyUpdate(t *testing.T) {
+	db, mock := newMockTableDatabase(t)
+	mock.ExpectQuery(`SELECT id, project_id, name, description, color FROM "project_tags" WHERE project_id = \$1 AND id = \$2`).
+		WithArgs(uint(42), uint(7), 1).
+		WillReturnRows(projectTagRows().AddRow(7, 42, "player", "hero", "#123456"))
+
+	tag, err := NewGormProjectTagDao(db).Update(context.Background(), 42, 7, &ProjectTagUpdate{})
+	if err != nil || tag.ID != 7 {
+		t.Fatalf("empty update lookup: tag=%+v err=%v", tag, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestProjectTagDaoBuildsUpdateFieldsAndNormalizesWriteErrors(t *testing.T) {
+	name := "hero"
+	description := "main character"
+	color := "#654321"
+	fields := projectTagUpdateFields(&ProjectTagUpdate{Name: &name, Description: &description, Color: &color})
+	if fields["name"] != name || fields["description"] != description || fields["color"] != color {
+		t.Fatalf("unexpected update fields: %+v", fields)
+	}
+	if fields := projectTagUpdateFields(&ProjectTagUpdate{}); len(fields) != 0 {
+		t.Fatalf("expected no update fields, got %+v", fields)
+	}
+
+	uniqueViolation := projectTagSQLStateError{state: "23505"}
+	if got := normalizeProjectTagWriteError(uniqueViolation); !errors.Is(got, ErrProjectTagConflict) {
+		t.Fatalf("expected SQL state conflict, got %v", got)
+	}
+	unknown := projectTagSQLStateError{state: "22000"}
+	if got := normalizeProjectTagWriteError(unknown); !errors.Is(got, unknown) {
+		t.Fatalf("expected unknown write error passthrough, got %v", got)
 	}
 }
 
