@@ -6,9 +6,40 @@ import (
 	"reflect"
 	"testing"
 
+	"gorm.io/gorm"
+
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
+
+type projectTagAssetDaoDBStub struct {
+	dao.AssetDao
+	db *gorm.DB
+}
+
+func (s *projectTagAssetDaoDBStub) DBHandle() *gorm.DB {
+	return s.db
+}
+
+func (s *projectTagAssetDaoDBStub) WithDB(db *gorm.DB) dao.AssetDao {
+	return &projectTagAssetDaoDBStub{db: db}
+}
+
+type projectTagContentDaoDBStub struct {
+	dao.AssetContentDao
+}
+
+func (s *projectTagContentDaoDBStub) WithDB(*gorm.DB) dao.AssetContentDao {
+	return &projectTagContentDaoDBStub{}
+}
+
+type projectTagRecordDaoDBStub struct {
+	dao.AssetRecordDao
+}
+
+func (s *projectTagRecordDaoDBStub) WithDB(*gorm.DB) dao.AssetRecordDao {
+	return &projectTagRecordDaoDBStub{}
+}
 
 type projectTagDaoStub struct {
 	dao.ProjectTagDao
@@ -238,5 +269,49 @@ func TestProjectTagRepositoryHandlesNilConversions(t *testing.T) {
 	unknown := errors.New("unknown")
 	if got := normalizeProjectTagError(unknown); !errors.Is(got, unknown) {
 		t.Fatalf("expected unknown error passthrough, got %v", got)
+	}
+}
+
+func TestAssetRepositoryWiresProjectTagStorage(t *testing.T) {
+	db := &gorm.DB{}
+	assetDao := &projectTagAssetDaoDBStub{db: db}
+	contentDao := &projectTagContentDaoDBStub{}
+	recordDao := &projectTagRecordDaoDBStub{}
+
+	fromProvider := NewAssetRepository(assetDao, contentDao, recordDao).(*AssetRepositoryImpl)
+	if fromProvider.ProjectTagDao == nil {
+		t.Fatal("expected project tag DAO from asset DB provider")
+	}
+	if fromProvider.transactionDB() != db {
+		t.Fatal("expected transaction DB from asset DAO provider")
+	}
+
+	withoutProvider := NewAssetRepository(nil, contentDao, recordDao).(*AssetRepositoryImpl)
+	if withoutProvider.ProjectTagDao != nil {
+		t.Fatal("did not expect project tag DAO without a database provider")
+	}
+
+	withDB := NewAssetRepositoryWithDB(db, assetDao, contentDao, recordDao).(*AssetRepositoryImpl)
+	if withDB.DB != db || withDB.ProjectTagDao == nil {
+		t.Fatalf("expected explicit DB and project tag DAO, got %+v", withDB)
+	}
+
+	transactionRepository, err := fromProvider.withDB(db)
+	if err != nil {
+		t.Fatalf("create transaction repository: %v", err)
+	}
+	if transactionRepository.DB != db || transactionRepository.ProjectTagDao == nil {
+		t.Fatalf("expected transaction-scoped project tag DAO, got %+v", transactionRepository)
+	}
+}
+
+func TestProjectTagRepositoryBuildsDAOFromRepositoryDB(t *testing.T) {
+	db := &gorm.DB{}
+	projectTagDao, err := (&AssetRepositoryImpl{DB: db}).projectTagDao()
+	if err != nil {
+		t.Fatalf("resolve project tag DAO: %v", err)
+	}
+	if projectTagDao == nil {
+		t.Fatal("expected project tag DAO")
 	}
 }
