@@ -37,6 +37,9 @@ func Register(
 	}
 	if as != nil {
 		RegisterAssetRoutes(openAPI, as)
+		if tags, ok := as.(ProjectTagRouter); ok {
+			RegisterProjectTagRoutes(openAPI, tags)
+		}
 	}
 	if pr != nil {
 		RegisterProjectRoutes(openAPI, pr)
