@@ -162,7 +162,7 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		if project == nil {
 			return nil, fmt.Errorf("generator: load project %d context: empty result", projectID)
 		}
-		value.Perspective = string(project.Perspective)
+		value.Perspective = string(assetdomain.PerspectiveSideOn)
 		value.ProjectContext = SceneryProjectContext{
 			Name: strings.TrimSpace(project.Name), GameType: strings.TrimSpace(string(project.GameType)),
 			TargetPlatform: strings.TrimSpace(string(project.TargetPlatform)), Description: strings.TrimSpace(project.Description),
