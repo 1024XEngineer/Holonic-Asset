@@ -108,7 +108,7 @@ func TestLoadAppConfigUsesJWTSecretEnvironmentOverride(t *testing.T) {
 
 func TestInitRouterRegistersApplicationRoutes(t *testing.T) {
 	projectStore := repository.NewProjectRepository(&projectDaoStub{})
-	workspaceModule := workspace.New(projectStore, &assetStoreStub{}, nil)
+	workspaceModule := workspace.New(projectStore, &assetStoreStub{}, nil, nil)
 	handlers := InitHandlers(
 		workspaceModule,
 		generator.NewEngine(nil, nil),

@@ -72,7 +72,7 @@ func (*generationRouterStub) ResolveApplication(
 
 func TestGenerationRoutesAreRegistered(t *testing.T) {
 	stub := &generationRouterStub{}
-	e := router.Register(nil, nil, stub, nil)
+	e := router.Register(nil, nil, stub, nil, nil)
 
 	tests := []struct {
 		method         string
@@ -145,7 +145,7 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 
 func TestGenerationListRejectsZeroAssetID(t *testing.T) {
 	stub := &generationRouterStub{}
-	e := router.Register(nil, nil, stub, nil)
+	e := router.Register(nil, nil, stub, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/42/generation-runs?assetId=0", nil)
 	recorder := httptest.NewRecorder()
 
@@ -161,7 +161,7 @@ func TestGenerationListRejectsZeroAssetID(t *testing.T) {
 
 func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
 	stub := &generationRouterStub{}
-	e := router.Register(nil, nil, stub, nil)
+	e := router.Register(nil, nil, stub, nil, nil)
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/projects/42/generation-runs",
@@ -182,7 +182,7 @@ func TestGenerationCreateRejectsInvalidKind(t *testing.T) {
 
 func TestGenerationCreateAcceptsEditFramesParameters(t *testing.T) {
 	stub := &generationRouterStub{}
-	e := router.Register(nil, nil, stub, nil)
+	e := router.Register(nil, nil, stub, nil, nil)
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/projects/42/generation-runs",
@@ -202,7 +202,7 @@ func TestGenerationCreateAcceptsEditFramesParameters(t *testing.T) {
 }
 
 func TestAIRoutesAreNotExposed(t *testing.T) {
-	e := router.Register(nil, nil, &generationRouterStub{}, nil)
+	e := router.Register(nil, nil, &generationRouterStub{}, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/tile-set/item/edit", strings.NewReader(`{}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -216,7 +216,7 @@ func TestAIRoutesAreNotExposed(t *testing.T) {
 }
 
 func TestCandidateConfirmationRouteIsNotExposed(t *testing.T) {
-	e := router.Register(nil, nil, &generationRouterStub{}, nil)
+	e := router.Register(nil, nil, &generationRouterStub{}, nil, nil)
 
 	req := httptest.NewRequest(
 		http.MethodPost,

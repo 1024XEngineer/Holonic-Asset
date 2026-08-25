@@ -14,7 +14,6 @@ import (
 )
 
 type projectTagRouterStub struct {
-	router.AssetRouter
 	created dto.CreateProjectTagRequest
 	updated dto.UpdateProjectTagRequest
 	deleted dto.DeleteProjectTagRequest
@@ -68,7 +67,7 @@ func (s *projectTagRouterStub) DeleteProjectTag(
 
 func TestProjectTagRoutesExposeScopedCRUD(t *testing.T) {
 	stub := &projectTagRouterStub{}
-	server := router.Register(stub, nil, nil, nil)
+	server := router.Register(nil, nil, nil, nil, stub)
 
 	requests := []struct {
 		method string

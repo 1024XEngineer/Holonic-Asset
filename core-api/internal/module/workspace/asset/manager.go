@@ -4,11 +4,6 @@ import "context"
 
 // Manager exposes asset lifecycle, content, and version operations.
 type Manager interface {
-	CreateProjectTag(ctx context.Context, tag ProjectTag) (ProjectTag, error)
-	ListProjectTags(ctx context.Context, projectID uint) ([]ProjectTag, error)
-	GetProjectTag(ctx context.Context, projectID, tagID uint) (ProjectTag, error)
-	UpdateProjectTag(ctx context.Context, projectID, tagID uint, update *ProjectTagUpdate) (ProjectTag, error)
-	DeleteProjectTag(ctx context.Context, projectID, tagID uint) error
 	GetAssets(ctx context.Context, projectID uint, filter AssetListFilter) ([]Asset, error)
 	GetDetail(ctx context.Context, id uint) (Asset, error)
 	Delete(ctx context.Context, id uint) error
@@ -30,66 +25,6 @@ type manager struct {
 
 func NewManager(store Store) Manager {
 	return &manager{store: store}
-}
-
-func (m *manager) CreateProjectTag(ctx context.Context, tag ProjectTag) (ProjectTag, error) {
-	if err := tag.validateCreate(); err != nil {
-		return ProjectTag{}, err
-	}
-	if err := m.store.CreateProjectTag(ctx, &tag); err != nil {
-		return ProjectTag{}, err
-	}
-	return tag, nil
-}
-
-func (m *manager) ListProjectTags(ctx context.Context, projectID uint) ([]ProjectTag, error) {
-	if projectID == 0 {
-		return nil, invalidProjectTag("projectID is required")
-	}
-	return m.store.ListProjectTags(ctx, projectID)
-}
-
-func (m *manager) GetProjectTag(ctx context.Context, projectID, tagID uint) (ProjectTag, error) {
-	if err := validateProjectTagScope(projectID, tagID); err != nil {
-		return ProjectTag{}, err
-	}
-	tag, err := m.store.GetProjectTag(ctx, projectID, tagID)
-	if err != nil {
-		return ProjectTag{}, err
-	}
-	if tag == nil {
-		return ProjectTag{}, ErrProjectTagNotFound
-	}
-	return *tag, nil
-}
-
-func (m *manager) UpdateProjectTag(
-	ctx context.Context,
-	projectID uint,
-	tagID uint,
-	update *ProjectTagUpdate,
-) (ProjectTag, error) {
-	if err := validateProjectTagScope(projectID, tagID); err != nil {
-		return ProjectTag{}, err
-	}
-	if err := update.validate(); err != nil {
-		return ProjectTag{}, err
-	}
-	tag, err := m.store.UpdateProjectTag(ctx, projectID, tagID, update)
-	if err != nil {
-		return ProjectTag{}, err
-	}
-	if tag == nil {
-		return ProjectTag{}, ErrProjectTagNotFound
-	}
-	return *tag, nil
-}
-
-func (m *manager) DeleteProjectTag(ctx context.Context, projectID, tagID uint) error {
-	if err := validateProjectTagScope(projectID, tagID); err != nil {
-		return err
-	}
-	return m.store.DeleteProjectTag(ctx, projectID, tagID)
 }
 
 func (m *manager) GetAssets(ctx context.Context, projectID uint, filter AssetListFilter) ([]Asset, error) {

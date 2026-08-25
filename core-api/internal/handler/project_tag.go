@@ -8,14 +8,28 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	tagdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 )
 
-func (h *Handler) CreateProjectTag(
+type ProjectTagHandler struct {
+	manager tagdomain.Manager
+}
+
+func NewProjectTagHandler(manager tagdomain.Manager) *ProjectTagHandler {
+	return &ProjectTagHandler{manager: manager}
+}
+
+func (h *ProjectTagHandler) CreateProjectTag(
 	ctx context.Context,
 	request dto.CreateProjectTagRequest,
 ) (dto.SuccessResponse[dto.CreateProjectTagResponse], error) {
-	tag, err := h.AssetManager.CreateProjectTag(ctx, domain.ProjectTag{
+	if h == nil || h.manager == nil {
+		return dto.SuccessResponse[dto.CreateProjectTagResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"tag manager is not initialized",
+		)
+	}
+	tag, err := h.manager.CreateProjectTag(ctx, tagdomain.Tag{
 		ProjectID:   request.ProjectID,
 		Name:        request.Name,
 		Description: request.Description,
@@ -27,11 +41,17 @@ func (h *Handler) CreateProjectTag(
 	return dto.NewTypedSuccessResponse(dto.CreateProjectTagResponse{Tag: projectTagResponse(tag)}), nil
 }
 
-func (h *Handler) ListProjectTags(
+func (h *ProjectTagHandler) ListProjectTags(
 	ctx context.Context,
 	request dto.ListProjectTagsRequest,
 ) (dto.SuccessResponse[dto.ListProjectTagsResponse], error) {
-	tags, err := h.AssetManager.ListProjectTags(ctx, request.ProjectID)
+	if h == nil || h.manager == nil {
+		return dto.SuccessResponse[dto.ListProjectTagsResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"tag manager is not initialized",
+		)
+	}
+	tags, err := h.manager.ListProjectTags(ctx, request.ProjectID)
 	if err != nil {
 		return dto.SuccessResponse[dto.ListProjectTagsResponse]{}, projectTagHandlerError(err)
 	}
@@ -42,22 +62,34 @@ func (h *Handler) ListProjectTags(
 	return dto.NewTypedSuccessResponse(dto.ListProjectTagsResponse{Tags: result}), nil
 }
 
-func (h *Handler) GetProjectTag(
+func (h *ProjectTagHandler) GetProjectTag(
 	ctx context.Context,
 	request dto.ProjectTagDetailRequest,
 ) (dto.SuccessResponse[dto.ProjectTagDetailResponse], error) {
-	tag, err := h.AssetManager.GetProjectTag(ctx, request.ProjectID, request.TagID)
+	if h == nil || h.manager == nil {
+		return dto.SuccessResponse[dto.ProjectTagDetailResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"tag manager is not initialized",
+		)
+	}
+	tag, err := h.manager.GetProjectTag(ctx, request.ProjectID, request.TagID)
 	if err != nil {
 		return dto.SuccessResponse[dto.ProjectTagDetailResponse]{}, projectTagHandlerError(err)
 	}
 	return dto.NewTypedSuccessResponse(dto.ProjectTagDetailResponse{Tag: projectTagResponse(tag)}), nil
 }
 
-func (h *Handler) UpdateProjectTag(
+func (h *ProjectTagHandler) UpdateProjectTag(
 	ctx context.Context,
 	request dto.UpdateProjectTagRequest,
 ) (dto.SuccessResponse[dto.UpdateProjectTagResponse], error) {
-	tag, err := h.AssetManager.UpdateProjectTag(ctx, request.ProjectID, request.TagID, &domain.ProjectTagUpdate{
+	if h == nil || h.manager == nil {
+		return dto.SuccessResponse[dto.UpdateProjectTagResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"tag manager is not initialized",
+		)
+	}
+	tag, err := h.manager.UpdateProjectTag(ctx, request.ProjectID, request.TagID, &tagdomain.TagUpdate{
 		Name:        request.Name,
 		Description: request.Description,
 		Color:       request.Color,
@@ -68,17 +100,23 @@ func (h *Handler) UpdateProjectTag(
 	return dto.NewTypedSuccessResponse(dto.UpdateProjectTagResponse{Tag: projectTagResponse(tag)}), nil
 }
 
-func (h *Handler) DeleteProjectTag(
+func (h *ProjectTagHandler) DeleteProjectTag(
 	ctx context.Context,
 	request dto.DeleteProjectTagRequest,
 ) (dto.SuccessResponse[dto.DeleteProjectTagResponse], error) {
-	if err := h.AssetManager.DeleteProjectTag(ctx, request.ProjectID, request.TagID); err != nil {
+	if h == nil || h.manager == nil {
+		return dto.SuccessResponse[dto.DeleteProjectTagResponse]{}, echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"tag manager is not initialized",
+		)
+	}
+	if err := h.manager.DeleteProjectTag(ctx, request.ProjectID, request.TagID); err != nil {
 		return dto.SuccessResponse[dto.DeleteProjectTagResponse]{}, projectTagHandlerError(err)
 	}
 	return dto.NewTypedSuccessResponse(dto.DeleteProjectTagResponse{Success: true}), nil
 }
 
-func projectTagResponse(tag domain.ProjectTag) dto.ProjectTagResponse {
+func projectTagResponse(tag tagdomain.Tag) dto.ProjectTagResponse {
 	return dto.ProjectTagResponse{
 		TagID:       tag.ID,
 		ProjectID:   tag.ProjectID,
@@ -92,12 +130,12 @@ func projectTagHandlerError(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, domain.ErrInvalidProjectTag):
+	case errors.Is(err, tagdomain.ErrInvalidTag):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
-	case errors.Is(err, domain.ErrProjectTagNotFound),
-		errors.Is(err, domain.ErrProjectTagProjectNotFound):
+	case errors.Is(err, tagdomain.ErrTagNotFound),
+		errors.Is(err, tagdomain.ErrTagProjectNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, err.Error()).SetInternal(err)
-	case errors.Is(err, domain.ErrProjectTagConflict):
+	case errors.Is(err, tagdomain.ErrTagConflict):
 		return echo.NewHTTPError(http.StatusConflict, err.Error()).SetInternal(err)
 	default:
 		return err

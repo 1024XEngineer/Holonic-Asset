@@ -15,11 +15,10 @@ import (
 )
 
 type AssetRepositoryImpl struct {
-	DB            *gorm.DB
-	AssetDao      dao.AssetDao
-	ContentDao    dao.AssetContentDao
-	RecordDao     dao.AssetRecordDao
-	ProjectTagDao dao.ProjectTagDao
+	DB         *gorm.DB
+	AssetDao   dao.AssetDao
+	ContentDao dao.AssetContentDao
+	RecordDao  dao.AssetRecordDao
 }
 
 type assetDaoWithDB interface {
@@ -43,15 +42,11 @@ func NewAssetRepository(
 	contentDao dao.AssetContentDao,
 	recordDao dao.AssetRecordDao,
 ) domain.Store {
-	repository := &AssetRepositoryImpl{
+	return &AssetRepositoryImpl{
 		AssetDao:   assetDao,
 		ContentDao: contentDao,
 		RecordDao:  recordDao,
 	}
-	if provider, ok := assetDao.(assetDBProvider); ok {
-		repository.ProjectTagDao = dao.NewGormProjectTagDao(provider.DBHandle())
-	}
-	return repository
 }
 
 func NewAssetRepositoryWithDB(
@@ -61,11 +56,10 @@ func NewAssetRepositoryWithDB(
 	recordDao dao.AssetRecordDao,
 ) domain.Store {
 	return &AssetRepositoryImpl{
-		DB:            db,
-		AssetDao:      assetDao,
-		ContentDao:    contentDao,
-		RecordDao:     recordDao,
-		ProjectTagDao: dao.NewGormProjectTagDao(db),
+		DB:         db,
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
 	}
 }
 
@@ -95,11 +89,10 @@ func (r *AssetRepositoryImpl) withDB(db *gorm.DB) (*AssetRepositoryImpl, error) 
 		return nil, fmt.Errorf("repository: asset record DAO does not support transactions")
 	}
 	return &AssetRepositoryImpl{
-		DB:            db,
-		AssetDao:      assetDao.WithDB(db),
-		ContentDao:    contentDao.WithDB(db),
-		RecordDao:     recordDao.WithDB(db),
-		ProjectTagDao: dao.NewGormProjectTagDao(db),
+		DB:         db,
+		AssetDao:   assetDao.WithDB(db),
+		ContentDao: contentDao.WithDB(db),
+		RecordDao:  recordDao.WithDB(db),
 	}, nil
 }
 

@@ -4,11 +4,6 @@ import "context"
 
 // Store persists assets, their content, and immutable version records.
 type Store interface {
-	CreateProjectTag(ctx context.Context, tag *ProjectTag) error
-	ListProjectTags(ctx context.Context, projectID uint) ([]ProjectTag, error)
-	GetProjectTag(ctx context.Context, projectID, tagID uint) (*ProjectTag, error)
-	UpdateProjectTag(ctx context.Context, projectID, tagID uint, update *ProjectTagUpdate) (*ProjectTag, error)
-	DeleteProjectTag(ctx context.Context, projectID, tagID uint) error
 	GetAssetsByProjectID(ctx context.Context, projectID uint, filter AssetListFilter) ([]Asset, error)
 	GetAssetDetail(ctx context.Context, id uint) (*Asset, error)
 	Delete(ctx context.Context, id uint) error

@@ -19,6 +19,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	projectdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
+	tagdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 	"github.com/1024XEngineer/Holonic-Asset/internal/router"
@@ -37,6 +38,11 @@ func InitAssetStore(db *gorm.DB) assetdomain.Store {
 		&dao.AssetContentDaoImpl{DB: db},
 		&dao.AssetRecordDaoImpl{DB: db},
 	)
+}
+
+// InitTagStore wires the project tag DAO to its repository adapter.
+func InitTagStore(db *gorm.DB) tagdomain.Store {
+	return repository.NewProjectTagRepository(dao.NewGormProjectTagDao(db))
 }
 
 // InitTaskStore creates the persistence adapter used by the task module.
@@ -87,13 +93,14 @@ func InitUploadStore(cfg config.QiniuConfig) (upload.Store, error) {
 	return store, nil
 }
 
-// InitWorkspace creates the project and asset business module.
+// InitWorkspace creates the project, asset, and tag business module.
 func InitWorkspace(
 	projectStore projectdomain.Store,
 	assetStore assetdomain.Store,
+	tagStore tagdomain.Store,
 	images imageclient.ImageGenerationService,
 ) *workspace.Workspace {
-	return workspace.New(projectStore, assetStore, images)
+	return workspace.New(projectStore, assetStore, tagStore, images)
 }
 
 // InitImageProcessor creates the deterministic image-processing service.
@@ -129,6 +136,7 @@ type HTTPHandlers struct {
 	Project    router.ProjectRouter
 	Generation router.GenerationRouter
 	Upload     router.UploadRouter
+	Tag        router.ProjectTagRouter
 }
 
 // InitHandlers creates all HTTP handlers from initialized business modules.
@@ -142,11 +150,16 @@ func InitHandlers(
 	if len(references) > 0 {
 		resolver = references[0]
 	}
+	var tagRouter router.ProjectTagRouter
+	if workspaceModule != nil && workspaceModule.Tags != nil {
+		tagRouter = handler.NewProjectTagHandler(workspaceModule.Tags)
+	}
 	return HTTPHandlers{
 		Asset:      handler.NewHandler(workspaceModule.Assets, resolver),
 		Project:    handler.NewProjectHandler(workspaceModule.Projects, resolver),
 		Generation: handler.NewGenerationHandler(generatorEngine, resolver),
 		Upload:     handler.NewUploadHandler(uploadManager),
+		Tag:        tagRouter,
 	}
 }
 
@@ -157,5 +170,6 @@ func InitRouter(handlers HTTPHandlers) *echo.Echo {
 		handlers.Project,
 		handlers.Generation,
 		handlers.Upload,
+		handlers.Tag,
 	)
 }

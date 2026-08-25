@@ -29,6 +29,7 @@ func main() {
 		handler.NewProjectHandler(nil),
 		handler.NewGenerationHandler(nil),
 		handler.NewUploadHandler(nil),
+		handler.NewProjectTagHandler(nil),
 		router.Authentication{
 			Router:     handler.NewAuthHandler(nil),
 			Middleware: func(next echo.HandlerFunc) echo.HandlerFunc { return next },

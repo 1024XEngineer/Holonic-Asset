@@ -5,21 +5,26 @@ import (
 	"errors"
 	"fmt"
 
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	tagdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
 
-func (r *AssetRepositoryImpl) projectTagDao() (dao.ProjectTagDao, error) {
-	if r.ProjectTagDao != nil {
-		return r.ProjectTagDao, nil
-	}
-	if db := r.transactionDB(); db != nil {
-		return dao.NewGormProjectTagDao(db), nil
+type ProjectTagRepository struct {
+	dao dao.ProjectTagDao
+}
+
+func NewProjectTagRepository(projectTagDao dao.ProjectTagDao) *ProjectTagRepository {
+	return &ProjectTagRepository{dao: projectTagDao}
+}
+
+func (r *ProjectTagRepository) projectTagDao() (dao.ProjectTagDao, error) {
+	if r != nil && r.dao != nil {
+		return r.dao, nil
 	}
 	return nil, fmt.Errorf("repository: project tag storage is required")
 }
 
-func (r *AssetRepositoryImpl) CreateProjectTag(ctx context.Context, tag *domain.ProjectTag) error {
+func (r *ProjectTagRepository) CreateProjectTag(ctx context.Context, tag *tagdomain.Tag) error {
 	projectTagDao, err := r.projectTagDao()
 	if err != nil {
 		return err
@@ -32,7 +37,7 @@ func (r *AssetRepositoryImpl) CreateProjectTag(ctx context.Context, tag *domain.
 	return nil
 }
 
-func (r *AssetRepositoryImpl) ListProjectTags(ctx context.Context, projectID uint) ([]domain.ProjectTag, error) {
+func (r *ProjectTagRepository) ListProjectTags(ctx context.Context, projectID uint) ([]tagdomain.Tag, error) {
 	projectTagDao, err := r.projectTagDao()
 	if err != nil {
 		return nil, err
@@ -41,18 +46,18 @@ func (r *AssetRepositoryImpl) ListProjectTags(ctx context.Context, projectID uin
 	if err != nil {
 		return nil, normalizeProjectTagError(err)
 	}
-	result := make([]domain.ProjectTag, len(tags))
+	result := make([]tagdomain.Tag, len(tags))
 	for index := range tags {
 		result[index] = convertProjectTagToDomain(&tags[index])
 	}
 	return result, nil
 }
 
-func (r *AssetRepositoryImpl) GetProjectTag(
+func (r *ProjectTagRepository) GetProjectTag(
 	ctx context.Context,
 	projectID uint,
 	tagID uint,
-) (*domain.ProjectTag, error) {
+) (*tagdomain.Tag, error) {
 	projectTagDao, err := r.projectTagDao()
 	if err != nil {
 		return nil, err
@@ -65,12 +70,12 @@ func (r *AssetRepositoryImpl) GetProjectTag(
 	return &value, nil
 }
 
-func (r *AssetRepositoryImpl) UpdateProjectTag(
+func (r *ProjectTagRepository) UpdateProjectTag(
 	ctx context.Context,
 	projectID uint,
 	tagID uint,
-	update *domain.ProjectTagUpdate,
-) (*domain.ProjectTag, error) {
+	update *tagdomain.TagUpdate,
+) (*tagdomain.Tag, error) {
 	projectTagDao, err := r.projectTagDao()
 	if err != nil {
 		return nil, err
@@ -83,7 +88,7 @@ func (r *AssetRepositoryImpl) UpdateProjectTag(
 	return &value, nil
 }
 
-func (r *AssetRepositoryImpl) DeleteProjectTag(ctx context.Context, projectID, tagID uint) error {
+func (r *ProjectTagRepository) DeleteProjectTag(ctx context.Context, projectID, tagID uint) error {
 	projectTagDao, err := r.projectTagDao()
 	if err != nil {
 		return err
@@ -91,7 +96,7 @@ func (r *AssetRepositoryImpl) DeleteProjectTag(ctx context.Context, projectID, t
 	return normalizeProjectTagError(projectTagDao.Delete(ctx, projectID, tagID))
 }
 
-func convertProjectTagToDao(tag *domain.ProjectTag) *dao.ProjectTag {
+func convertProjectTagToDao(tag *tagdomain.Tag) *dao.ProjectTag {
 	if tag == nil {
 		return nil
 	}
@@ -104,11 +109,11 @@ func convertProjectTagToDao(tag *domain.ProjectTag) *dao.ProjectTag {
 	}
 }
 
-func convertProjectTagToDomain(tag *dao.ProjectTag) domain.ProjectTag {
+func convertProjectTagToDomain(tag *dao.ProjectTag) tagdomain.Tag {
 	if tag == nil {
-		return domain.ProjectTag{}
+		return tagdomain.Tag{}
 	}
-	return domain.ProjectTag{
+	return tagdomain.Tag{
 		ID:          tag.ID,
 		ProjectID:   tag.ProjectID,
 		Name:        tag.Name,
@@ -117,7 +122,7 @@ func convertProjectTagToDomain(tag *dao.ProjectTag) domain.ProjectTag {
 	}
 }
 
-func convertProjectTagUpdateToDao(update *domain.ProjectTagUpdate) *dao.ProjectTagUpdate {
+func convertProjectTagUpdateToDao(update *tagdomain.TagUpdate) *dao.ProjectTagUpdate {
 	if update == nil {
 		return nil
 	}
@@ -131,12 +136,14 @@ func convertProjectTagUpdateToDao(update *domain.ProjectTagUpdate) *dao.ProjectT
 func normalizeProjectTagError(err error) error {
 	switch {
 	case errors.Is(err, dao.ErrProjectTagNotFound):
-		return domain.ErrProjectTagNotFound
+		return tagdomain.ErrTagNotFound
 	case errors.Is(err, dao.ErrProjectTagConflict):
-		return domain.ErrProjectTagConflict
+		return tagdomain.ErrTagConflict
 	case errors.Is(err, dao.ErrProjectNotFound):
-		return domain.ErrProjectTagProjectNotFound
+		return tagdomain.ErrTagProjectNotFound
 	default:
 		return err
 	}
 }
+
+var _ tagdomain.Store = (*ProjectTagRepository)(nil)

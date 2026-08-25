@@ -6,40 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"gorm.io/gorm"
-
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	tagdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
 )
-
-type projectTagAssetDaoDBStub struct {
-	dao.AssetDao
-	db *gorm.DB
-}
-
-func (s *projectTagAssetDaoDBStub) DBHandle() *gorm.DB {
-	return s.db
-}
-
-func (s *projectTagAssetDaoDBStub) WithDB(db *gorm.DB) dao.AssetDao {
-	return &projectTagAssetDaoDBStub{db: db}
-}
-
-type projectTagContentDaoDBStub struct {
-	dao.AssetContentDao
-}
-
-func (s *projectTagContentDaoDBStub) WithDB(*gorm.DB) dao.AssetContentDao {
-	return &projectTagContentDaoDBStub{}
-}
-
-type projectTagRecordDaoDBStub struct {
-	dao.AssetRecordDao
-}
-
-func (s *projectTagRecordDaoDBStub) WithDB(*gorm.DB) dao.AssetRecordDao {
-	return &projectTagRecordDaoDBStub{}
-}
 
 type projectTagDaoStub struct {
 	dao.ProjectTagDao
@@ -96,7 +65,7 @@ func (s *projectTagDaoStub) Delete(_ context.Context, projectID, tagID uint) err
 	return s.deleteErr
 }
 
-func TestAssetRepositoryConvertsProjectTagsAcrossDomainBoundary(t *testing.T) {
+func TestProjectTagRepositoryConvertsTagsAcrossDomainBoundary(t *testing.T) {
 	projectTagDao := &projectTagDaoStub{tags: []dao.ProjectTag{{
 		ID: 7, ProjectID: 42, Name: "player", Description: "hero", Color: "#123456",
 	}}, found: &dao.ProjectTag{
@@ -104,8 +73,8 @@ func TestAssetRepositoryConvertsProjectTagsAcrossDomainBoundary(t *testing.T) {
 	}, updated: &dao.ProjectTag{
 		ID: 7, ProjectID: 42, Name: "hero", Description: "main character", Color: "#654321",
 	}}
-	repository := &AssetRepositoryImpl{ProjectTagDao: projectTagDao}
-	tag := &domain.ProjectTag{ProjectID: 42, Name: "player", Description: "hero", Color: "#123456"}
+	repository := NewProjectTagRepository(projectTagDao)
+	tag := &tagdomain.Tag{ProjectID: 42, Name: "player", Description: "hero", Color: "#123456"}
 
 	if err := repository.CreateProjectTag(context.Background(), tag); err != nil {
 		t.Fatalf("create project tag: %v", err)
@@ -118,7 +87,7 @@ func TestAssetRepositoryConvertsProjectTagsAcrossDomainBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list project tags: %v", err)
 	}
-	want := []domain.ProjectTag{{ID: 7, ProjectID: 42, Name: "player", Description: "hero", Color: "#123456"}}
+	want := []tagdomain.Tag{{ID: 7, ProjectID: 42, Name: "player", Description: "hero", Color: "#123456"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected project tags: got=%+v want=%+v", got, want)
 	}
@@ -131,7 +100,7 @@ func TestAssetRepositoryConvertsProjectTagsAcrossDomainBoundary(t *testing.T) {
 	name := "hero"
 	description := "main character"
 	color := "#654321"
-	updated, err := repository.UpdateProjectTag(context.Background(), 42, 7, &domain.ProjectTagUpdate{
+	updated, err := repository.UpdateProjectTag(context.Background(), 42, 7, &tagdomain.TagUpdate{
 		Name: &name, Description: &description, Color: &color,
 	})
 	if err != nil || updated.Name != name || projectTagDao.updateInput == nil ||
@@ -155,9 +124,9 @@ func TestProjectTagRepositoryNormalizesPersistenceErrors(t *testing.T) {
 		input error
 		want  error
 	}{
-		{input: dao.ErrProjectTagNotFound, want: domain.ErrProjectTagNotFound},
-		{input: dao.ErrProjectTagConflict, want: domain.ErrProjectTagConflict},
-		{input: dao.ErrProjectNotFound, want: domain.ErrProjectTagProjectNotFound},
+		{input: dao.ErrProjectTagNotFound, want: tagdomain.ErrTagNotFound},
+		{input: dao.ErrProjectTagConflict, want: tagdomain.ErrTagConflict},
+		{input: dao.ErrProjectNotFound, want: tagdomain.ErrTagProjectNotFound},
 	}
 	for _, test := range tests {
 		if got := normalizeProjectTagError(test.input); !errors.Is(got, test.want) {
@@ -170,58 +139,58 @@ func TestProjectTagRepositoryMapsErrorsFromEveryOperation(t *testing.T) {
 	name := "hero"
 	tests := []struct {
 		name string
-		run  func(*AssetRepositoryImpl) error
+		run  func(*ProjectTagRepository) error
 		stub *projectTagDaoStub
 		want error
 	}{
 		{
 			name: "create conflict",
 			stub: &projectTagDaoStub{createErr: dao.ErrProjectTagConflict},
-			run: func(repository *AssetRepositoryImpl) error {
-				return repository.CreateProjectTag(context.Background(), &domain.ProjectTag{ProjectID: 42, Name: "hero"})
+			run: func(repository *ProjectTagRepository) error {
+				return repository.CreateProjectTag(context.Background(), &tagdomain.Tag{ProjectID: 42, Name: "hero"})
 			},
-			want: domain.ErrProjectTagConflict,
+			want: tagdomain.ErrTagConflict,
 		},
 		{
 			name: "list missing project",
 			stub: &projectTagDaoStub{listErr: dao.ErrProjectNotFound},
-			run: func(repository *AssetRepositoryImpl) error {
+			run: func(repository *ProjectTagRepository) error {
 				_, err := repository.ListProjectTags(context.Background(), 42)
 				return err
 			},
-			want: domain.ErrProjectTagProjectNotFound,
+			want: tagdomain.ErrTagProjectNotFound,
 		},
 		{
 			name: "get missing tag",
 			stub: &projectTagDaoStub{findErr: dao.ErrProjectTagNotFound},
-			run: func(repository *AssetRepositoryImpl) error {
+			run: func(repository *ProjectTagRepository) error {
 				_, err := repository.GetProjectTag(context.Background(), 42, 7)
 				return err
 			},
-			want: domain.ErrProjectTagNotFound,
+			want: tagdomain.ErrTagNotFound,
 		},
 		{
 			name: "update conflict",
 			stub: &projectTagDaoStub{updateErr: dao.ErrProjectTagConflict},
-			run: func(repository *AssetRepositoryImpl) error {
-				_, err := repository.UpdateProjectTag(context.Background(), 42, 7, &domain.ProjectTagUpdate{Name: &name})
+			run: func(repository *ProjectTagRepository) error {
+				_, err := repository.UpdateProjectTag(context.Background(), 42, 7, &tagdomain.TagUpdate{Name: &name})
 				return err
 			},
-			want: domain.ErrProjectTagConflict,
+			want: tagdomain.ErrTagConflict,
 		},
 		{
 			name: "delete missing tag",
 			stub: &projectTagDaoStub{deleteErr: dao.ErrProjectTagNotFound},
-			run: func(repository *AssetRepositoryImpl) error {
+			run: func(repository *ProjectTagRepository) error {
 				return repository.DeleteProjectTag(context.Background(), 42, 7)
 			},
-			want: domain.ErrProjectTagNotFound,
+			want: tagdomain.ErrTagNotFound,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			repository := &AssetRepositoryImpl{ProjectTagDao: test.stub}
+			repository := NewProjectTagRepository(test.stub)
 			if err := test.run(repository); !errors.Is(err, test.want) {
 				t.Fatalf("expected %v, got %v", test.want, err)
 			}
@@ -230,8 +199,8 @@ func TestProjectTagRepositoryMapsErrorsFromEveryOperation(t *testing.T) {
 }
 
 func TestProjectTagRepositoryRequiresStorage(t *testing.T) {
-	repository := &AssetRepositoryImpl{}
-	tag := &domain.ProjectTag{ProjectID: 42, Name: "hero"}
+	repository := &ProjectTagRepository{}
+	tag := &tagdomain.Tag{ProjectID: 42, Name: "hero"}
 	name := "player"
 	operations := []func() error{
 		func() error { return repository.CreateProjectTag(context.Background(), tag) },
@@ -244,7 +213,7 @@ func TestProjectTagRepositoryRequiresStorage(t *testing.T) {
 			return err
 		},
 		func() error {
-			_, err := repository.UpdateProjectTag(context.Background(), 42, 7, &domain.ProjectTagUpdate{Name: &name})
+			_, err := repository.UpdateProjectTag(context.Background(), 42, 7, &tagdomain.TagUpdate{Name: &name})
 			return err
 		},
 		func() error { return repository.DeleteProjectTag(context.Background(), 42, 7) },
@@ -260,7 +229,7 @@ func TestProjectTagRepositoryHandlesNilConversions(t *testing.T) {
 	if got := convertProjectTagToDao(nil); got != nil {
 		t.Fatalf("expected nil DAO tag, got %+v", got)
 	}
-	if got := convertProjectTagToDomain(nil); !reflect.DeepEqual(got, domain.ProjectTag{}) {
+	if got := convertProjectTagToDomain(nil); !reflect.DeepEqual(got, tagdomain.Tag{}) {
 		t.Fatalf("expected empty domain tag, got %+v", got)
 	}
 	if got := convertProjectTagUpdateToDao(nil); got != nil {
@@ -269,49 +238,5 @@ func TestProjectTagRepositoryHandlesNilConversions(t *testing.T) {
 	unknown := errors.New("unknown")
 	if got := normalizeProjectTagError(unknown); !errors.Is(got, unknown) {
 		t.Fatalf("expected unknown error passthrough, got %v", got)
-	}
-}
-
-func TestAssetRepositoryWiresProjectTagStorage(t *testing.T) {
-	db := &gorm.DB{}
-	assetDao := &projectTagAssetDaoDBStub{db: db}
-	contentDao := &projectTagContentDaoDBStub{}
-	recordDao := &projectTagRecordDaoDBStub{}
-
-	fromProvider := NewAssetRepository(assetDao, contentDao, recordDao).(*AssetRepositoryImpl)
-	if fromProvider.ProjectTagDao == nil {
-		t.Fatal("expected project tag DAO from asset DB provider")
-	}
-	if fromProvider.transactionDB() != db {
-		t.Fatal("expected transaction DB from asset DAO provider")
-	}
-
-	withoutProvider := NewAssetRepository(nil, contentDao, recordDao).(*AssetRepositoryImpl)
-	if withoutProvider.ProjectTagDao != nil {
-		t.Fatal("did not expect project tag DAO without a database provider")
-	}
-
-	withDB := NewAssetRepositoryWithDB(db, assetDao, contentDao, recordDao).(*AssetRepositoryImpl)
-	if withDB.DB != db || withDB.ProjectTagDao == nil {
-		t.Fatalf("expected explicit DB and project tag DAO, got %+v", withDB)
-	}
-
-	transactionRepository, err := fromProvider.withDB(db)
-	if err != nil {
-		t.Fatalf("create transaction repository: %v", err)
-	}
-	if transactionRepository.DB != db || transactionRepository.ProjectTagDao == nil {
-		t.Fatalf("expected transaction-scoped project tag DAO, got %+v", transactionRepository)
-	}
-}
-
-func TestProjectTagRepositoryBuildsDAOFromRepositoryDB(t *testing.T) {
-	db := &gorm.DB{}
-	projectTagDao, err := (&AssetRepositoryImpl{DB: db}).projectTagDao()
-	if err != nil {
-		t.Fatalf("resolve project tag DAO: %v", err)
-	}
-	if projectTagDao == nil {
-		t.Fatal("expected project tag DAO")
 	}
 }

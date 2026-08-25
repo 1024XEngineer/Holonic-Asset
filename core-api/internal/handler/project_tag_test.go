@@ -10,21 +10,21 @@ import (
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
-	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+	tagdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 )
 
 type projectTagManagerStub struct {
-	domain.Manager
-	created        domain.ProjectTag
-	createResult   domain.ProjectTag
+	tagdomain.Manager
+	created        tagdomain.Tag
+	createResult   tagdomain.Tag
 	createErr      error
-	listed         []domain.ProjectTag
+	listed         []tagdomain.Tag
 	listedProject  uint
 	listErr        error
 	detailProject  uint
 	detailID       uint
 	detailErr      error
-	updated        *domain.ProjectTagUpdate
+	updated        *tagdomain.TagUpdate
 	updatedProject uint
 	updatedID      uint
 	updateErr      error
@@ -33,32 +33,32 @@ type projectTagManagerStub struct {
 	deleteErr      error
 }
 
-func (s *projectTagManagerStub) CreateProjectTag(_ context.Context, tag domain.ProjectTag) (domain.ProjectTag, error) {
+func (s *projectTagManagerStub) CreateProjectTag(_ context.Context, tag tagdomain.Tag) (tagdomain.Tag, error) {
 	s.created = tag
 	return s.createResult, s.createErr
 }
 
-func (s *projectTagManagerStub) ListProjectTags(_ context.Context, projectID uint) ([]domain.ProjectTag, error) {
+func (s *projectTagManagerStub) ListProjectTags(_ context.Context, projectID uint) ([]tagdomain.Tag, error) {
 	s.listedProject = projectID
 	return s.listed, s.listErr
 }
 
-func (s *projectTagManagerStub) GetProjectTag(_ context.Context, projectID, tagID uint) (domain.ProjectTag, error) {
+func (s *projectTagManagerStub) GetProjectTag(_ context.Context, projectID, tagID uint) (tagdomain.Tag, error) {
 	s.detailProject = projectID
 	s.detailID = tagID
-	return domain.ProjectTag{ID: tagID, ProjectID: projectID, Name: "player", Color: "#123456"}, s.detailErr
+	return tagdomain.Tag{ID: tagID, ProjectID: projectID, Name: "player", Color: "#123456"}, s.detailErr
 }
 
 func (s *projectTagManagerStub) UpdateProjectTag(
 	_ context.Context,
 	projectID uint,
 	tagID uint,
-	update *domain.ProjectTagUpdate,
-) (domain.ProjectTag, error) {
+	update *tagdomain.TagUpdate,
+) (tagdomain.Tag, error) {
 	s.updatedProject = projectID
 	s.updatedID = tagID
 	s.updated = update
-	return domain.ProjectTag{ID: tagID, ProjectID: projectID, Name: "hero", Color: "#654321"}, s.updateErr
+	return tagdomain.Tag{ID: tagID, ProjectID: projectID, Name: "hero", Color: "#654321"}, s.updateErr
 }
 
 func (s *projectTagManagerStub) DeleteProjectTag(_ context.Context, projectID uint, tagID uint) error {
@@ -69,10 +69,10 @@ func (s *projectTagManagerStub) DeleteProjectTag(_ context.Context, projectID ui
 
 func TestProjectTagHandlerMapsCRUDResponses(t *testing.T) {
 	manager := &projectTagManagerStub{
-		createResult: domain.ProjectTag{ID: 7, ProjectID: 42, Name: "player", Color: "#123456"},
-		listed:       []domain.ProjectTag{{ID: 7, ProjectID: 42, Name: "player", Color: "#123456"}},
+		createResult: tagdomain.Tag{ID: 7, ProjectID: 42, Name: "player", Color: "#123456"},
+		listed:       []tagdomain.Tag{{ID: 7, ProjectID: 42, Name: "player", Color: "#123456"}},
 	}
-	h := handler.NewHandler(manager)
+	h := handler.NewProjectTagHandler(manager)
 
 	created, err := h.CreateProjectTag(context.Background(), dto.CreateProjectTagRequest{
 		ProjectID: 42, Name: "player", Color: "#123456",
@@ -116,13 +116,13 @@ func TestProjectTagHandlerMapsDomainErrors(t *testing.T) {
 		err    error
 		status int
 	}{
-		{err: domain.ErrInvalidProjectTag, status: http.StatusBadRequest},
-		{err: domain.ErrProjectTagNotFound, status: http.StatusNotFound},
-		{err: domain.ErrProjectTagProjectNotFound, status: http.StatusNotFound},
-		{err: domain.ErrProjectTagConflict, status: http.StatusConflict},
+		{err: tagdomain.ErrInvalidTag, status: http.StatusBadRequest},
+		{err: tagdomain.ErrTagNotFound, status: http.StatusNotFound},
+		{err: tagdomain.ErrTagProjectNotFound, status: http.StatusNotFound},
+		{err: tagdomain.ErrTagConflict, status: http.StatusConflict},
 	}
 	for _, test := range tests {
-		h := handler.NewHandler(&projectTagManagerStub{createErr: test.err})
+		h := handler.NewProjectTagHandler(&projectTagManagerStub{createErr: test.err})
 		_, err := h.CreateProjectTag(context.Background(), dto.CreateProjectTagRequest{ProjectID: 42, Name: "player"})
 		var httpErr *echo.HTTPError
 		if !errors.As(err, &httpErr) || httpErr.Code != test.status {
@@ -137,12 +137,12 @@ func TestProjectTagHandlerPropagatesManagerErrorsAcrossCRUD(t *testing.T) {
 	tests := []struct {
 		name    string
 		manager *projectTagManagerStub
-		run     func(*handler.Handler) error
+		run     func(*handler.ProjectTagHandler) error
 	}{
 		{
 			name:    "list",
 			manager: &projectTagManagerStub{listErr: managerErr},
-			run: func(h *handler.Handler) error {
+			run: func(h *handler.ProjectTagHandler) error {
 				_, err := h.ListProjectTags(context.Background(), dto.ListProjectTagsRequest{ProjectID: 42})
 				return err
 			},
@@ -150,7 +150,7 @@ func TestProjectTagHandlerPropagatesManagerErrorsAcrossCRUD(t *testing.T) {
 		{
 			name:    "detail",
 			manager: &projectTagManagerStub{detailErr: managerErr},
-			run: func(h *handler.Handler) error {
+			run: func(h *handler.ProjectTagHandler) error {
 				_, err := h.GetProjectTag(context.Background(), dto.ProjectTagDetailRequest{ProjectID: 42, TagID: 7})
 				return err
 			},
@@ -158,7 +158,7 @@ func TestProjectTagHandlerPropagatesManagerErrorsAcrossCRUD(t *testing.T) {
 		{
 			name:    "update",
 			manager: &projectTagManagerStub{updateErr: managerErr},
-			run: func(h *handler.Handler) error {
+			run: func(h *handler.ProjectTagHandler) error {
 				_, err := h.UpdateProjectTag(context.Background(), dto.UpdateProjectTagRequest{ProjectID: 42, TagID: 7, Name: &name})
 				return err
 			},
@@ -166,7 +166,7 @@ func TestProjectTagHandlerPropagatesManagerErrorsAcrossCRUD(t *testing.T) {
 		{
 			name:    "delete",
 			manager: &projectTagManagerStub{deleteErr: managerErr},
-			run: func(h *handler.Handler) error {
+			run: func(h *handler.ProjectTagHandler) error {
 				_, err := h.DeleteProjectTag(context.Background(), dto.DeleteProjectTagRequest{ProjectID: 42, TagID: 7})
 				return err
 			},
@@ -175,9 +175,29 @@ func TestProjectTagHandlerPropagatesManagerErrorsAcrossCRUD(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.run(handler.NewHandler(test.manager)); !errors.Is(err, managerErr) {
+			if err := test.run(handler.NewProjectTagHandler(test.manager)); !errors.Is(err, managerErr) {
 				t.Fatalf("expected manager error, got %v", err)
 			}
 		})
+	}
+}
+
+func TestProjectTagHandlerRejectsUninitializedManager(t *testing.T) {
+	var nilHandler *handler.ProjectTagHandler
+	name := "hero"
+	if _, err := nilHandler.CreateProjectTag(context.Background(), dto.CreateProjectTagRequest{}); err == nil {
+		t.Fatal("expected uninitialized manager error")
+	}
+	if _, err := nilHandler.ListProjectTags(context.Background(), dto.ListProjectTagsRequest{}); err == nil {
+		t.Fatal("expected uninitialized manager error")
+	}
+	if _, err := nilHandler.GetProjectTag(context.Background(), dto.ProjectTagDetailRequest{}); err == nil {
+		t.Fatal("expected uninitialized manager error")
+	}
+	if _, err := nilHandler.UpdateProjectTag(context.Background(), dto.UpdateProjectTagRequest{Name: &name}); err == nil {
+		t.Fatal("expected uninitialized manager error")
+	}
+	if _, err := nilHandler.DeleteProjectTag(context.Background(), dto.DeleteProjectTagRequest{}); err == nil {
+		t.Fatal("expected uninitialized manager error")
 	}
 }

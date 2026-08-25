@@ -18,6 +18,7 @@ func Register(
 	pr ProjectRouter,
 	gr GenerationRouter,
 	ur UploadRouter,
+	tr ProjectTagRouter,
 	authentication ...Authentication,
 ) *echo.Echo {
 	e := echo.New()
@@ -37,9 +38,9 @@ func Register(
 	}
 	if as != nil {
 		RegisterAssetRoutes(openAPI, as)
-		if tags, ok := as.(ProjectTagRouter); ok {
-			RegisterProjectTagRoutes(openAPI, tags)
-		}
+	}
+	if tr != nil {
+		RegisterProjectTagRoutes(openAPI, tr)
 	}
 	if pr != nil {
 		RegisterProjectRoutes(openAPI, pr)
