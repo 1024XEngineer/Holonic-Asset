@@ -37,10 +37,12 @@ type LogConfig struct {
 	Compress   bool   `mapstructure:"compress" yaml:"compress"`
 }
 
-// ModelConfig maps one gateway model to its required wire protocol.
+// ModelConfig maps one gateway model to its required wire protocol and endpoint settings.
 type ModelConfig struct {
 	Name     string `mapstructure:"name" yaml:"name"`
 	Protocol string `mapstructure:"protocol" yaml:"protocol"`
+	BaseURL  string `mapstructure:"baseURL" yaml:"baseURL"`
+	APIKey   string `mapstructure:"apiKey" yaml:"apiKey"`
 }
 
 type ImageClientConfig struct {

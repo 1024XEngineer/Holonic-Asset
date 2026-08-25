@@ -33,30 +33,32 @@ log:
   maxAge: 14
   compress: true
 image:
-  baseURL: https://images.example.test
-  apiKey: test-image-key
   defaultModel: openai/gpt-image-2
   fallbackModel: google/gemini-image
   models:
     - name: openai/gpt-image-2
       protocol: openai_images
+      baseURL: https://images.example.test
+      apiKey: test-image-key
     - name: google/gemini-image
       protocol: chat_completions
+      baseURL: https://google-images.example.test
+      apiKey: test-google-key
 llm:
-  baseURL: https://llm.example.test
-  apiKey: test-llm-key
   defaultModel: vision-model
   models:
     - name: vision-model
       protocol: chat_completions
+      baseURL: https://llm.example.test
+      apiKey: test-llm-key
 pprof:
   enabled: true
 video:
-  baseURL: https://video.example.test
-  apiKey: test-video-key
   models:
     - name: bytedance/seedance-2.0
       protocol: fal_queue
+      baseURL: https://video.example.test
+      apiKey: test-video-key
   pollInterval: 5s
   pollTimeout: 45s
   maxRetries: 3
@@ -95,17 +97,31 @@ qiniu:
 	}
 	if len(loaded.Image.Models) != 2 ||
 		loaded.Image.Models[0].Protocol != "openai_images" ||
+		loaded.Image.Models[0].BaseURL != "https://images.example.test" ||
+		loaded.Image.Models[0].APIKey != "test-image-key" ||
 		loaded.Image.Models[1].Name != "google/gemini-image" ||
-		loaded.Image.Models[1].Protocol != "chat_completions" {
+		loaded.Image.Models[1].Protocol != "chat_completions" ||
+		loaded.Image.Models[1].BaseURL != "https://google-images.example.test" ||
+		loaded.Image.Models[1].APIKey != "test-google-key" {
 		t.Fatalf("unexpected image models: %+v", loaded.Image.Models)
 	}
-	if loaded.LLM.BaseURL != "https://llm.example.test" || loaded.LLM.APIKey != "test-llm-key" || loaded.LLM.DefaultModel != "vision-model" {
+	if loaded.LLM.DefaultModel != "vision-model" {
 		t.Fatalf("unexpected LLM config: %+v", loaded.LLM)
 	}
-	if len(loaded.LLM.Models) != 1 || loaded.LLM.Models[0].Protocol != "chat_completions" {
+	if len(loaded.LLM.Models) != 1 ||
+		loaded.LLM.Models[0].Protocol != "chat_completions" ||
+		loaded.LLM.Models[0].BaseURL != "https://llm.example.test" ||
+		loaded.LLM.Models[0].APIKey != "test-llm-key" {
 		t.Fatalf("unexpected LLM models: %+v", loaded.LLM.Models)
 	}
-	if loaded.Video.BaseURL != "https://video.example.test" || loaded.Video.APIKey != "test-video-key" || len(loaded.Video.Models) != 1 || loaded.Video.Models[0].Protocol != "fal_queue" || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
+	if len(loaded.Video.Models) != 1 ||
+		loaded.Video.Models[0].Protocol != "fal_queue" ||
+		loaded.Video.Models[0].BaseURL != "https://video.example.test" ||
+		loaded.Video.Models[0].APIKey != "test-video-key" ||
+		loaded.Video.PollInterval != 5*time.Second ||
+		loaded.Video.PollTimeout != 45*time.Second ||
+		loaded.Video.MaxRetries != 3 ||
+		loaded.Video.RetryDelay != 2*time.Second {
 		t.Fatalf("unexpected video config: %+v", loaded.Video)
 	}
 	if loaded.QiNiu.AccessKey != "test-ak" || loaded.QiNiu.SecretKey != "test-sk" || loaded.QiNiu.Bucket != "asset-bucket" || loaded.QiNiu.Domain != "cdn.example.com" || loaded.QiNiu.UploadTokenExpiry != 45*time.Minute || loaded.QiNiu.DownloadURLExpiry != 20*time.Minute {
@@ -127,13 +143,13 @@ func TestLoadConfigDecodesExampleConfig(t *testing.T) {
 	if loaded.Image.DefaultModel != "openai/gpt-image-2" {
 		t.Fatalf("unexpected image config: %+v", loaded.Image)
 	}
-	if len(loaded.Image.Models) != 2 || loaded.Image.Models[1].Protocol != "chat_completions" {
+	if len(loaded.Image.Models) != 2 || loaded.Image.Models[1].Protocol != "chat_completions" || loaded.Image.Models[0].BaseURL != "https://api.qnaigc.com" {
 		t.Fatalf("unexpected example image models: %+v", loaded.Image.Models)
 	}
 	if loaded.Auth.TokenExpiry != 24*time.Hour {
 		t.Fatalf("unexpected auth config: %+v", loaded.Auth)
 	}
-	if loaded.LLM.DefaultModel != "google/gemini-3.7-flash" || len(loaded.LLM.Models) != 1 || loaded.LLM.Models[0].Protocol != "chat_completions" {
+	if loaded.LLM.DefaultModel != "google/gemini-3.7-flash" || len(loaded.LLM.Models) != 1 || loaded.LLM.Models[0].Protocol != "chat_completions" || loaded.LLM.Models[0].BaseURL != "https://api.qnaigc.com" {
 		t.Fatalf("unexpected example LLM config: %+v", loaded.LLM)
 	}
 	if len(loaded.Video.Models) != 0 || loaded.Video.PollInterval != 5*time.Second || loaded.Video.PollTimeout != 45*time.Second || loaded.Video.MaxRetries != 3 || loaded.Video.RetryDelay != 2*time.Second {
