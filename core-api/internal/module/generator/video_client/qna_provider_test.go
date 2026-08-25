@@ -127,6 +127,111 @@ func TestQNAProviderGeneratesPollsAndDownloadsVideo(t *testing.T) {
 	}
 }
 
+func TestQNAProviderRoutesConfiguredVideoModel(t *testing.T) {
+	const model = "acme/video-v1"
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/queue/acme/video-v1/image-to-video" {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"request_id": "configured-video",
+			"video":      map[string]string{"url": "https://cdn.example.test/configured.mp4"},
+		})
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL: server.URL,
+		APIKey:  "test-key",
+		Models: []videoclient.ModelConfig{
+			{Name: model, Protocol: "fal_queue"},
+		},
+		HTTPClient: server.Client(),
+	})
+	result, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "fixed camera",
+		Model:         model,
+		StartImageURL: "data:image/png;base64,cG5n",
+	})
+	if err != nil {
+		t.Fatalf("generate configured video model: %v", err)
+	}
+	if result.RequestID != "configured-video" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestQNAProviderRejectsInvalidConfiguredVideoRoutes(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    videoclient.QNAConfig
+		model     string
+		wantError string
+	}{
+		{
+			name: "missing request model",
+			config: videoclient.QNAConfig{
+				Models: []videoclient.ModelConfig{
+					{Name: "configured-model", Protocol: "fal_queue"},
+				},
+			},
+			wantError: "video model is required",
+		},
+		{
+			name: "unmapped model",
+			config: videoclient.QNAConfig{
+				Models: []videoclient.ModelConfig{
+					{Name: "configured-model", Protocol: "fal_queue"},
+				},
+			},
+			model:     "unmapped-model",
+			wantError: `no video protocol is configured for model "unmapped-model"`,
+		},
+		{
+			name: "unsupported protocol",
+			config: videoclient.QNAConfig{
+				Models: []videoclient.ModelConfig{
+					{Name: "model", Protocol: "openai_video"},
+				},
+			},
+			model:     "model",
+			wantError: `unsupported video protocol "openai_video" for model "model"`,
+		},
+		{
+			name: "duplicate model",
+			config: videoclient.QNAConfig{
+				Models: []videoclient.ModelConfig{
+					{Name: "model", Protocol: "fal_queue"},
+					{Name: "model", Protocol: "fal_queue"},
+				},
+			},
+			model:     "model",
+			wantError: `model "model" is assigned to multiple video protocols`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.config.APIKey = "test-key"
+			provider := videoclient.NewQNAProvider(test.config)
+			_, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+				Prompt:        "fixed camera",
+				Model:         test.model,
+				StartImageURL: "data:image/png;base64,cG5n",
+			})
+			var providerErr *videoclient.ProviderError
+			if !errors.As(err, &providerErr) || providerErr.Kind != videoclient.ErrorKindInvalidRequest {
+				t.Fatalf("error = %v, want invalid-request ProviderError", err)
+			}
+			if !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("error = %q, want it to contain %q", err, test.wantError)
+			}
+		})
+	}
+}
+
 func TestQNAProviderSendsStartAndEndImages(t *testing.T) {
 	var received struct {
 		Prompt      string `json:"prompt"`
