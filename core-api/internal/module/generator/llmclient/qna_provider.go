@@ -20,10 +20,12 @@ const (
 	qnaProviderName = "qna"
 )
 
-// ModelConfig maps one QNA model to its wire protocol.
+// ModelConfig maps one QNA model to its wire protocol and endpoint settings.
 type ModelConfig struct {
 	Name     string
 	Protocol string
+	BaseURL  string
+	APIKey   string
 }
 
 // QNAConfig configures the QNA multimodal LLM gateway.
@@ -51,13 +53,12 @@ type QNAProvider struct {
 
 // NewQNAProvider creates the QNA gateway provider.
 func NewQNAProvider(config QNAConfig) *QNAProvider {
-	chatCompletions := newQNAChatCompletionsAdapter(config)
 	provider := &QNAProvider{
 		defaultModel: strings.TrimSpace(config.DefaultModel),
 		adapters:     make(map[string]llmProtocolAdapter, len(config.Models)),
 	}
 	if len(config.Models) == 0 {
-		provider.legacy = chatCompletions
+		provider.legacy = newQNAChatCompletionsAdapter(config)
 		return provider
 	}
 
@@ -74,9 +75,23 @@ func NewQNAProvider(config QNAConfig) *QNAProvider {
 			continue
 		}
 
+		baseURL := strings.TrimSpace(configured.BaseURL)
+		if baseURL == "" {
+			baseURL = strings.TrimSpace(config.BaseURL)
+		}
+		apiKey := strings.TrimSpace(configured.APIKey)
+		if apiKey == "" {
+			apiKey = strings.TrimSpace(config.APIKey)
+		}
+		modelConfig := config
+		modelConfig.BaseURL = baseURL
+		modelConfig.APIKey = apiKey
+		modelConfig.DefaultModel = model
+		modelConfig.SDKClient = nil
+
 		switch ProtocolType(strings.ToLower(strings.TrimSpace(configured.Protocol))) {
 		case ProtocolTypeChatCompletions:
-			provider.adapters[key] = chatCompletions
+			provider.adapters[key] = newQNAChatCompletionsAdapter(modelConfig)
 		default:
 			provider.adapters[key] = newInvalidLLMProtocolAdapter(
 				fmt.Sprintf("unsupported LLM protocol %q for model %q", configured.Protocol, model),

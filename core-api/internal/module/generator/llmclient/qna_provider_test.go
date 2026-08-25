@@ -593,3 +593,59 @@ func TestQNAProviderRetriesInvalidJSONObjectResponse(t *testing.T) {
 		t.Fatalf("unexpected fallback prompts: %#v", prompts)
 	}
 }
+
+func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
+	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer llm-key-a" {
+			t.Errorf("serverA auth = %q, want Bearer llm-key-a", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"a\"}"}}]}`))
+	}))
+	defer serverA.Close()
+
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer llm-key-b" {
+			t.Errorf("serverB auth = %q, want Bearer llm-key-b", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"model\":\"b\"}"}}]}`))
+	}))
+	defer serverB.Close()
+
+	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		DefaultModel: "provider-a/vision",
+		Models: []llmclient.ModelConfig{
+			{
+				Name:     "provider-a/vision",
+				Protocol: "chat_completions",
+				BaseURL:  serverA.URL,
+				APIKey:   "llm-key-a",
+			},
+			{
+				Name:     "provider-b/vision",
+				Protocol: "chat_completions",
+				BaseURL:  serverB.URL,
+				APIKey:   "llm-key-b",
+			},
+		},
+	})
+
+	resA, err := provider.Complete(context.Background(), validProviderRequest())
+	if err != nil {
+		t.Fatalf("complete provider A: %v", err)
+	}
+	if string(resA.JSON) != `{"model":"a"}` {
+		t.Fatalf("resA JSON = %s", resA.JSON)
+	}
+
+	reqB := validProviderRequest()
+	reqB.Model = "provider-b/vision"
+	resB, err := provider.Complete(context.Background(), reqB)
+	if err != nil {
+		t.Fatalf("complete provider B: %v", err)
+	}
+	if string(resB.JSON) != `{"model":"b"}` {
+		t.Fatalf("resB JSON = %s", resB.JSON)
+	}
+}
