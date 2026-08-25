@@ -13,3 +13,13 @@ coverage:
         target: auto
         threshold: 0%
         informational: false
+
+flags:
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+  backend:
+    paths:
+      - core-api/
+    carryforward: true
