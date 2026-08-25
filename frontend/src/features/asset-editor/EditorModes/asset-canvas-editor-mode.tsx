@@ -73,12 +73,20 @@ function ConnectedTilesetEditor({
   const target = resolution.target
     ? { label: resolution.target.label, detail: t("tilesetTargetDetail") }
     : null;
-  const targetError =
-    resolution.error === "too-many"
-      ? t("tooManyTilesetTargets", { count: MAX_TILESET_EDIT_TARGETS })
-      : resolution.error === "missing"
-        ? t("selectTilesetTarget")
-        : null;
+  let targetError: string | null = null;
+  switch (resolution.error) {
+    case "too-many":
+      targetError = t("tooManyTilesetTargets", {
+        count: MAX_TILESET_EDIT_TARGETS,
+      });
+      break;
+    case "multiple-items":
+      targetError = t("tilesetTargetsMustShareItem");
+      break;
+    case "missing":
+      targetError = t("selectTilesetTarget");
+      break;
+  }
   const handleCanvasEvent = (event: TilesetCanvasEvent) => {
     switch (event.type) {
       case "cell.selection.toggled":

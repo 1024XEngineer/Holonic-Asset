@@ -18,7 +18,7 @@ export type ResolvedTilesetEditTarget =
 
 export type TilesetEditTargetResolution = {
   target: ResolvedTilesetEditTarget | null;
-  error: "missing" | "too-many" | null;
+  error: "missing" | "too-many" | "multiple-items" | null;
 };
 
 export function resolveTilesetEditTarget({
@@ -46,6 +46,13 @@ export function resolveTilesetEditTarget({
     return {
       target: null,
       error: "too-many",
+    };
+  }
+
+  if (new Set(selected.map(({ itemId }) => itemId)).size > 1) {
+    return {
+      target: null,
+      error: "multiple-items",
     };
   }
 
@@ -90,7 +97,10 @@ function createOccupiedCellIndex(
   items: readonly TilesetItem[],
   gridSize: number,
 ) {
-  const occupied = new Map<number, { position: ItemTile; label: string }>();
+  const occupied = new Map<
+    number,
+    { position: ItemTile; label: string; itemId: string }
+  >();
   for (const item of items) {
     item.tiles.forEach((position, itemCellIndex) => {
       const cellIndex = toCellIndex(position, gridSize);
@@ -98,6 +108,7 @@ function createOccupiedCellIndex(
       occupied.set(cellIndex, {
         position: [position[0], position[1]],
         label: `${item.label} / Tile ${itemCellIndex + 1}`,
+        itemId: item.id,
       });
     });
   }

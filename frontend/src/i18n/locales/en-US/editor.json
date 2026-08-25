@@ -90,6 +90,7 @@
   "noTilesetGrid": "No tileset grid",
   "selectTilesetTarget": "Select one or more generated tiles on the canvas to edit.",
   "tooManyTilesetTargets": "Select no more than {{count}} generated tiles.",
+  "tilesetTargetsMustShareItem": "Select tiles from only one tileset item.",
   "tilesetTargetDetail": "Selected on canvas",
   "clearTilesetSelection": "Clear tile selection",
   "uiSetCanvas": "UI Set canvas",

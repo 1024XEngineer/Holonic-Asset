@@ -90,6 +90,7 @@
   "noTilesetGrid": "暂无 Tileset 网格",
   "selectTilesetTarget": "请在画布上选择一个或多个已生成的格子进行编辑。",
   "tooManyTilesetTargets": "最多选择 {{count}} 个已生成格子。",
+  "tilesetTargetsMustShareItem": "请选择同一个 Tileset Item 中的格子。",
   "tilesetTargetDetail": "已在画布上选择",
   "clearTilesetSelection": "清除格子选择",
   "uiSetCanvas": "UI Set 画布",

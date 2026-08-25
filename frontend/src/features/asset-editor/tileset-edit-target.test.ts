@@ -82,22 +82,31 @@ describe("resolveTilesetEditTarget", () => {
     });
   });
 
-  it("resolves partial and cross-item selections to stable tile targets", () => {
+  it("resolves partial selections within one item to stable tile targets", () => {
     expect(
       resolveTilesetEditTarget({
-        selectedCellIndexes: [15, 1, 0, 15, 2, -1, 1.5],
+        selectedCellIndexes: [1, 0, -1, 1.5],
         items,
         gridSize: 4,
       }).target,
     ).toMatchObject({
       kind: "tiles",
-      label: "Sofa / Tile 1, Sofa / Tile 2, Lamp / Tile 1",
+      label: "Sofa / Tile 1, Sofa / Tile 2",
       positions: [
         [0, 0],
         [1, 0],
-        [3, 3],
       ],
     });
+  });
+
+  it("rejects selections that span multiple items", () => {
+    expect(
+      resolveTilesetEditTarget({
+        selectedCellIndexes: [0, 15],
+        items,
+        gridSize: 4,
+      }),
+    ).toEqual({ target: null, error: "multiple-items" });
   });
 
   it("rejects empty and oversized editable selections", () => {
