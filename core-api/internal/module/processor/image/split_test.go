@@ -460,7 +460,7 @@ func TestProcessorSplitImageAnimationSupportsSupersampledRenderFrames(t *testing
 		FrameWidth:  32,
 		FrameHeight: 32,
 		RenderScale: 4,
-		Margin:      AnimationFrameMargin(32, 32),
+		Margin:      animationFrameMarginForTest(32, 32),
 		Anchor:      AnimationAnchorCenter,
 	})
 	if err != nil {

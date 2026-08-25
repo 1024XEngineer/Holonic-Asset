@@ -148,7 +148,7 @@ result, err := processor.SplitImage(ctx, &image.SplitImageRequest{
     FrameCount:  8,
     FrameWidth:  256,
     FrameHeight: 256,
-    Margin:      image.AnimationFrameMargin(256, 256),
+    Margin:      48, // caller-owned safety margin for this frame size
     Anchor:      image.AnimationAnchorFeet,
     PreserveSourceCellScale: true,
 })
@@ -173,14 +173,20 @@ one fixed cell-to-frame scale. It deliberately does **not** fit the union of all
 visible poses. Consequently, a sword, staff, or tool extending farther in one
 pose does not shrink the character in every returned frame.
 
-The canonical prototype and the video reference must use the same padded-frame
-contract. Prepare both with `AnimationFrameResizeOptions`; for example, a 64x64
-prototype uses a 16-pixel safety margin and its 1024x1024 video reference uses a
-256-pixel safety margin:
+When a caller needs a fixed padded frame, construct one generic
+`ResizeOptions` value for each target size and keep the margin policy in that
+caller. For example, a 64x64 frame with a 12-pixel safety margin and a
+1024x1024 frame with a 192-pixel safety margin can be represented as:
 
 ```go
-prototypeOptions := image.AnimationFrameResizeOptions(64, 64)
-referenceOptions := image.AnimationFrameResizeOptions(1024, 1024)
+frameOptions := image.ResizeOptions{
+    Width: 64, Height: 64, Margin: 12,
+    CropContent: true, Mode: image.RasterModeSmooth,
+}
+referenceOptions := image.ResizeOptions{
+    Width: 1024, Height: 1024, Margin: 192,
+    CropContent: true, Mode: image.RasterModeSmooth,
+}
 ```
 
 This space must be reserved before video generation. `SplitImage` can preserve
@@ -233,14 +239,13 @@ The normalization engine is private to the processor. There is no second
 public animation endpoint: callers always use
 `SplitImage(ImageSplitModeAnimation)`.
 
-For generated prototypes, `PrototypePixelResizeOptions` and
-`CharacterPrototypePixelResizeOptions` use the same target-size palette budget
-and enable the dedicated `SpritePixelPipeline`. This profile intentionally does
-not run generic object contour repair, round-shape regularization, isolated
-component deletion, or colour-island consolidation. Those heuristics can make a
-basketball oval, erase a thin blade joint, or turn a valid internal line into a
-random colour block. Instead it follows the safer ordering used by dedicated
-pixel-art converters:
+For deterministic pixel-art conversion, callers can enable the dedicated
+`SpritePixelPipeline` together with a target-size palette budget. This profile
+intentionally does not run generic object contour repair, round-shape
+regularization, isolated component deletion, or colour-island consolidation.
+Those heuristics can make a basketball oval, erase a thin blade joint, or turn a
+valid internal line into a random colour block. Instead it follows the safer
+ordering used by dedicated pixel-art converters:
 
 1. hard-threshold the alpha channel at the converter's 128 cutoff;
 2. quantize the source colours with the same weighted median-cut and eight-pass
@@ -252,24 +257,21 @@ pixel-art converters:
    sampling; and
 5. scrub transparent RGB without inventing geometry.
 
-The generator uses two geometry contracts. Character frames already contain a
-shared pose canvas with action/safety space, so their final pixel pass sets
-`PreserveCanvasGeometry` and does not refit the alpha bounds. Object frames also
-need animation safety space, but their generated direction cells can contain
-large, inconsistent transparent borders. They therefore crop to the visible
-alpha bounds, fill the inner canvas (`target - 2*margin`) with the Sprite-like
-content-fit pass, and finally place that result on the complete 32/64px canvas
-with a transparent outer safety margin. Neither contract permits the subject to
-touch the final canvas edge.
+Callers with pre-padded frames should set `PreserveCanvasGeometry` and disable
+content cropping so the final pixel pass does not refit the alpha bounds. For
+standalone content, callers can crop to visible alpha bounds, fit the content
+inside the inner canvas (`target - 2*margin`), and then place it on the complete
+canvas with a transparent outer safety margin. Neither contract permits the
+subject to touch the final canvas edge.
 
 Direction frames receive a final conservative colour canonicalization pass that
 merges only near-duplicate colours and never moves pixels or changes silhouette
 geometry.
 
-### Prototype Sprite-AI-compatible fitting
+### Sprite-compatible pixel fitting
 
-The prototype profile now uses a dedicated `SpritePixelPipeline` rather than
-trying to repair the final image with object-specific contour heuristics. Its
+The `SpritePixelPipeline` uses a dedicated conversion path rather than trying
+to repair the final image with object-specific contour heuristics. Its
 geometry stage is intentionally compatible with the public browser converter
 used as the reference implementation:
 
@@ -288,7 +290,7 @@ is not the active geometry path when `SpritePixelPipeline` is enabled. This is
 deliberate: the browser converter does not infer a hidden logical grid from
 edge energy; it quantizes, fits, and nearest-resamples the visible image.
 
-This pass is intentionally limited to prototype pixel options. General image
+This pass is intentionally limited to the sprite pixel profile. General image
 resizing and non-integral inputs retain the prior area behaviour. The sprite
 profile stops after quantization, grid/nearest sampling, and hard-alpha cleanup;
 it does not run shape-repair heuristics after sampling.

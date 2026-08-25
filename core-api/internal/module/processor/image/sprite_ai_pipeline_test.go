@@ -133,8 +133,8 @@ func TestObjectSpritePipelineFillsInnerCanvasThenAddsSafetyMargin(t *testing.T) 
 		}
 	}
 
-	options := PrototypePixelResizeOptions(32, 32)
-	options.Margin = AnimationFrameMargin(32, 32)
+	options := prototypePixelResizeOptionsForTest(32, 32)
+	options.Margin = animationFrameMarginForTest(32, 32)
 	options.CropContent = true
 	options.PreserveCanvasGeometry = false
 
@@ -153,7 +153,7 @@ func TestObjectSpritePipelineFillsInnerCanvasThenAddsSafetyMargin(t *testing.T) 
 	if !visible {
 		t.Fatal("object disappeared during conversion")
 	}
-	margin := AnimationFrameMargin(32, 32)
+	margin := animationFrameMarginForTest(32, 32)
 	if bounds.Min.X < margin || bounds.Min.Y < margin || bounds.Max.X > 32-margin || bounds.Max.Y > 32-margin {
 		t.Fatalf("object escaped animation safety area: bounds=%v margin=%d", bounds, margin)
 	}
@@ -175,8 +175,8 @@ func TestObjectSpritePipelinePreservesLongThinAspectRatioInsideSafetyMargin(t *t
 		}
 	}
 
-	options := PrototypePixelResizeOptions(32, 32)
-	options.Margin = AnimationFrameMargin(32, 32)
+	options := prototypePixelResizeOptionsForTest(32, 32)
+	options.Margin = animationFrameMarginForTest(32, 32)
 	options.CropContent = true
 	options.PreserveCanvasGeometry = false
 	got, _, err := ResizeImage(source, options)
@@ -188,7 +188,7 @@ func TestObjectSpritePipelinePreservesLongThinAspectRatioInsideSafetyMargin(t *t
 	if !visible {
 		t.Fatal("long object disappeared during conversion")
 	}
-	margin := AnimationFrameMargin(32, 32)
+	margin := animationFrameMarginForTest(32, 32)
 	if bounds.Min.X < margin || bounds.Min.Y < margin || bounds.Max.X > 32-margin || bounds.Max.Y > 32-margin {
 		t.Fatalf("long object escaped animation safety area: bounds=%v margin=%d", bounds, margin)
 	}
@@ -222,7 +222,7 @@ func TestAnimationPixelResizePreservesFixedFramePositionAndHardensEdges(t *testi
 		}
 	}
 
-	options := AnimationPixelResizeOptions(32, 32)
+	options := animationPixelResizeOptionsForTest(32, 32)
 	got, report, err := ResizeImage(source, options)
 	if err != nil {
 		t.Fatalf("pixel-process normalized animation frame: %v", err)

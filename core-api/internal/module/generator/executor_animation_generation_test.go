@@ -388,7 +388,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.resizeRequests[0].ImageBase64 != foreground ||
 		processor.resizeRequests[0].Options.Width != animationReferenceSize ||
 		processor.resizeRequests[0].Options.Height != animationReferenceSize ||
-		processor.resizeRequests[0].Options.Margin != imageprocessor.AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
+		processor.resizeRequests[0].Options.Margin != AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
 	assertAnimationPixelResizeRequests(t, processor.resizeRequests[1:], 4, 64, 64)
@@ -404,7 +404,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Columns != 2 || processor.splitRequest.Rows != 2 ||
 		processor.splitRequest.FrameCount != 4 ||
 		processor.splitRequest.FrameWidth != 64 || processor.splitRequest.FrameHeight != 64 ||
-		processor.splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		processor.splitRequest.Margin != AnimationFrameMargin(64, 64) ||
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
 		!processor.splitRequest.PreserveVerticalMotion ||

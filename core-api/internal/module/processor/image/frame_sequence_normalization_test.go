@@ -246,7 +246,7 @@ func TestNormalizeAnimationImageCentersStaticObjectFramesAfterSharedCrop(t *test
 	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
 		Columns: 2, Rows: 2, FrameCount: 4,
 		FrameWidth: 32, FrameHeight: 32, RenderScale: 4,
-		Margin: AnimationFrameMargin(32, 32),
+		Margin: animationFrameMarginForTest(32, 32),
 		Anchor: AnimationAnchorCenter, NormalizeContentArea: true,
 		CenterContent: true, AlphaThreshold: PixelAlphaThreshold,
 	})

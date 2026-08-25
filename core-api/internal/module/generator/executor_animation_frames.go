@@ -16,7 +16,7 @@ func (s *animationGenerationService) pixelProcessAnimationFrames(
 	regions []imageprocessor.ImageRegion,
 	columns, frameWidth, frameHeight int,
 ) ([]imageprocessor.ImageRegion, string, error) {
-	options := imageprocessor.AnimationPixelResizeOptions(frameWidth, frameHeight)
+	options := AnimationPixelResizeOptions(frameWidth, frameHeight)
 	processedRegions := make([]imageprocessor.ImageRegion, 0, len(regions))
 	processedImages := make([]image.Image, 0, len(regions))
 

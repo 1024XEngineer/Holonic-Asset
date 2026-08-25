@@ -531,7 +531,7 @@ func (s *animationGenerationService) processVideo(
 		FrameCount:              request.FrameCount,
 		FrameWidth:              request.FrameWidth,
 		FrameHeight:             request.FrameHeight,
-		Margin:                  imageprocessor.AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
+		Margin:                  AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
 		Anchor:                  imageprocessor.AnimationAnchorFeet,
 		ForceProportionalGrid:   true,
 		PreserveVerticalMotion:  true,

@@ -300,7 +300,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
 		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
 		splitRequest.RenderScale != imageprocessor.PrototypeRenderScale ||
-		splitRequest.Margin != imageprocessor.AnimationFrameMargin(64, 64) ||
+		splitRequest.Margin != generator.AnimationFrameMargin(64, 64) ||
 		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
 		!splitRequest.NormalizeContentScale || splitRequest.CenterContent || splitRequest.CropToContent ||
 		!splitRequest.RejectGridBoundaryContent || splitRequest.GridBoundaryMargin != 14 {
@@ -678,7 +678,7 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 			t.Fatalf("object direction %d did not pass its original split frame to Resize", index)
 		}
 		if request.Options.Width != 128 || request.Options.Height != 128 ||
-			request.Options.Margin != imageprocessor.AnimationFrameMargin(128, 128) || !request.Options.CropContent ||
+			request.Options.Margin != generator.AnimationFrameMargin(128, 128) || !request.Options.CropContent ||
 			request.Options.PaletteSize != 24 || !request.Options.RecoverPixelGrid ||
 			!request.Options.PrequantizeBeforeResize || !request.Options.PreferNearestReduction ||
 			!request.Options.SpritePixelPipeline || request.Options.PreserveCanvasGeometry {

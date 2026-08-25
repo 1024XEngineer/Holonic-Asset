@@ -271,7 +271,7 @@ func (e *executor) generatePrototypeResources(
 			FrameWidth:                int(dimensions.Width),
 			FrameHeight:               int(dimensions.Height),
 			RenderScale:               imageprocessor.PrototypeRenderScale,
-			Margin:                    imageprocessor.AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			Margin:                    AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
 			AlphaThreshold:            imageprocessor.PixelAlphaThreshold,
 			Anchor:                    imageprocessor.AnimationAnchorCenter,
 			NormalizeContentScale:     !isObjectPrototypeTask(taskType),
@@ -449,9 +449,9 @@ func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imag
 	var options imageprocessor.ResizeOptions
 	switch taskType {
 	case GenerateCharacterProtoType, EditCharacterProtoType:
-		options = imageprocessor.CharacterPrototypePixelResizeOptions(width, height)
+		options = CharacterPrototypePixelResizeOptions(width, height)
 	default:
-		options = imageprocessor.PrototypePixelResizeOptions(width, height)
+		options = PrototypePixelResizeOptions(width, height)
 	}
 	if isObjectPrototypeTask(taskType) {
 		// Objects need animation room too, but preserving the complete supersampled
@@ -459,7 +459,7 @@ func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imag
 		// drawable area. Refit the alpha content into the target canvas minus the
 		// canonical safety margin, matching the browser converter's content-fit
 		// geometry without allowing the object to touch the canvas edge.
-		options.Margin = imageprocessor.AnimationFrameMargin(width, height)
+		options.Margin = AnimationFrameMargin(width, height)
 		options.CropContent = true
 		options.PreserveCanvasGeometry = false
 		return options

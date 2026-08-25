@@ -653,7 +653,7 @@ func TestResizeImageObjectPipelineExpandsSquashedRoundObjectInsideCanonicalMargi
 		}
 	}
 
-	result, _, err := ResizeImage(source, PrototypePixelResizeOptions(32, 32))
+	result, _, err := ResizeImage(source, prototypePixelResizeOptionsForTest(32, 32))
 	if err != nil {
 		t.Fatalf("resize squashed round object: %v", err)
 	}
@@ -754,7 +754,7 @@ func TestCharacterPrototypePixelPipelinePreservesSourceColoursAndBothEyes(t *tes
 		}
 	}
 
-	options := CharacterPrototypePixelResizeOptions(32, 32)
+	options := characterPixelResizeOptionsForTest(32, 32)
 	result, report, err := ResizeImage(source, options)
 	if err != nil {
 		t.Fatalf("resize character prototype: %v", err)
@@ -762,7 +762,7 @@ func TestCharacterPrototypePixelPipelinePreservesSourceColoursAndBothEyes(t *tes
 	if report.Sampling != resizeSamplingNearest {
 		t.Fatalf("character fixture did not recover the logical grid: %+v", report)
 	}
-	margin := AnimationFrameMargin(32, 32)
+	margin := animationFrameMarginForTest(32, 32)
 	for _, point := range eyes {
 		got := result.RGBAAt(margin+point.X, margin+point.Y)
 		if got != (color.RGBA{R: eye.R, G: eye.G, B: eye.B, A: 255}) {
@@ -779,106 +779,6 @@ func TestCharacterPrototypePixelPipelinePreservesSourceColoursAndBothEyes(t *tes
 				t.Fatalf("pipeline invented colour %+v at (%d,%d)", pixel, x, y)
 			}
 		}
-	}
-}
-
-func TestAnimationFrameMarginUsesThreeSixteenthsOfShortEdge(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		width, height      int
-		wantMargin         int
-		wantDrawableWidth  int
-		wantDrawableHeight int
-	}{
-		{width: 32, height: 32, wantMargin: 6, wantDrawableWidth: 20, wantDrawableHeight: 20},
-		{width: 48, height: 64, wantMargin: 9, wantDrawableWidth: 30, wantDrawableHeight: 46},
-		{width: 64, height: 64, wantMargin: 12, wantDrawableWidth: 40, wantDrawableHeight: 40},
-		{width: 128, height: 128, wantMargin: 24, wantDrawableWidth: 80, wantDrawableHeight: 80},
-		{width: 256, height: 256, wantMargin: 48, wantDrawableWidth: 160, wantDrawableHeight: 160},
-	}
-	for _, test := range tests {
-		margin := AnimationFrameMargin(test.width, test.height)
-		if margin != test.wantMargin {
-			t.Fatalf("%dx%d margin = %d, want %d", test.width, test.height, margin, test.wantMargin)
-		}
-		if got := test.width - 2*margin; got != test.wantDrawableWidth {
-			t.Fatalf("%dx%d drawable width = %d, want %d", test.width, test.height, got, test.wantDrawableWidth)
-		}
-		if got := test.height - 2*margin; got != test.wantDrawableHeight {
-			t.Fatalf("%dx%d drawable height = %d, want %d", test.width, test.height, got, test.wantDrawableHeight)
-		}
-	}
-}
-
-func TestPrototypePixelResizeOptionsKeepCanonicalMarginAndBoundOutput(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		width, height int
-		palette       int
-	}{
-		{width: 32, height: 32, palette: 16},
-		{width: 48, height: 64, palette: 16},
-		{width: 64, height: 64, palette: 16},
-		{width: 128, height: 128, palette: 24},
-		{width: 256, height: 256, palette: 24},
-	}
-	for _, test := range tests {
-		options := PrototypePixelResizeOptions(test.width, test.height)
-		if options.Margin != AnimationFrameMargin(test.width, test.height) {
-			t.Fatalf("%dx%d margin = %d, want canonical margin %d", test.width, test.height, options.Margin, AnimationFrameMargin(test.width, test.height))
-		}
-		if options.Mode != RasterModePixel || !options.HardAlpha || !options.RecoverPixelGrid || options.PaletteSize != test.palette ||
-			!options.PrequantizeBeforeResize || !options.PreferNearestReduction || !options.SpritePixelPipeline {
-			t.Fatalf("unexpected %dx%d prototype options: %+v", test.width, test.height, options)
-		}
-	}
-
-	characterPalettes := map[int]int{32: 16, 64: 16, 128: 24, 256: 24}
-	for dimension, wantPalette := range characterPalettes {
-		character := CharacterPrototypePixelResizeOptions(dimension, dimension)
-		object := PrototypePixelResizeOptions(dimension, dimension)
-		if character.Margin != object.Margin || character.Mode != RasterModePixel || !character.HardAlpha || !character.RecoverPixelGrid ||
-			!character.PrequantizeBeforeResize || !character.PreferNearestReduction || !character.SpritePixelPipeline {
-			t.Fatalf("character %dx%d changed canonical geometry or enabled object-only rounding: character=%+v object=%+v", dimension, dimension, character, object)
-		}
-		if character.PaletteSize != wantPalette || character.PaletteSize != object.PaletteSize {
-			t.Fatalf("%dx%d palette budgets diverged: character=%d object=%d, want both %d", dimension, dimension, character.PaletteSize, object.PaletteSize, wantPalette)
-		}
-	}
-
-	source := image.NewNRGBA(image.Rect(0, 0, 64, 64))
-	for y := range 64 {
-		for x := range 64 {
-			source.SetNRGBA(x, y, color.NRGBA{
-				R: uint8(x * 4), G: uint8(y * 4), B: uint8((x + y) * 2),
-				A: uint8(96 + (x+y)%160),
-			})
-		}
-	}
-	options := PrototypePixelResizeOptions(32, 32)
-	result, report, err := ResizeImage(source, options)
-	if err != nil {
-		t.Fatalf("resize prototype: %v", err)
-	}
-	if report.Mode != RasterModePixel || report.Sampling != resizeSamplingNearest || !report.HardAlpha {
-		t.Fatalf("unexpected prototype report: %+v", report)
-	}
-	colours := map[color.RGBA]struct{}{}
-	for y := range result.Bounds().Dy() {
-		for x := range result.Bounds().Dx() {
-			pixel := result.RGBAAt(x, y)
-			if pixel.A != 0 && pixel.A != 255 {
-				t.Fatalf("prototype retained partial alpha at (%d,%d): %d", x, y, pixel.A)
-			}
-			if pixel.A == 255 {
-				colours[color.RGBA{R: pixel.R, G: pixel.G, B: pixel.B, A: 255}] = struct{}{}
-			}
-		}
-	}
-	if len(colours) > options.PaletteSize {
-		t.Fatalf("visible colour count = %d, palette limit = %d", len(colours), options.PaletteSize)
 	}
 }
 
