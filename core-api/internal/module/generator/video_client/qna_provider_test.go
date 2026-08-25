@@ -688,3 +688,76 @@ func (l *recordingLogger) find(message string) (recordedLogEntry, bool) {
 	}
 	return recordedLogEntry{}, false
 }
+
+func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
+	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer video-key-a" {
+			t.Errorf("serverA auth = %q, want Bearer video-key-a", r.Header.Get("Authorization"))
+		}
+		if r.URL.Path != "/queue/provider-a/video-model/image-to-video" {
+			t.Errorf("serverA path = %q, want /queue/provider-a/video-model/image-to-video", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"request_id": "req-a",
+			"video":      map[string]string{"url": "https://cdn.example.test/video-a.mp4"},
+		})
+	}))
+	defer serverA.Close()
+
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer video-key-b" {
+			t.Errorf("serverB auth = %q, want Bearer video-key-b", r.Header.Get("Authorization"))
+		}
+		if r.URL.Path != "/queue/provider-b/video-model/image-to-video" {
+			t.Errorf("serverB path = %q, want /queue/provider-b/video-model/image-to-video", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"request_id": "req-b",
+			"video":      map[string]string{"url": "https://cdn.example.test/video-b.mp4"},
+		})
+	}))
+	defer serverB.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		Models: []videoclient.ModelConfig{
+			{
+				Name:     "provider-a/video-model",
+				Protocol: "fal_queue",
+				BaseURL:  serverA.URL,
+				APIKey:   "video-key-a",
+			},
+			{
+				Name:     "provider-b/video-model",
+				Protocol: "fal_queue",
+				BaseURL:  serverB.URL,
+				APIKey:   "video-key-b",
+			},
+		},
+	})
+
+	resA, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "animate a",
+		Model:         "provider-a/video-model",
+		StartImageURL: "data:image/png;base64,cG5n",
+	})
+	if err != nil {
+		t.Fatalf("generate on provider A: %v", err)
+	}
+	if resA.RequestID != "req-a" || resA.VideoURL != "https://cdn.example.test/video-a.mp4" {
+		t.Fatalf("unexpected resA: %+v", resA)
+	}
+
+	resB, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt:        "animate b",
+		Model:         "provider-b/video-model",
+		StartImageURL: "data:image/png;base64,cG5n",
+	})
+	if err != nil {
+		t.Fatalf("generate on provider B: %v", err)
+	}
+	if resB.RequestID != "req-b" || resB.VideoURL != "https://cdn.example.test/video-b.mp4" {
+		t.Fatalf("unexpected resB: %+v", resB)
+	}
+}

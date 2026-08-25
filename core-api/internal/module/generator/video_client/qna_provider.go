@@ -21,10 +21,12 @@ const (
 	qnaProviderName = "qna"
 )
 
-// ModelConfig maps one QNA video model to its wire protocol.
+// ModelConfig maps one QNA video model to its wire protocol and endpoint settings.
 type ModelConfig struct {
 	Name     string
 	Protocol string
+	BaseURL  string
+	APIKey   string
 }
 
 // QNAConfig configures the QNA video gateway.
@@ -96,9 +98,20 @@ func NewQNAProvider(config QNAConfig) *QNAProvider {
 			continue
 		}
 
+		baseURL := strings.TrimSpace(configured.BaseURL)
+		if baseURL == "" {
+			baseURL = strings.TrimSpace(config.BaseURL)
+		}
+		apiKey := strings.TrimSpace(configured.APIKey)
+		if apiKey == "" {
+			apiKey = strings.TrimSpace(config.APIKey)
+		}
+
 		switch ProtocolType(strings.ToLower(strings.TrimSpace(configured.Protocol))) {
 		case ProtocolTypeFalQueue:
 			modelAdapterConfig := adapterConfig
+			modelAdapterConfig.BaseURL = baseURL
+			modelAdapterConfig.APIKey = apiKey
 			modelAdapterConfig.CreatePath = path.Join("/queue", model, "image-to-video")
 			modelAdapterConfig.ResultPath = path.Join("/queue", model, "requests")
 			provider.adapters[key] = newQNAFalQueueAdapter(modelAdapterConfig)
