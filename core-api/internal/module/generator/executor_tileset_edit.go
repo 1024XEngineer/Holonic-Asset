@@ -174,6 +174,26 @@ func resolveTileSetTargets(
 	content assetdomain.AssetContent,
 	dimensions assetdomain.TileSetDimensions,
 ) ([]tileSetResolvedTarget, error) {
+	positions, err := indexTileSetContent(content, dimensions)
+	if err != nil {
+		return nil, err
+	}
+	resolved := make([]tileSetResolvedTarget, len(requested))
+	for index, target := range requested {
+		position := assetdomain.TilePosition{X: *target.Position.X, Y: *target.Position.Y}
+		match, found := positions[position]
+		if !found {
+			return nil, invalidTaskPayload("Tileset target position (%d,%d) is not occupied", position.X, position.Y)
+		}
+		resolved[index] = match
+	}
+	return resolved, nil
+}
+
+func indexTileSetContent(
+	content assetdomain.AssetContent,
+	dimensions assetdomain.TileSetDimensions,
+) (map[assetdomain.TilePosition]tileSetResolvedTarget, error) {
 	positions := make(map[assetdomain.TilePosition]tileSetResolvedTarget)
 	for itemIndex, item := range content.Items {
 		for tileIndex, tile := range item.Tiles {
@@ -191,16 +211,7 @@ func resolveTileSetTargets(
 			positions[position] = tileSetResolvedTarget{itemIndex: itemIndex, tileIndex: tileIndex}
 		}
 	}
-	resolved := make([]tileSetResolvedTarget, len(requested))
-	for index, target := range requested {
-		position := assetdomain.TilePosition{X: *target.Position.X, Y: *target.Position.Y}
-		match, found := positions[position]
-		if !found {
-			return nil, invalidTaskPayload("Tileset target position (%d,%d) is not occupied", position.X, position.Y)
-		}
-		resolved[index] = match
-	}
-	return resolved, nil
+	return positions, nil
 }
 
 func (e *executor) resolveTileSetEditReferences(
@@ -208,15 +219,24 @@ func (e *executor) resolveTileSetEditReferences(
 	project *projectdomain.Project,
 	creatingReference string,
 ) ([]string, error) {
+	return e.resolveTileSetContextReferences(ctx, EditTiles, project, creatingReference)
+}
+
+func (e *executor) resolveTileSetContextReferences(
+	ctx context.Context,
+	taskType TaskType,
+	project *projectdomain.Project,
+	creatingReference string,
+) ([]string, error) {
 	references := make([]string, 0, 2)
 	if creatingReference != "" {
-		resolved, err := e.resolveReferences(ctx, EditTiles, []string{creatingReference})
+		resolved, err := e.resolveReferences(ctx, taskType, []string{creatingReference})
 		if err != nil {
 			return nil, err
 		}
 		references = append(references, resolved...)
 	}
-	projectReferences, err := e.resolveReferences(ctx, EditTiles, referenceImages(project.Reference))
+	projectReferences, err := e.resolveReferences(ctx, taskType, referenceImages(project.Reference))
 	if err != nil {
 		return nil, err
 	}

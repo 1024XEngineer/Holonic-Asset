@@ -25,15 +25,17 @@ const (
 )
 
 type processedTileSetItem struct {
-	Index       int
-	Name        string
-	Columns     int
-	Rows        int
-	ImageBase64 string
-	MIMEType    string
-	LocalShape  []TileSetCoordinate
-	Tiles       []imageprocessor.ImageRegion
-	Perspective assetdomain.Perspective
+	Index          int
+	Name           string
+	Columns        int
+	Rows           int
+	ImageBase64    string
+	MIMEType       string
+	RawImageBase64 string
+	RawMediaType   string
+	LocalShape     []TileSetCoordinate
+	Tiles          []imageprocessor.ImageRegion
+	Perspective    assetdomain.Perspective
 }
 
 func (e *executor) generateTileSet(
@@ -344,24 +346,18 @@ func (e *executor) processTileSetItemCandidate(
 		tiles[coordinateIndex] = split.Regions[coordinate[1]*columns+coordinate[0]]
 	}
 	return &processedTileSetItem{
-		Index:       index,
-		Name:        item.Name,
-		Columns:     columns,
-		Rows:        rows,
-		ImageBase64: aligned,
-		MIMEType:    resized.MIMEType,
-		LocalShape:  localShape,
-		Tiles:       tiles,
-		Perspective: perspective,
+		Index:          index,
+		Name:           item.Name,
+		Columns:        columns,
+		Rows:           rows,
+		ImageBase64:    aligned,
+		MIMEType:       resized.MIMEType,
+		RawImageBase64: candidate.Base64,
+		RawMediaType:   candidate.MediaType,
+		LocalShape:     localShape,
+		Tiles:          tiles,
+		Perspective:    perspective,
 	}, nil
-}
-
-type tileSetTileUpload struct {
-	itemIndex int
-	tileIndex int
-	position  TileSetCoordinate
-	region    imageprocessor.ImageRegion
-	objectKey string
 }
 
 func (e *executor) publishTileSet(
@@ -388,17 +384,7 @@ func (e *executor) publishTileSet(
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode Tileset dimensions: %w", err))
 	}
-	contentItems := make([]assetdomain.TileSetItem, len(items))
-	for _, upload := range uploads {
-		if contentItems[upload.itemIndex].Name == "" {
-			contentItems[upload.itemIndex].Name = items[upload.itemIndex].Name
-		}
-		key := upload.objectKey
-		contentItems[upload.itemIndex].Tiles = append(contentItems[upload.itemIndex].Tiles, assetdomain.Tile{
-			URL:      &key,
-			Position: assetdomain.TilePosition{X: upload.position[0], Y: upload.position[1]},
-		})
-	}
+	contentItems := buildTileSetContentItems(items, uploads)
 	content, err := assetdomain.EncodeContent(assetdomain.AssetContent{Items: contentItems})
 	if err != nil {
 		return nil, cleanup(fmt.Errorf("generator: encode Tileset content: %w", err))
@@ -422,96 +408,6 @@ func (e *executor) publishTileSet(
 		return nil, cleanup(fmt.Errorf("generator: create Tileset asset: empty ID"))
 	}
 	return encodeExecutionResult(ExecutionResult{AssetID: assetID, Version: 1})
-}
-
-func buildTileSetUploads(
-	references ReferenceStore,
-	items []processedTileSetItem,
-	layout []tileSetPlacement,
-) ([]tileSetTileUpload, error) {
-	if len(items) != len(layout) {
-		return nil, fmt.Errorf("generator: Tileset layout count does not match Item count")
-	}
-	total := 0
-	for _, item := range items {
-		total += len(item.Tiles)
-	}
-	uploads := make([]tileSetTileUpload, 0, total)
-	allocated := make(map[string]struct{}, total)
-	for itemIndex, item := range items {
-		placement := layout[itemIndex]
-		if placement.ItemIndex != itemIndex || len(item.Tiles) != len(placement.Positions) {
-			return nil, fmt.Errorf("generator: Tileset Item %d layout does not match processed Tiles", itemIndex)
-		}
-		for tileIndex, region := range item.Tiles {
-			key, err := references.NewObjectKey("image/png")
-			if err != nil {
-				return nil, fmt.Errorf("generator: allocate Tileset Item %d Tile %d key: %w", itemIndex, tileIndex, err)
-			}
-			if _, duplicate := allocated[key]; duplicate {
-				return nil, fmt.Errorf("generator: allocate Tileset Item %d Tile %d key: duplicate object key %q", itemIndex, tileIndex, key)
-			}
-			allocated[key] = struct{}{}
-			uploads = append(uploads, tileSetTileUpload{
-				itemIndex: itemIndex, tileIndex: tileIndex, position: placement.Positions[tileIndex],
-				region: region, objectKey: key,
-			})
-		}
-	}
-	return uploads, nil
-}
-
-func (e *executor) persistTileSetUploads(
-	ctx context.Context,
-	uploads []tileSetTileUpload,
-) ([]string, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	semaphore := make(chan struct{}, maxTileSetItemConcurrency)
-	uploaded := make([]bool, len(uploads))
-	var group sync.WaitGroup
-	var firstErr error
-	var errOnce sync.Once
-	for index := range uploads {
-		group.Go(func() {
-			select {
-			case semaphore <- struct{}{}:
-				defer func() { <-semaphore }()
-			case <-ctx.Done():
-				return
-			}
-			upload := uploads[index]
-			dataURL := "data:" + upload.region.MIMEType + ";base64," + upload.region.ImageBase64
-			if err := e.references.PersistReferenceAt(ctx, upload.objectKey, dataURL); err != nil {
-				errOnce.Do(func() {
-					firstErr = fmt.Errorf("generator: upload Tileset Item %d Tile %d: %w", upload.itemIndex, upload.tileIndex, err)
-					cancel()
-				})
-				return
-			}
-			uploaded[index] = true
-		})
-	}
-	group.Wait()
-	keys := make([]string, 0, len(uploads))
-	for index, ok := range uploaded {
-		if ok {
-			keys = append(keys, uploads[index].objectKey)
-		}
-	}
-	if firstErr != nil {
-		if cleanupErr := e.references.DeleteObjects(context.WithoutCancel(ctx), keys); cleanupErr != nil {
-			return nil, errors.Join(firstErr, fmt.Errorf("generator: clean up partial Tileset uploads: %w", cleanupErr))
-		}
-		return nil, firstErr
-	}
-	if err := ctx.Err(); err != nil {
-		if cleanupErr := e.references.DeleteObjects(context.WithoutCancel(ctx), keys); cleanupErr != nil {
-			return nil, errors.Join(err, fmt.Errorf("generator: clean up canceled Tileset uploads: %w", cleanupErr))
-		}
-		return nil, err
-	}
-	return keys, nil
 }
 
 func buildTileSetShapeGuide(

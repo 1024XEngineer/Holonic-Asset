@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	qiniuclient "github.com/qiniu/go-sdk/v7/client"
 	qiniustorage "github.com/qiniu/go-sdk/v7/storage"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
@@ -218,6 +219,21 @@ func TestGetObjectMetadataUsesBucketManager(t *testing.T) {
 		t.Fatalf("unexpected metadata: %+v", metadata)
 	}
 	assertQiniuPrivateURL(t, metadata.ObjectURL, "https://cdn.example.com/uploads/object.webp")
+}
+
+func TestGetObjectMetadataClassifiesMissingObject(t *testing.T) {
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create object store: %v", err)
+	}
+	store.bucketManager = &bucketManagerStub{statErr: &qiniuclient.ErrorInfo{
+		Code: 612,
+		Err:  "no such file or directory",
+	}}
+
+	if _, err := store.GetObjectMetadata(context.Background(), "uploads/missing.png"); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("expected object-not-found error, got %v", err)
+	}
 }
 
 func TestReferenceNormalizationAndResolutionUsesManagedStorage(t *testing.T) {

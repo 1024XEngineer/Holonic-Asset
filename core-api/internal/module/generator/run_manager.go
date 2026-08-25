@@ -195,6 +195,19 @@ func (e *Engine) prepareTaskPayload(ctx context.Context, projectID uint, payload
 		return value, nil
 	case CreateTileSetPayload:
 		return value, nil
+	case AddTilesetItemPayload:
+		if e.assets == nil {
+			return nil, ErrAssetReaderRequired
+		}
+		asset, err := e.assets.GetDetail(ctx, value.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("generator: load Tileset asset %d for Item addition: %w", value.AssetID, err)
+		}
+		if err := validateAddTilesetItemAsset(asset, value); err != nil {
+			return nil, err
+		}
+		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
+		return value, err
 	case EditTilesetItemPayload:
 		var err error
 		value.CreatingReference, err = persistReference("creating", value.CreatingReference)
@@ -446,6 +459,30 @@ func buildTaskPayload(request *Request) (any, error) {
 			Items:         parameters.Items,
 		}
 		if err := validateCreateTileSetPayload(&payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	case AddTilesetItem:
+		parameters := struct {
+			CreatingReference string                    `json:"creating_reference,omitempty"`
+			Item              *AddTileSetItemDefinition `json:"item"`
+		}{}
+		if len(request.TargetAssetPaths) != 0 {
+			return nil, invalidTaskPayload("add_tileset_item does not accept targetAssetPaths")
+		}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		payload := AddTilesetItemPayload{
+			ProjectID:         request.ProjectID,
+			CreativeBrief:     request.CreativeBrief,
+			CreatingReference: parameters.CreatingReference,
+			Item:              parameters.Item,
+		}
+		if request.AssetID != nil {
+			payload.AssetID = *request.AssetID
+		}
+		if err := validateAddTilesetItemPayload(&payload); err != nil {
 			return nil, err
 		}
 		return payload, nil

@@ -10,6 +10,7 @@ NON-OVERRIDABLE STYLE RULES:
 - Use a coarse square pixel grid, crisp hard edges, stepped silhouettes, intentional pixel clusters, selective dithering, and a small deliberate colour palette.
 - Do not use anti-aliasing, subpixel detail, smooth curves, gradients, soft shadows, ambient occlusion, depth of field, texture filtering, or smooth resampling.
 - Express depth only through flat pixel clusters and hard-edged value groups in the requested game-camera perspective.
+- Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbour scaling. Never turn it into a high-definition illustration.
 
 AUTHORITATIVE SHAPE GUIDE:
 - The first reference image is a generated occupancy guide, not a style reference.
@@ -41,7 +42,7 @@ OUTPUT CONTRACT:
 - Return exactly one complete Item image whose canvas is the occupied cells' bounding rectangle.
 - Preserve the guide grid and keep every occupied cell aligned to the same pixel density.
 - Keep one connected opaque Item across all occupied cells; never separate neighbouring Tiles with matte or transparent lines.
-- Fill all protected regions with one flat, opaque pure green #00ff00 matte.
+- Fill all protected regions and any unoccupied background area outside the Item with one flat, opaque pure green #00ff00 matte for deterministic background removal. Do not draw a black background box, white glow, or checkerboard pattern.
 - Replace every black occupied region with clearly visible, opaque Item artwork. Never return the black/green guide unchanged or leave an occupied cell as matte.
 - Keep the outermost canvas border pure #00ff00 wherever it is protected so the processor can identify one border-connected matte region.
 - Use colours with clear RGB separation from #00ff00 for every Item pixel; green design details must use a visibly different hue or value.

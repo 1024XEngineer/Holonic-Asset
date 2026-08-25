@@ -1,6 +1,11 @@
 package generator
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
+)
 
 type tileSetPlacement struct {
 	ItemIndex int
@@ -144,4 +149,84 @@ func findFirstTileSetPlacement(
 		}
 	}
 	return TileSetCoordinate{}, nil, false
+}
+
+func resolveAddedTileSetItemPlacement(
+	request AddTilesetItemPayload,
+	content assetdomain.AssetContent,
+	dimensions assetdomain.TileSetDimensions,
+) (tileSetPlacement, error) {
+	if request.Item == nil {
+		return tileSetPlacement{}, invalidTaskPayload("item is required")
+	}
+	if len(content.Items) >= maxTileSetItems {
+		return tileSetPlacement{}, invalidTaskPayload("Tileset already contains the maximum of %d Items", maxTileSetItems)
+	}
+	name := strings.TrimSpace(request.Item.Name)
+	for _, existing := range content.Items {
+		if strings.EqualFold(strings.TrimSpace(existing.Name), name) {
+			return tileSetPlacement{}, invalidTaskPayload("Tileset Item name %q already exists", name)
+		}
+	}
+	definition := TileSetItemDefinition{
+		Name: request.Item.Name, Description: request.Item.Description, Shape: request.Item.Shape,
+	}
+	if err := validateTileSetItemDefinition("item", definition, dimensions); err != nil {
+		return tileSetPlacement{}, err
+	}
+	occupied, err := indexTileSetContent(content, dimensions)
+	if err != nil {
+		return tileSetPlacement{}, err
+	}
+	occupiedCells := make(map[TileSetCoordinate]struct{}, len(occupied))
+	for position := range occupied {
+		occupiedCells[TileSetCoordinate{position.X, position.Y}] = struct{}{}
+	}
+	localShape, err := normalizeTileSetShape(request.Item.Shape)
+	if err != nil {
+		return tileSetPlacement{}, invalidTaskPayload("item.shape is invalid: %v", err)
+	}
+	columns, rows := int(dimensions.TileAmount.Columns), int(dimensions.TileAmount.Rows)
+	if request.Item.Origin != nil {
+		origin := TileSetCoordinate{*request.Item.Origin.X, *request.Item.Origin.Y}
+		positions, placeErr := placeTileSetShapeAtOrigin(localShape, occupiedCells, origin, columns, rows)
+		if placeErr != nil {
+			return tileSetPlacement{}, placeErr
+		}
+		return tileSetPlacement{Origin: origin, Positions: positions}, nil
+	}
+	origin, positions, found := findFirstTileSetPlacement(localShape, occupiedCells, columns, rows)
+	if !found {
+		return tileSetPlacement{}, invalidTaskPayload(
+			"Tileset Item %q does not fit in the remaining %dx%d grid", name, columns, rows,
+		)
+	}
+	return tileSetPlacement{Origin: origin, Positions: positions}, nil
+}
+
+func placeTileSetShapeAtOrigin(
+	shape []TileSetCoordinate,
+	occupied map[TileSetCoordinate]struct{},
+	origin TileSetCoordinate,
+	columns int,
+	rows int,
+) ([]TileSetCoordinate, error) {
+	positions := make([]TileSetCoordinate, len(shape))
+	for index, cell := range shape {
+		position := TileSetCoordinate{origin[0] + cell[0], origin[1] + cell[1]}
+		if position[0] < 0 || position[0] >= columns || position[1] < 0 || position[1] >= rows {
+			return nil, invalidTaskPayload(
+				"item.origin (%d,%d) places item.shape outside the %dx%d grid",
+				origin[0], origin[1], columns, rows,
+			)
+		}
+		if _, collision := occupied[position]; collision {
+			return nil, invalidTaskPayload(
+				"item.origin (%d,%d) collides with occupied Tile position (%d,%d)",
+				origin[0], origin[1], position[0], position[1],
+			)
+		}
+		positions[index] = position
+	}
+	return positions, nil
 }

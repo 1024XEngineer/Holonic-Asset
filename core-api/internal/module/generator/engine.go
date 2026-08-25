@@ -25,8 +25,9 @@ type ProjectReader interface {
 }
 
 // AssetReader supplies the project-scoped list projection used for tag
-// reference selection. ThumbnailURL is the persisted first prototype image.
+// reference selection as well as detail lookup for asset validation.
 type AssetReader interface {
+	GetDetail(context.Context, uint) (assetdomain.Asset, error)
 	GetAssets(context.Context, uint, assetdomain.AssetListFilter) ([]assetdomain.Asset, error)
 }
 
