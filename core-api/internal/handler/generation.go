@@ -141,6 +141,34 @@ func (h *GenerationHandler) Cancel(
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{Cancelled: true}), nil
 }
 
+func (h *GenerationHandler) Retry(
+	ctx context.Context,
+	request dto.RetryGenerationRequest,
+) (dto.SuccessResponse[dto.RetryGenerationResponse], error) {
+	runID, err := h.runs.Retry(ctx, request.GenerationRunID)
+	if err != nil {
+		return dto.SuccessResponse[dto.RetryGenerationResponse]{}, generationRunMutationError(err)
+	}
+	return dto.NewTypedSuccessResponse(dto.RetryGenerationResponse{GenerationRunID: runID}), nil
+}
+
+func (h *GenerationHandler) Delete(
+	ctx context.Context,
+	request dto.DeleteGenerationRequest,
+) (dto.SuccessResponse[dto.DeleteGenerationResponse], error) {
+	if err := h.runs.Delete(ctx, request.GenerationRunID); err != nil {
+		return dto.SuccessResponse[dto.DeleteGenerationResponse]{}, generationRunMutationError(err)
+	}
+	return dto.NewTypedSuccessResponse(dto.DeleteGenerationResponse{Deleted: true}), nil
+}
+
+func generationRunMutationError(err error) error {
+	if errors.Is(err, generator.ErrRunNotFailed) {
+		return echo.NewHTTPError(http.StatusConflict, err.Error()).SetInternal(err)
+	}
+	return err
+}
+
 func (h *GenerationHandler) ResolveApplication(
 	ctx context.Context,
 	request dto.ResolveGenerationApplicationRequest,

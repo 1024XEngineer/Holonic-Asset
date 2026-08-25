@@ -151,7 +151,8 @@ export interface paths {
         get: operations["getGenerationRun"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete a failed generation run */
+        delete: operations["deleteGenerationRun"];
         options?: never;
         head?: never;
         patch?: never;
@@ -185,6 +186,23 @@ export interface paths {
         put?: never;
         /** Cancel a generation run */
         post: operations["cancelGenerationRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/generation-runs/{run_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a failed generation run */
+        post: operations["retryGenerationRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -440,6 +458,9 @@ export interface components {
         DeleteAssetResponse: {
             success: boolean;
         };
+        DeleteGenerationResponse: {
+            deleted: boolean;
+        };
         DeleteProjectRequest: {
             /** Format: int64 */
             projectID: number;
@@ -618,6 +639,10 @@ export interface components {
         ResolveGenerationApplicationRequest: {
             applied: boolean;
         };
+        RetryGenerationResponse: {
+            /** Format: int64 */
+            generationRunId: number;
+        };
         RollBackAssetRequest: {
             /** Format: int64 */
             assetId: number;
@@ -689,6 +714,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["DeleteAssetResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseDeleteGenerationResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["DeleteGenerationResponse"];
             /** @constant */
             message: "success";
         };
@@ -789,6 +824,16 @@ export interface components {
              */
             code: 200;
             data: components["schemas"]["RecordAssetResponse"];
+            /** @constant */
+            message: "success";
+        };
+        SuccessResponseRetryGenerationResponse: {
+            /**
+             * Format: int64
+             * @enum {integer}
+             */
+            code: 200;
+            data: components["schemas"]["RetryGenerationResponse"];
             /** @constant */
             message: "success";
         };
@@ -1333,6 +1378,55 @@ export interface operations {
             };
         };
     };
+    deleteGenerationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseDeleteGenerationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     resolveGenerationApplication: {
         parameters: {
             query?: never;
@@ -1415,6 +1509,55 @@ export interface operations {
             };
             /** @description Error */
             default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    retryGenerationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponseRetryGenerationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
