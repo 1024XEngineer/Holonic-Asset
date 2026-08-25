@@ -139,6 +139,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 		"/generation-runs/{run_id}/cancel":       {"post"},
 		"/uploads":                               {"post"},
 		"/projects/{project_id}/assets":          {"get"},
+		"/projects/{project_id}/tags":            {"get", "post"},
+		"/projects/{project_id}/tags/{tag_id}":   {"get", "put", "delete"},
 		"/asset/{asset_id}/records":              {"get"},
 		"/asset/{asset_id}":                      {"get"},
 		"/asset/save":                            {"post"},
