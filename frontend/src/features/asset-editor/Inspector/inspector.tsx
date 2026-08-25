@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpriteInspectorContent } from "./sprite";
 import { InspectorHistory } from "./history";
 import { SceneryInspectorContent } from "./scenery";
+import { TilesetInspectorContent } from "./tileset";
 import type { InspectorProps } from "./inspector.types";
 
 export type { InspectorSubmitRequest } from "./inspector.types";
@@ -36,6 +37,16 @@ export function Inspector(props: InspectorProps) {
                 dimensions={props.dimensions}
                 visible={props.visible}
                 onToggleVisibility={props.onToggleVisibility}
+              />
+            ) : props.kind === "tileset" ? (
+              <TilesetInspectorContent
+                prompt={props.prompt}
+                target={props.target}
+                targetError={props.targetError}
+                isSubmitting={props.isSubmitting}
+                onPromptChange={props.onPromptChange}
+                onSubmit={props.onSubmit}
+                onClearSelection={props.onClearSelection}
               />
             ) : (
               <SpriteInspectorContent

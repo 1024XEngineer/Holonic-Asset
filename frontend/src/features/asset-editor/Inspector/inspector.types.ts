@@ -48,6 +48,11 @@ export type InspectorSubmitRequest = z.infer<
   typeof inspectorSubmitRequestSchema
 >;
 
+export type EditPromptSubmitRequest = {
+  prompt: string;
+  creatingReference?: InspectorCreatingReference;
+};
+
 export type SpriteInspectorProps = {
   kind: "sprite";
   selectedNodes: AnimatedSpriteNodeId[];
@@ -71,8 +76,6 @@ export type SceneryInspectorProps = {
   onToggleVisibility: () => void;
 };
 
-export type InspectorProps = SpriteInspectorProps | SceneryInspectorProps;
-
 export type SpriteInspectorContentProps = Omit<
   SpriteInspectorProps,
   "history" | "kind"
@@ -81,7 +84,7 @@ export type SpriteInspectorContentProps = Omit<
 export type InspectorTargetSummary = {
   label: string;
   detail: string;
-  thumbnail: {
+  thumbnail?: {
     imageUrl: string;
     column: number;
     row: number;
@@ -89,3 +92,20 @@ export type InspectorTargetSummary = {
     rows: number;
   };
 };
+
+export type TilesetInspectorProps = {
+  kind: "tileset";
+  prompt: string;
+  history: AssetRevision[];
+  target: InspectorTargetSummary | null;
+  targetError: string | null;
+  isSubmitting?: boolean;
+  onPromptChange: (value: string) => void;
+  onSubmit: (request: EditPromptSubmitRequest) => void | Promise<void>;
+  onClearSelection: () => void;
+};
+
+export type InspectorProps =
+  | SpriteInspectorProps
+  | SceneryInspectorProps
+  | TilesetInspectorProps;
