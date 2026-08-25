@@ -2057,7 +2057,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Export a character or object asset",
+        "summary": "Export an asset",
         "tags": [
           "Exports"
         ]

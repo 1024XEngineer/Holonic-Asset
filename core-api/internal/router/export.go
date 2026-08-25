@@ -26,7 +26,7 @@ type getExportOutput struct {
 }
 
 func RegisterExportRoutes(api huma.API, r ExportRouter) {
-	huma.Register(api, huma.Operation{OperationID: "createAssetExport", Method: http.MethodPost, Path: "/asset/export", Summary: "Export a character or object asset", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest}}, func(ctx context.Context, input *createExportInput) (*createExportOutput, error) {
+	huma.Register(api, huma.Operation{OperationID: "createAssetExport", Method: http.MethodPost, Path: "/asset/export", Summary: "Export an asset", Tags: []string{"Exports"}, Errors: []int{http.StatusBadRequest}}, func(ctx context.Context, input *createExportInput) (*createExportOutput, error) {
 		response, err := r.Create(ctx, input.Body)
 		return &createExportOutput{Body: response}, openAPIError(err)
 	})

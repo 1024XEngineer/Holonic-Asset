@@ -192,15 +192,15 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		Assets:     workspaceModule.Assets,
 		References: references,
 	})
-	exportService := export.NewService(workspaceModule.Assets, references, artifactStore, taskManager)
-	taskManager.Register(string(export.TaskType), exportService)
+	exportManager := export.NewManager(workspaceModule.Assets, references, artifactStore, taskManager)
+	taskManager.Register(string(export.TaskType), exportManager)
 
 	// Transport.
 	assetHandler := handler.NewHandler(workspaceModule.Assets, references)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
 	generationHandler := handler.NewGenerationHandler(generatorEngine, references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
-	exportHandler := handler.NewExportHandler(exportService)
+	exportHandler := handler.NewExportHandler(exportManager)
 	authHandler := handler.NewAuthHandler(authService)
 	httpEngine := router.RegisterWithExport(
 		assetHandler,

@@ -15,10 +15,17 @@ import (
 
 var (
 	ErrInvalidRequest   = errors.New("export: invalid request")
-	ErrUnsupportedAsset = errors.New("export: only character, object, and tileSet assets are supported")
+	ErrUnsupportedAsset = errors.New("export: only character, object, tileSet, and scenery assets are supported")
 )
 
-type Service struct {
+// Manager exposes asset export use cases and task handling.
+type Manager interface {
+	Create(context.Context, CreateRequest) (CreateResponse, error)
+	Get(context.Context, uint) (ExportResponse, error)
+	Handle(context.Context, *taskdomain.Task) (any, error)
+}
+
+type manager struct {
 	assets     AssetReader
 	references ReferenceResolver
 	artifacts  ArtifactStore
@@ -26,19 +33,19 @@ type Service struct {
 	now        func() time.Time
 }
 
-func NewService(assets AssetReader, references ReferenceResolver, artifacts ArtifactStore, tasks TaskManager) *Service {
-	return &Service{assets: assets, references: references, artifacts: artifacts, tasks: tasks, now: time.Now}
+func NewManager(assets AssetReader, references ReferenceResolver, artifacts ArtifactStore, tasks TaskManager) Manager {
+	return &manager{assets: assets, references: references, artifacts: artifacts, tasks: tasks, now: time.Now}
 }
 
-func (s *Service) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	if request.AssetID == 0 || s.assets == nil || s.tasks == nil || s.artifacts == nil || s.references == nil {
+func (m *manager) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
+	if request.AssetID == 0 || m.assets == nil || m.tasks == nil || m.artifacts == nil || m.references == nil {
 		return CreateResponse{}, ErrInvalidRequest
 	}
-	snapshot, err := s.snapshot(ctx, request.AssetID, request.Version)
+	snapshot, err := m.snapshot(ctx, request.AssetID, request.Version)
 	if err != nil {
 		return CreateResponse{}, err
 	}
-	key, err := s.objectKey(snapshot)
+	key, err := m.objectKey(snapshot)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -46,19 +53,19 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (CreateResp
 	if err != nil {
 		return CreateResponse{}, fmt.Errorf("export: encode task payload: %w", err)
 	}
-	t := &taskdomain.Task{Type: string(TaskType), Payload: payload, CreatedAt: s.now().UTC(), UpdatedAt: s.now().UTC()}
-	taskID, err := s.tasks.Publish(ctx, t)
+	t := &taskdomain.Task{Type: string(TaskType), Payload: payload, CreatedAt: m.now().UTC(), UpdatedAt: m.now().UTC()}
+	taskID, err := m.tasks.Publish(ctx, t)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 	return CreateResponse{ExportID: taskID, TaskID: taskID, Status: taskdomain.StatusPending.String()}, nil
 }
 
-func (s *Service) Get(ctx context.Context, exportID uint) (ExportResponse, error) {
-	if exportID == 0 || s.tasks == nil {
+func (m *manager) Get(ctx context.Context, exportID uint) (ExportResponse, error) {
+	if exportID == 0 || m.tasks == nil {
 		return ExportResponse{}, ErrInvalidRequest
 	}
-	t, err := s.tasks.GetDetail(ctx, exportID)
+	t, err := m.tasks.GetDetail(ctx, exportID)
 	if err != nil {
 		return ExportResponse{}, err
 	}
@@ -79,10 +86,10 @@ func (s *Service) Get(ctx context.Context, exportID uint) (ExportResponse, error
 	}
 	response.FileName, response.FileSize, response.SHA256 = result.FileName, result.FileSize, result.SHA256
 	response.DownloadURL = result.DownloadURL
-	if result.ObjectKey != "" && s.artifacts != nil {
+	if result.ObjectKey != "" && m.artifacts != nil {
 		// Resolve on every status read so private object URLs are refreshed after
 		// their configured expiry instead of returning a stale task result URL.
-		response.DownloadURL, err = s.artifacts.ResolveReference(ctx, result.ObjectKey)
+		response.DownloadURL, err = m.artifacts.ResolveReference(ctx, result.ObjectKey)
 		if err != nil {
 			return ExportResponse{}, fmt.Errorf("export: resolve package URL: %w", err)
 		}
@@ -90,7 +97,7 @@ func (s *Service) Get(ctx context.Context, exportID uint) (ExportResponse, error
 	return response, nil
 }
 
-func (s *Service) Handle(ctx context.Context, t *taskdomain.Task) (any, error) {
+func (m *manager) Handle(ctx context.Context, t *taskdomain.Task) (any, error) {
 	if t == nil {
 		return nil, ErrInvalidRequest
 	}
@@ -98,14 +105,14 @@ func (s *Service) Handle(ctx context.Context, t *taskdomain.Task) (any, error) {
 	if err := json.Unmarshal(t.Payload, &payload); err != nil {
 		return nil, fmt.Errorf("export: decode payload: %w", err)
 	}
-	packageData, result, err := BuildPackage(ctx, payload.Snapshot, s.references)
+	packageData, result, err := BuildPackage(ctx, payload.Snapshot, m.references)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.artifacts.PutArtifact(ctx, payload.ObjectKey, "application/zip", packageData); err != nil {
+	if err := m.artifacts.PutArtifact(ctx, payload.ObjectKey, "application/zip", packageData); err != nil {
 		return nil, fmt.Errorf("export: upload package: %w", err)
 	}
-	url, err := s.artifacts.ResolveReference(ctx, payload.ObjectKey)
+	url, err := m.artifacts.ResolveReference(ctx, payload.ObjectKey)
 	if err != nil {
 		return nil, fmt.Errorf("export: resolve package URL: %w", err)
 	}
@@ -113,8 +120,8 @@ func (s *Service) Handle(ctx context.Context, t *taskdomain.Task) (any, error) {
 	return result, nil
 }
 
-func (s *Service) snapshot(ctx context.Context, assetID, version uint) (Snapshot, error) {
-	asset, err := s.assets.GetDetail(ctx, assetID)
+func (m *manager) snapshot(ctx context.Context, assetID, version uint) (Snapshot, error) {
+	asset, err := m.assets.GetDetail(ctx, assetID)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -127,7 +134,7 @@ func (s *Service) snapshot(ctx context.Context, assetID, version uint) (Snapshot
 	if version == 0 || version == asset.Version {
 		return Snapshot{AssetID: asset.ID, ProjectID: asset.ProjectID, Version: asset.Version, Name: asset.Name, Description: asset.Description, Type: asset.Type, Perspective: asset.Perspective, Dimensions: append([]byte(nil), asset.Dimensions...), Content: append([]byte(nil), asset.Content...)}, nil
 	}
-	records, err := s.assets.GetRecordHistory(ctx, assetID)
+	records, err := m.assets.GetRecordHistory(ctx, assetID)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -139,12 +146,12 @@ func (s *Service) snapshot(ctx context.Context, assetID, version uint) (Snapshot
 	return Snapshot{}, fmt.Errorf("export: asset %d version %d not found", assetID, version)
 }
 
-func (s *Service) objectKey(snapshot Snapshot) (string, error) {
+func (m *manager) objectKey(snapshot Snapshot) (string, error) {
 	var randomID [8]byte
 	if _, err := rand.Read(randomID[:]); err != nil {
 		return "", fmt.Errorf("export: generate object key: %w", err)
 	}
-	return fmt.Sprintf("exports/%d/%s-%s.zip", snapshot.AssetID, s.now().UTC().Format("20060102T150405Z"), hex.EncodeToString(randomID[:])), nil
+	return fmt.Sprintf("exports/%d/%s-%s.zip", snapshot.AssetID, m.now().UTC().Format("20060102T150405Z"), hex.EncodeToString(randomID[:])), nil
 }
 
 func slug(value string) string {
@@ -159,3 +166,5 @@ func slug(value string) string {
 	}
 	return strings.Trim(b.String(), "-")
 }
+
+var _ Manager = (*manager)(nil)

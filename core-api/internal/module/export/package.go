@@ -34,6 +34,7 @@ type exportAssetJSON struct {
 	Prototype      []exportResource        `json:"prototype"`
 	Animations     []exportAnimation       `json:"animations"`
 	Items          []exportTileSetItem     `json:"items,omitempty"`
+	Layers         []exportSceneryLayer    `json:"layers,omitempty"`
 }
 
 type exportResource struct {
@@ -65,6 +66,18 @@ type exportTileSetItem struct {
 type exportTileSetTile struct {
 	Path     string                   `json:"path"`
 	Position assetdomain.TilePosition `json:"position"`
+}
+
+type exportSceneryLayer struct {
+	ID        uint                 `json:"id"`
+	Name      string               `json:"name"`
+	Path      string               `json:"path"`
+	Position  assetdomain.Position `json:"position"`
+	Transform json.RawMessage      `json:"transform,omitempty"`
+	Visible   *bool                `json:"visible,omitempty"`
+	Opacity   *float64             `json:"opacity,omitempty"`
+	ZIndex    *int                 `json:"zIndex,omitempty"`
+	Metadata  map[string]any       `json:"metadata,omitempty"`
 }
 
 type manifest struct {
@@ -159,6 +172,30 @@ func BuildPackage(ctx context.Context, snapshot Snapshot, resolver ReferenceReso
 		}
 		assetJSON.Animations = append(assetJSON.Animations, out)
 	}
+	if snapshot.Type == assetdomain.AssetTypeScenery {
+		for layerIndex, layer := range content.Layers {
+			resource := strings.TrimSpace(layer.Resource)
+			if resource == "" {
+				return nil, taskResult{}, fmt.Errorf("export: scenery layer %d has no image reference", layerIndex)
+			}
+			filePath := sceneryLayerPath(layerIndex, layer.Name)
+			if _, exists := seenPaths[filePath]; exists {
+				return nil, taskResult{}, fmt.Errorf("export: duplicate package path %q", filePath)
+			}
+			seenPaths[filePath] = struct{}{}
+			data, err := fetchPNG(ctx, resolver, resource)
+			if err != nil {
+				return nil, taskResult{}, fmt.Errorf("export: scenery layer %d: %w", layerIndex, err)
+			}
+			files = append(files, packageFile{Path: filePath, Kind: "scenery-layer", ContentType: "image/png", Data: data})
+			assetJSON.Layers = append(assetJSON.Layers, exportSceneryLayer{
+				ID: layer.ID, Name: layer.Name, Path: filePath, Position: layer.Position,
+				Transform: append(json.RawMessage(nil), layer.Transform...), Visible: layer.Visible,
+				Opacity: layer.Opacity, ZIndex: layer.ZIndex, Metadata: layer.Metadata,
+			})
+		}
+	}
+
 	if snapshot.Type == assetdomain.AssetTypeTileSet {
 		for itemIndex, item := range content.Items {
 			exportedItem := exportTileSetItem{Index: uint(itemIndex), Name: item.Name, Tiles: []exportTileSetTile{}}
@@ -217,7 +254,15 @@ type packageFile struct {
 }
 
 func isSupportedAssetType(assetType assetdomain.AssetType) bool {
-	return assetType == assetdomain.AssetTypeCharacter || assetType == assetdomain.AssetTypeObject || assetType == assetdomain.AssetTypeTileSet
+	return assetType == assetdomain.AssetTypeCharacter || assetType == assetdomain.AssetTypeObject || assetType == assetdomain.AssetTypeTileSet || assetType == assetdomain.AssetTypeScenery
+}
+
+func sceneryLayerPath(index int, name string) string {
+	filePath := fmt.Sprintf("layers/%03d.png", index)
+	if value := slug(name); value != "" {
+		filePath = fmt.Sprintf("layers/%03d-%s.png", index, value)
+	}
+	return filePath
 }
 
 func tileSetItemDirectory(index int, name string) string {

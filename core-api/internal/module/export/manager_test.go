@@ -49,13 +49,13 @@ func (s *artifactStoreStub) ResolveReference(_ context.Context, key string) (str
 	return "https://download.example/" + key, nil
 }
 
-type serviceResolverStub struct{}
+type managerResolverStub struct{}
 
-func (serviceResolverStub) ResolveReference(_ context.Context, reference string) (string, error) {
+func (managerResolverStub) ResolveReference(_ context.Context, reference string) (string, error) {
 	return reference, nil
 }
 
-func servicePNGDataURL(t *testing.T) string {
+func managerPNGDataURL(t *testing.T) string {
 	t.Helper()
 	var data bytes.Buffer
 	if err := png.Encode(&data, image.NewNRGBA(image.Rect(0, 0, 1, 1))); err != nil {
@@ -64,17 +64,17 @@ func servicePNGDataURL(t *testing.T) string {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data.Bytes())
 }
 
-func TestServiceCreateSnapshotsRequestedVersionAndHandle(t *testing.T) {
-	content := json.RawMessage(`{"prototype":[{"id":1,"url":"` + servicePNGDataURL(t) + `"}]}`)
+func TestManagerCreateSnapshotsRequestedVersionAndHandle(t *testing.T) {
+	content := json.RawMessage(`{"prototype":[{"id":1,"url":"` + managerPNGDataURL(t) + `"}]}`)
 	assets := assetReaderStub{
 		detail:  assetdomain.Asset{ID: 7, ProjectID: 9, Type: assetdomain.AssetTypeObject, Name: "Chest", Version: 3, Content: json.RawMessage(`{"prototype":[]}`)},
 		records: []assetdomain.AssetRecord{{ID: 20, AssetID: 7, Version: 2, Name: "Old Chest", Content: content}},
 	}
 	tasks := &taskManagerStub{}
 	artifacts := &artifactStoreStub{}
-	service := NewService(assets, serviceResolverStub{}, artifacts, tasks)
+	manager := NewManager(assets, managerResolverStub{}, artifacts, tasks)
 
-	created, err := service.Create(context.Background(), CreateRequest{AssetID: 7, Version: 2})
+	created, err := manager.Create(context.Background(), CreateRequest{AssetID: 7, Version: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestServiceCreateSnapshotsRequestedVersionAndHandle(t *testing.T) {
 		t.Fatalf("unexpected snapshot: %+v", payload.Snapshot)
 	}
 
-	result, err := service.Handle(context.Background(), tasks.task)
+	result, err := manager.Handle(context.Background(), tasks.task)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestServiceCreateSnapshotsRequestedVersionAndHandle(t *testing.T) {
 	}
 	tasks.task.Status = taskdomain.StatusCompleted
 	tasks.task.Result = encoded
-	response, err := service.Get(context.Background(), 42)
+	response, err := manager.Get(context.Background(), 42)
 	if err != nil {
 		t.Fatal(err)
 	}
