@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsv4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/qiniu/go-sdk/v7/auth/qbox"
+	qiniuclient "github.com/qiniu/go-sdk/v7/client"
 	qiniustorage "github.com/qiniu/go-sdk/v7/storage"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
@@ -176,6 +177,10 @@ func (s *QiniuStorage) GetObjectMetadata(ctx context.Context, objectKey string) 
 
 	info, err := s.bucketManager.Stat(s.bucket, objectKey)
 	if err != nil {
+		var qiniuErr *qiniuclient.ErrorInfo
+		if errors.As(err, &qiniuErr) && qiniuErr.Code == 612 {
+			return nil, fmt.Errorf("%w: %q", ErrObjectNotFound, objectKey)
+		}
 		return nil, fmt.Errorf("upload: get object metadata %q: %w", objectKey, err)
 	}
 	privateURL, err := s.privateURL(ctx, objectKey)
