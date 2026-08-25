@@ -7,8 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
+
+type tileSetReferenceMetadataReader interface {
+	GetObjectMetadata(context.Context, string) (*upload.ObjectMetadata, error)
+}
 
 func validateAddTilesetItemAsset(asset assetdomain.Asset, request AddTilesetItemPayload) error {
 	if asset.ID == 0 {
@@ -56,7 +61,10 @@ func (e *executor) addTileSetItem(
 	}
 	creatingReference := strings.TrimSpace(request.CreatingReference)
 	if creatingReference == "" {
-		creatingReference = resolveTileSetUnprocessedReference(addition.content)
+		creatingReference, err = e.resolveExistingTileSetUnprocessedReference(ctx, addition.content)
+		if err != nil {
+			return nil, err
+		}
 	}
 	references, err := e.resolveTileSetContextReferences(
 		ctx, AddTilesetItem, addition.project, creatingReference,
@@ -97,6 +105,27 @@ func resolveTileSetUnprocessedReference(content assetdomain.AssetContent) string
 		}
 	}
 	return ""
+}
+
+func (e *executor) resolveExistingTileSetUnprocessedReference(
+	ctx context.Context,
+	content assetdomain.AssetContent,
+) (string, error) {
+	reference := resolveTileSetUnprocessedReference(content)
+	if reference == "" {
+		return "", nil
+	}
+	reader, ok := e.references.(tileSetReferenceMetadataReader)
+	if !ok {
+		return "", nil
+	}
+	if _, err := reader.GetObjectMetadata(ctx, reference); err != nil {
+		if errors.Is(err, upload.ErrObjectNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("generator: inspect automatic Tileset reference %q: %w", reference, err)
+	}
+	return reference, nil
 }
 
 func (e *executor) publishAddedTileSetItem(
