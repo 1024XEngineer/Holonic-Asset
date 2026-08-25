@@ -60,6 +60,8 @@ func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) ima
 		models = append(models, imageclient.ModelConfig{
 			Name:     model.Name,
 			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
 		})
 	}
 	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
@@ -85,6 +87,8 @@ func InitLLMService(cfg config.LLMClientConfig, appLogger ...logger.Logger) llmc
 		models = append(models, llmclient.ModelConfig{
 			Name:     model.Name,
 			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
 		})
 	}
 	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
@@ -104,6 +108,8 @@ func InitVideoService(cfg config.VideoClientConfig, appLogger logger.Logger) vid
 		models = append(models, videoclient.ModelConfig{
 			Name:     model.Name,
 			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
 		})
 	}
 	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{

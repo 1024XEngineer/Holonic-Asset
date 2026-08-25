@@ -15,6 +15,9 @@ import (
 
 func TestInitImageServiceRoutesConfiguredModelProtocol(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer model-key" {
+			t.Errorf("authorization = %q, want Bearer model-key", request.Header.Get("Authorization"))
+		}
 		if request.URL.Path != "/v1/chat/completions" {
 			t.Errorf("path = %q, want /v1/chat/completions", request.URL.Path)
 			writer.WriteHeader(http.StatusNotFound)
@@ -37,12 +40,13 @@ func TestInitImageServiceRoutesConfiguredModelProtocol(t *testing.T) {
 	defer server.Close()
 
 	service := InitImageService(config.ImageClientConfig{
-		BaseURL:      server.URL,
 		DefaultModel: "studio/custom-image",
 		Models: []config.ModelConfig{
 			{
 				Name:     "studio/custom-image",
 				Protocol: "chat_completions",
+				BaseURL:  server.URL,
+				APIKey:   "model-key",
 			},
 		},
 	}, nil)
