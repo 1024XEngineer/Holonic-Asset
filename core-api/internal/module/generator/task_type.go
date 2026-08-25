@@ -1,5 +1,7 @@
 package generator
 
+import "slices"
+
 type TaskType string
 
 const (
@@ -40,6 +42,10 @@ func (t TaskType) AwaitsApplication() bool {
 	default:
 		return false
 	}
+}
+
+func (t TaskType) Valid() bool {
+	return slices.Contains(TaskTypes(), t)
 }
 
 func TaskTypes() []TaskType {

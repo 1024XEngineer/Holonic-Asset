@@ -1,11 +1,9 @@
 import { useTranslation } from "react-i18next";
 
+import type { GenerationTaskListItem } from "@/features/generation";
 import type { AssetKind } from "@/model";
 
-import {
-  EditorHeader,
-  type EditorGenerationTask,
-} from "../Header/editor-header";
+import { EditorHeader } from "../Header/editor-header";
 
 export type EditorModeFrameProps = {
   assetKind: AssetKind;
@@ -16,7 +14,7 @@ export type EditorModeFrameProps = {
   children: React.ReactNode;
 };
 
-const emptyGenerationTasks: EditorGenerationTask[] = [];
+const emptyGenerationTasks: GenerationTaskListItem[] = [];
 const noAction = () => undefined;
 
 export function EditorModeFrame({

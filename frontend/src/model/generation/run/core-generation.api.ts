@@ -2,9 +2,11 @@ import type {
   CancelGenerationResponse,
   CreateGenerationRequest,
   CreateGenerationResponse,
+  DeleteGenerationResponse,
   GenerationRunResponse,
   ListGenerationRunsQuery,
   ListGenerationRunsResponse,
+  RetryGenerationResponse,
 } from "./generation.contract";
 import {
   coreApiClient,
@@ -37,6 +39,18 @@ export const coreGenerationApi = {
   cancel: async (runID: number) =>
     unwrapApiResponse<CancelGenerationResponse>(
       await coreApiClient.POST("/generation-runs/{run_id}/cancel", {
+        params: { path: { run_id: runID } },
+      }),
+    ),
+  retry: async (runID: number) =>
+    unwrapApiResponse<RetryGenerationResponse>(
+      await coreApiClient.POST("/generation-runs/{run_id}/retry", {
+        params: { path: { run_id: runID } },
+      }),
+    ),
+  delete: async (runID: number) =>
+    unwrapApiResponse<DeleteGenerationResponse>(
+      await coreApiClient.DELETE("/generation-runs/{run_id}", {
         params: { path: { run_id: runID } },
       }),
     ),

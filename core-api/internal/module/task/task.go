@@ -2,8 +2,11 @@ package task
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 )
+
+var ErrTaskNotFailed = errors.New("task: task is not failed")
 
 // Task is the queue-neutral task envelope. Business modules own Type and Payload semantics.
 type Task struct {

@@ -15,6 +15,8 @@ type GenerationRouter interface {
 	Create(context.Context, dto.CreateGenerationRequest) (dto.SuccessResponse[dto.CreateGenerationResponse], error)
 	List(context.Context, dto.ListGenerationRunsRequest) (dto.SuccessResponse[dto.ListGenerationRunsResponse], error)
 	Get(context.Context, dto.GetGenerationRequest) (dto.SuccessResponse[dto.GetGenerationResponse], error)
+	Retry(context.Context, dto.RetryGenerationRequest) (dto.SuccessResponse[dto.RetryGenerationResponse], error)
+	Delete(context.Context, dto.DeleteGenerationRequest) (dto.SuccessResponse[dto.DeleteGenerationResponse], error)
 	Cancel(context.Context, dto.CancelGenerationRequest) (dto.SuccessResponse[dto.CancelGenerationResponse], error)
 	ResolveApplication(context.Context, dto.ResolveGenerationApplicationRequest) error
 }
@@ -63,6 +65,18 @@ type getGenerationInput dto.GetGenerationRequest
 
 type getGenerationOutput struct {
 	Body dto.SuccessResponse[dto.GetGenerationResponse]
+}
+
+type retryGenerationInput dto.RetryGenerationRequest
+
+type retryGenerationOutput struct {
+	Body dto.SuccessResponse[dto.RetryGenerationResponse]
+}
+
+type deleteGenerationInput dto.DeleteGenerationRequest
+
+type deleteGenerationOutput struct {
+	Body dto.SuccessResponse[dto.DeleteGenerationResponse]
 }
 
 type cancelGenerationInput dto.CancelGenerationRequest
@@ -123,6 +137,30 @@ func RegisterGenerationRoutes(api huma.API, r GenerationRouter) {
 	}, func(ctx context.Context, input *getGenerationInput) (*getGenerationOutput, error) {
 		response, err := r.Get(ctx, dto.GetGenerationRequest(*input))
 		return &getGenerationOutput{Body: response}, openAPIError(err)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "deleteGenerationRun",
+		Method:      http.MethodDelete,
+		Path:        "/generation-runs/{run_id}",
+		Summary:     "Delete a failed generation run",
+		Tags:        []string{"Generation"},
+		Errors:      []int{http.StatusConflict},
+	}, func(ctx context.Context, input *deleteGenerationInput) (*deleteGenerationOutput, error) {
+		response, err := r.Delete(ctx, dto.DeleteGenerationRequest(*input))
+		return &deleteGenerationOutput{Body: response}, openAPIError(err)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "retryGenerationRun",
+		Method:      http.MethodPost,
+		Path:        "/generation-runs/{run_id}/retry",
+		Summary:     "Retry a failed generation run",
+		Tags:        []string{"Generation"},
+		Errors:      []int{http.StatusConflict},
+	}, func(ctx context.Context, input *retryGenerationInput) (*retryGenerationOutput, error) {
+		response, err := r.Retry(ctx, dto.RetryGenerationRequest(*input))
+		return &retryGenerationOutput{Body: response}, openAPIError(err)
 	})
 
 	huma.Register(api, huma.Operation{

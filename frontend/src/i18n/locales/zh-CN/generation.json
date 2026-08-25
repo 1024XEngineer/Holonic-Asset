@@ -77,6 +77,13 @@
   "queue": "生成队列",
   "task_one": "个任务",
   "task_other": "个任务",
+  "retry": "重试",
+  "delete": "删除",
+  "retryTask": "重试 {{name}}",
+  "deleteTask": "删除 {{name}}",
+  "deleteTaskConfirm": "删除失败任务“{{name}}”？",
+  "deleteTaskDescription": "该操作会从生成队列中移除这个失败任务，且无法撤销。",
+  "taskActionError": "无法更新该任务，请重试。",
   "status": {
     "pending": "待处理",
     "processing": "处理中",

@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
 	"github.com/1024XEngineer/Holonic-Asset/internal/repository/dao"
@@ -69,6 +70,96 @@ func (r *TaskRepositoryImpl) CreateWithOutbox(ctx context.Context, task *domain.
 		return 0, err
 	}
 	return task.ID, nil
+}
+
+func (r *TaskRepositoryImpl) RetryFailedTask(
+	ctx context.Context,
+	taskID uint,
+	completionStatus domain.Status,
+) error {
+	return r.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		persisted, err := lockTask(ctx, tx, taskID)
+		if err != nil {
+			return err
+		}
+		if domain.Status(persisted.Status) != domain.StatusFailed {
+			return failedTaskStatusError(taskID, domain.Status(persisted.Status))
+		}
+
+		result := tx.WithContext(ctx).
+			Model(&dao.Task{}).
+			Where("id = ? AND status = ?", taskID, uint(domain.StatusFailed)).
+			Updates(map[string]any{
+				"status": uint(domain.StatusPending),
+				"result": nil,
+				"error":  "",
+			})
+		if result.Error != nil {
+			return fmt.Errorf("repo: reset failed task %d: %w", taskID, result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return failedTaskStatusError(taskID, domain.Status(persisted.Status))
+		}
+
+		message := taskFromDAO(persisted)
+		message.Status = domain.StatusPending
+		message.CompletionStatus = completionStatus
+		message.Result = nil
+		message.Error = ""
+		payload, err := json.Marshal(message)
+		if err != nil {
+			return fmt.Errorf("repo: marshal retried task %d: %w", taskID, err)
+		}
+		outbox := &dao.Outbox{
+			TaskID:   taskID,
+			TaskType: message.Type,
+			Payload:  datatypes.JSON(payload),
+		}
+		if err := r.OutboxDao.Insert(ctx, tx, outbox); err != nil {
+			return fmt.Errorf("repo: insert retry outbox for task %d: %w", taskID, err)
+		}
+		return nil
+	})
+}
+
+func (r *TaskRepositoryImpl) DeleteFailedTask(ctx context.Context, taskID uint) error {
+	return r.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		persisted, err := lockTask(ctx, tx, taskID)
+		if err != nil {
+			return err
+		}
+		if domain.Status(persisted.Status) != domain.StatusFailed {
+			return failedTaskStatusError(taskID, domain.Status(persisted.Status))
+		}
+
+		if err := tx.WithContext(ctx).Where("task_id = ?", taskID).Delete(&dao.Outbox{}).Error; err != nil {
+			return fmt.Errorf("repo: delete outbox records for task %d: %w", taskID, err)
+		}
+		result := tx.WithContext(ctx).
+			Where("id = ? AND status = ?", taskID, uint(domain.StatusFailed)).
+			Delete(&dao.Task{})
+		if result.Error != nil {
+			return fmt.Errorf("repo: delete failed task %d: %w", taskID, result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return failedTaskStatusError(taskID, domain.Status(persisted.Status))
+		}
+		return nil
+	})
+}
+
+func lockTask(ctx context.Context, tx *gorm.DB, taskID uint) (*dao.Task, error) {
+	var persisted dao.Task
+	if err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&persisted, taskID).Error; err != nil {
+		return nil, fmt.Errorf("repo: lock task %d: %w", taskID, err)
+	}
+	return &persisted, nil
+}
+
+func failedTaskStatusError(taskID uint, status domain.Status) error {
+	return fmt.Errorf("%w: task %d has status %s", domain.ErrTaskNotFailed, taskID, status)
 }
 
 func (r *TaskRepositoryImpl) UpdateTaskStatus(ctx context.Context, taskID uint, status domain.Status) error {

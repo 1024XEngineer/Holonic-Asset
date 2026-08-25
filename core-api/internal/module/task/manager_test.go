@@ -17,11 +17,25 @@ type taskStoreStub struct {
 	failure       string
 	failureCalls  int
 	listFilter    *ListFilter
+	retriedID     uint
+	retryStatus   Status
+	deletedID     uint
 }
 
 func (s *taskStoreStub) CreateWithOutbox(_ context.Context, task *Task) (uint, error) {
 	s.createdTask = task
 	return 42, nil
+}
+
+func (s *taskStoreStub) RetryFailedTask(_ context.Context, taskID uint, completionStatus Status) error {
+	s.retriedID = taskID
+	s.retryStatus = completionStatus
+	return nil
+}
+
+func (s *taskStoreStub) DeleteFailedTask(_ context.Context, taskID uint) error {
+	s.deletedID = taskID
+	return nil
 }
 
 func (*taskStoreStub) GetTaskByID(context.Context, uint) (*Task, error) {
@@ -79,6 +93,20 @@ func TestManagerDelegatesTaskOperations(t *testing.T) {
 	}
 	if id != 42 || store.createdTask != message {
 		t.Fatalf("unexpected create delegation: id=%d task=%p", id, store.createdTask)
+	}
+
+	if err := manager.RetryFailed(context.Background(), id, StatusAwaitingApplication); err != nil {
+		t.Fatalf("retry failed task: %v", err)
+	}
+	if store.retriedID != id || store.retryStatus != StatusAwaitingApplication {
+		t.Fatalf("unexpected retry delegation: id=%d status=%s", store.retriedID, store.retryStatus)
+	}
+
+	if err := manager.DeleteFailed(context.Background(), id); err != nil {
+		t.Fatalf("delete failed task: %v", err)
+	}
+	if store.deletedID != id {
+		t.Fatalf("unexpected delete delegation: id=%d", store.deletedID)
 	}
 
 	detail, err := manager.GetDetail(context.Background(), id)

@@ -1,12 +1,13 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AssetKindIcon } from "@/components/asset-kind";
 import { Badge } from "@/components/ui/badge";
 import { isGenerationRunActive, type GenerationRun } from "@/model/generation";
 
+import { GenerationTaskList } from "./generation-task-list";
+
 export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
-  const { t } = useTranslation(["generation", "common"]);
+  const { t } = useTranslation("generation");
   if (runs.length === 0) return null;
   const hasActiveRuns = runs.some(isGenerationRunActive);
 
@@ -29,34 +30,7 @@ export function GenerationQueue({ runs }: { runs: GenerationRun[] }) {
         </Badge>
       </div>
       <div className="mt-3 divide-y border-y" aria-live="polite">
-        {runs.map((run) => {
-          const isFailed = run.status === "failed";
-
-          return (
-            <div key={run.id} className="flex min-w-0 items-center gap-3 py-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-                <AssetKindIcon kind={run.kind} className="size-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{run.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {run.prompt}
-                </p>
-              </div>
-              <span className="hidden shrink-0 text-xs text-muted-foreground md:block">
-                {t(`common:assetKinds.${run.kind}`)}
-              </span>
-              <Badge variant={isFailed ? "destructive" : "outline"}>
-                {isFailed ? (
-                  <AlertCircle />
-                ) : (
-                  <LoaderCircle className="animate-spin" />
-                )}
-                {t(`status.${run.status}`)}
-              </Badge>
-            </div>
-          );
-        })}
+        <GenerationTaskList tasks={runs} variant="queue" />
       </div>
     </section>
   );

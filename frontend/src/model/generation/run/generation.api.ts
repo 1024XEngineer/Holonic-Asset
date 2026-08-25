@@ -29,12 +29,14 @@ export type {
   CancelGenerationResponse,
   CreateGenerationRequest,
   CreateGenerationResponse,
+  DeleteGenerationResponse,
   GenerationRunListItemResponse,
   GenerationRunResponse,
   GenerationTaskStatus,
   GenerationTaskType,
   ListGenerationRunsQuery,
   ListGenerationRunsResponse,
+  RetryGenerationResponse,
 } from "./generation.contract";
 
 export type GenerationApi = {

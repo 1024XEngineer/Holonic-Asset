@@ -30,6 +30,8 @@ type TaskExecutionStore interface {
 // TaskStore provides task persistence and transactional outbox creation.
 type TaskStore interface {
 	CreateWithOutbox(ctx context.Context, task *Task) (uint, error)
+	RetryFailedTask(ctx context.Context, taskID uint, completionStatus Status) error
+	DeleteFailedTask(ctx context.Context, taskID uint) error
 	GetTaskByID(ctx context.Context, taskID uint) (*Task, error)
 	ListTasks(ctx context.Context, filter *ListFilter) ([]*Task, error)
 	TaskExecutionStore

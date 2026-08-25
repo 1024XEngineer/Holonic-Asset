@@ -3,14 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { GenerationTaskListItem } from "@/features/generation";
 import type { AssetKind } from "@/model";
 
-import {
-  GenerationTaskDropdown,
-  type EditorGenerationTask,
-} from "./generation-task-dropdown";
-
-export type { EditorGenerationTask } from "./generation-task-dropdown";
+import { GenerationTaskDropdown } from "./generation-task-dropdown";
 
 export type EditorHeaderProps = {
   assetKind: AssetKind;
@@ -23,7 +19,7 @@ export type EditorHeaderProps = {
   canRedo: boolean;
   isDirty: boolean;
   isSaving: boolean;
-  generationTasks: EditorGenerationTask[];
+  generationTasks: GenerationTaskListItem[];
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;

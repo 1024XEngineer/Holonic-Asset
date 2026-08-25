@@ -49,6 +49,20 @@ func (*generationRouterStub) Cancel(
 	return dto.NewTypedSuccessResponse(dto.CancelGenerationResponse{}), nil
 }
 
+func (*generationRouterStub) Retry(
+	context.Context,
+	dto.RetryGenerationRequest,
+) (dto.SuccessResponse[dto.RetryGenerationResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.RetryGenerationResponse{GenerationRunID: 7}), nil
+}
+
+func (*generationRouterStub) Delete(
+	context.Context,
+	dto.DeleteGenerationRequest,
+) (dto.SuccessResponse[dto.DeleteGenerationResponse], error) {
+	return dto.NewTypedSuccessResponse(dto.DeleteGenerationResponse{Deleted: true}), nil
+}
+
 func (*generationRouterStub) ResolveApplication(
 	context.Context,
 	dto.ResolveGenerationApplicationRequest,
@@ -75,6 +89,17 @@ func TestGenerationRoutesAreRegistered(t *testing.T) {
 		{
 			method:         http.MethodGet,
 			path:           "/api/v1/generation-runs/7",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			method:         http.MethodDelete,
+			path:           "/api/v1/generation-runs/7",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			method:         http.MethodPost,
+			path:           "/api/v1/generation-runs/7/retry",
+			body:           `{}`,
 			expectedStatus: http.StatusOK,
 		},
 		{
