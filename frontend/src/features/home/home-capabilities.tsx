@@ -6,6 +6,7 @@ import {
   Layers3,
   Music,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 
 const capabilities = [
@@ -150,11 +151,7 @@ function CapabilityPreview({
 }: {
   title: string;
   preview: { readonly src: string; readonly alt: string } | undefined;
-  Icon: (props: {
-    className: string;
-    strokeWidth: number;
-    "aria-hidden": true;
-  }) => React.ReactNode;
+  Icon: LucideIcon;
   imageAlt: string;
   sceneryAlt: string;
   sceneryTreesAlt: string;
