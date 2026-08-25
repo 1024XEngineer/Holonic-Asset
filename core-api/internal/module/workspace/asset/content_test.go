@@ -240,3 +240,13 @@ func TestAssetContentPreservesTileGridPositionWithoutDimensions(t *testing.T) {
 		t.Fatalf("tileSize belongs to asset dimensions: %s", payload)
 	}
 }
+
+func TestEncodeContentReturnsErrorForUnsupportedMetadataValue(t *testing.T) {
+	content := domain.AssetContent{
+		Metadata: map[string]any{"unsupported": make(chan int)},
+	}
+
+	if _, err := domain.EncodeContent(content); err == nil {
+		t.Fatal("expected encoding unsupported metadata value to fail")
+	}
+}
