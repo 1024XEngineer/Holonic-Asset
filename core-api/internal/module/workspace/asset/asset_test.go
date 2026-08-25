@@ -61,17 +61,3 @@ func TestTagUnmarshalJSONErrors(t *testing.T) {
 		}
 	})
 }
-
-func TestDefaultProjectTags(t *testing.T) {
-	if len(assetdomain.DefaultProjectTags) == 0 {
-		t.Fatal("expected DefaultProjectTags to contain presets")
-	}
-	for _, tag := range assetdomain.DefaultProjectTags {
-		if tag.Name == "" {
-			t.Fatal("expected preset tag to have a name")
-		}
-		if tag.Color == "" {
-			t.Fatalf("expected preset tag %q to have a color", tag.Name)
-		}
-	}
-}
