@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     reset: vi.fn(),
   },
   generationQuery: { data: undefined as unknown[] | undefined },
+  projectTagsQuery: { data: [] as unknown[], error: null as Error | null },
   library: {
     counts: {} as Record<AssetKind, number>,
     filteredAssets: [] as AssetLibraryItem[],
@@ -39,6 +40,8 @@ const mocks = vi.hoisted(() => ({
     mutateAsync: vi.fn(),
     reset: vi.fn(),
   },
+  createTag: { mutateAsync: vi.fn() },
+  updateTag: { mutateAsync: vi.fn() },
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -75,6 +78,12 @@ vi.mock("@/model/generation", () => ({
   useGenerationRunsQuery: () => mocks.generationQuery,
 }));
 
+vi.mock("@/model/project", () => ({
+  useProjectTagsQuery: () => mocks.projectTagsQuery,
+  useCreateProjectTagMutation: () => mocks.createTag,
+  useUpdateProjectTagMutation: () => mocks.updateTag,
+}));
+
 vi.mock("./use-asset-library", () => ({
   useAssetLibrary: () => mocks.library,
 }));
@@ -107,6 +116,8 @@ beforeEach(() => {
   mocks.assetQuery.error = null;
   mocks.assetQuery.isPending = false;
   mocks.generationQuery.data = undefined;
+  mocks.projectTagsQuery.data = [];
+  mocks.projectTagsQuery.error = null;
   mocks.collection.find.mockReturnValue(undefined);
   mocks.library.filteredAssets = [];
   mocks.library.selectedKinds = ["character"];
@@ -120,6 +131,8 @@ beforeEach(() => {
   mocks.update.error = null;
   mocks.update.isPending = false;
   mocks.update.mutateAsync.mockResolvedValue(undefined);
+  mocks.createTag.mutateAsync.mockResolvedValue(undefined);
+  mocks.updateTag.mutateAsync.mockResolvedValue(undefined);
 });
 
 describe("useAssetLibraryController", () => {
