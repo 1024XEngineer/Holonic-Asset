@@ -30,6 +30,7 @@ const (
 	defaultAnimationAspectRatio         = "1:1"
 	animationVideoAttempts              = 2
 	animationReferenceSize              = 1024
+	animationExpandedReferenceSize      = 1920
 	maxAnimationReferenceBytes          = 32 << 20
 	defaultAnimationReferenceMaxRetries = 3
 	defaultAnimationReferenceTimeout    = 45 * time.Second
@@ -147,10 +148,15 @@ type AnimationGenerationRequest struct {
 	Columns                int
 	FrameWidth             int
 	FrameHeight            int
-	FPS                    int
-	Resolution             string
-	Duration               int
-	AspectRatio            string
+	// PrototypeWidth and PrototypeHeight describe the source prototype canvas.
+	// They let reference preparation add animation padding without reducing the
+	// subject relative to its prototype.
+	PrototypeWidth  int
+	PrototypeHeight int
+	FPS             int
+	Resolution      string
+	Duration        int
+	AspectRatio     string
 
 	continuityReferenceFrames []image.Image
 }
@@ -296,6 +302,10 @@ func (s *animationGenerationService) Generate(
 		Action:             options.Action,
 		OriginalAction:     options.OriginalAction,
 		FrameCount:         options.FrameCount,
+		PrototypeWidth:     options.PrototypeWidth,
+		PrototypeHeight:    options.PrototypeHeight,
+		FrameWidth:         options.FrameWidth,
+		FrameHeight:        options.FrameHeight,
 		LocalFrameEdit:     options.ReferenceImageContext,
 		TargetFrameIndices: options.TargetFrameIndices,
 	}
@@ -303,6 +313,10 @@ func (s *animationGenerationService) Generate(
 		ctx,
 		options.ReferenceImage,
 		options.ReferenceImagePrepared,
+		options.PrototypeWidth,
+		options.PrototypeHeight,
+		options.FrameWidth,
+		options.FrameHeight,
 	)
 	if err != nil {
 		return nil, err
@@ -313,12 +327,21 @@ func (s *animationGenerationService) Generate(
 			ctx,
 			options.EndReferenceImage,
 			options.ReferenceImagePrepared,
+			options.PrototypeWidth,
+			options.PrototypeHeight,
+			options.FrameWidth,
+			options.FrameHeight,
 		)
 		if prepareErr != nil {
 			return nil, fmt.Errorf("generator: prepare end animation reference: %w", prepareErr)
 		}
 		endReference = &videoclient.ReferenceImage{Base64: greenEndReference, MediaType: "image/png"}
 	}
+	initialReferenceLongEdge, err := animationReferenceLongEdge(greenReference)
+	if err != nil {
+		return nil, fmt.Errorf("generator: inspect animation reference dimensions: %w", err)
+	}
+	currentReferenceLongEdge := initialReferenceLongEdge
 
 	baseVideoPrompt := prompts.BuildAnimationVideo(promptOptions)
 	videoPrompt := baseVideoPrompt
@@ -343,7 +366,13 @@ func (s *animationGenerationService) Generate(
 		if downloadErr != nil {
 			return nil, fmt.Errorf("generator: download animation video: %w", downloadErr)
 		}
-		processed, processErr := s.processVideo(ctx, video, options)
+		sourceCellScaleMultiplier := float64(currentReferenceLongEdge) / float64(initialReferenceLongEdge)
+		processed, processErr := s.processVideoWithSourceCellScale(
+			ctx,
+			video,
+			options,
+			sourceCellScaleMultiplier,
+		)
 		if processErr == nil {
 			processed.VideoRequestID = videoResult.RequestID
 			processed.VideoAttempts = attempt
@@ -355,125 +384,47 @@ func (s *animationGenerationService) Generate(
 			return nil, fmt.Errorf("generator: process animation video: %w", processErr)
 		}
 		lastQualityError = processErr
+		if qualityError.Kind == "framing" {
+			greenReference, err = expandAnimationReferenceCanvas(
+				greenReference,
+				animationExpandedReferenceSize,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("generator: expand animation start reference after framing failure: %w", err)
+			}
+			currentReferenceLongEdge, err = animationReferenceLongEdge(greenReference)
+			if err != nil {
+				return nil, fmt.Errorf("generator: inspect expanded animation reference dimensions: %w", err)
+			}
+			if endReference != nil {
+				endReference.Base64, err = expandAnimationReferenceCanvas(
+					endReference.Base64,
+					animationExpandedReferenceSize,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("generator: expand animation end reference after framing failure: %w", err)
+				}
+			}
+		}
 		videoPrompt = prompts.BuildAnimationVideoRetry(baseVideoPrompt, qualityError.Kind)
 	}
 	return nil, fmt.Errorf("generator: process animation video: %w", lastQualityError)
 }
 
-func normalizeAnimationGenerationRequest(
-	request *AnimationGenerationRequest,
-) (AnimationGenerationRequest, error) {
-	if request == nil {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation generation request is required")
-	}
-	value := *request
-	value.Description = strings.TrimSpace(value.Description)
-	value.Style = strings.TrimSpace(value.Style)
-	value.Action = strings.TrimSpace(value.Action)
-	value.OriginalAction = strings.TrimSpace(value.OriginalAction)
-	value.TargetFrameIndices = append([]int(nil), value.TargetFrameIndices...)
-	value.ContextReferenceImages = append([]string(nil), value.ContextReferenceImages...)
-	for index := range value.ContextReferenceImages {
-		value.ContextReferenceImages[index] = strings.TrimSpace(value.ContextReferenceImages[index])
-	}
-	value.ReferenceImage = strings.TrimSpace(value.ReferenceImage)
-	value.EndReferenceImage = strings.TrimSpace(value.EndReferenceImage)
-	value.Resolution = strings.TrimSpace(value.Resolution)
-	value.AspectRatio = strings.TrimSpace(value.AspectRatio)
-	if value.Description == "" {
-		value.Description = "preserve the supplied subject exactly"
-	}
-	if value.Style == "" {
-		value.Style = prompts.DefaultAnimationStyle
-	}
-	if value.Action == "" {
-		value.Action = "idle"
-	}
-	if value.ReferenceImage == "" {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation reference image is required")
-	}
-	if value.FrameCount == 0 {
-		value.FrameCount = defaultAnimationFrameCount
-	}
-	if value.Columns == 0 {
-		value.Columns = animationGridColumns(value.FrameCount)
-	}
-	if value.FrameWidth == 0 {
-		value.FrameWidth = defaultAnimationFrameWidth
-	}
-	if value.FrameHeight == 0 {
-		value.FrameHeight = defaultAnimationFrameHeight
-	}
-	if value.FPS == 0 {
-		value.FPS = defaultAnimationFPS
-	}
-	if value.Resolution == "" {
-		value.Resolution = defaultAnimationResolution
-	}
-	if value.Duration == 0 {
-		value.Duration = defaultAnimationDuration
-	}
-	if value.AspectRatio == "" {
-		value.AspectRatio = defaultAnimationAspectRatio
-	}
-	if value.FrameCount < 1 || value.FrameCount > 32 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame count must be between 1 and 32")
-	}
-	if value.Columns < 1 || value.Columns > 8 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation columns must be between 1 and 8")
-	}
-	if animationRows(value.FrameCount, value.Columns) > 8 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation grid must not exceed 8 rows")
-	}
-	if value.FrameWidth < 32 || value.FrameWidth > 1024 || value.FrameHeight < 32 || value.FrameHeight > 1024 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame dimensions must be between 32 and 1024 pixels")
-	}
-	if value.FPS < 1 || value.FPS > 60 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation FPS must be between 1 and 60")
-	}
-	if value.Duration < 4 || value.Duration > 15 {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation video duration must be between 4 and 15 seconds")
-	}
-	if len(value.TargetFrameIndices) > 0 && !value.ReferenceImageContext {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame indices require an animation context reference")
-	}
-	previousTarget := -1
-	for _, target := range value.TargetFrameIndices {
-		if target < 0 || target >= value.FrameCount {
-			return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame index %d is outside the %d-frame context", target, value.FrameCount)
-		}
-		if target <= previousTarget {
-			return AnimationGenerationRequest{}, fmt.Errorf("generator: target frame indices must be unique and ordered")
-		}
-		previousTarget = target
-	}
-	if value.ReferenceImageContext && value.EndReferenceImage == "" {
-		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame edit end reference image is required")
-	}
-	if value.ReferenceImageContext && len(value.ContextReferenceImages) != value.FrameCount {
-		return AnimationGenerationRequest{}, fmt.Errorf(
-			"generator: animation frame edit requires %d context reference images; got %d",
-			value.FrameCount,
-			len(value.ContextReferenceImages),
-		)
-	}
-	for index, reference := range value.ContextReferenceImages {
-		if reference == "" {
-			return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame edit context reference image %d is required", index+1)
-		}
-	}
-	return value, nil
-}
-
-func (s *animationGenerationService) processVideo(
+func (s *animationGenerationService) processVideoWithSourceCellScale(
 	ctx context.Context,
 	video []byte,
 	request AnimationGenerationRequest,
+	sourceCellScaleMultiplier float64,
 ) (*AnimationGenerationResult, error) {
+	if sourceCellScaleMultiplier <= 0 || math.IsNaN(sourceCellScaleMultiplier) || math.IsInf(sourceCellScaleMultiplier, 0) {
+		return nil, fmt.Errorf("generator: source cell scale multiplier must be finite and positive")
+	}
 	var loop AnimationLoopSelection
+	chromaKey := animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight)
 	processed, err := s.videoProcessor.Process(ctx, video, videoprocessor.ProcessOptions{
 		AnalysisFPS: animationAnalysisFPS,
-		ChromaKey:   animationVideoChromaKey(),
+		ChromaKey:   chromaKey,
 		Select: func(analysis videoprocessor.FrameSequenceAnalysis) ([]int, error) {
 			if request.ReferenceImageContext {
 				indices, selectErr := selectEditFrameContextIndices(analysis, request.FrameCount)
@@ -523,19 +474,25 @@ func (s *animationGenerationService) processVideo(
 	if err != nil {
 		return nil, fmt.Errorf("generator: encode sampled animation sheet: %w", err)
 	}
+	splitSourceCellScaleMultiplier := 0.0
+	if math.Abs(sourceCellScaleMultiplier-1) > 1e-9 {
+		splitSourceCellScaleMultiplier = sourceCellScaleMultiplier
+	}
 	normalized, err := s.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
-		ImageBase64:             encoded,
-		Mode:                    imageprocessor.ImageSplitModeAnimation,
-		Columns:                 request.Columns,
-		Rows:                    animationRows(request.FrameCount, request.Columns),
-		FrameCount:              request.FrameCount,
-		FrameWidth:              request.FrameWidth,
-		FrameHeight:             request.FrameHeight,
-		Margin:                  AnimationFrameMargin(request.FrameWidth, request.FrameHeight),
-		Anchor:                  imageprocessor.AnimationAnchorFeet,
-		ForceProportionalGrid:   true,
-		PreserveVerticalMotion:  true,
-		PreserveSourceCellScale: true,
+		ImageBase64:               encoded,
+		Mode:                      imageprocessor.ImageSplitModeAnimation,
+		Columns:                   request.Columns,
+		Rows:                      animationRows(request.FrameCount, request.Columns),
+		FrameCount:                request.FrameCount,
+		FrameWidth:                request.FrameWidth,
+		FrameHeight:               request.FrameHeight,
+		Margin:                    0,
+		UseExactMargin:            true,
+		Anchor:                    imageprocessor.AnimationAnchorFeet,
+		ForceProportionalGrid:     true,
+		PreserveVerticalMotion:    true,
+		PreserveSourceCellScale:   true,
+		SourceCellScaleMultiplier: splitSourceCellScaleMultiplier,
 		// The video prompt asks for a matte, but providers can return a
 		// different (or compressed) background colour. Sample the frame
 		// borders instead of assuming an exact pure-green key; otherwise
@@ -627,7 +584,7 @@ func animationFrameSelectionError(
 		case "framing":
 			return &videoprocessor.QualityError{
 				Kind:    "framing",
-				Message: fmt.Sprintf("generator: no candidate interval has %d sampled frames inside the outer 2.5%% safety band; interval still needs at least %.0f%% of the source duration", frameCount, animationMinLoopSpanRatio*100),
+				Message: fmt.Sprintf("generator: no candidate interval has %d sampled frames inside the configured edge safety band; interval still needs at least %.0f%% of the source duration", frameCount, animationMinLoopSpanRatio*100),
 			}
 		}
 	}
@@ -769,6 +726,12 @@ func (e *executor) generateAnimation(
 	if err != nil {
 		return nil, err
 	}
+	frameWidth, frameHeight, err := resolveAnimationFrameDimensions(
+		dimensions, payload.FrameWidth, payload.FrameHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
 	description := strings.TrimSpace(asset.Description)
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
@@ -780,12 +743,13 @@ func (e *executor) generateAnimation(
 		ReferenceImage:         reference,
 		ReferenceImagePrepared: referencePrepared,
 		FrameCount:             payload.FrameCount,
-		FrameWidth:             int(dimensions.Width),
-		FrameHeight:            int(dimensions.Height),
+		FrameWidth:             frameWidth,
+		FrameHeight:            frameHeight,
+		PrototypeWidth:         int(dimensions.Width),
+		PrototypeHeight:        int(dimensions.Height),
 		FPS:                    payload.FPS,
 		Resolution:             payload.Resolution,
 		Duration:               payload.Duration,
-		AspectRatio:            defaultAnimationAspectRatio,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generator: normalize animation request: %w", err)
@@ -892,6 +856,16 @@ func (e *executor) editAnimation(
 	}
 
 	generation := *animation.Generation
+	dimensions, err := animationFrameDimensions(asset)
+	if err != nil {
+		return nil, err
+	}
+	frameWidth, frameHeight, err := resolveAnimationFrameDimensions(
+		dimensions, generation.FrameWidth, generation.FrameHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
 	reference, _, err := animationReference(asset, generation.Direction)
 	if err != nil {
 		return nil, err
@@ -900,7 +874,7 @@ func (e *executor) editAnimation(
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
 	}
-	generationRequest := AnimationGenerationRequest{
+	generationRequest, err := normalizeAnimationGenerationRequest(&AnimationGenerationRequest{
 		Description:            description,
 		Style:                  generation.Style,
 		Action:                 creativeBrief,
@@ -908,12 +882,17 @@ func (e *executor) editAnimation(
 		ReferenceImagePrepared: false,
 		FrameCount:             generation.FrameCount,
 		Columns:                generation.Columns,
-		FrameWidth:             generation.FrameWidth,
-		FrameHeight:            generation.FrameHeight,
+		FrameWidth:             frameWidth,
+		FrameHeight:            frameHeight,
+		PrototypeWidth:         int(dimensions.Width),
+		PrototypeHeight:        int(dimensions.Height),
 		FPS:                    generation.FPS,
 		Resolution:             generation.Resolution,
 		Duration:               generation.Duration,
 		AspectRatio:            generation.AspectRatio,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generator: normalize regenerated animation request: %w", err)
 	}
 	generated, err := e.animations.Generate(ctx, &generationRequest)
 	if err != nil {
@@ -926,6 +905,10 @@ func (e *executor) editAnimation(
 	if err != nil {
 		return nil, err
 	}
+	generation.FrameWidth = generationRequest.FrameWidth
+	generation.FrameHeight = generationRequest.FrameHeight
+	generation.AspectRatio = generationRequest.AspectRatio
+	animation.Generation = &generation
 	animation.Frames = append([]assetdomain.Frame(nil), frames...)
 	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{
 		Animations: []assetdomain.Animation{*animation},

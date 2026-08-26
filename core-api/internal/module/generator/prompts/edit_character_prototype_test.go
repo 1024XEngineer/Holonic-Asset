@@ -36,8 +36,8 @@ func TestEditCharacterPrototypeDefinesReferenceRolesAndDirectionLayout(t *testin
 		"change only the exposed scales to light blue",
 		"<direction_count>\n2\n</direction_count>",
 		"<asset_dimensions>\n{\"width\":48,\"height\":64}\n</asset_dimensions>",
-		"at most 30 x 46 drawable logical pixels",
-		"small character with 30 x 46 drawable logical pixels",
+		"Use the full 48 x 64 logical prototype canvas",
+		"medium-size character with 48 x 64 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected character edit prompt to contain %q: %s", expected, prompt)
@@ -98,7 +98,7 @@ func TestEditCharacterPrototypeDerivesDirectionLayoutFromPerspective(t *testing.
 	}
 }
 
-func TestEditCharacterPrototypeUsesDrawableGridForSmallCharacterDetail(t *testing.T) {
+func TestEditCharacterPrototypeUsesFullGridForSmallCharacterDetail(t *testing.T) {
 	prompt := prompts.EditCharacterPrototype(
 		"a player character",
 		"change the shirt color",
@@ -108,14 +108,9 @@ func TestEditCharacterPrototypeUsesDrawableGridForSmallCharacterDetail(t *testin
 		prompts.TransparentBackground(),
 	)
 	for _, expected := range []string{
-		"ultra-small character with only 20 x 20 drawable logical pixels",
+		"small character with 32 x 32 drawable logical pixels",
+		"prioritize silhouette, head/body separation, and a few broad identity accents",
 		"The requested final canvas has a short edge of 32 pixels or less",
-		"few large connected regions",
-		"6-8 visually distinct color roles",
-		"narrower than three logical pixels",
-		"silhouette readability overrides anatomical separation",
-		"Avoid scattered single-pixel highlights",
-		"Avoid one-pixel-wide torsos or limbs",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected small character edit prompt to contain %q: %s", expected, prompt)

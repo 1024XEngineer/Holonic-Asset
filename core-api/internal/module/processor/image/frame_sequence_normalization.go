@@ -38,26 +38,28 @@ type AnimationBackgroundOptions struct {
 // normalizeAnimationRequest is the private animation engine input assembled
 // by SplitImage animation mode.
 type normalizeAnimationRequest struct {
-	Columns                  int
-	Rows                     int
-	FrameCount               int
-	FrameWidth               int
-	FrameHeight              int
-	RenderScale              int
-	Margin                   int
-	CropPadding              int
-	AlphaThreshold           uint8
-	Anchor                   AnimationAnchor
-	PreserveHorizontalMotion bool
-	PreserveVerticalMotion   bool
-	NormalizeContentScale    bool
-	NormalizeContentArea     bool
-	PreserveSourceCellScale  bool
-	CenterContent            bool
-	MaxStabilizationShift    int
-	DetectGridBounds         bool
-	AllowEmptyFrames         bool
-	Background               *AnimationBackgroundOptions
+	Columns                   int
+	Rows                      int
+	FrameCount                int
+	FrameWidth                int
+	FrameHeight               int
+	RenderScale               int
+	Margin                    int
+	UseExactMargin            bool
+	CropPadding               int
+	AlphaThreshold            uint8
+	Anchor                    AnimationAnchor
+	PreserveHorizontalMotion  bool
+	PreserveVerticalMotion    bool
+	NormalizeContentScale     bool
+	NormalizeContentArea      bool
+	PreserveSourceCellScale   bool
+	SourceCellScaleMultiplier float64
+	CenterContent             bool
+	MaxStabilizationShift     int
+	DetectGridBounds          bool
+	AllowEmptyFrames          bool
+	Background                *AnimationBackgroundOptions
 }
 
 type AnimationPoint struct {
@@ -84,37 +86,39 @@ type animationFrame struct {
 }
 
 type AnimationNormalizationReport struct {
-	SourceWidth             int               `json:"source_width"`
-	SourceHeight            int               `json:"source_height"`
-	FrameWidth              int               `json:"frame_width"`
-	FrameHeight             int               `json:"frame_height"`
-	SheetWidth              int               `json:"sheet_width"`
-	SheetHeight             int               `json:"sheet_height"`
-	Columns                 int               `json:"columns"`
-	Rows                    int               `json:"rows"`
-	FrameCount              int               `json:"frame_count"`
-	Margin                  int               `json:"margin"`
-	CropPadding             int               `json:"crop_padding"`
-	SharedCrop              AlphaBoundingBox  `json:"shared_crop"`
-	Scale                   float64           `json:"scale"`
-	Anchor                  AnimationAnchor   `json:"anchor"`
-	SourceAnchorMedian      AnimationPoint    `json:"source_anchor_median"`
-	SourceAnchorRange       AnimationPoint    `json:"source_anchor_range"`
-	OutputAnchorRange       AnimationPoint    `json:"output_anchor_range"`
-	AppliedMaxShift         AnimationPoint    `json:"applied_max_shift"`
-	TranslationClamped      int               `json:"translation_clamped"`
-	ContentScaleNormalized  bool              `json:"content_scale_normalized,omitempty"`
-	ContentAreaNormalized   bool              `json:"content_area_normalized,omitempty"`
-	ContentHeightMedian     float64           `json:"content_height_median,omitempty"`
-	ContentAreaMedian       float64           `json:"content_area_median,omitempty"`
-	ContentScaleMin         float64           `json:"content_scale_min,omitempty"`
-	ContentScaleMax         float64           `json:"content_scale_max,omitempty"`
-	GridXBounds             []int             `json:"grid_x_bounds"`
-	GridYBounds             []int             `json:"grid_y_bounds"`
-	GridPolicy              string            `json:"grid_policy"`
-	RegistrationPolicy      string            `json:"registration_policy"`
-	BackgroundRemovalReport *ExtractionReport `json:"background_removal_report,omitempty"`
-	Warnings                []string          `json:"warnings,omitempty"`
+	SourceWidth                        int               `json:"source_width"`
+	SourceHeight                       int               `json:"source_height"`
+	FrameWidth                         int               `json:"frame_width"`
+	FrameHeight                        int               `json:"frame_height"`
+	SheetWidth                         int               `json:"sheet_width"`
+	SheetHeight                        int               `json:"sheet_height"`
+	Columns                            int               `json:"columns"`
+	Rows                               int               `json:"rows"`
+	FrameCount                         int               `json:"frame_count"`
+	Margin                             int               `json:"margin"`
+	CropPadding                        int               `json:"crop_padding"`
+	SharedCrop                         AlphaBoundingBox  `json:"shared_crop"`
+	Scale                              float64           `json:"scale"`
+	RequestedSourceCellScaleMultiplier float64           `json:"requested_source_cell_scale_multiplier,omitempty"`
+	AppliedSourceCellScaleMultiplier   float64           `json:"applied_source_cell_scale_multiplier,omitempty"`
+	Anchor                             AnimationAnchor   `json:"anchor"`
+	SourceAnchorMedian                 AnimationPoint    `json:"source_anchor_median"`
+	SourceAnchorRange                  AnimationPoint    `json:"source_anchor_range"`
+	OutputAnchorRange                  AnimationPoint    `json:"output_anchor_range"`
+	AppliedMaxShift                    AnimationPoint    `json:"applied_max_shift"`
+	TranslationClamped                 int               `json:"translation_clamped"`
+	ContentScaleNormalized             bool              `json:"content_scale_normalized,omitempty"`
+	ContentAreaNormalized              bool              `json:"content_area_normalized,omitempty"`
+	ContentHeightMedian                float64           `json:"content_height_median,omitempty"`
+	ContentAreaMedian                  float64           `json:"content_area_median,omitempty"`
+	ContentScaleMin                    float64           `json:"content_scale_min,omitempty"`
+	ContentScaleMax                    float64           `json:"content_scale_max,omitempty"`
+	GridXBounds                        []int             `json:"grid_x_bounds"`
+	GridYBounds                        []int             `json:"grid_y_bounds"`
+	GridPolicy                         string            `json:"grid_policy"`
+	RegistrationPolicy                 string            `json:"registration_policy"`
+	BackgroundRemovalReport            *ExtractionReport `json:"background_removal_report,omitempty"`
+	Warnings                           []string          `json:"warnings,omitempty"`
 }
 
 type normalizedAnimation struct {
@@ -155,6 +159,12 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 	}
 	if request.NormalizeContentScale && request.NormalizeContentArea {
 		return nil, fmt.Errorf("normalize content scale and normalize content area cannot both be enabled")
+	}
+	if request.SourceCellScaleMultiplier < 0 || math.IsNaN(request.SourceCellScaleMultiplier) || math.IsInf(request.SourceCellScaleMultiplier, 0) {
+		return nil, fmt.Errorf("source cell scale multiplier must be finite and non-negative")
+	}
+	if request.SourceCellScaleMultiplier != 0 && !request.PreserveSourceCellScale {
+		return nil, fmt.Errorf("source cell scale multiplier requires preserve source cell scale")
 	}
 	anchor := request.Anchor
 	if anchor == "" || anchor == AnimationAnchorAuto {
@@ -221,7 +231,7 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		return nil, fmt.Errorf("render scale must be positive")
 	}
 	margin := request.Margin
-	if margin == 0 {
+	if margin == 0 && !request.UseExactMargin {
 		margin = defaultAssetMargin(frameWidth, frameHeight)
 	}
 	frameWidth *= renderScale
@@ -296,7 +306,31 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 		// fitting the sequence-wide foreground union. This keeps foreground scale
 		// stable when individual frames have different visible extents.
 		renderCrop = image.Rect(pad, pad, pad+cellW, pad+cellH)
-		scale = math.Min(float64(frameWidth)/float64(cellW), float64(frameHeight)/float64(cellH))
+		baseScale := math.Min(float64(frameWidth)/float64(cellW), float64(frameHeight)/float64(cellH))
+		multiplier := request.SourceCellScaleMultiplier
+		if multiplier == 0 {
+			multiplier = 1
+		}
+		scale = baseScale * multiplier
+		if multiplier > 1 {
+			maxScale := maximumCenteredAnimationScale(shared, renderCrop, frameWidth, frameHeight, margin)
+			if maxScale > 0 && scale > maxScale {
+				// Never make the compensated retry less safe than the existing
+				// source-cell behavior. The provider framing gate should already
+				// keep the base transform inside the canvas.
+				scale = math.Max(baseScale, maxScale)
+				report.Warnings = append(report.Warnings, fmt.Sprintf(
+					"source cell scale compensation clamped from %.4f to %.4f to keep the animation inside the target frame",
+					multiplier,
+					scale/baseScale,
+				))
+			}
+		}
+		if request.SourceCellScaleMultiplier != 0 {
+			report.RequestedSourceCellScaleMultiplier = multiplier
+			report.AppliedSourceCellScaleMultiplier = scale / baseScale
+			report.RegistrationPolicy += "_sequence_scale_compensation"
+		}
 	} else {
 		scale = math.Min(float64(innerW)/float64(shared.Dx()), float64(innerH)/float64(shared.Dy()))
 	}
@@ -586,6 +620,39 @@ func animationOpaqueArea(img *image.NRGBA, threshold uint8) int {
 // prototype objects the frame itself is the contract: every view must occupy
 // the same centre band. Recentring here cannot invent or delete pixels and it
 // leaves the fixed animation/action margin intact.
+// maximumCenteredAnimationScale returns the largest uniform scale that keeps
+// the sequence-wide registered foreground inside a centered target rectangle.
+// The same value is used for every frame, so retry compensation cannot introduce
+// per-frame size jitter or alter their relative motion.
+func maximumCenteredAnimationScale(
+	foreground image.Rectangle,
+	sourceCanvas image.Rectangle,
+	targetWidth, targetHeight, margin int,
+) float64 {
+	if foreground.Empty() || sourceCanvas.Empty() || targetWidth <= 0 || targetHeight <= 0 {
+		return 0
+	}
+	margin = max(0, margin)
+	if margin*2 >= targetWidth || margin*2 >= targetHeight {
+		return 0
+	}
+	sourceCenterX := float64(sourceCanvas.Min.X+sourceCanvas.Max.X) / 2
+	sourceCenterY := float64(sourceCanvas.Min.Y+sourceCanvas.Max.Y) / 2
+	halfSourceWidth := math.Max(sourceCenterX-float64(foreground.Min.X), float64(foreground.Max.X)-sourceCenterX)
+	halfSourceHeight := math.Max(sourceCenterY-float64(foreground.Min.Y), float64(foreground.Max.Y)-sourceCenterY)
+	maxScale := math.Inf(1)
+	if halfSourceWidth > 0 {
+		maxScale = math.Min(maxScale, float64(targetWidth-2*margin)/(2*halfSourceWidth))
+	}
+	if halfSourceHeight > 0 {
+		maxScale = math.Min(maxScale, float64(targetHeight-2*margin)/(2*halfSourceHeight))
+	}
+	if math.IsInf(maxScale, 1) {
+		return 0
+	}
+	return maxScale
+}
+
 func centerAnimationFrameContent(frame *image.NRGBA, threshold uint8) (*image.NRGBA, image.Point) {
 	if frame == nil {
 		return frame, image.Point{}

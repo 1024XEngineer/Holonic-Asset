@@ -32,8 +32,8 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 		Action:      "walking cycle",
 		FrameCount:  8,
 		Columns:     4,
-		FrameWidth:  128,
-		FrameHeight: 128,
+		FrameWidth:  224,
+		FrameHeight: 192,
 		FPS:         12,
 		Resolution:  "1080p",
 		Duration:    8,
@@ -66,8 +66,10 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 		ReferenceImagePrepared: false,
 		FrameCount:             8,
 		Columns:                4,
-		FrameWidth:             128,
-		FrameHeight:            128,
+		FrameWidth:             224,
+		FrameHeight:            192,
+		PrototypeWidth:         128,
+		PrototypeHeight:        128,
 		FPS:                    12,
 		Resolution:             "1080p",
 		Duration:               8,
@@ -83,6 +85,9 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	if len(content.Animations) != 1 || len(content.Animations[0].Frames) != 2 {
 		t.Fatalf("generation must return the edited frames: result=%+v content=%+v", application, content)
 	}
+	if content.Animations[0].Generation == nil || content.Animations[0].Generation.AspectRatio != "1:1" {
+		t.Fatalf("edited animation aspect ratio was not preserved: %+v", content.Animations[0].Generation)
+	}
 	frames := content.Animations[0].Frames
 	if frames[0].ID != 1 || frames[0].URL == nil ||
 		*frames[0].URL != "uploads/generated-1.png" || frames[0].Duration != 83 ||
@@ -97,6 +102,67 @@ func TestExecutorEditsAnimationUsingPersistedGeneration(t *testing.T) {
 	}
 	if application.AssetID != 7 || application.AnimationID != 3 || len(application.GeneratedResources) != 2 {
 		t.Fatalf("unexpected animation application candidate: %+v", application)
+	}
+}
+
+func TestExecutorEditAnimationPersistsResolvedLegacyFrameDimensions(t *testing.T) {
+	events := []string{}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames: []imageprocessor.ImageRegion{{ImageBase64: "edited", MIMEType: "image/png"}},
+		},
+	}
+	parent := animationParentAssetWithAnimation(t, &assetdomain.AnimationGenerationConfig{
+		Direction:   "front",
+		Style:       "painted pixel art",
+		Action:      "idle",
+		FrameCount:  8,
+		Columns:     4,
+		FrameWidth:  0,
+		FrameHeight: 0,
+		FPS:         12,
+		Resolution:  "1080p",
+		Duration:    8,
+		AspectRatio: "1:1",
+	})
+	assets := &generationAssetWriterStub{events: &events, parentAsset: parent}
+	executor := generator.NewExecutorWithDependencies(nil, nil, assets, generator.ExecutorDependencies{
+		Animations: animations,
+		References: &executorReferenceStoreStub{},
+	})
+
+	result, err := executor.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{
+		"asset_id":7,
+		"animation_id":3,
+		"project_id":11,
+		"creative_brief":"jump"
+	}`))
+	if err != nil {
+		t.Fatalf("edit legacy animation: %v", err)
+	}
+	if animations.request == nil {
+		t.Fatal("expected animation generation request")
+	}
+	if animations.request.FrameWidth != 192 || animations.request.FrameHeight != 192 {
+		t.Fatalf(
+			"legacy animation must use resolved 1.5x frame dimensions: got %dx%d",
+			animations.request.FrameWidth,
+			animations.request.FrameHeight,
+		)
+	}
+
+	_, content := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if len(content.Animations) != 1 || content.Animations[0].Generation == nil {
+		t.Fatalf("expected edited animation generation metadata: %+v", content.Animations)
+	}
+	generation := content.Animations[0].Generation
+	if generation.FrameWidth != 192 || generation.FrameHeight != 192 {
+		t.Fatalf(
+			"resolved legacy frame dimensions must be persisted: got %dx%d",
+			generation.FrameWidth,
+			generation.FrameHeight,
+		)
 	}
 }
 
@@ -288,8 +354,8 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		"style":"painted pixel art",
 		"frame_count":8,
 		"columns":4,
-		"frame_width":128,
-		"frame_height":128,
+		"frame_width":224,
+		"frame_height":192,
 		"fps":12,
 		"resolution":"1080p",
 		"duration":8,
@@ -311,8 +377,10 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		ReferenceImagePrepared: false,
 		FrameCount:             8,
 		Columns:                3,
-		FrameWidth:             128,
-		FrameHeight:            128,
+		FrameWidth:             224,
+		FrameHeight:            192,
+		PrototypeWidth:         128,
+		PrototypeHeight:        128,
 		FPS:                    12,
 		Resolution:             "1080p",
 		Duration:               8,
@@ -357,8 +425,8 @@ func TestExecutorGeneratesAnimationBeforeUpdatingFrames(t *testing.T) {
 		Action:      "walking cycle",
 		FrameCount:  8,
 		Columns:     3,
-		FrameWidth:  128,
-		FrameHeight: 128,
+		FrameWidth:  224,
+		FrameHeight: 192,
 		FPS:         12,
 		Resolution:  "1080p",
 		Duration:    8,
@@ -424,8 +492,8 @@ func TestExecutorPersistsEffectiveAnimationGenerationDefaults(t *testing.T) {
 		Action:      "idle",
 		FrameCount:  16,
 		Columns:     4,
-		FrameWidth:  128,
-		FrameHeight: 128,
+		FrameWidth:  192,
+		FrameHeight: 192,
 		FPS:         10,
 		Resolution:  "720p",
 		Duration:    5,

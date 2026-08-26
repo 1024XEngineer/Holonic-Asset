@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,9 +20,11 @@ import (
 )
 
 type animationVideoServiceStub struct {
-	requests  []*videoclient.GenerateRequest
-	generated int
-	err       error
+	requests        []*videoclient.GenerateRequest
+	downloadResults [][]byte
+	generated       int
+	downloaded      int
+	err             error
 }
 
 func (s *animationVideoServiceStub) Generate(
@@ -45,6 +48,11 @@ func (s *animationVideoServiceStub) Generate(
 }
 
 func (s *animationVideoServiceStub) Download(context.Context, string) ([]byte, error) {
+	index := s.downloaded
+	s.downloaded++
+	if index < len(s.downloadResults) {
+		return append([]byte(nil), s.downloadResults[index]...), nil
+	}
 	return []byte("video"), nil
 }
 
@@ -169,7 +177,7 @@ func TestPrepareAnimationReferenceResolvesAndDownloadsUnprocessedImage(t *testin
 		resolver,
 	).(*animationGenerationService)
 
-	result, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	result, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false, 32, 32, 48, 48)
 	if err != nil {
 		t.Fatalf("prepare downloaded reference: %v", err)
 	}
@@ -196,7 +204,7 @@ func TestPrepareAnimationReferenceRejectsDownloadFailures(t *testing.T) {
 		&animationVideoProcessorStub{},
 		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
 	).(*animationGenerationService)
-	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false, 32, 32, 48, 48)
 	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
 		t.Fatalf("expected HTTP 404 error, got %v", err)
 	}
@@ -214,7 +222,7 @@ func TestPrepareAnimationReferenceRejectsInvalidDownloadedImage(t *testing.T) {
 		&animationVideoProcessorStub{},
 		&animationReferenceResolverStub{resolved: server.URL + "/hero-unprocessed.png"},
 	).(*animationGenerationService)
-	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false)
+	_, err := service.prepareAnimationReference(context.Background(), "uploads/hero-unprocessed.png", false, 32, 32, 48, 48)
 	if err == nil || !strings.Contains(err.Error(), "decode downloaded animation reference") {
 		t.Fatalf("expected invalid-image error, got %v", err)
 	}
@@ -287,7 +295,7 @@ func TestNormalizeAnimationGenerationRequestSupportsGameFrameSizes(t *testing.T)
 	}
 }
 
-func TestAnimationGenerationKeepsPreparedGreenReference(t *testing.T) {
+func TestAnimationGenerationPadsPreparedGreenReferenceToSquareCanvas(t *testing.T) {
 	prepared := animationTestPreparedGreenReference(t)
 	videos := &animationVideoServiceStub{}
 	processor := &animationProcessorStub{}
@@ -316,8 +324,11 @@ func TestAnimationGenerationKeepsPreparedGreenReference(t *testing.T) {
 	if decodeErr != nil {
 		t.Fatalf("decode provider reference: %v", decodeErr)
 	}
-	if got.Bounds().Dx() != 256 || got.Bounds().Dy() != 512 {
-		t.Fatalf("prepared reference resized to %v", got.Bounds().Size())
+	if got.Bounds().Dx() != 512 || got.Bounds().Dy() != 512 {
+		t.Fatalf("prepared reference canvas = %v, want 512x512", got.Bounds().Size())
+	}
+	if videos.requests[0].AspectRatio != "1:1" {
+		t.Fatalf("provider aspect ratio = %q, want 1:1", videos.requests[0].AspectRatio)
 	}
 	if corner := color.NRGBAModel.Convert(got.At(0, 0)).(color.NRGBA); corner != (color.NRGBA{G: 255, A: 255}) {
 		t.Fatalf("prepared reference corner = %#v", corner)
@@ -351,14 +362,16 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 	action := "以左脚为轴完成不规则仪式动作，然后把容器放回腰间"
 
 	result, err := service.Generate(context.Background(), &AnimationGenerationRequest{
-		Description:    "knight",
-		Action:         action,
-		ReferenceImage: parent,
-		FrameCount:     4,
-		Columns:        2,
-		FrameWidth:     64,
-		FrameHeight:    64,
-		FPS:            10,
+		Description:     "knight",
+		Action:          action,
+		ReferenceImage:  parent,
+		FrameCount:      4,
+		Columns:         2,
+		FrameWidth:      64,
+		FrameHeight:     64,
+		PrototypeWidth:  32,
+		PrototypeHeight: 32,
+		FPS:             10,
 	})
 	if err != nil {
 		t.Fatalf("generate animation: %v", err)
@@ -372,6 +385,7 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 	}
 	if len(videoProcessor.options) != 2 || videoProcessor.options[1].AnalysisFPS != animationAnalysisFPS ||
 		videoProcessor.options[1].Select == nil || videoProcessor.options[1].ChromaKey.HueMin != animationChromaHueMin ||
+		videoProcessor.options[1].ChromaKey.SafetyMarginRatio != 1.0/64.0 ||
 		!videoProcessor.options[1].ChromaKey.AutoDetect {
 		t.Fatalf("executor did not supply media selection policy: %+v", videoProcessor.options)
 	}
@@ -384,17 +398,42 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.removeRequests[0].MatteColor != "auto" {
 		t.Fatalf("parent prototype was not passed directly to background removal: %+v", processor.removeRequests)
 	}
+	wantReferenceSize := animationReferencePrototypeCanvasSize(
+		animationReferenceCanvasSize(),
+		32,
+		32,
+		64,
+		64,
+	)
 	if len(processor.resizeRequests) != 5 ||
 		processor.resizeRequests[0].ImageBase64 != foreground ||
-		processor.resizeRequests[0].Options.Width != animationReferenceSize ||
-		processor.resizeRequests[0].Options.Height != animationReferenceSize ||
-		processor.resizeRequests[0].Options.Margin != AnimationFrameMargin(animationReferenceSize, animationReferenceSize) {
+		processor.resizeRequests[0].Options.Width != wantReferenceSize.X ||
+		processor.resizeRequests[0].Options.Height != wantReferenceSize.Y ||
+		processor.resizeRequests[0].Options.Margin != 0 {
 		t.Fatalf("unexpected parent prototype resize request: %+v", processor.resizeRequests)
 	}
 	assertAnimationPixelResizeRequests(t, processor.resizeRequests[1:], 4, 64, 64)
 	greenReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
 	if decodeErr != nil {
 		t.Fatalf("decode video reference: %v", decodeErr)
+	}
+	expandedReference, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[1].StartImage.Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode expanded video reference: %v", decodeErr)
+	}
+	if got, want := greenReference.Bounds().Size(), animationReferenceCanvasSize(); got != want {
+		t.Fatalf("initial video reference canvas = %v, want %v", got, want)
+	}
+	if got, want := expandedReference.Bounds().Size(), animationReferenceCanvasSizeForLongEdge(animationExpandedReferenceSize); got != want {
+		t.Fatalf("expanded video reference canvas = %v, want %v", got, want)
+	}
+	initialContent := animationReferenceContentBounds(t, greenReference)
+	expandedContent := animationReferenceContentBounds(t, expandedReference)
+	if expandedContent.Size() != initialContent.Size() {
+		t.Fatalf("framing retry resized subject from %v to %v", initialContent.Size(), expandedContent.Size())
+	}
+	if expandedContent.Min.X <= initialContent.Min.X || expandedContent.Min.Y <= initialContent.Min.Y {
+		t.Fatalf("framing retry did not add matte around subject: initial=%v expanded=%v", initialContent, expandedContent)
 	}
 	if got := color.NRGBAModel.Convert(greenReference.At(0, 0)).(color.NRGBA); got != (color.NRGBA{G: 255, A: 255}) {
 		t.Fatalf("video reference corner = %#v, want pure green", got)
@@ -404,15 +443,153 @@ func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing
 		processor.splitRequest.Columns != 2 || processor.splitRequest.Rows != 2 ||
 		processor.splitRequest.FrameCount != 4 ||
 		processor.splitRequest.FrameWidth != 64 || processor.splitRequest.FrameHeight != 64 ||
-		processor.splitRequest.Margin != AnimationFrameMargin(64, 64) ||
+		processor.splitRequest.Margin != 0 || !processor.splitRequest.UseExactMargin ||
 		processor.splitRequest.Anchor != imageprocessor.AnimationAnchorFeet ||
 		!processor.splitRequest.ForceProportionalGrid ||
 		!processor.splitRequest.PreserveVerticalMotion ||
 		!processor.splitRequest.PreserveSourceCellScale ||
+		math.Abs(processor.splitRequest.SourceCellScaleMultiplier-1.875) > 0.001 ||
 		processor.splitRequest.Background == nil ||
 		processor.splitRequest.Background.MatteColor != "auto" ||
 		!processor.splitRequest.Background.BorderConnectedOnly {
 		t.Fatalf("unexpected split request: %+v", processor.splitRequest)
+	}
+}
+
+func TestAnimationGenerationRestoresPrototypeScaleAfterExpandedReferenceRetry(t *testing.T) {
+	prototype := image.NewNRGBA(image.Rect(0, 0, 128, 128))
+	draw.Draw(prototype, image.Rect(44, 24, 84, 112), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
+	reference := animationTestImageDataURL(t, prototype)
+	request := &AnimationGenerationRequest{
+		ReferenceImage: reference,
+		FrameCount:     4, Columns: 2,
+		FrameWidth: 128, FrameHeight: 128,
+		PrototypeWidth: 128, PrototypeHeight: 128,
+		FPS: 10,
+	}
+
+	baselineFrames := animationTestVideoFramesWithSubject(4, image.Pt(60, 80))
+	baseline := newAnimationGenerationService(
+		&animationVideoServiceStub{},
+		imageprocessor.NewProcessor(),
+		&animationVideoProcessorStub{results: []*videoprocessor.Result{{Frames: baselineFrames}}},
+	)
+	baselineResult, err := baseline.Generate(context.Background(), request)
+	if err != nil {
+		t.Fatalf("generate baseline animation: %v", err)
+	}
+
+	qualityErr := &videoprocessor.QualityError{Kind: "framing", Message: "unsafe framing"}
+	retryFrames := animationTestVideoFramesWithSubject(4, image.Pt(32, 43))
+	retried := newAnimationGenerationService(
+		&animationVideoServiceStub{},
+		imageprocessor.NewProcessor(),
+		&animationVideoProcessorStub{
+			errors:  []error{qualityErr, nil},
+			results: []*videoprocessor.Result{nil, {Frames: retryFrames}},
+		},
+	)
+	retryResult, err := retried.Generate(context.Background(), request)
+	if err != nil {
+		t.Fatalf("generate compensated retry animation: %v", err)
+	}
+	if retryResult.VideoAttempts != 2 {
+		t.Fatalf("video attempts = %d, want 2", retryResult.VideoAttempts)
+	}
+	if retryResult.Normalization == nil || math.Abs(retryResult.Normalization.RequestedSourceCellScaleMultiplier-1.875) > 0.001 {
+		t.Fatalf("retry normalization did not record 1920/1024 compensation: %+v", retryResult.Normalization)
+	}
+
+	baselineBounds := animationGenerationForegroundBounds(t, baselineResult)
+	retryBounds := animationGenerationForegroundBounds(t, retryResult)
+	for index := range baselineBounds {
+		if got, want := retryBounds[index].Dx(), baselineBounds[index].Dx(); absGeneratorInt(got-want) > 2 {
+			t.Fatalf("frame %d retry width = %d, want prototype-scale width about %d", index, got, want)
+		}
+		if got, want := retryBounds[index].Dy(), baselineBounds[index].Dy(); absGeneratorInt(got-want) > 2 {
+			t.Fatalf("frame %d retry height = %d, want prototype-scale height about %d", index, got, want)
+		}
+		if retryBounds[index].Min.X <= 0 || retryBounds[index].Min.Y <= 0 ||
+			retryBounds[index].Max.X >= request.FrameWidth || retryBounds[index].Max.Y >= request.FrameHeight {
+			t.Fatalf("frame %d compensated foreground touches target boundary: %v", index, retryBounds[index])
+		}
+	}
+}
+
+func TestAnimationGenerationExpandsBothBoundaryReferencesAfterFramingFailure(t *testing.T) {
+	prepared := animationTestPreparedGreenReference(t)
+	qualityErr := &videoprocessor.QualityError{Kind: "framing", Message: "unsafe framing"}
+	videos := &animationVideoServiceStub{}
+	service := newAnimationGenerationService(
+		videos,
+		&animationProcessorStub{},
+		&animationVideoProcessorStub{errors: []error{qualityErr, qualityErr}},
+	)
+
+	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
+		ReferenceImage:         "data:image/png;base64," + prepared,
+		EndReferenceImage:      "data:image/png;base64," + prepared,
+		ReferenceImagePrepared: true,
+		FrameCount:             4,
+		Columns:                2,
+		FrameWidth:             224,
+		FrameHeight:            192,
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsafe framing") {
+		t.Fatalf("generate animation error = %v, want final framing failure", err)
+	}
+	if len(videos.requests) != 2 || videos.requests[1].EndImage == nil {
+		t.Fatalf("video requests = %+v, want two requests with an end reference", videos.requests)
+	}
+
+	wantCanvas := animationReferenceCanvasSizeForLongEdge(animationExpandedReferenceSize)
+	start, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[1].StartImage.Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode expanded start reference: %v", decodeErr)
+	}
+	end, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[1].EndImage.Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode expanded end reference: %v", decodeErr)
+	}
+	if start.Bounds().Size() != wantCanvas || end.Bounds().Size() != wantCanvas {
+		t.Fatalf("expanded boundary canvases = start %v end %v, want %v", start.Bounds().Size(), end.Bounds().Size(), wantCanvas)
+	}
+}
+
+func TestAnimationGenerationDoesNotExpandReferenceForForegroundRetry(t *testing.T) {
+	prepared := animationTestPreparedGreenReference(t)
+	qualityErr := &videoprocessor.QualityError{Kind: "foreground", Message: "subject missing"}
+	videos := &animationVideoServiceStub{}
+	service := newAnimationGenerationService(
+		videos,
+		&animationProcessorStub{},
+		&animationVideoProcessorStub{errors: []error{qualityErr, qualityErr}},
+	)
+
+	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
+		ReferenceImage:         "data:image/png;base64," + prepared,
+		ReferenceImagePrepared: true,
+		FrameCount:             4,
+		Columns:                2,
+		FrameWidth:             64,
+		FrameHeight:            64,
+	})
+	if err == nil || !strings.Contains(err.Error(), "subject missing") {
+		t.Fatalf("generate animation error = %v, want final foreground failure", err)
+	}
+	if len(videos.requests) != 2 {
+		t.Fatalf("video requests = %d, want 2", len(videos.requests))
+	}
+	first, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[0].StartImage.Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode first reference: %v", decodeErr)
+	}
+	second, decodeErr := imageprocessor.DecodeBase64Image(videos.requests[1].StartImage.Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode retry reference: %v", decodeErr)
+	}
+	if first.Bounds() != second.Bounds() {
+		t.Fatalf("foreground retry changed reference canvas from %v to %v", first.Bounds(), second.Bounds())
 	}
 }
 
@@ -491,7 +668,7 @@ func TestPrepareGreenReferenceKeepsExistingTransparentPrototype(t *testing.T) {
 	processor := &animationProcessorStub{foregroundBase64: prototype}
 	service := &animationGenerationService{processor: processor}
 
-	_, err := service.prepareGreenReference(context.Background(), "data:image/png;base64,"+prototype)
+	_, err := service.prepareGreenReference(context.Background(), "data:image/png;base64,"+prototype, 32, 32, 48, 48)
 	if err != nil {
 		t.Fatalf("prepare transparent reference: %v", err)
 	}
@@ -500,6 +677,70 @@ func TestPrepareGreenReferenceKeepsExistingTransparentPrototype(t *testing.T) {
 	}
 	if len(processor.resizeRequests) != 1 || processor.resizeRequests[0].ImageBase64 != "data:image/png;base64,"+prototype {
 		t.Fatalf("transparent prototype was not resized directly: %+v", processor.resizeRequests)
+	}
+}
+
+func TestPrepareGreenReferenceAddsConfiguredFrameBorder(t *testing.T) {
+	prototype := image.NewNRGBA(image.Rect(0, 0, 128, 128))
+	// Leave one transparent row and column so the reference is already a
+	// foreground image while making the prototype canvas nearly edge-filling.
+	draw.Draw(prototype, image.Rect(0, 0, 127, 127), &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
+	encoded, err := imageprocessor.EncodePNGBase64(prototype)
+	if err != nil {
+		t.Fatalf("encode prototype: %v", err)
+	}
+	service := &animationGenerationService{processor: imageprocessor.NewProcessor()}
+	prepared, err := service.prepareGreenReference(
+		context.Background(),
+		"data:image/png;base64,"+encoded,
+		128,
+		128,
+		224,
+		192,
+	)
+	if err != nil {
+		t.Fatalf("prepare green reference: %v", err)
+	}
+	result, err := imageprocessor.DecodeBase64Image(prepared)
+	if err != nil {
+		t.Fatalf("decode prepared reference: %v", err)
+	}
+	canvasSize := animationReferenceCanvasSize()
+	if result.Bounds() != (image.Rectangle{Max: canvasSize}) {
+		t.Fatalf("prepared bounds = %v", result.Bounds())
+	}
+
+	foreground := image.Rectangle{}
+	found := false
+	for y := result.Bounds().Min.Y; y < result.Bounds().Max.Y; y++ {
+		for x := result.Bounds().Min.X; x < result.Bounds().Max.X; x++ {
+			pixel := color.NRGBAModel.Convert(result.At(x, y)).(color.NRGBA)
+			if pixel == (color.NRGBA{G: 255, A: 255}) {
+				continue
+			}
+			point := image.Rect(x, y, x+1, y+1)
+			if !found {
+				foreground = point
+				found = true
+			} else {
+				foreground = foreground.Union(point)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("prepared reference has no foreground")
+	}
+	referenceSize := animationReferencePrototypeCanvasSize(canvasSize, 128, 128, 224, 192)
+	minimumHorizontalBorder := (canvasSize.X - referenceSize.X) / 2
+	minimumVerticalBorder := (canvasSize.Y - referenceSize.Y) / 2
+	if foreground.Min.X < minimumHorizontalBorder || canvasSize.X-foreground.Max.X < minimumHorizontalBorder ||
+		foreground.Min.Y < minimumVerticalBorder || canvasSize.Y-foreground.Max.Y < minimumVerticalBorder {
+		t.Fatalf(
+			"foreground bounds %v do not preserve configured borders horizontal=%d vertical=%d",
+			foreground,
+			minimumHorizontalBorder,
+			minimumVerticalBorder,
+		)
 	}
 }
 
@@ -534,13 +775,13 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 		processor:      imageprocessor.NewProcessor(),
 		videoProcessor: videoProcessor,
 	}
-	result, err := service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
+	result, err := service.processVideoWithSourceCellScale(context.Background(), []byte("video"), AnimationGenerationRequest{
 		Action:      "idle breathing",
 		FrameCount:  4,
 		Columns:     2,
 		FrameWidth:  64,
 		FrameHeight: 64,
-	})
+	}, 1)
 	if err != nil {
 		t.Fatalf("process video: %v", err)
 	}
@@ -594,9 +835,9 @@ func TestProcessAnimationVideoAutoDetectsNonGreenMatte(t *testing.T) {
 		videoProcessor: videoProcessor,
 	}
 
-	result, err := service.processVideo(context.Background(), []byte("video"), AnimationGenerationRequest{
+	result, err := service.processVideoWithSourceCellScale(context.Background(), []byte("video"), AnimationGenerationRequest{
 		Action: "idle breathing", FrameCount: 4, Columns: 2, FrameWidth: 64, FrameHeight: 64,
-	})
+	}, 1)
 	if err != nil {
 		t.Fatalf("process video with non-green matte: %v", err)
 	}
@@ -628,6 +869,31 @@ func assertAnimationPixelResizeRequests(
 			t.Fatalf("final animation pixel resize request %d has unexpected options: %+v", index, options)
 		}
 	}
+}
+
+func animationReferenceContentBounds(t *testing.T, reference image.Image) image.Rectangle {
+	t.Helper()
+	matte := color.NRGBA{G: 255, A: 255}
+	bounds := image.Rectangle{}
+	found := false
+	for y := reference.Bounds().Min.Y; y < reference.Bounds().Max.Y; y++ {
+		for x := reference.Bounds().Min.X; x < reference.Bounds().Max.X; x++ {
+			if color.NRGBAModel.Convert(reference.At(x, y)).(color.NRGBA) == matte {
+				continue
+			}
+			pixel := image.Rect(x, y, x+1, y+1)
+			if !found {
+				bounds = pixel
+				found = true
+			} else {
+				bounds = bounds.Union(pixel)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("animation reference contains no non-matte pixels")
+	}
+	return bounds
 }
 
 func animationTestForeground(t *testing.T) string {
@@ -677,6 +943,54 @@ func animationTestImageDataURL(t *testing.T, frame image.Image) string {
 		t.Fatalf("encode animation test frame: %v", err)
 	}
 	return "data:image/png;base64," + encoded
+}
+
+func animationGenerationForegroundBounds(t *testing.T, result *AnimationGenerationResult) []image.Rectangle {
+	t.Helper()
+	bounds := make([]image.Rectangle, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, err := imageprocessor.DecodeBase64Image(frame.ImageBase64)
+		if err != nil {
+			t.Fatalf("decode generated animation frame %d: %v", index, err)
+		}
+		found := false
+		for y := decoded.Bounds().Min.Y; y < decoded.Bounds().Max.Y; y++ {
+			for x := decoded.Bounds().Min.X; x < decoded.Bounds().Max.X; x++ {
+				if color.NRGBAModel.Convert(decoded.At(x, y)).(color.NRGBA).A == 0 {
+					continue
+				}
+				pixel := image.Rect(x, y, x+1, y+1)
+				if !found {
+					bounds[index], found = pixel, true
+				} else {
+					bounds[index] = bounds[index].Union(pixel)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("generated animation frame %d has no foreground", index)
+		}
+	}
+	return bounds
+}
+
+func animationTestVideoFramesWithSubject(count int, subjectSize image.Point) []image.Image {
+	frames := make([]image.Image, count)
+	for index := range frames {
+		frame := image.NewNRGBA(image.Rect(0, 0, 192, 192))
+		draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+		min := image.Pt((192-subjectSize.X)/2, (192-subjectSize.Y)/2+index%2)
+		draw.Draw(frame, image.Rectangle{Min: min, Max: min.Add(subjectSize)}, &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
+		frames[index] = frame
+	}
+	return frames
+}
+
+func absGeneratorInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func animationTestVideoFrames(count int) []image.Image {

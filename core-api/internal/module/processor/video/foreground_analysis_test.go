@@ -66,3 +66,23 @@ func TestForegroundBoundsHandlesEmptyAndOffsetImages(t *testing.T) {
 		t.Fatalf("unexpected foreground bounds: %v, ok=%v", bounds, ok)
 	}
 }
+
+func TestConfiguredSafetyMarginAllowsEffectsNearButNotOnFrameEdge(t *testing.T) {
+	frame := testGreenFrame(256, 256)
+	drawSubject(frame, image.Rect(1, 80, 200, 176))
+
+	if frameInsideSafetyBand(frame, testGreenChromaKey) {
+		t.Fatal("legacy 2.5% margin should reject foreground this close to the edge")
+	}
+	configured := testGreenChromaKey
+	configured.SafetyMarginRatio = 1.0 / 192.0
+	if !frameInsideSafetyBand(frame, configured) {
+		t.Fatal("one-logical-pixel margin should allow foreground that remains inside the edge")
+	}
+
+	touching := testGreenFrame(256, 256)
+	drawSubject(touching, image.Rect(0, 80, 200, 176))
+	if frameInsideSafetyBand(touching, configured) {
+		t.Fatal("configured margin must still reject foreground touching the frame edge")
+	}
+}

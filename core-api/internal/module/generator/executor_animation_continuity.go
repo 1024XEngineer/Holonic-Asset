@@ -62,6 +62,22 @@ func animationVideoChromaKey() videoprocessor.ChromaKey {
 	}
 }
 
+func animationVideoChromaKeyForFrame(width, height int) videoprocessor.ChromaKey {
+	key := animationVideoChromaKey()
+	key.SafetyMarginRatio = animationFrameSafetyMarginRatio(width, height)
+	return key
+}
+
+func animationFrameSafetyMarginRatio(width, height int) float64 {
+	shortEdge := min(width, height)
+	if shortEdge <= 0 {
+		return 0
+	}
+	// Keep approximately one final logical pixel clear at the edge. Cap the
+	// ratio at the legacy 2.5% so small frames do not become more restrictive.
+	return min(.025, 1/float64(shortEdge))
+}
+
 func validateEditFrameContinuity(request AnimationGenerationRequest, generated []image.Image) error {
 	original := request.continuityReferenceFrames
 	if len(original) != request.FrameCount {
@@ -88,11 +104,11 @@ func validateEditFrameContinuity(request AnimationGenerationRequest, generated [
 		}
 	}
 
-	originalAnalysis, err := videoprocessor.AnalyzeFrameSequence(original, request.FPS, animationVideoChromaKey())
+	originalAnalysis, err := videoprocessor.AnalyzeFrameSequence(original, request.FPS, animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight))
 	if err != nil {
 		return fmt.Errorf("generator: analyze original edit frame context: %w", err)
 	}
-	finalAnalysis, err := videoprocessor.AnalyzeFrameSequence(finalFrames, request.FPS, animationVideoChromaKey())
+	finalAnalysis, err := videoprocessor.AnalyzeFrameSequence(finalFrames, request.FPS, animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight))
 	if err != nil {
 		return fmt.Errorf("generator: analyze edited frame context: %w", err)
 	}

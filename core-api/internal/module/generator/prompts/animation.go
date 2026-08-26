@@ -21,6 +21,10 @@ type AnimationOptions struct {
 	Action             string
 	OriginalAction     string
 	FrameCount         int
+	PrototypeWidth     int
+	PrototypeHeight    int
+	FrameWidth         int
+	FrameHeight        int
 	LocalFrameEdit     bool
 	TargetFrameIndices []int
 }
@@ -34,6 +38,7 @@ func BuildAnimationVideo(options AnimationOptions) string {
 	style := limit(options.Style, maxAnimationStyleLength)
 	action := limit(options.Action, maxAnimationActionLength)
 	originalAction := limit(options.OriginalAction, maxAnimationActionLength)
+	framingInstructions := animationFramingInstructions(options)
 	if style == "" {
 		style = DefaultAnimationStyle
 	}
@@ -78,12 +83,13 @@ func BuildAnimationVideo(options AnimationOptions) string {
 			sections = fmt.Sprintf("%s\n\n%s", actionInstructions, referenceInstructions)
 		}
 	}
-	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video from the supplied reference image inputs.
+	prompt := strings.TrimSpace(fmt.Sprintf(`Create one normal single-subject in-place 2D game asset animation video.
 
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
-- every frame contains exactly ONE complete subject and its attached or held props
+- every frame contains exactly ONE complete subject and its attached or held props; keep spray, projectiles, particles, trails, glow, and shadows inside a visible matte edge
 - normal full-frame video; never a contact sheet, collage, grid, storyboard, spritesheet, multiple views, poses, or copies
-- fixed camera/root; keep the subject inside the inner 70%% on a uniform chroma background: use pure green #00FF00 by default, but use pure magenta #FF00FF only when the subject contains substantial colours close to pure green
+- fixed camera/root on uniform chroma: pure green #00FF00 by default; pure magenta #FF00FF only when the subject contains substantial colours close to pure green
+%s
 - preserve original colours and saturation; never recolour, desaturate, gray out, or remove green subject pixels
 - matte only in the background; never use its exact colour inside or over the subject
 
@@ -101,11 +107,23 @@ CONTINUITY:
 
 FRAMING AND BACKGROUND:
 - fixed camera: no pan, tilt, zoom, shake, crop, reframe, or cut
-- keep the whole subject and props inside the inner 70%%; maintain at least 15%% uninterrupted empty space on every side
-- keep long parts, weapons, and tool tips central; reduce amplitude rather than reaching toward an edge
+- keep the whole subject, long parts, weapons, tool tips, and every visible effect within the available canvas; this includes projectiles, liquid, spray, particles, trails, glow, and shadows
+- keep at least a thin continuous matte line visible at every canvas edge in every frame; shorten the motion or effect rather than resizing the subject or reaching an edge
 - background is perfectly uniform in the selected matte; never mix mattes`,
-		description, style, action, options.FrameCount, sections))
+		framingInstructions, description, style, action, options.FrameCount, sections))
 	return limit(prompt, MaxAnimationVideoCharacters)
+}
+
+func animationFramingInstructions(options AnimationOptions) string {
+	if options.PrototypeWidth > 0 && options.PrototypeHeight > 0 && options.FrameWidth > 0 && options.FrameHeight > 0 {
+		return fmt.Sprintf("- SCALE: prototype %dx%d -> frame %dx%d; keep reference scale/root exactly; matte border is movement room, never resize the subject",
+			options.PrototypeWidth,
+			options.PrototypeHeight,
+			options.FrameWidth,
+			options.FrameHeight,
+		)
+	}
+	return "- SCALE: keep full-frame reference scale/root exactly; matte border is movement room, never resize the subject to force margins"
 }
 
 func formatAnimationTargetFrames(indices []int, frameCount int) string {
@@ -123,10 +141,11 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 	base = limit(base, maxAnimationBaseCharacters)
 	correction := `Generate a fresh take; the previous take failed framing checks.
 - output exactly one subject in a normal video frame; never reproduce a multi-direction reference sheet or show multiple views
-- keep the complete subject and every attached or held object inside the inner 64% of the frame throughout the entire video
-- maintain at least 18% uninterrupted empty space in the selected pure chroma matte on every side
-- preserve the smaller scale of the supplied reference and never zoom, crop, reframe, or push any subject part toward an edge
-- keep long parts, weapons, or tool tips inside the central 64%%; use a compact controlled motion instead of a wide edge-reaching swing`
+- preserve the exact subject scale, root placement, and existing matte border shown in the supplied reference; never zoom, shrink, crop, or reframe
+- keep the complete subject, every attached or held object, and every visible effect within the available frame throughout the entire video
+- use the existing matte border as movement room; never invent an arbitrary percentage margin by resizing the subject
+- keep at least a thin continuous matte line visible at every canvas edge in every frame
+- keep long parts, weapons, tool tips, projectiles, liquid, spray, particles, trails, glow, and shadows within the available canvas; shorten or reduce the motion/effect instead of reaching an edge`
 	if issueKind == "subject" || issueKind == "foreground" {
 		correction = `Generate a fresh take; the previous take lost the readable subject silhouette.
 - output exactly one subject in every frame; never reproduce a multi-direction reference sheet or show multiple views

@@ -135,3 +135,23 @@ func TestAnimationUnprocessedImageURLAddsSuffixWithoutChangingReferenceSemantics
 		})
 	}
 }
+
+func TestAnimationFrameSafetyMarginRatioTracksLogicalFrameSize(t *testing.T) {
+	tests := []struct {
+		name          string
+		width, height int
+		want          float64
+	}{
+		{name: "unknown dimensions use processor default", want: 0},
+		{name: "small frame retains legacy cap", width: 32, height: 48, want: .025},
+		{name: "large rectangular frame keeps one short-edge pixel", width: 224, height: 192, want: 1.0 / 192.0},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := animationFrameSafetyMarginRatio(test.width, test.height)
+			if got != test.want {
+				t.Fatalf("margin ratio = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
