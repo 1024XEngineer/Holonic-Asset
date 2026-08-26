@@ -96,7 +96,13 @@ describe("assetApi Core routing", () => {
       name: "Large Barrel",
       description: "Updated prop",
       tags: [
-        { name: "prop", description: "Props", color: "#4F46E5" },
+        {
+          name: "prop",
+          description: "Props",
+          color: "#4F46E5",
+          tagId: 11,
+          projectId: 42,
+        },
         { name: "wood", description: "Wooden", color: "#16A34A" },
       ],
       canvasSize: "48 × 64 px",
