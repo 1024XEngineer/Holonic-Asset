@@ -124,11 +124,11 @@ export function useTilesetEditorWorkspace({
       status: "processing",
     });
     try {
-      await flow.submit({
+      const submitted = await flow.submit({
         prompt: request.creativeBrief,
         request: buildAddTilesetItemGenerationRequest({ assetId, request }),
       });
-      reportAction(`${request.itemName} queued`);
+      if (submitted) reportAction(`${request.itemName} queued`);
     } catch {
       reportAction("Tileset item generation failed");
     } finally {
@@ -158,7 +158,7 @@ export function useTilesetEditorWorkspace({
     onSubmit: submit,
     onGenerateItem: (request: CreateTilesetItemRequest) =>
       generateItem(request),
-    isGeneratingItem: itemTask !== null,
+    isGeneratingItem: itemTask !== null || flow.isPromptSubmitting,
     onResolveReview: (applied: boolean) => void flow.resolveReview(applied),
   };
 }

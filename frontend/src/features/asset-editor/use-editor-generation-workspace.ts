@@ -121,6 +121,7 @@ export function useEditorGenerationWorkspace<Content>({
         prompt: submittedPrompt,
       });
       if (submitted) reportAction("Prompt sent");
+      return submitted;
     } catch (error) {
       reportAction("Prompt submission failed");
       throw error;
