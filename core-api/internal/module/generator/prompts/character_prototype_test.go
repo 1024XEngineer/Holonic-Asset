@@ -112,6 +112,8 @@ func TestCharacterPrototypeAdaptsRulesToLogicalPixelBudget(t *testing.T) {
 		{name: "48x64 nominal / 30x46 drawable", dimensions: assetdomain.Size{Width: 48, Height: 64}, want: "small character with 30 x 46 drawable logical pixels"},
 		{name: "64px nominal / 40px drawable", dimensions: assetdomain.Size{Width: 64, Height: 64}, want: "small character with 40 x 40 drawable logical pixels"},
 		{name: "128px nominal / 80px drawable", dimensions: assetdomain.Size{Width: 128, Height: 128}, want: "medium-size character with 80 x 80 drawable logical pixels"},
+		{name: "256px nominal / 160px drawable", dimensions: assetdomain.Size{Width: 256, Height: 256}, want: "character has 160 x 160 drawable logical pixels: permit more material"},
+		{name: "512px nominal / 320px drawable", dimensions: assetdomain.Size{Width: 512, Height: 512}, want: "Even at this larger drawable target, construct the character from deliberate coarse pixel clusters"},
 	}
 
 	for _, test := range tests {

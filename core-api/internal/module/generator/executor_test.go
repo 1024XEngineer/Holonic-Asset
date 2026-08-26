@@ -408,6 +408,7 @@ func assertPrototypeResources(t *testing.T, asset *assetdomain.Asset, wantCount 
 	t.Helper()
 	if asset == nil {
 		t.Fatal("expected created asset")
+		return
 	}
 	content, err := asset.DecodeContent()
 	if err != nil {

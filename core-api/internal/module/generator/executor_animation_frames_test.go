@@ -344,6 +344,12 @@ func TestPackAnimationFramesValidatesInputAndPlacement(t *testing.T) {
 			t.Fatalf("error = %v", err)
 		}
 	})
+	t.Run("rejects zero-sized frame", func(t *testing.T) {
+		frames := []image.Image{image.NewNRGBA(image.Rect(0, 0, 0, 0))}
+		if _, err := packTransparentAnimationFrames(frames, 1); err == nil || !strings.Contains(err.Error(), "must be positive") {
+			t.Fatalf("expected positive dimensions error, got %v", err)
+		}
+	})
 	t.Run("packs non-zero bounds and fills video matte", func(t *testing.T) {
 		first := image.NewNRGBA(image.Rect(5, 7, 7, 9))
 		first.SetNRGBA(5, 7, color.NRGBA{R: 255, A: 255})

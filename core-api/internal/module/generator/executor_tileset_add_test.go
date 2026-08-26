@@ -803,3 +803,42 @@ func TestResolveExistingTileSetUnprocessedReference(t *testing.T) {
 		}
 	})
 }
+
+func TestPublishAddedTileSetItemErrors(t *testing.T) {
+	placement := tileSetPlacement{
+		ItemIndex: 0,
+		Positions: []TileSetCoordinate{{0, 0}},
+	}
+
+	t.Run("upload build failure", func(t *testing.T) {
+		item := processedTileSetItem{
+			Name: "Chair",
+			Tiles: []imageprocessor.ImageRegion{
+				{ImageBase64: "b64", MIMEType: "image/png"},
+			},
+		}
+		store := &mockReferenceStore{
+			keyErr: errors.New("key failed"),
+		}
+		exec := &executor{references: store}
+		_, err := exec.publishAddedTileSetItem(context.Background(), 1, 1, item, placement)
+		if err == nil {
+			t.Fatal("expected error on upload build failure")
+		}
+	})
+
+	t.Run("empty item name triggers cleanup error", func(t *testing.T) {
+		item := processedTileSetItem{
+			Name: "", // empty name triggers error
+			Tiles: []imageprocessor.ImageRegion{
+				{ImageBase64: "b64", MIMEType: "image/png"},
+			},
+		}
+		store := &mockReferenceStore{}
+		exec := &executor{references: store}
+		_, err := exec.publishAddedTileSetItem(context.Background(), 1, 1, item, placement)
+		if err == nil || !strings.Contains(err.Error(), "candidate is empty") {
+			t.Fatalf("expected candidate is empty error, got %v", err)
+		}
+	})
+}

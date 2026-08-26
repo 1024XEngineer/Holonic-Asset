@@ -255,4 +255,36 @@ func TestResolveAddedTileSetItemPlacementRejectsConflicts(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("nil item returns error", func(t *testing.T) {
+		_, err := resolveAddedTileSetItemPlacement(
+			AddTilesetItemPayload{Item: nil}, content, dimensions,
+		)
+		if err == nil || !strings.Contains(err.Error(), "item is required") {
+			t.Fatalf("expected item is required, got %v", err)
+		}
+	})
+
+	t.Run("max items reached returns error", func(t *testing.T) {
+		fullContent := assetdomain.AssetContent{
+			Items: make([]assetdomain.TileSetItem, maxTileSetItems),
+		}
+		for i := range maxTileSetItems {
+			fullContent.Items[i] = assetdomain.TileSetItem{Name: strings.Repeat("a", i+1)}
+		}
+		item := AddTileSetItemDefinition{Name: "NewItem", Description: "desc", Shape: []TileSetCoordinate{{0, 0}}}
+		_, err := resolveAddedTileSetItemPlacement(
+			AddTilesetItemPayload{Item: &item}, fullContent, dimensions,
+		)
+		if err == nil || !strings.Contains(err.Error(), "already contains the maximum") {
+			t.Fatalf("expected max items error, got %v", err)
+		}
+	})
+}
+
+func TestFindFirstTileSetPlacementEdgeCases(t *testing.T) {
+	origin, pos, found := findFirstTileSetPlacement(nil, nil, 0, 0)
+	if found || pos != nil || origin != (TileSetCoordinate{}) {
+		t.Fatalf("expected not found for empty shape/grid: %v, %v, %v", origin, pos, found)
+	}
 }
