@@ -343,18 +343,28 @@ func (s *animationGenerationService) Generate(
 	}
 	currentReferenceLongEdge := initialReferenceLongEdge
 
+	var referenceImages []videoclient.ReferenceImage
+	if len(options.ContextReferenceImages) > 0 {
+		referenceImages = make([]videoclient.ReferenceImage, 0, 1+len(options.ContextReferenceImages))
+		referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"})
+		for _, ref := range options.ContextReferenceImages {
+			referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: ref, MediaType: "image/png"})
+		}
+	}
+
 	baseVideoPrompt := prompts.BuildAnimationVideo(promptOptions)
 	videoPrompt := baseVideoPrompt
 	var lastQualityError error
 	for attempt := 1; attempt <= animationVideoAttempts; attempt++ {
 		videoResult, generateErr := s.videos.Generate(ctx, &videoclient.GenerateRequest{
-			Prompt:        videoPrompt,
-			StartImage:    videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"},
-			EndImage:      endReference,
-			Resolution:    options.Resolution,
-			Duration:      options.Duration,
-			AspectRatio:   options.AspectRatio,
-			GenerateAudio: false,
+			Prompt:          videoPrompt,
+			StartImage:      videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"},
+			ReferenceImages: referenceImages,
+			EndImage:        endReference,
+			Resolution:      options.Resolution,
+			Duration:        options.Duration,
+			AspectRatio:     options.AspectRatio,
+			GenerateAudio:   false,
 		})
 		if generateErr != nil {
 			return nil, fmt.Errorf("generator: generate animation video: %w", generateErr)
