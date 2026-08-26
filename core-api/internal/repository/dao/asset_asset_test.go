@@ -430,6 +430,45 @@ func TestDecodeAssetTagsRejectsMalformedAndUnsupportedValues(t *testing.T) {
 	}
 }
 
+func TestAssetDaoDeleteAsset(t *testing.T) {
+	db, mock := newMockAssetDatabase(t)
+	dao := &AssetDaoImpl{DB: db}
+
+	// success
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "assets" WHERE id = $1`)).
+		WithArgs(10).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := dao.DeleteAsset(context.Background(), 10); err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+
+	// not found
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "assets" WHERE id = $1`)).
+		WithArgs(10).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+
+	if err := dao.DeleteAsset(context.Background(), 10); err == nil {
+		t.Fatal("expected error on not found asset delete")
+	}
+
+	// db error
+	wantErr := errors.New("db error")
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "assets" WHERE id = $1`)).
+		WithArgs(10).
+		WillReturnError(wantErr)
+	mock.ExpectRollback()
+
+	if err := dao.DeleteAsset(context.Background(), 10); !errors.Is(err, wantErr) {
+		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
+}
+
 func expectAssetRow(mock sqlmock.Sqlmock, assetID, projectID uint) {
 	mock.ExpectQuery(`SELECT \* FROM "assets" WHERE "assets"\."id" = \$1 ORDER BY "assets"\."id" LIMIT \$2`).
 		WithArgs(assetID, 1).

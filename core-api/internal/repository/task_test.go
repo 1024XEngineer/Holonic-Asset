@@ -27,6 +27,9 @@ type taskDaoStub struct {
 	currentStatus uint
 	status        uint
 	result        datatypes.JSON
+	errorMessage  string
+	detail        *dao.Task
+	listResult    []*dao.Task
 	updated       bool
 	err           error
 }
@@ -43,6 +46,12 @@ func (s *taskDaoStub) UpdateStatusFrom(
 	return s.updated, s.err
 }
 
+func (s *taskDaoStub) UpdateStatus(_ context.Context, taskID uint, status uint) error {
+	s.taskID = taskID
+	s.status = status
+	return s.err
+}
+
 func (s *taskDaoStub) UpdateResult(
 	_ context.Context,
 	taskID uint,
@@ -53,6 +62,48 @@ func (s *taskDaoStub) UpdateResult(
 	s.status = status
 	s.result = append(datatypes.JSON(nil), result...)
 	return s.err
+}
+
+func (s *taskDaoStub) UpdateFailure(_ context.Context, taskID uint, status uint, errorMessage string) error {
+	s.taskID = taskID
+	s.status = status
+	s.errorMessage = errorMessage
+	return s.err
+}
+
+func (s *taskDaoStub) GetDetail(_ context.Context, taskID uint) (*dao.Task, error) {
+	s.taskID = taskID
+	return s.detail, s.err
+}
+
+func (s *taskDaoStub) List(_ context.Context, _ dao.TaskListFilter) ([]*dao.Task, error) {
+	return s.listResult, s.err
+}
+
+type outboxDaoStub struct {
+	dao.OutboxDao
+	inserted       *dao.Outbox
+	insertErr      error
+	pendingRecords []*dao.Outbox
+	fetchErr       error
+	markedID       uint
+	markedQueueID  int64
+	markErr        error
+}
+
+func (s *outboxDaoStub) Insert(_ context.Context, _ *gorm.DB, record *dao.Outbox) error {
+	s.inserted = record
+	return s.insertErr
+}
+
+func (s *outboxDaoStub) FetchPending(_ context.Context, _ int) ([]*dao.Outbox, error) {
+	return s.pendingRecords, s.fetchErr
+}
+
+func (s *outboxDaoStub) MarkPublished(_ context.Context, id uint, queueID int64) error {
+	s.markedID = id
+	s.markedQueueID = queueID
+	return s.markErr
 }
 
 func TestTaskRepositoryCompleteTaskTransitionsAwaitingApplication(t *testing.T) {
@@ -416,4 +467,154 @@ func taskRowsWithPayload(
 		sql.NullTime{},
 		sql.NullTime{},
 	)
+}
+
+func TestTaskRepositoryCreateWithOutbox(t *testing.T) {
+	db, mock := newMockTaskRepositoryDatabase(t)
+	outboxMock := &outboxDaoStub{}
+	repo := &repository.TaskRepositoryImpl{
+		DB:        db,
+		OutboxDao: outboxMock,
+	}
+
+	task := &taskdomain.Task{
+		Type:    string(generator.GenerateAnimation),
+		Payload: json.RawMessage(`{"project_id":42}`),
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO "tasks"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(88))
+	mock.ExpectCommit()
+
+	id, err := repo.CreateWithOutbox(context.Background(), task)
+	if err != nil {
+		t.Fatalf("create with outbox: %v", err)
+	}
+	if id != 88 || task.ID != 88 {
+		t.Fatalf("expected task id 88, got %d", id)
+	}
+	if outboxMock.inserted == nil || outboxMock.inserted.TaskID != 88 {
+		t.Fatalf("unexpected outbox inserted: %+v", outboxMock.inserted)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestTaskRepositoryUpdateTaskStatusAndFailure(t *testing.T) {
+	stub := &taskDaoStub{}
+	repo := &repository.TaskRepositoryImpl{TaskDao: stub}
+
+	if err := repo.UpdateTaskStatus(context.Background(), 12, taskdomain.StatusProcessing); err != nil {
+		t.Fatalf("update task status: %v", err)
+	}
+	if stub.taskID != 12 || stub.status != uint(taskdomain.StatusProcessing) {
+		t.Fatalf("unexpected status update: %+v", stub)
+	}
+
+	if err := repo.UpdateTaskFailure(context.Background(), 12, "timeout"); err != nil {
+		t.Fatalf("update task failure: %v", err)
+	}
+	if stub.taskID != 12 || stub.status != uint(taskdomain.StatusFailed) || stub.errorMessage != "timeout" {
+		t.Fatalf("unexpected failure update: %+v", stub)
+	}
+}
+
+func TestTaskRepositoryGetTaskByID(t *testing.T) {
+	stub := &taskDaoStub{
+		detail: &dao.Task{
+			ID:      55,
+			Type:    string(generator.GenerateAnimation),
+			Status:  uint(taskdomain.StatusCompleted),
+			Payload: datatypes.JSON(`{"key":"val"}`),
+			Result:  datatypes.JSON(`{"res":1}`),
+		},
+	}
+	repo := &repository.TaskRepositoryImpl{TaskDao: stub}
+
+	task, err := repo.GetTaskByID(context.Background(), 55)
+	if err != nil {
+		t.Fatalf("get task by id: %v", err)
+	}
+	if task.ID != 55 || task.Type != string(generator.GenerateAnimation) || task.Status != taskdomain.StatusCompleted {
+		t.Fatalf("unexpected task: %+v", task)
+	}
+
+	// Error case
+	wantErr := errors.New("not found")
+	stubErr := &taskDaoStub{err: wantErr}
+	_, err = (&repository.TaskRepositoryImpl{TaskDao: stubErr}).GetTaskByID(context.Background(), 55)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected error containing not found, got %v", err)
+	}
+}
+
+func TestTaskRepositoryListTasks(t *testing.T) {
+	stub := &taskDaoStub{
+		listResult: []*dao.Task{
+			{ID: 10, Type: "gen", Status: 1},
+			{ID: 9, Type: "gen", Status: 2},
+		},
+	}
+	repo := &repository.TaskRepositoryImpl{TaskDao: stub}
+
+	// Nil filter error
+	if _, err := repo.ListTasks(context.Background(), nil); err == nil {
+		t.Fatal("expected error on nil filter")
+	}
+
+	filter := &taskdomain.ListFilter{
+		Statuses: []taskdomain.Status{taskdomain.StatusPending},
+		Types:    []string{"gen"},
+		Limit:    10,
+	}
+	tasks, err := repo.ListTasks(context.Background(), filter)
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	if len(tasks) != 2 || tasks[0].ID != 10 || tasks[1].ID != 9 {
+		t.Fatalf("unexpected list output: %+v", tasks)
+	}
+
+	// Error case
+	wantErr := errors.New("list failed")
+	stubErr := &taskDaoStub{err: wantErr}
+	_, err = (&repository.TaskRepositoryImpl{TaskDao: stubErr}).ListTasks(context.Background(), filter)
+	if err == nil || !strings.Contains(err.Error(), "list failed") {
+		t.Fatalf("expected list failed error, got %v", err)
+	}
+}
+
+func TestTaskRepositoryOutboxOperations(t *testing.T) {
+	outboxStub := &outboxDaoStub{
+		pendingRecords: []*dao.Outbox{
+			{ID: 1, Payload: datatypes.JSON(`{"id":1}`)},
+			{ID: 2, Payload: datatypes.JSON(`{"id":2}`)},
+		},
+	}
+	repo := &repository.TaskRepositoryImpl{OutboxDao: outboxStub}
+
+	records, err := repo.FetchPendingOutbox(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("fetch pending outbox: %v", err)
+	}
+	if len(records) != 2 || records[0].ID != 1 || string(records[0].Payload) != `{"id":1}` {
+		t.Fatalf("unexpected records: %+v", records)
+	}
+
+	if err := repo.MarkOutboxPublished(context.Background(), 1, 999); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if outboxStub.markedID != 1 || outboxStub.markedQueueID != 999 {
+		t.Fatalf("unexpected mark published params: id=%d queueID=%d", outboxStub.markedID, outboxStub.markedQueueID)
+	}
+
+	// Fetch error case
+	wantErr := errors.New("fetch error")
+	stubErr := &outboxDaoStub{fetchErr: wantErr}
+	_, err = (&repository.TaskRepositoryImpl{OutboxDao: stubErr}).FetchPendingOutbox(context.Background(), 10)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
 }
