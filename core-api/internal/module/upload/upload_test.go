@@ -34,6 +34,7 @@ func TestManagerReturnsPlaceholderTargetWithoutStore(t *testing.T) {
 	}
 	if target == nil {
 		t.Fatal("expected a non-nil placeholder target")
+		return
 	}
 	if target.ObjectKey != "" || target.ObjectURL != "" || target.UploadURL != "" || target.UploadToken != "" {
 		t.Fatalf("expected an empty placeholder target, got %+v", target)
