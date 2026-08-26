@@ -7,6 +7,9 @@ import (
 
 const sceneryVisualConstraints = `Visual contract:
 - The final scene and every independently generated layer MUST use classic low-resolution 2D pixel art, matching the character and object asset pipeline.
+- Perspective contract: Game scenery backgrounds MUST ALWAYS strictly use a Side-On (side-view / 2D horizontal side-scrolling / panoramic) perspective. Never generate top-down, isometric, birds-eye, high-angle, or first-person views for scenery backgrounds.
+- Reference contract: Any supplied project or asset reference image provides visual style ONLY (color palette, pixel texture, lighting atmosphere, material mood). Game background scenery MUST NOT inherit or reference any perspective, angle, or composition from project references.
+- Grounding contract: Ground-level, terrain, platform, and highway foreground layers MUST occupy the lower region of the canvas and anchor solidly to the bottom of the frame to ground the scene naturally. Do not float terrain or foreground structures in mid-air unless explicitly requested as floating islands.
 - Use deliberate pixel clusters, hard aliased edges, a restricted palette, no antialiasing, no smooth gradients, no painterly brushwork, no vector rendering, no 3D rendering, and no photorealism.
 - Keep one consistent pixel density, palette, lighting model, material language, and perspective across every layer.
 - Scenery should contain no characters, people, humanoids, animals, or creatures by default. If and only if the user's creative brief explicitly requests one of them, follow that explicit request and ignore this preference.`
@@ -21,6 +24,7 @@ Rules:
 - Give every layer a short unique name and a self-contained image-generation brief.
 - Each layer brief must describe only that layer's visual content and its intended placement, framing, scale, depth, and relationship to the full canvas.
 - Coordinate silhouettes, overlaps, palette, lighting, perspective, and level of detail across all layer briefs so separately generated images form one coherent scene.
+- For terrain, roads, platforms, or foreground structures, explicitly specify their grounding alignment along the bottom border of the canvas.
 - Do not add IDs; the backend assigns stable IDs from response order.
 - Return only the fields defined by the supplied JSON schema. Do not return explanations, coordinates, resources, or metadata.
 
@@ -34,7 +38,7 @@ Project visual context:
 <project_name>%s</project_name>
 <game_type>%s</game_type>
 <target_platform>%s</target_platform>
-<project_description>%s</project_description>`
+<project_description>%s</project_description>%s`
 
 type SceneryPlanInput struct {
 	AssetName          string
@@ -44,11 +48,16 @@ type SceneryPlanInput struct {
 	GameType           string
 	TargetPlatform     string
 	ProjectDescription string
+	PreviousCritique   string
 	Width              uint
 	Height             uint
 }
 
 func SceneryPlan(input SceneryPlanInput) string {
+	critiqueSection := ""
+	if critique := strings.TrimSpace(input.PreviousCritique); critique != "" {
+		critiqueSection = fmt.Sprintf("\n\nPrevious review critique to address:\n<previous_review_critique>\n%s\n</previous_review_critique>", critique)
+	}
 	return fmt.Sprintf(
 		sceneryPlanTemplate,
 		sceneryVisualConstraints,
@@ -61,6 +70,7 @@ func SceneryPlan(input SceneryPlanInput) string {
 		strings.TrimSpace(input.GameType),
 		strings.TrimSpace(input.TargetPlatform),
 		strings.TrimSpace(input.ProjectDescription),
+		critiqueSection,
 	)
 }
 
@@ -152,11 +162,14 @@ func SceneryLayer(input SceneryLayerInput, backgroundConstraint string) string {
 	)
 }
 
-const sceneryLayoutAnalysisTemplate = `Inspect every attached processed image and propose the final layout for one layered 2D game scenery.
+const sceneryLayoutAnalysisTemplate = `Inspect every attached processed image, critically evaluate the overall composition quality, and propose the final layout for one layered 2D game scenery.
 
 %s
 
-Layout rules:
+Review and Calibration rules:
+- Review the entire composed scene critically for floating ground structures, broken horizontal spans, perspective mismatches, scale inconsistencies, or unnatural gaps.
+- If the composition is visually coherent, properly grounded, and ready for production, set approved to true. If the scene has severe layout flaws, floating ground elements, or incompatible layer perspectives, set approved to false.
+- Include concise review_notes summarizing your assessment and any specific visual defects observed.
 - Return exactly one layout for every supplied layer ID. Do not invent, omit, or duplicate IDs.
 - Every attached image is already registered to the complete final canvas at the requested dimensions. Transparent pixels are intentional padding, and visible pixels already express the planned global placement.
 - The first attached image is the authoritative opaque full-canvas backdrop. Keep it at position (0, 0), scale (1, 1), rotation 0, opacity 1, and give it the unique lowest zIndex so it can never cover another layer.
@@ -166,7 +179,7 @@ Layout rules:
 - Scale X and Y must be finite and greater than zero. Opacity must be from 0 through 1. zIndex must be an integer.
 - Keep every transformed layer at least partially intersecting the canvas.
 - Use the actual attached pixels, shared creative intent, perspective, and depth relationships to choose placement, scale, rotation, opacity, and stacking order.
-- Return only the fields defined by the supplied JSON schema. Do not return names, visibility, resources, metadata, explanations, or revised images.
+- Return only the fields defined by the supplied JSON schema. Do not return names, visibility, resources, metadata, or revised images.
 
 Scenery asset:
 <asset_name>%s</asset_name>

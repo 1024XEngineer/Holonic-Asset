@@ -91,9 +91,35 @@ func TestSceneryLayoutAnalysisPromptContainsContextAndImageMapping(t *testing.T)
 		"first attached image is the authoritative opaque full-canvas backdrop", "unique lowest zIndex",
 		`Attached image 1 corresponds to layer ID 1 named "Sky"`,
 		`Attached image 2 corresponds to layer ID 2 named "Mountains"`,
+		"critically evaluate the overall composition quality",
+		"approved to true",
+		"approved to false",
+		"review_notes",
 	} {
 		if !strings.Contains(prompt, required) {
 			t.Fatalf("prompt omitted %q: %s", required, prompt)
 		}
+	}
+}
+
+func TestSceneryPlanPromptIncludesPreviousCritiqueWhenProvided(t *testing.T) {
+	promptWithoutCritique := prompts.SceneryPlan(prompts.SceneryPlanInput{
+		AssetName: "Valley", CreativeBrief: "dawn valley",
+		Perspective: "Side-On", ProjectName: "Starbound", GameType: "RPG",
+		TargetPlatform: "PC", ProjectDescription: "exploration", Width: 640, Height: 360,
+	})
+	if strings.Contains(promptWithoutCritique, "<previous_review_critique>") {
+		t.Fatalf("expected no critique section when empty, got %s", promptWithoutCritique)
+	}
+
+	promptWithCritique := prompts.SceneryPlan(prompts.SceneryPlanInput{
+		AssetName: "Valley", CreativeBrief: "dawn valley",
+		Perspective: "Side-On", ProjectName: "Starbound", GameType: "RPG",
+		TargetPlatform: "PC", ProjectDescription: "exploration", Width: 640, Height: 360,
+		PreviousCritique: "The foreground bridge is floating 50px above the ground.",
+	})
+	if !strings.Contains(promptWithCritique, "<previous_review_critique>") ||
+		!strings.Contains(promptWithCritique, "The foreground bridge is floating 50px above the ground.") {
+		t.Fatalf("expected critique section to be included, got %s", promptWithCritique)
 	}
 }

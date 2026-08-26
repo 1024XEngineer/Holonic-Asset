@@ -394,17 +394,65 @@ func newSceneryExecutor(assets generator.AssetWriter, resources generator.Resour
 	)
 }
 
+func TestExecutorSceneryRetriesRejectedLayoutAndPassesCritique(t *testing.T) {
+	events := []string{}
+	llm := &sceneryLLMStub{
+		events: &events,
+		results: []*llmclient.CompletionResult{
+			// Round 1 planning
+			{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)},
+			// Round 1 layout review (rejected)
+			{JSON: json.RawMessage(`{"approved":false,"review_notes":"The foreground bridge is floating 50px above the ground.","layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}]}`)},
+			// Round 2 planning
+			{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky grounded"}]}`)},
+			// Round 2 layout review (approved)
+			{JSON: json.RawMessage(`{"approved":true,"review_notes":"Grounding fixed, looks great.","layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}]}`)},
+		},
+	}
+	images := &sceneryImageStub{
+		events: &events,
+		results: []*imageclient.GenerateResult{
+			{Images: []imageclient.GeneratedImage{{Base64: "sky-1"}}},
+			{Images: []imageclient.GeneratedImage{{Base64: "sky-2"}}},
+		},
+	}
+	processor := &sceneryProcessorStub{events: &events}
+	assets := &generationAssetWriterStub{events: &events}
+	resources := &sceneryResourceStoreStub{}
+	executor := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
+		LLM: llm, Resources: resources,
+	})
+
+	result, err := executor.Generate(context.Background(), generator.GenerateScenery, sceneryPayload(t))
+	if err != nil {
+		t.Fatalf("generate scenery with retry: %v", err)
+	}
+	if len(llm.requests) != 4 {
+		t.Fatalf("expected 4 LLM requests (plan1, layout1, plan2, layout2), got %d", len(llm.requests))
+	}
+	// Verify round 2 planning prompt contains the review notes from round 1
+	plan2Prompt := llm.requests[2].Prompt
+	if !strings.Contains(plan2Prompt, "<previous_review_critique>") ||
+		!strings.Contains(plan2Prompt, "The foreground bridge is floating 50px above the ground.") {
+		t.Fatalf("round 2 planning prompt omitted round 1 review critique: %s", plan2Prompt)
+	}
+	var decoded generator.ExecutionResult
+	if err := json.Unmarshal(result, &decoded); err != nil || decoded.AssetID != 43 {
+		t.Fatalf("unexpected result: result=%s err=%v", result, err)
+	}
+}
+
 func validSceneryLLM(events *[]string) *sceneryLLMStub {
 	return &sceneryLLMStub{events: events, results: []*llmclient.CompletionResult{
 		{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"},{"name":"Mountains","creative_brief":"distant peaks"}]}`)},
-		{JSON: json.RawMessage(`{"layers":[{"id":2,"position":{"x":100,"y":40},"scale":{"x":0.8,"y":0.8},"rotation":0,"opacity":0.75,"zIndex":20},{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":-10}]}`)},
+		{JSON: json.RawMessage(`{"approved":true,"review_notes":"Well composed and grounded.","layers":[{"id":2,"position":{"x":100,"y":40},"scale":{"x":0.8,"y":0.8},"rotation":0,"opacity":0.75,"zIndex":20},{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":-10}]}`)},
 	}}
 }
 
 func validSingleLayerSceneryLLM() *sceneryLLMStub {
 	return &sceneryLLMStub{results: []*llmclient.CompletionResult{
 		{JSON: json.RawMessage(`{"layers":[{"name":"Sky","creative_brief":"warm sky"}]}`)},
-		{JSON: json.RawMessage(`{"layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}]}`)},
+		{JSON: json.RawMessage(`{"approved":true,"review_notes":"Clean single layer.","layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}]}`)},
 	}}
 }
 
