@@ -11,7 +11,7 @@ import (
 // The provider logs metadata only. Prompts, API keys, image data URIs and
 // response content are intentionally excluded because scenery requests can be
 // very large and may contain user/project data.
-func (p *QNAProvider) logRequestSuccess(
+func (p *qnaChatCompletionsAdapter) logRequestSuccess(
 	model string,
 	imageCount int,
 	schemaName string,
@@ -31,7 +31,7 @@ func (p *QNAProvider) logRequestSuccess(
 	p.logger.Debug("qna llm request completed", fields...)
 }
 
-func (p *QNAProvider) logRequestFailure(
+func (p *qnaChatCompletionsAdapter) logRequestFailure(
 	model string,
 	imageCount int,
 	schemaName string,

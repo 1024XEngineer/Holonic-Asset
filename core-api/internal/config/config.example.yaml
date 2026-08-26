@@ -32,18 +32,30 @@ log:
   compress: true
 
 image:
-  baseURL: "https://api.qnaigc.com"
-  apiKey: ""
   defaultModel: "openai/gpt-image-2"
+  fallbackModel: "google/gemini-3.1-flash-lite-image"
+  models:
+    - name: "openai/gpt-image-2"
+      protocol: openai_images
+      baseURL: "https://api.qnaigc.com"
+      apiKey: ""
+    - name: "google/gemini-3.1-flash-lite-image"
+      protocol: chat_completions
+      baseURL: "https://api.qnaigc.com"
+      apiKey: ""
 
 llm:
-  baseURL: ""
-  apiKey: ""
-  defaultModel: ""
+  defaultModel: "google/gemini-3.7-flash"
+  models:
+    - name: "google/gemini-3.7-flash"
+      protocol: chat_completions
+      baseURL: "https://api.qnaigc.com"
+      apiKey: ""
 
 video:
   baseURL: "https://api.qnaigc.com"
   apiKey: ""
+  models: []
   # Polling and retry settings apply to transient QNA HTTP failures.
   pollInterval: 5s
   pollTimeout: 45s

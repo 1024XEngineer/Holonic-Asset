@@ -1,6 +1,9 @@
-# Holonic-Asset Backend
+# Holonic Asset Core API
 
 ## Architecture
+
+The full current-state design is documented in
+[`docs/en/core-api-architecture.md`](../docs/en/core-api-architecture.md).
 
 ```text
 database.go
@@ -10,14 +13,22 @@ internal/
   config/
   middleware/
   module/
+    auth/
     generator/
       imageclient/
+      llmclient/
+      prompts/
+      video_client/
     logger/
+    processor/
+      image/
+      video/
     task/
     upload/
     viperx/
     workspace/
       asset/
+      perspective/
       project/
   dto/
   handler/
@@ -28,7 +39,7 @@ internal/
 
 Workspace is the business module for project and asset lifecycle operations. `internal/module/workspace/project` and `internal/module/workspace/asset` own their domain models, persistence ports, and managers; the root `workspace.Workspace` groups both capabilities. Repository implementations and DAOs remain infrastructure adapters under `internal/repository`.
 
-Generator is a self-contained business module under `internal/module/generator`; it owns generation requests, run projections, task types, payloads, and task-handler skeletons. HTTP request and response contracts live in the independent `internal/dto` package. External image-provider capabilities remain under `internal/module/generator/imageclient`. Shared helpers such as logging and Viper configuration loading live under `internal/module`. `internal/module/task` exposes one `task.Manager` entry point for task contracts, execution, queries, and transactional outbox dispatch.
+Generator is a self-contained business module under `internal/module/generator`; it owns generation requests, run projections, task types, payloads, and task-handler skeletons. HTTP request and response contracts live in the independent `internal/dto` package. External image-provider capabilities remain under `internal/module/generator/imageclient`. `internal/module/processor` is a business-unaware media capability module: its image and video processors perform deterministic transformations without knowing Projects, Assets, task types, providers, or persistence. Shared helpers such as logging and Viper configuration loading live under `internal/module`. `internal/module/task` exposes one `task.Manager` entry point for task contracts, execution, queries, and transactional outbox dispatch.
 
 Assets are aggregate documents. Asset metadata lives in the asset row, while nested content is stored in `asset_contents` and referenced by the asset's current `content_id`. Asset records map a version number to an immutable content snapshot; content edits use copy-on-write, records create a new snapshot, and rollback switches the current content pointer while discarding records newer than the target. Asset resources are not modeled as a separate table.
 
@@ -77,6 +88,60 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 ```
 
 The seed is idempotent by username and does not replace existing passwords.
+
+## Model Gateway Routing
+
+Each model in `image`, `llm`, and `video` binds its own wire protocol and
+endpoint settings (`baseURL` and `apiKey`), allowing multiple provider channels
+(such as QNA/Qiniu, Google official, or Alibaba) to be configured side-by-side.
+Top-level `baseURL` and `apiKey` settings remain available as optional fallback
+defaults:
+
+```yaml
+image:
+  defaultModel: "openai/gpt-image-2"
+  fallbackModel: "google/gemini-3.1-flash-lite-image"
+  models:
+    - name: "openai/gpt-image-2"
+      protocol: openai_images
+      baseURL: "https://api.qnaigc.com"
+      apiKey: "..."
+    - name: "google/gemini-3.1-flash-lite-image"
+      protocol: chat_completions
+      baseURL: "https://api.qnaigc.com"
+      apiKey: "..."
+
+llm:
+  defaultModel: "google/gemini-3.7-flash"
+  models:
+    - name: "google/gemini-3.7-flash"
+      protocol: chat_completions
+      baseURL: "https://api.qnaigc.com"
+      apiKey: "..."
+
+video:
+  models: []
+  pollInterval: 5s
+  pollTimeout: 45s
+  maxRetries: 3
+  retryDelay: 2s
+```
+
+`openai_images` calls `/v1/images/generations` or `/v1/images/edits`, while
+`chat_completions` calls `/v1/chat/completions`. `fal_queue` derives video task
+paths from the selected model, for example
+`/queue/bytedance/seedance-2.0/image-to-video` and
+`/queue/bytedance/seedance-2.0/requests`.
+
+The provider owns the gateway connections and model routing; protocol adapters
+own request and response formats. The order of `models` does not select a
+default or control fallback. Each image or LLM `defaultModel` must name an entry
+in its client's `models` array. Video has no configured default model: an
+explicit request model is required when video `models` are configured. With an
+empty video `models` array, the existing fixed Fal Queue paths remain active.
+For images, `fallbackModel` is tried only after a transient primary failure. The
+legacy singular image `provider` setting remains supported only when no image
+`models` array is configured.
 
 ## Qiniu Uploads
 

@@ -12,6 +12,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
+	videoclient "github.com/1024XEngineer/Holonic-Asset/internal/module/generator/video_client"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/task"
@@ -60,11 +61,23 @@ func InitAuthService(cfg config.AuthConfig, store auth.Store) (*auth.Service, er
 
 // InitImageService creates the external image provider and its application service.
 func InitImageService(cfg config.ImageClientConfig, appLogger logger.Logger) imageclient.ImageGenerationService {
-	provider := imageclient.NewQNAProvider(imageclient.QNAConfig{
-		BaseURL:      cfg.BaseURL,
-		APIKey:       cfg.APIKey,
-		DefaultModel: cfg.DefaultModel,
-		Logger:       appLogger,
+	models := make([]imageclient.ModelConfig, 0, len(cfg.Models))
+	for _, model := range cfg.Models {
+		models = append(models, imageclient.ModelConfig{
+			Name:     model.Name,
+			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
+		})
+	}
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       cfg.BaseURL,
+		APIKey:        cfg.APIKey,
+		DefaultModel:  cfg.DefaultModel,
+		FallbackModel: cfg.FallbackModel,
+		Provider:      cfg.Provider,
+		Models:        models,
+		Logger:        appLogger,
 	})
 	return imageclient.NewImageGenerationService(provider)
 }
@@ -75,13 +88,47 @@ func InitLLMService(cfg config.LLMClientConfig, appLogger ...logger.Logger) llmc
 	if len(appLogger) > 0 {
 		providerLogger = appLogger[0]
 	}
+	models := make([]llmclient.ModelConfig, 0, len(cfg.Models))
+	for _, model := range cfg.Models {
+		models = append(models, llmclient.ModelConfig{
+			Name:     model.Name,
+			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
+		})
+	}
 	provider := llmclient.NewQNAProvider(llmclient.QNAConfig{
 		BaseURL:      cfg.BaseURL,
 		APIKey:       cfg.APIKey,
 		DefaultModel: cfg.DefaultModel,
+		Models:       models,
 		Logger:       providerLogger,
 	})
 	return llmclient.NewLLMService(provider)
+}
+
+// InitVideoService creates the QNA video provider and its application service.
+func InitVideoService(cfg config.VideoClientConfig, appLogger logger.Logger) videoclient.VideoGenerationService {
+	models := make([]videoclient.ModelConfig, 0, len(cfg.Models))
+	for _, model := range cfg.Models {
+		models = append(models, videoclient.ModelConfig{
+			Name:     model.Name,
+			Protocol: model.Protocol,
+			BaseURL:  model.BaseURL,
+			APIKey:   model.APIKey,
+		})
+	}
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		BaseURL:      cfg.BaseURL,
+		APIKey:       cfg.APIKey,
+		Models:       models,
+		PollInterval: cfg.PollInterval,
+		PollTimeout:  cfg.PollTimeout,
+		MaxRetries:   cfg.MaxRetries,
+		RetryDelay:   cfg.RetryDelay,
+		Logger:       appLogger,
+	})
+	return videoclient.NewVideoGenerationService(provider)
 }
 
 // InitUploadStore creates the configured object storage adapter.
