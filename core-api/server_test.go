@@ -69,6 +69,7 @@ func TestNewAppBuildsApplication(t *testing.T) {
 	app := NewApp(engine, nil, nil, logger.NewDefaultLogger())
 	if app == nil {
 		t.Fatal("expected server application")
+		return
 	}
 	if app.engine != engine {
 		t.Fatal("expected server engine")
