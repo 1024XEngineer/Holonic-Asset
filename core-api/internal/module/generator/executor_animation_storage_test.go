@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
 type animationFrameStorageStub struct {
@@ -128,3 +129,46 @@ func TestPersistAnimationFramesRejectsStorageFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestAnimationReferenceErrors(t *testing.T) {
+	t.Run("unsupported asset type", func(t *testing.T) {
+		asset := assetdomain.Asset{Type: assetdomain.AssetTypeScenery}
+		_, _, err := animationReference(asset, "front")
+		if err == nil {
+			t.Fatal("expected error for scenery asset")
+		}
+	})
+
+	t.Run("corrupt content json", func(t *testing.T) {
+		asset := assetdomain.Asset{
+			Type:    assetdomain.AssetTypeCharacter,
+			Content: []byte(`{invalid`),
+		}
+		_, _, err := animationReference(asset, "front")
+		if err == nil {
+			t.Fatal("expected error for corrupt content")
+		}
+	})
+
+	t.Run("missing prototype url", func(t *testing.T) {
+		asset := assetdomain.Asset{
+			Type: assetdomain.AssetTypeCharacter,
+			Content: []byte(`{
+				"direction_count": 4,
+				"prototype": [{"url": ""}]
+			}`),
+		}
+		_, _, err := animationReference(asset, "front")
+		if err == nil {
+			t.Fatal("expected error for empty prototype url")
+		}
+	})
+
+	t.Run("invalid url path fallback", func(t *testing.T) {
+		got := animationUnprocessedImageURL("http://::invalid-url")
+		if !strings.HasSuffix(got, "-unprocessed") {
+			t.Fatalf("expected -unprocessed suffix, got %q", got)
+		}
+	})
+}
+
