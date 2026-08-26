@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, Layers3, Ruler, Tags, X } from "lucide-react";
+import { AlertCircle, Layers3, Ruler, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AssetTagPicker,
+  type AssetTagCreateHandler,
+  type AssetTagUpdateHandler,
+} from "@/components/asset-tag-picker";
+import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import {
   Dialog,
   DialogClose,
@@ -25,6 +24,7 @@ import { AssetKindIcon } from "@/components/asset-kind";
 import {
   assetMetadataUpdateSchema,
   assetCanvasSizeOptions,
+  type AssetTag,
   type AssetLibraryItem,
   type AssetMetadataUpdate,
 } from "@/model/asset";
@@ -38,23 +38,29 @@ import { AssetPreview } from "./asset-preview";
 
 export function AssetEditDialog({
   asset,
+  availableTags = [],
   error,
   isSaving,
   onClose,
   onSave,
+  onCreateTag,
+  onUpdateTag,
   projectId,
 }: {
   asset?: AssetLibraryItem;
+  availableTags?: readonly AssetTag[];
   error?: Error;
   isSaving: boolean;
   onClose: () => void;
   onSave: (metadata: AssetMetadataUpdate) => void;
+  onCreateTag?: AssetTagCreateHandler;
+  onUpdateTag?: AssetTagUpdateHandler;
   projectId?: string;
 }) {
   const { t } = useTranslation(["assets", "common"]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<AssetTag[]>([]);
   const [canvasSize, setCanvasSize] = useState("");
   const [perspective, setPerspective] = useState<Perspective>(
     perspectiveOptions[0],
@@ -78,7 +84,6 @@ export function AssetEditDialog({
     setPerspective(asset.perspective);
   }, [asset]);
 
-  const tagOptions = Array.from(new Set([...availableTags, ...tags]));
   const canvasOptions = Array.from(
     new Set([...assetCanvasSizeOptions, canvasSize]),
   );
@@ -89,14 +94,6 @@ export function AssetEditDialog({
     canvasSize,
     perspective,
   });
-  const toggleTag = (tag: string, checked: boolean) => {
-    setTags((currentTags) =>
-      checked
-        ? [...currentTags, tag]
-        : currentTags.filter((currentTag) => currentTag !== tag),
-    );
-  };
-
   return (
     <Dialog
       open={Boolean(asset)}
@@ -180,44 +177,18 @@ export function AssetEditDialog({
                       }}
                     />
                   </Field>
-                  <Field
-                    label={t("edit.tags")}
-                    htmlFor="asset-tags"
-                    icon={<Tags className="size-3.5" />}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            disabled={isSaving}
-                            id="asset-tags"
-                            type="button"
-                            variant="outline"
-                            className="h-8 w-full justify-start truncate font-normal"
-                          />
-                        }
-                      >
-                        {tags.length > 0
-                          ? tags.join(", ")
-                          : t("edit.selectTags")}
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-[var(--anchor-width)] min-w-52">
-                        {tagOptions.map((tag) => (
-                          <DropdownMenuCheckboxItem
-                            key={tag}
-                            checked={tags.includes(tag)}
-                            closeOnClick={false}
-                            onCheckedChange={(checked) => {
-                              setValidationError(undefined);
-                              toggleTag(tag, checked);
-                            }}
-                          >
-                            {tag}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </Field>
+                  <AssetTagPicker
+                    availableTags={availableTags}
+                    disabled={isSaving}
+                    id="asset-tags"
+                    onCreateTag={onCreateTag}
+                    onUpdateTag={onUpdateTag}
+                    tags={tags}
+                    onChange={(nextTags) => {
+                      setValidationError(undefined);
+                      setTags(nextTags);
+                    }}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <DropdownField
                       disabled={isSaving}
@@ -297,25 +268,13 @@ export function AssetEditDialog({
   );
 }
 
-const availableTags = [
-  "pixel-art",
-  "character",
-  "object",
-  "environment",
-  "interface",
-  "terrain",
-  "Top-Down",
-];
-
 function Field({
   children,
   htmlFor,
-  icon,
   label,
 }: {
   children: ReactNode;
   htmlFor: string;
-  icon?: ReactNode;
   label: string;
 }) {
   return (
@@ -324,7 +283,6 @@ function Field({
         htmlFor={htmlFor}
         className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
       >
-        {icon}
         {label}
       </label>
       {children}

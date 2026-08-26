@@ -14,6 +14,18 @@ export {
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
 export type { AssetAttributes } from "./asset-attributes";
 export {
+  assetTagSchema,
+  defaultAssetTagColor,
+  getRandomAssetTagColor,
+  getTagBadgeStyle,
+  hexToRgb,
+  mergeAssetTags,
+  normalizeAssetTag,
+  presetAssetTagColors,
+  type AssetTag,
+} from "./asset-tag";
+
+export {
   DEFAULT_ANIMATION_FRAME_DURATION_MS,
   getAnimationFrameDuration,
   getEffectiveAnimationFps,

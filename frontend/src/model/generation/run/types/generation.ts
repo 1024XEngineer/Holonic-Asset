@@ -1,4 +1,4 @@
-import type { CreatableAssetKind } from "@/model/asset";
+import type { AssetTag, CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
 import type { ItemTile } from "@/model/item-tile";
 
@@ -9,6 +9,7 @@ export type CreationRequest<CreatingReference = unknown> = {
   canvasSize: string;
   dimensions?: { width: number; height: number };
   perspective?: Perspective;
+  tags?: AssetTag[];
   creatingReference?: CreatingReference;
   style?: string;
   tiles?: {

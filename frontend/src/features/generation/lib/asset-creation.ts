@@ -1,5 +1,5 @@
 import type { CreatableAssetKind } from "@/model/asset";
-import { assetCanvasSizeSchema } from "@/model/asset";
+import { assetCanvasSizeSchema, assetTagSchema } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import { getDefaultAssetCanvasSize } from "@/model";
 import { perspectiveOptions, perspectiveSchema } from "@/model/project";
@@ -99,6 +99,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
     ...commonAssetCreationDraftShape,
     kind: z.enum(["character", "object"]),
     perspective: perspectiveSchema,
+    tags: z.array(assetTagSchema),
     creatingReference: z.unknown().optional(),
   }),
 ]);
@@ -146,6 +147,7 @@ export function createAssetCreationDraft<CreatingReference = unknown>(
         ...common,
         kind,
         perspective: perspectiveOptions[0],
+        tags: [],
         creatingReference: undefined,
       };
   }
@@ -196,6 +198,7 @@ export function toCreationRequest<CreatingReference>(
         ? {
             ...common,
             perspective: draft.perspective,
+            tags: draft.tags,
             creatingReference: draft.creatingReference,
           }
         : common;

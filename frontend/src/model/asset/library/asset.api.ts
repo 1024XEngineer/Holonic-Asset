@@ -4,7 +4,12 @@ import {
   assetCanvasSizeDimensionsSchema,
   resolveAssetCanvasSize,
 } from "./asset-canvas-size";
-import type { AssetKind, AssetMetadataUpdate, ProjectAsset } from "../types";
+import {
+  mergeAssetTags,
+  type AssetKind,
+  type AssetMetadataUpdate,
+  type ProjectAsset,
+} from "../types";
 
 export { coreAssetApi } from "./core-asset.api";
 
@@ -37,7 +42,11 @@ export const assetApi = {
       assetId: coreAssetId(assetId),
       name: metadata.name,
       description: metadata.description,
-      tags: metadata.tags,
+      tags: metadata.tags.map(({ name, description, color }) => ({
+        name,
+        description,
+        color,
+      })),
       perspective: metadata.perspective,
       ...(dimensions ? { dimensions } : {}),
     });
@@ -74,7 +83,7 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
       version: `v${item.version}`,
       canvasSize: resolveAssetCanvasSize(item),
       perspective: item.perspective,
-      tags: normalizeAssetTagNames(item.tags),
+      tags: mergeAssetTags(item.tags ?? []),
       ...(item.thumbnailUrl ? { thumbnailUrl: item.thumbnailUrl } : {}),
       history: [],
       animations: [],
@@ -83,15 +92,6 @@ export function toAssetGroups(items: AssetListItemResponse[]) {
   }
 
   return [...groups].map(([kind, assets]) => ({ kind, assets }));
-}
-
-function normalizeAssetTagNames(
-  tags: (string | { name: string })[] | null | undefined,
-): string[] {
-  if (!tags) return [];
-  return tags
-    .map((tag) => (typeof tag === "string" ? tag.trim() : tag.name.trim()))
-    .filter(Boolean);
 }
 
 function coreProjectId(projectId: string) {

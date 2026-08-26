@@ -58,7 +58,11 @@ describe("toAssetGroups", () => {
       {
         kind: "object",
         assets: [
-          { id: "8", version: "v2", tags: ["prop"] },
+          {
+            id: "8",
+            version: "v2",
+            tags: [{ name: "prop", description: "", color: "#4F46E5" }],
+          },
           { id: "10", version: "v3", tags: [] },
         ],
       },

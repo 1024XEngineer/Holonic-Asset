@@ -29,7 +29,10 @@ function assetGroups(): AssetGroup[] {
       kind: "character",
       assets: [
         asset("asset-1", "Moonlit Swordsman", {
-          tags: ["hero", "pixel-art"],
+          tags: [
+            { name: "hero", description: "", color: "#4F46E5" },
+            { name: "pixel-art", description: "", color: "#4F46E5" },
+          ],
         }),
       ],
     },
@@ -38,7 +41,10 @@ function assetGroups(): AssetGroup[] {
       assets: [
         asset("asset-2", "Storage Barrel", {
           description: "Wooden prop",
-          tags: ["storage", "wood"],
+          tags: [
+            { name: "storage", description: "", color: "#4F46E5" },
+            { name: "wood", description: "", color: "#4F46E5" },
+          ],
         }),
       ],
     },

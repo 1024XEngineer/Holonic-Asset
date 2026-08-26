@@ -3,16 +3,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   assetKinds,
   createAssetLibraryCollection,
+  mergeAssetTags,
   useAssetLibraryQuery,
   useCopyAssetMutation,
   useDeleteAssetMutation,
   useUpdateAssetMutation,
 } from "@/model/asset";
 import { useGenerationRunsQuery } from "@/model/generation";
+import {
+  useCreateProjectTagMutation,
+  useProjectTagsQuery,
+  useUpdateProjectTagMutation,
+} from "@/model/project";
 import type {
   AssetKind,
   AssetLibraryItem,
   AssetMetadataUpdate,
+  AssetTag,
 } from "@/model/asset";
 import type { GenerationRun } from "@/model/generation";
 import type { ProjectSummary } from "@/model/project";
@@ -26,6 +33,12 @@ export type AssetLibraryController = {
   counts: Record<AssetKind, number>;
   totalAssets: number;
   filteredAssets: AssetLibraryItem[];
+  availableTags: AssetTag[];
+  createTag: (tag: AssetTag) => Promise<AssetTag | undefined>;
+  updateTag: (
+    currentTag: AssetTag,
+    nextTag: AssetTag,
+  ) => Promise<AssetTag | undefined>;
   generationRuns: GenerationRun[];
   editingAsset?: AssetLibraryItem;
   actionError?: Error;
@@ -56,9 +69,12 @@ export function useAssetLibraryController({
   const projectId = project?.id;
   const assetsQuery = useAssetLibraryQuery(projectId);
   const generationsQuery = useGenerationRunsQuery(projectId);
+  const projectTagsQuery = useProjectTagsQuery(projectId);
   const copyMutation = useCopyAssetMutation();
   const deleteMutation = useDeleteAssetMutation();
   const updateMutation = useUpdateAssetMutation();
+  const createTagMutation = useCreateProjectTagMutation();
+  const updateTagMutation = useUpdateProjectTagMutation();
   const {
     isError: hasCopyError,
     mutateAsync: mutateCopyAsset,
@@ -94,6 +110,14 @@ export function useAssetLibraryController({
   const generationRuns = useMemo(
     () => generationsQuery.data ?? [],
     [generationsQuery.data],
+  );
+  const availableTags = useMemo(
+    () =>
+      mergeAssetTags(
+        projectTagsQuery.data ?? [],
+        ...assetCollection.items.map((asset) => asset.tags),
+      ),
+    [assetCollection, projectTagsQuery.data],
   );
   const {
     counts,
@@ -214,6 +238,26 @@ export function useAssetLibraryController({
     [editingAssetId, mutateUpdateAsset, projectId],
   );
 
+  const createTag = useCallback(
+    (tag: AssetTag) => {
+      if (!projectId) return Promise.resolve(undefined);
+      return createTagMutation.mutateAsync({ projectId, tag });
+    },
+    [createTagMutation, projectId],
+  );
+
+  const updateTag = useCallback(
+    (currentTag: AssetTag, nextTag: AssetTag) => {
+      if (!projectId || !currentTag.tagId) return Promise.resolve(nextTag);
+      return updateTagMutation.mutateAsync({
+        projectId,
+        tagId: currentTag.tagId,
+        tag: nextTag,
+      });
+    },
+    [projectId, updateTagMutation],
+  );
+
   return {
     project,
     query,
@@ -221,6 +265,9 @@ export function useAssetLibraryController({
     counts,
     totalAssets,
     filteredAssets,
+    availableTags,
+    createTag,
+    updateTag,
     generationRuns,
     editingAsset,
     actionError: copyMutation.error ?? deleteMutation.error ?? undefined,

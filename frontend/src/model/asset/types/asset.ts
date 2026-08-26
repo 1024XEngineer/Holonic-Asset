@@ -1,4 +1,5 @@
 import type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
+import { assetTagSchema, type AssetTag } from "./asset-tag";
 import { perspectiveSchema, type Perspective } from "@/model/project";
 import { z } from "zod";
 
@@ -91,7 +92,7 @@ export type ProjectAsset = {
   version: string;
   canvasSize: string;
   perspective: Perspective;
-  tags: string[];
+  tags: AssetTag[];
   thumbnailUrl?: string;
   prototypeUrls?: string[];
   previewCrop?: AssetPreviewCrop;
@@ -106,7 +107,7 @@ export type ProjectAsset = {
 export const assetMetadataUpdateSchema = z.object({
   name: z.string().trim().min(1, "Asset name is required."),
   description: z.string(),
-  tags: z.array(z.string()),
+  tags: z.array(assetTagSchema),
   canvasSize: z.string().trim().min(1, "Canvas size is required."),
   perspective: perspectiveSchema,
 });

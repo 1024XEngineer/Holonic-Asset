@@ -1,4 +1,4 @@
-import type { CreatableAssetKind } from "@/model/asset";
+import type { AssetTag, CreatableAssetKind } from "@/model/asset";
 import type { Perspective } from "@/model/project";
 import type { ItemTile } from "@/model/item-tile";
 import type { SceneryAspectRatio } from "../create-asset/scenery-aspect-ratio";
@@ -15,6 +15,7 @@ export type VisualAssetCreationDraft<CreatingReference = unknown> =
     Exclude<CreatableAssetKind, "audio" | "scenery" | "tileset" | "uiset">
   > & {
     perspective: Perspective;
+    tags: AssetTag[];
     creatingReference: CreatingReference | undefined;
   };
 
