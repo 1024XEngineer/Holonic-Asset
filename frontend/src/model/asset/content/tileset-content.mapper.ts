@@ -66,18 +66,57 @@ export function toTilesetContentCandidate(
     }
   }
 
+  const occupiedPositions = new Set(
+    record.tileset.items.flatMap((item) =>
+      item.tiles.map(([x, y]) => tilesetPositionKey(x, y)),
+    ),
+  );
+  const addedItems = (patch.items ?? []).flatMap((item, itemIndex) => {
+    const tiles = (item.tiles ?? [])
+      .filter(
+        ({ position }) =>
+          Number.isInteger(position.x) &&
+          Number.isInteger(position.y) &&
+          position.x >= 0 &&
+          position.y >= 0 &&
+          position.x < record.tileset.gridSize &&
+          position.y < record.tileset.gridSize,
+      )
+      .map(({ position }) => [position.x, position.y] as [number, number]);
+    if (
+      tiles.length === 0 ||
+      tiles.some(([x, y]) => occupiedPositions.has(tilesetPositionKey(x, y))) ||
+      !tiles.some(([x, y]) => patchedURLs.has(tilesetPositionKey(x, y)))
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: candidateTilesetItemId(item.name, itemIndex),
+        label: item.name,
+        tiles,
+        tileUrls: tiles.map(([x, y]) =>
+          patchedURLs.get(tilesetPositionKey(x, y)),
+        ),
+      },
+    ];
+  });
+
   return {
     ...record,
     tileset: {
       ...record.tileset,
-      items: record.tileset.items.map((item) => ({
-        ...item,
-        tileUrls: item.tiles.map(
-          ([x, y], tileIndex) =>
-            patchedURLs.get(tilesetPositionKey(x, y)) ??
-            item.tileUrls?.[tileIndex],
-        ),
-      })),
+      items: [
+        ...record.tileset.items.map((item) => ({
+          ...item,
+          tileUrls: item.tiles.map(
+            ([x, y], tileIndex) =>
+              patchedURLs.get(tilesetPositionKey(x, y)) ??
+              item.tileUrls?.[tileIndex],
+          ),
+        })),
+        ...addedItems,
+      ],
     },
   };
 }
@@ -112,13 +151,46 @@ export function getTilesetCandidateItemIds(
       changedPositions.add(tilesetPositionKey(x, y));
     }
   }
-  return items
+  const changedItemIds = items
     .filter((item) =>
       item.tiles.some(([x, y]) =>
         changedPositions.has(tilesetPositionKey(x, y)),
       ),
     )
     .map((item) => item.id);
+  const occupiedPositions = new Set(
+    items.flatMap((item) =>
+      item.tiles.map(([x, y]) => tilesetPositionKey(x, y)),
+    ),
+  );
+  for (const [itemIndex, item] of (patch.items ?? []).entries()) {
+    const tiles = item.tiles ?? [];
+    const positions = tiles.map(({ position }) => position);
+    if (
+      positions.length > 0 &&
+      positions.every(
+        ({ x, y }) =>
+          Number.isInteger(x) &&
+          Number.isInteger(y) &&
+          x >= 0 &&
+          y >= 0 &&
+          x < gridSize &&
+          y < gridSize &&
+          !occupiedPositions.has(tilesetPositionKey(x, y)),
+      ) &&
+      positions.some(({ x, y }) =>
+        tiles.some(
+          (tile) =>
+            tile.position.x === x &&
+            tile.position.y === y &&
+            Boolean(tile.url?.trim()),
+        ),
+      )
+    ) {
+      changedItemIds.push(candidateTilesetItemId(item.name, itemIndex));
+    }
+  }
+  return changedItemIds;
 }
 
 export function toBackendTilesetContent(
@@ -139,4 +211,8 @@ export function toBackendTilesetContent(
 
 function tilesetPositionKey(x: number, y: number) {
   return `${x}:${y}`;
+}
+
+function candidateTilesetItemId(name: string, index: number) {
+  return `candidate:${index}:${name.trim() || "item"}`;
 }

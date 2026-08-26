@@ -95,6 +95,7 @@ describe("TilesetCanvas", () => {
             review: {
               items: [
                 {
+                  kind: "comparison",
                   itemId: currentItem.id,
                   currentItem,
                   candidateItem,
@@ -137,6 +138,7 @@ describe("TilesetCanvas", () => {
             review: {
               items: [
                 {
+                  kind: "comparison",
                   itemId: item.id,
                   currentItem: item,
                   candidateItem: item,
@@ -175,6 +177,7 @@ describe("TilesetCanvas", () => {
             review: {
               items: [
                 {
+                  kind: "comparison",
                   itemId: item.id,
                   currentItem: item,
                   candidateItem: { ...item, tiles: [[99, 99]] },
@@ -204,6 +207,7 @@ describe("TilesetCanvas", () => {
             review: {
               items: [
                 {
+                  kind: "comparison",
                   itemId: currentItem.id,
                   currentItem,
                   candidateItem: currentItem,

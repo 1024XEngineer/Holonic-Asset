@@ -22,6 +22,7 @@
   "reviewTilesetItem": "Review {{value}} changes",
   "tilesetReviewTitle": "Review {{value}}",
   "tilesetReviewDescription": "Compare the complete item before applying the generated changes.",
+  "tilesetNewItemReviewDescription": "Review the generated item before adding it to this tileset.",
   "generated": "Generated",
   "generationReviewCount_one": "{{count}} result",
   "generationReviewCount_other": "{{count}} results",

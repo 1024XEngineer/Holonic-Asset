@@ -1,10 +1,17 @@
 import type { TilesetItem } from "@/model";
 
-export type TilesetItemReview = {
-  itemId: string;
-  currentItem: TilesetItem;
-  candidateItem: TilesetItem;
-};
+export type TilesetItemReview =
+  | {
+      kind: "comparison";
+      itemId: string;
+      currentItem: TilesetItem;
+      candidateItem: TilesetItem;
+    }
+  | {
+      kind: "new-item";
+      itemId: string;
+      candidateItem: TilesetItem;
+    };
 
 export type TilesetCanvasModel = {
   gridSize: number;

@@ -111,6 +111,8 @@ function ConnectedTilesetEditor({
           onToggleTile={(itemId, itemCellIndex) =>
             canvas.send({ type: "item-cell.toggle", itemId, itemCellIndex })
           }
+          onGenerateItem={editor.onGenerateItem}
+          isGeneratingItem={editor.isGeneratingItem}
         />
         <TilesetCanvas
           model={{

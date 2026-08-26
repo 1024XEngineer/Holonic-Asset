@@ -128,6 +128,93 @@ describe("Tileset candidates", () => {
       ),
     ).toEqual([]);
   });
+
+  it("adds a generated item to the candidate without changing existing items", () => {
+    const record = {
+      mode: "tileset" as const,
+      prompt: "Forest",
+      tileset: {
+        gridSize: 4,
+        items: [
+          {
+            id: "ground",
+            label: "Ground",
+            tiles: [[0, 0]] as [number, number][],
+            tileUrls: ["/ground.png"],
+          },
+        ],
+      },
+    };
+    const patch = {
+      items: [
+        {
+          name: "Oak tree",
+          tiles: [
+            { position: { x: 2, y: 1 }, url: "/tree-1.png" },
+            { position: { x: 3, y: 1 }, url: "/tree-2.png" },
+          ],
+        },
+      ],
+    };
+
+    const candidate = toTilesetContentCandidate(record, patch);
+    expect(candidate).toMatchObject({
+      tileset: {
+        items: [
+          { id: "ground", tileUrls: ["/ground.png"] },
+          {
+            id: "candidate:0:Oak tree",
+            label: "Oak tree",
+            tiles: [
+              [2, 1],
+              [3, 1],
+            ],
+            tileUrls: ["/tree-1.png", "/tree-2.png"],
+          },
+        ],
+      },
+    });
+    expect(getTilesetCandidateItemIds(patch, record.tileset.items, 4)).toEqual([
+      "candidate:0:Oak tree",
+    ]);
+  });
+
+  it("handles omitted item arrays and derives the fallback candidate id", () => {
+    const record = {
+      mode: "tileset" as const,
+      prompt: "Forest",
+      tileset: { gridSize: 4, items: [] },
+    };
+
+    expect(toTilesetContentCandidate(record, {})).toEqual(record);
+    expect(
+      toTilesetContentCandidate(record, {
+        items: [{ name: "Empty" }],
+      }),
+    ).toEqual(record);
+    expect(getTilesetCandidateItemIds({}, record.tileset.items, 4)).toEqual([]);
+    expect(
+      getTilesetCandidateItemIds(
+        { items: [{ name: "Empty" }] },
+        record.tileset.items,
+        4,
+      ),
+    ).toEqual([]);
+    expect(
+      getTilesetCandidateItemIds(
+        {
+          items: [
+            {
+              name: " ",
+              tiles: [{ position: { x: 2, y: 2 }, url: "/item.png" }],
+            },
+          ],
+        },
+        record.tileset.items,
+        4,
+      ),
+    ).toEqual(["candidate:0:item"]);
+  });
 });
 
 describe("loadAssetSnapshot", () => {
