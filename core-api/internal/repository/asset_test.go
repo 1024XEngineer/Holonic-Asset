@@ -15,16 +15,17 @@ import (
 
 type assetDaoStub struct {
 	dao.AssetDao
-	assets       []dao.Asset
-	asset        dao.Asset
-	getAssetsErr error
-	getDetailErr error
-	updatedAsset dao.Asset
-	updateErr    error
-	projectID    uint
-	assetID      uint
-	updateID     uint
-	update       *dao.AssetUpdate
+	assets         []dao.Asset
+	asset          dao.Asset
+	getAssetsErr   error
+	getDetailErr   error
+	updatedAsset   dao.Asset
+	updateErr      error
+	projectID      uint
+	assetID        uint
+	updateID       uint
+	deletedAssetID uint
+	update         *dao.AssetUpdate
 }
 
 func (s *assetDaoStub) GetAssetsByProjectID(_ context.Context, projectID uint) ([]dao.Asset, error) {
@@ -62,7 +63,7 @@ func (s *assetDaoStub) CreateAsset(_ context.Context, asset *dao.Asset) (dao.Ass
 }
 
 func (s *assetDaoStub) DeleteAsset(_ context.Context, assetID uint) error {
-	s.assetID = assetID
+	s.deletedAssetID = assetID
 	return nil
 }
 
@@ -321,7 +322,7 @@ func TestAssetRepositoryDelete(t *testing.T) {
 	if err := repo.Delete(context.Background(), 42); err != nil {
 		t.Fatalf("delete asset: %v", err)
 	}
-	if assetDao.assetID != 42 || contentDao.deletedAssetID != 42 || recordDao.deletedAssetID != 42 {
+	if assetDao.deletedAssetID != 42 || contentDao.deletedAssetID != 42 || recordDao.deletedAssetID != 42 {
 		t.Fatalf("expected assetID 42 to be deleted across all DAOs")
 	}
 

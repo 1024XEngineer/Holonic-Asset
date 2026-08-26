@@ -235,8 +235,8 @@ func TestProjectDelete(t *testing.T) {
 		t.Fatal("expected not found error")
 	}
 	var httpErr *echo.HTTPError
-	if errors.As(err, &httpErr) && httpErr.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d", httpErr.Code)
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusNotFound {
+		t.Fatalf("expected echo.HTTPError 404, got %v", err)
 	}
 }
 
@@ -247,8 +247,8 @@ func TestProjectGetDetailErrors(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	var httpErr *echo.HTTPError
-	if errors.As(err, &httpErr) && httpErr.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d", httpErr.Code)
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusNotFound {
+		t.Fatalf("expected echo.HTTPError 404, got %v", err)
 	}
 }
 
