@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 )
 
@@ -41,5 +44,59 @@ func TestInitLoggerWritesConfiguredFile(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "logger ready") {
 		t.Fatalf("expected log message in configured file, got %q", content)
+	}
+}
+
+func TestGetZapLevel(t *testing.T) {
+	tests := []struct {
+		input string
+		want  zapcore.Level
+	}{
+		{"debug", zapcore.DebugLevel},
+		{"DEBUG", zapcore.DebugLevel},
+		{"info", zapcore.InfoLevel},
+		{"warn", zapcore.WarnLevel},
+		{"warning", zapcore.WarnLevel},
+		{"error", zapcore.ErrorLevel},
+		{"dpanic", zapcore.DPanicLevel},
+		{"panic", zapcore.PanicLevel},
+		{"fatal", zapcore.FatalLevel},
+		{"unknown", zapcore.DebugLevel},
+		{"", zapcore.DebugLevel},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := getZapLevel(tt.input)
+			if got != tt.want {
+				t.Errorf("getZapLevel(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPrettyJSONEncoder(t *testing.T) {
+	encoderCfg := zap.NewProductionEncoderConfig()
+	baseEncoder := zapcore.NewJSONEncoder(encoderCfg)
+	prettyEncoder := &PrettyJSONEncoder{Encoder: baseEncoder}
+
+	cloned := prettyEncoder.Clone()
+	if cloned == nil {
+		t.Fatal("expected non-nil cloned encoder")
+	}
+
+	ent := zapcore.Entry{
+		Level:   zapcore.InfoLevel,
+		Message: "pretty log",
+	}
+
+	buf, err := prettyEncoder.EncodeEntry(ent, []zapcore.Field{
+		zap.String("key", "value"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+	if !strings.Contains(buf.String(), `"key": "value"`) {
+		t.Fatalf("expected formatted json in buffer, got %s", buf.String())
 	}
 }

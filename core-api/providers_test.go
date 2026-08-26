@@ -6,6 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
@@ -127,5 +133,97 @@ func TestInitVideoServiceRoutesConfiguredModelProtocol(t *testing.T) {
 	}
 	if result.RequestID != "video-1" || result.VideoURL != "https://cdn.example.test/video.mp4" {
 		t.Fatalf("unexpected video result: %+v", result)
+	}
+}
+
+func TestStoreInitializers(t *testing.T) {
+	sqlDB, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open gorm: %v", err)
+	}
+
+	projectStore := InitProjectStore(db)
+	if projectStore == nil {
+		t.Fatal("expected non-nil project store")
+	}
+
+	assetStore := InitAssetStore(db)
+	if assetStore == nil {
+		t.Fatal("expected non-nil asset store")
+	}
+
+	tagStore := InitTagStore(db)
+	if tagStore == nil {
+		t.Fatal("expected non-nil tag store")
+	}
+
+	taskStore := InitTaskStore(db)
+	if taskStore == nil {
+		t.Fatal("expected non-nil task store")
+	}
+
+	userStore := InitUserStore(db)
+	if userStore == nil {
+		t.Fatal("expected non-nil user store")
+	}
+
+	authService, err := InitAuthService(config.AuthConfig{
+		JWTSecret:   "01234567890123456789012345678901",
+		TokenExpiry: time.Hour,
+	}, userStore)
+	if err != nil || authService == nil {
+		t.Fatalf("expected initialized auth service, got err=%v", err)
+	}
+
+	workspaceModule := InitWorkspace(projectStore, assetStore, tagStore, nil)
+	if workspaceModule == nil {
+		t.Fatal("expected non-nil workspace module")
+	}
+
+	processor := InitImageProcessor()
+	if processor == nil {
+		t.Fatal("expected non-nil image processor")
+	}
+
+	executor := InitGeneratorExecutor(nil, nil, processor, nil)
+	if executor == nil {
+		t.Fatal("expected non-nil generator executor")
+	}
+
+	engine := InitGeneratorEngine(nil, executor)
+	if engine == nil {
+		t.Fatal("expected non-nil generator engine")
+	}
+
+	manager := InitUploadManager(nil)
+	if manager == nil {
+		t.Fatal("expected non-nil upload manager")
+	}
+}
+
+func TestInitUploadStore(t *testing.T) {
+	// Rejects invalid Qiniu config
+	_, err := InitUploadStore(config.QiniuConfig{})
+	if err == nil {
+		t.Fatal("expected error on invalid qiniu config")
+	}
+
+	// Success with valid config
+	store, err := InitUploadStore(config.QiniuConfig{
+		AccessKey: "ak",
+		SecretKey: "sk",
+		Bucket:    "bucket",
+		Domain:    "cdn.example.com",
+	})
+	if err != nil || store == nil {
+		t.Fatalf("expected valid store, got err=%v", err)
 	}
 }
