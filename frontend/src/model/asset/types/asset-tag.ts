@@ -4,12 +4,22 @@ import { z } from "zod";
 export const defaultAssetTagColor = "#4F46E5";
 
 export const assetTagSchema = z.object({
-  name: z.string().trim().min(1, "Tag name is required."),
-  description: z.string().trim().default(""),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Tag name is required.")
+    .max(100, "Tag name must be at most 100 characters."),
+  description: z
+    .string()
+    .trim()
+    .max(255, "Tag description must be at most 255 characters.")
+    .default(""),
   color: z
     .string()
     .trim()
     .regex(/^#[0-9a-f]{6}$/i, "Tag color must be a six-digit hex color."),
+  tagId: z.number().int().positive().optional(),
+  projectId: z.number().int().positive().optional(),
 });
 
 export type AssetTag = z.infer<typeof assetTagSchema>;
@@ -30,6 +40,12 @@ export function normalizeAssetTag(
     description,
     color:
       color && /^#[0-9a-f]{6}$/i.test(color) ? color : defaultAssetTagColor,
+    ...(typeof value === "string" || value.tagId === undefined
+      ? {}
+      : { tagId: value.tagId }),
+    ...(typeof value === "string" || value.projectId === undefined
+      ? {}
+      : { projectId: value.projectId }),
   };
 }
 
@@ -106,9 +122,19 @@ export function mergeAssetTags(
           tag.color !== defaultAssetTagColor
             ? tag.color
             : existing.color,
+        ...mergeTagIdentity(existing, tag),
       });
     }
   }
 
   return [...tags.values()];
+}
+
+function mergeTagIdentity(existing: AssetTag, next: AssetTag) {
+  const identity: Pick<AssetTag, "tagId" | "projectId"> = {};
+  if (existing.tagId !== undefined) identity.tagId = existing.tagId;
+  else if (next.tagId !== undefined) identity.tagId = next.tagId;
+  if (existing.projectId !== undefined) identity.projectId = existing.projectId;
+  else if (next.projectId !== undefined) identity.projectId = next.projectId;
+  return identity;
 }

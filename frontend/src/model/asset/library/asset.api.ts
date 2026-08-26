@@ -42,7 +42,11 @@ export const assetApi = {
       assetId: coreAssetId(assetId),
       name: metadata.name,
       description: metadata.description,
-      tags: metadata.tags,
+      tags: metadata.tags.map(({ name, description, color }) => ({
+        name,
+        description,
+        color,
+      })),
       perspective: metadata.perspective,
       ...(dimensions ? { dimensions } : {}),
     });
