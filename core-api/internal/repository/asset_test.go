@@ -15,16 +15,17 @@ import (
 
 type assetDaoStub struct {
 	dao.AssetDao
-	assets       []dao.Asset
-	asset        dao.Asset
-	getAssetsErr error
-	getDetailErr error
-	updatedAsset dao.Asset
-	updateErr    error
-	projectID    uint
-	assetID      uint
-	updateID     uint
-	update       *dao.AssetUpdate
+	assets         []dao.Asset
+	asset          dao.Asset
+	getAssetsErr   error
+	getDetailErr   error
+	updatedAsset   dao.Asset
+	updateErr      error
+	projectID      uint
+	assetID        uint
+	updateID       uint
+	deletedAssetID uint
+	update         *dao.AssetUpdate
 }
 
 func (s *assetDaoStub) GetAssetsByProjectID(_ context.Context, projectID uint) ([]dao.Asset, error) {
@@ -51,6 +52,55 @@ func (s *assetDaoStub) UpdateAsset(_ context.Context, assetID uint, update *dao.
 	s.updateID = assetID
 	s.update = update
 	return s.updatedAsset, s.updateErr
+}
+
+func (s *assetDaoStub) CreateAsset(_ context.Context, asset *dao.Asset) (dao.Asset, error) {
+	if asset.ID == 0 {
+		asset.ID = 100
+	}
+	s.asset = *asset
+	return *asset, nil
+}
+
+func (s *assetDaoStub) DeleteAsset(_ context.Context, assetID uint) error {
+	s.deletedAssetID = assetID
+	return nil
+}
+
+func (s *assetDaoStub) UpdateAssetCurrentContent(_ context.Context, _ uint, _ uint, _ uint, _ string) error {
+	return nil
+}
+
+type assetContentDaoStub struct {
+	dao.AssetContentDao
+	deletedAssetID uint
+	deleteErr      error
+}
+
+func (s *assetContentDaoStub) DeleteAssetContentsByAssetID(_ context.Context, assetID uint) error {
+	s.deletedAssetID = assetID
+	return s.deleteErr
+}
+
+func (s *assetContentDaoStub) CreateAssetContent(_ context.Context, c *dao.AssetContent) (dao.AssetContent, error) {
+	c.ID = 1
+	return *c, nil
+}
+
+type assetRecordDaoStub struct {
+	dao.AssetRecordDao
+	deletedAssetID uint
+	deleteErr      error
+}
+
+func (s *assetRecordDaoStub) DeleteAssetRecordsByAssetID(_ context.Context, assetID uint) error {
+	s.deletedAssetID = assetID
+	return s.deleteErr
+}
+
+func (s *assetRecordDaoStub) CreateAssetRecord(_ context.Context, r *dao.AssetRecord) (uint, error) {
+	r.ID = 1
+	return 1, nil
 }
 
 func TestAssetRepositoryGetAssetsMapsDAOResults(t *testing.T) {
@@ -247,5 +297,160 @@ func TestAssetRepositoryPropagatesDAOErrors(t *testing.T) {
 	_, err := repo.GetAssetDetail(context.Background(), 7)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetRepositoryDelete(t *testing.T) {
+	// Missing ContentDao or RecordDao returns error
+	repoMissing := &repository.AssetRepositoryImpl{
+		AssetDao: &assetDaoStub{},
+	}
+	if err := repoMissing.Delete(context.Background(), 10); err == nil {
+		t.Fatal("expected error on missing daos")
+	}
+
+	// Success
+	assetDao := &assetDaoStub{}
+	contentDao := &assetContentDaoStub{}
+	recordDao := &assetRecordDaoStub{}
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
+	}
+
+	if err := repo.Delete(context.Background(), 42); err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+	if assetDao.deletedAssetID != 42 || contentDao.deletedAssetID != 42 || recordDao.deletedAssetID != 42 {
+		t.Fatalf("expected assetID 42 to be deleted across all DAOs")
+	}
+
+	// GetAssetForUpdate error
+	wantErr := errors.New("lock failed")
+	repoLockErr := &repository.AssetRepositoryImpl{
+		AssetDao:   &assetDaoStub{getDetailErr: wantErr},
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
+	}
+	if err := repoLockErr.Delete(context.Background(), 42); !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+
+	// RecordDao delete error
+	repoRecordErr := &repository.AssetRepositoryImpl{
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  &assetRecordDaoStub{deleteErr: wantErr},
+	}
+	if err := repoRecordErr.Delete(context.Background(), 42); !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+
+	// ContentDao delete error
+	repoContentErr := &repository.AssetRepositoryImpl{
+		AssetDao:   assetDao,
+		ContentDao: &assetContentDaoStub{deleteErr: wantErr},
+		RecordDao:  recordDao,
+	}
+	if err := repoContentErr.Delete(context.Background(), 42); !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetRepositoryCreateSpecificAssetTypes(t *testing.T) {
+	assetDao := &assetDaoStub{}
+	contentDao := &assetContentDaoStub{}
+	recordDao := &assetRecordDaoStub{}
+	repo := &repository.AssetRepositoryImpl{
+		AssetDao:   assetDao,
+		ContentDao: contentDao,
+		RecordDao:  recordDao,
+	}
+
+	ctx := context.Background()
+
+	// Nil asset error
+	if _, err := repo.CreateObjectAsset(ctx, nil); err == nil {
+		t.Fatal("expected error on nil asset")
+	}
+	if _, err := repo.CreateTileSetAsset(ctx, nil); err == nil {
+		t.Fatal("expected error on nil asset")
+	}
+	if _, err := repo.CreateUISetAsset(ctx, nil); err == nil {
+		t.Fatal("expected error on nil asset")
+	}
+	if _, err := repo.CreateSceneryAsset(ctx, nil); err == nil {
+		t.Fatal("expected error on nil asset")
+	}
+
+	dim := json.RawMessage(`{"width":64,"height":64}`)
+	tileDim := json.RawMessage(`{"tileSize":{"width":16,"height":16},"tileAmount":{"columns":10,"rows":8}}`)
+
+	// CreateObjectAsset
+	id, err := repo.CreateObjectAsset(ctx, &domain.Asset{
+		Name:        "Chest",
+		ProjectID:   1,
+		Perspective: domain.PerspectiveTopDown,
+		Dimensions:  dim,
+	})
+	if err != nil {
+		t.Fatalf("create object asset: %v", err)
+	}
+	if id != 100 || assetDao.asset.Type != string(domain.AssetTypeObject) {
+		t.Fatalf("unexpected object asset: id=%d, type=%s", id, assetDao.asset.Type)
+	}
+
+	// CreateTileSetAsset
+	id, err = repo.CreateTileSetAsset(ctx, &domain.Asset{
+		Name:        "GrassTiles",
+		ProjectID:   1,
+		Perspective: domain.PerspectiveTopDown,
+		Dimensions:  tileDim,
+	})
+	if err != nil {
+		t.Fatalf("create tileSet asset: %v", err)
+	}
+	if id != 100 || assetDao.asset.Type != string(domain.AssetTypeTileSet) {
+		t.Fatalf("unexpected tileset asset: id=%d, type=%s", id, assetDao.asset.Type)
+	}
+
+	// CreateUISetAsset
+	id, err = repo.CreateUISetAsset(ctx, &domain.Asset{
+		Name:        "HealthBar",
+		ProjectID:   1,
+		Perspective: domain.PerspectiveTopDown,
+		Dimensions:  dim,
+	})
+	if err != nil {
+		t.Fatalf("create uiSet asset: %v", err)
+	}
+	if id != 100 || assetDao.asset.Type != string(domain.AssetTypeUISet) {
+		t.Fatalf("unexpected uiset asset: id=%d, type=%s", id, assetDao.asset.Type)
+	}
+
+	// CreateSceneryAsset
+	id, err = repo.CreateSceneryAsset(ctx, &domain.Asset{
+		Name:        "BackgroundMountain",
+		ProjectID:   1,
+		Perspective: domain.PerspectiveTopDown,
+		Dimensions:  dim,
+	})
+	if err != nil {
+		t.Fatalf("create scenery asset: %v", err)
+	}
+	if id != 100 || assetDao.asset.Type != string(domain.AssetTypeScenery) {
+		t.Fatalf("unexpected scenery asset: id=%d, type=%s", id, assetDao.asset.Type)
+	}
+}
+
+func TestNewAssetRepository(t *testing.T) {
+	r1 := repository.NewAssetRepository(nil, nil, nil)
+	if r1 == nil {
+		t.Fatal("expected non-nil AssetRepository")
+	}
+	r2 := repository.NewAssetRepositoryWithDB(nil, nil, nil, nil)
+	if r2 == nil {
+		t.Fatal("expected non-nil AssetRepository")
 	}
 }

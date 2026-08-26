@@ -39,11 +39,11 @@ func TestObjectPrototypeIncludesInputsStyleAndProcessingConstraints(t *testing.T
 		"Top-Down",
 		"<direction_count>\n4\n</direction_count>",
 		"<asset_dimensions>\n{\"width\":48,\"height\":48}\n</asset_dimensions>",
-		"at most 30 x 30 drawable logical pixels",
-		"fixed 9-pixel safety margin",
+		"Use the full 48 x 48 logical prototype canvas",
+		"Do not reserve internal padding for animation",
 		"whole pixels",
 		"high-contrast color clusters",
-		"small object with 30 x 30 drawable logical pixels",
+		"medium-size object with 48 x 48 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object prompt to contain %q: %s", expected, prompt)
@@ -57,6 +57,7 @@ func TestObjectPrototypeDerivesContentPercentageFromTargetDimensions(t *testing.
 		dimensions assetdomain.Size
 		want       string
 	}{
+		{name: "zero edge", dimensions: assetdomain.Size{Width: 0, Height: 0}, want: "approximately 20%"},
 		{name: "very small", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "approximately 20%"},
 		{name: "small sprite baseline", dimensions: assetdomain.Size{Width: 48, Height: 48}, want: "approximately 30%"},
 		{name: "rectangular couch", dimensions: assetdomain.Size{Width: 188, Height: 128}, want: "approximately 44%"},
@@ -126,7 +127,7 @@ func TestObjectPrototypeSideOnLocksBothViewsToOneScale(t *testing.T) {
 	}
 }
 
-func TestObjectPrototypeUsesDrawableGridForNominal32pxDetail(t *testing.T) {
+func TestObjectPrototypeUsesFullGridFor32pxDetail(t *testing.T) {
 	prompt := prompts.ObjectPrototype(
 		"game object",
 		"Top-Down",
@@ -135,11 +136,11 @@ func TestObjectPrototypeUsesDrawableGridForNominal32pxDetail(t *testing.T) {
 		prompts.PrototypeReferenceState{},
 	)
 	for _, expected := range []string{
-		"Choose complexity from the 20 x 20 drawable region, not from the nominal 32 x 32 canvas",
+		"Choose complexity from this 32 x 32 logical grid",
 		"The requested final canvas has a short edge of 32 pixels or less",
 		"simplified, continuous, consistently coloured logical-pixel line",
 		"simplified continuous one-logical-pixel path",
-		"ultra-small object with only 20 x 20 drawable logical pixels",
+		"small object with 32 x 32 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected 32px object prompt to contain %q: %s", expected, prompt)
@@ -165,5 +166,35 @@ func TestObjectPrototypeProtectsElongatedObjectComposition(t *testing.T) {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected elongated-object rule to contain %q: %s", expected, prompt)
 		}
+	}
+}
+
+func TestObjectPrototypeLogicalPixelTiers(t *testing.T) {
+	tests := []struct {
+		name       string
+		dimensions assetdomain.Size
+		want       string
+	}{
+		{name: "16px ultra small full canvas", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "ultra-small object with only 16 x 16 drawable logical pixels"},
+		{name: "32px full canvas", dimensions: assetdomain.Size{Width: 32, Height: 32}, want: "small object with 32 x 32 drawable logical pixels"},
+		{name: "64px full canvas", dimensions: assetdomain.Size{Width: 64, Height: 64}, want: "medium-size object with 64 x 64 drawable logical pixels"},
+		{name: "128px full canvas", dimensions: assetdomain.Size{Width: 128, Height: 128}, want: "This object has 128 x 128 drawable logical pixels"},
+		{name: "256px large full canvas", dimensions: assetdomain.Size{Width: 256, Height: 256}, want: "Even at this larger drawable target, construct the object from deliberate coarse pixel clusters"},
+		{name: "extra large (>160) full canvas", dimensions: assetdomain.Size{Width: 512, Height: 512}, want: "Even at this larger drawable target, construct the object from deliberate coarse pixel clusters"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := prompts.ObjectPrototype(
+				"test object",
+				"Top-Down",
+				tt.dimensions,
+				prompts.TransparentBackground(),
+				prompts.PrototypeReferenceState{},
+			)
+			if !strings.Contains(prompt, tt.want) {
+				t.Fatalf("expected prompt to contain %q: %s", tt.want, prompt)
+			}
+		})
 	}
 }

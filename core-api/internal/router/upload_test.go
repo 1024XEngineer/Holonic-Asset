@@ -16,7 +16,7 @@ import (
 func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
 	uploadManager := upload.NewManager(nil)
 	uploadHandler := handler.NewUploadHandler(uploadManager)
-	e := router.Register(nil, nil, nil, uploadHandler)
+	e := router.Register(nil, nil, nil, uploadHandler, nil)
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/uploads",
@@ -38,7 +38,7 @@ func TestUploadsRouteReturnsPlaceholderResponse(t *testing.T) {
 func TestUploadsRouteRejectsInvalidRequest(t *testing.T) {
 	uploadManager := upload.NewManager(nil)
 	uploadHandler := handler.NewUploadHandler(uploadManager)
-	e := router.Register(nil, nil, nil, uploadHandler)
+	e := router.Register(nil, nil, nil, uploadHandler, nil)
 
 	for _, body := range []string{
 		`{"contentType":"","contentLength":8}`,
@@ -59,7 +59,7 @@ func TestUploadsRouteRejectsInvalidRequest(t *testing.T) {
 func TestUploadRoutesDoNotExposeUnsupportedOperations(t *testing.T) {
 	uploadManager := upload.NewManager(nil)
 	uploadHandler := handler.NewUploadHandler(uploadManager)
-	e := router.Register(nil, nil, nil, uploadHandler)
+	e := router.Register(nil, nil, nil, uploadHandler, nil)
 
 	routes := []string{
 		"/api/v1/upload",

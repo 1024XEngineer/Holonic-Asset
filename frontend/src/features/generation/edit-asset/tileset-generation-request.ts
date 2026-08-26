@@ -1,5 +1,7 @@
 import type { CreateGenerationRequest, ItemTile } from "@/model";
 
+import type { CreateTilesetItemRequest } from "../types";
+
 export type TilesetGenerationTarget =
   | {
       kind: "item";
@@ -46,6 +48,27 @@ export function buildTilesetGenerationRequest({
         position: toPosition(position),
       })),
       ...referenceParameters,
+    },
+  };
+}
+
+export function buildAddTilesetItemGenerationRequest({
+  assetId,
+  request,
+}: {
+  assetId: number;
+  request: CreateTilesetItemRequest;
+}): CreateGenerationRequest {
+  return {
+    assetId,
+    kind: "add_tileset_item",
+    creative_brief: request.creativeBrief,
+    parameters: {
+      item: {
+        name: request.itemName.trim(),
+        description: request.itemDescription.trim(),
+        shape: request.shape,
+      },
     },
   };
 }

@@ -72,7 +72,9 @@ func sceneryPreviewLayer(t *testing.T, id uint, pixels []color.RGBA) ProcessedSc
 }
 
 func TestDecodeSceneryLayoutsAssociatesUnorderedResponseByStableID(t *testing.T) {
-	layouts, err := decodeSceneryLayouts([]byte(`{
+	approved, notes, layouts, err := decodeSceneryLayouts([]byte(`{
+		"approved": true,
+		"review_notes": "Well grounded, correct perspective",
 		"layers":[
 			{"id":2,"position":{"x":100,"y":40},"scale":{"x":0.8,"y":0.8},"rotation":15,"opacity":0.75,"zIndex":20},
 			{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":-10}
@@ -80,6 +82,9 @@ func TestDecodeSceneryLayoutsAssociatesUnorderedResponseByStableID(t *testing.T)
 	}`), sceneryLayoutTestLayers(), sceneryLayoutTestDimensions())
 	if err != nil {
 		t.Fatalf("decode valid scenery layout: %v", err)
+	}
+	if !approved || notes != "Well grounded, correct perspective" {
+		t.Fatalf("unexpected review decision: approved=%v, notes=%q", approved, notes)
 	}
 	if len(layouts) != 2 || layouts[1].ZIndex != -10 || layouts[2].Position.X != 100 ||
 		layouts[2].Scale.X != 0.8 || layouts[2].Rotation != 15 || layouts[2].Opacity != 0.75 {
@@ -89,7 +94,9 @@ func TestDecodeSceneryLayoutsAssociatesUnorderedResponseByStableID(t *testing.T)
 
 func TestDecodeSceneryLayoutsNormalizesOpaqueBackdrop(t *testing.T) {
 	layers := []ProcessedSceneryLayer{{ID: 1, Name: "Sky"}, {ID: 2, Name: "Trees"}, {ID: 3, Name: "Mountains"}}
-	layouts, err := decodeSceneryLayouts([]byte(`{
+	approved, notes, layouts, err := decodeSceneryLayouts([]byte(`{
+		"approved": false,
+		"review_notes": "Trees need ground adjustment",
 		"layers":[
 			{"id":1,"position":{"x":20,"y":10},"scale":{"x":0.5,"y":0.5},"rotation":5,"opacity":0.5,"zIndex":10},
 			{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":10},
@@ -98,6 +105,9 @@ func TestDecodeSceneryLayoutsNormalizesOpaqueBackdrop(t *testing.T) {
 	}`), layers, sceneryLayoutTestDimensions())
 	if err != nil {
 		t.Fatalf("decode scenery layout: %v", err)
+	}
+	if approved || notes != "Trees need ground adjustment" {
+		t.Fatalf("unexpected review decision: approved=%v, notes=%q", approved, notes)
 	}
 	backdrop := layouts[1]
 	if backdrop.Position != (SceneryLayoutVector{}) || backdrop.Scale != (SceneryLayoutVector{X: 1, Y: 1}) ||
@@ -112,40 +122,44 @@ func TestDecodeSceneryLayoutsNormalizesOpaqueBackdrop(t *testing.T) {
 func TestDecodeSceneryLayoutsRejectsInvalidModelOutput(t *testing.T) {
 	first := `{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0}`
 	second := `{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}`
+	validReview := `"approved":true,"review_notes":"ok"`
 	tests := []struct {
 		name string
 		json string
 	}{
 		{name: "malformed", json: `{"layers":[`},
-		{name: "missing layers", json: `{}`},
-		{name: "missing layer", json: `{"layers":[` + first + `]}`},
-		{name: "duplicate ID", json: `{"layers":[` + first + `,` + first + `]}`},
-		{name: "unknown ID", json: `{"layers":[` + first + `,{"id":3,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "unknown root field", json: `{"layers":[` + first + `,` + second + `],"explanation":"ok"}`},
-		{name: "unknown layer field", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1,"visible":true}]}`},
-		{name: "unknown position field", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0,"anchor":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "unknown scale field", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1,"uniform":true},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing ID", json: `{"layers":[` + first + `,{"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing position", json: `{"layers":[` + first + `,{"id":2,"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing position coordinate", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing scale", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing scale coordinate", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "missing rotation", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"opacity":1,"zIndex":1}]}`},
-		{name: "missing opacity", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"zIndex":1}]}`},
-		{name: "missing zIndex", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1}]}`},
-		{name: "non-integer zIndex", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1.5}]}`},
-		{name: "number overflow", json: `{"layers":[` + first + `,{"id":2,"position":{"x":1e1000,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "zero scale", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":0,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "negative scale", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":-1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "opacity below range", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":-0.1,"zIndex":1}]}`},
-		{name: "opacity above range", json: `{"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1.1,"zIndex":1}]}`},
-		{name: "outside canvas", json: `{"layers":[` + first + `,{"id":2,"position":{"x":640,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
-		{name: "trailing data", json: `{"layers":[` + first + `,` + second + `]} {}`},
+		{name: "missing layers", json: `{` + validReview + `}`},
+		{name: "missing approved", json: `{"review_notes":"ok","layers":[` + first + `,` + second + `]}`},
+		{name: "missing review_notes", json: `{"approved":true,"layers":[` + first + `,` + second + `]}`},
+		{name: "blank review_notes", json: `{"approved":true,"review_notes":"   ","layers":[` + first + `,` + second + `]}`},
+		{name: "missing layer", json: `{` + validReview + `,"layers":[` + first + `]}`},
+		{name: "duplicate ID", json: `{` + validReview + `,"layers":[` + first + `,` + first + `]}`},
+		{name: "unknown ID", json: `{` + validReview + `,"layers":[` + first + `,{"id":3,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "unknown root field", json: `{` + validReview + `,"layers":[` + first + `,` + second + `],"explanation":"ok"}`},
+		{name: "unknown layer field", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1,"visible":true}]}`},
+		{name: "unknown position field", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0,"anchor":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "unknown scale field", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1,"uniform":true},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing ID", json: `{` + validReview + `,"layers":[` + first + `,{"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing position", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing position coordinate", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing scale", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing scale coordinate", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "missing rotation", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"opacity":1,"zIndex":1}]}`},
+		{name: "missing opacity", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"zIndex":1}]}`},
+		{name: "missing zIndex", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1}]}`},
+		{name: "non-integer zIndex", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1.5}]}`},
+		{name: "number overflow", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":1e1000,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "zero scale", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":0,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "negative scale", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":-1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "opacity below range", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":-0.1,"zIndex":1}]}`},
+		{name: "opacity above range", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1.1,"zIndex":1}]}`},
+		{name: "outside canvas", json: `{` + validReview + `,"layers":[` + first + `,{"id":2,"position":{"x":640,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`},
+		{name: "trailing data", json: `{` + validReview + `,"layers":[` + first + `,` + second + `]} {}`},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := decodeSceneryLayouts([]byte(test.json), sceneryLayoutTestLayers(), sceneryLayoutTestDimensions())
+			_, _, _, err := decodeSceneryLayouts([]byte(test.json), sceneryLayoutTestLayers(), sceneryLayoutTestDimensions())
 			if !errors.Is(err, ErrInvalidSceneryLayout) {
 				t.Fatalf("expected invalid scenery layout, got %v", err)
 			}
@@ -177,13 +191,13 @@ func TestValidateSceneryLayoutRejectsInvalidCandidates(t *testing.T) {
 }
 
 func TestDecodeSceneryLayoutsRejectsInvalidProcessedLayerIDs(t *testing.T) {
-	valid := []byte(`{"layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0},{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`)
+	valid := []byte(`{"approved":true,"review_notes":"ok","layers":[{"id":1,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":0},{"id":2,"position":{"x":0,"y":0},"scale":{"x":1,"y":1},"rotation":0,"opacity":1,"zIndex":1}]}`)
 	for name, layers := range map[string][]ProcessedSceneryLayer{
 		"zero":      {{ID: 0}, {ID: 2}},
 		"duplicate": {{ID: 1}, {ID: 1}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := decodeSceneryLayouts(valid, layers, sceneryLayoutTestDimensions()); !errors.Is(err, ErrInvalidSceneryLayout) {
+			if _, _, _, err := decodeSceneryLayouts(valid, layers, sceneryLayoutTestDimensions()); !errors.Is(err, ErrInvalidSceneryLayout) {
 				t.Fatalf("expected invalid processed layers, got %v", err)
 			}
 		})

@@ -10,8 +10,10 @@ import type {
   AssetWorkspaceData,
   CreateGenerationRequest,
 } from "@/model";
+import { useAssetExport } from "@/model";
 
 import { getEditorStatus } from "./editor-status";
+import { downloadAssetExport } from "./download-asset-export";
 import { useEditorSession } from "./state";
 
 type EditorGenerationWorkspaceInput<Content> = {
@@ -38,6 +40,7 @@ export function useEditorGenerationWorkspace<Content>({
     },
     initialRecord: data.record,
   });
+  const assetExport = useAssetExport();
   const { snapshot, syncExternalRecord } = session;
   const generation = useGenerationEditFlow<Content>({
     projectId: asset.projectId,
@@ -102,10 +105,31 @@ export function useEditorGenerationWorkspace<Content>({
   }, [generation.candidateContent, snapshot.record, toCandidateRecord]);
 
   const save = async () => {
-    if (!snapshot.dirty) return;
+    if (!snapshot.dirty) return { status: "saved" as const };
     const result = await session.save();
     if (result.status === "saved") reportAction("Saved just now");
     if (result.status === "failed") reportAction("Save failed");
+    return result;
+  };
+
+  const exportAsset = async () => {
+    const saveResult = await save();
+    if (saveResult.status !== "saved") return;
+
+    const assetId = Number(asset.id);
+    if (!Number.isSafeInteger(assetId) || assetId <= 0) {
+      reportAction("Export failed");
+      return;
+    }
+
+    try {
+      const result = await assetExport.exportAsset(assetId);
+      if (!result) return;
+      downloadAssetExport(result);
+      reportAction("Export ready");
+    } catch {
+      reportAction("Export failed");
+    }
   };
 
   const submit = async ({
@@ -121,6 +145,7 @@ export function useEditorGenerationWorkspace<Content>({
         prompt: submittedPrompt,
       });
       if (submitted) reportAction("Prompt sent");
+      return submitted;
     } catch (error) {
       reportAction("Prompt submission failed");
       throw error;
@@ -160,11 +185,14 @@ export function useEditorGenerationWorkspace<Content>({
       canRedo: snapshot.canRedo,
       isDirty: snapshot.dirty,
       isSaving: snapshot.saveState.phase === "saving",
+      canExport: asset.kind !== "uiset",
+      isExporting: assetExport.isExporting,
       generationTasks,
       onBack,
       onUndo: () => session.dispatch({ type: "history.undo" }),
       onRedo: () => session.dispatch({ type: "history.redo" }),
       onSave: () => void save(),
+      onExport: () => void exportAsset(),
     },
     snapshot,
     session,

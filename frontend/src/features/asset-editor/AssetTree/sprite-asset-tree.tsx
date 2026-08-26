@@ -18,6 +18,7 @@ import { AssetTree } from "./asset-tree";
 
 export function SpriteAssetTree({
   animations,
+  prototypeDimensions,
   perspective,
   selectedNode,
   selectedFrames,
@@ -29,6 +30,7 @@ export function SpriteAssetTree({
   isGeneratingAnimation,
 }: {
   animations: CharacterAnimation[];
+  prototypeDimensions?: { width: number; height: number };
   perspective: Perspective;
   selectedNode: AnimatedSpriteNodeId | null;
   selectedFrames: Array<{ nodeId: AnimatedSpriteNodeId; index: number }>;
@@ -48,6 +50,7 @@ export function SpriteAssetTree({
   return (
     <CreateAnimationTrigger
       isGenerating={isGeneratingAnimation}
+      prototypeDimensions={prototypeDimensions}
       perspective={perspective}
       onGenerate={onGenerateAnimation}
     >

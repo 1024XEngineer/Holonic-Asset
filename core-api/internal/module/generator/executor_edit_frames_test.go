@@ -130,6 +130,67 @@ func TestExecutorEditFramesReplacesOnlySelectedFramesAndPersistsRawFrames(t *tes
 	}
 }
 
+func TestExecutorEditFramesPersistsResolvedLegacyFrameDimensions(t *testing.T) {
+	parent := editFramesAsset(t, 3)
+	var content assetdomain.AssetContent
+	if err := json.Unmarshal(parent.Content, &content); err != nil {
+		t.Fatalf("decode parent content: %v", err)
+	}
+	content.Animations[0].Generation.FrameWidth = 0
+	content.Animations[0].Generation.FrameHeight = 0
+	encoded, err := assetdomain.EncodeContent(content)
+	if err != nil {
+		t.Fatalf("encode legacy parent content: %v", err)
+	}
+	parent.Content = encoded
+
+	events := []string{}
+	animations := &animationGenerationServiceStub{
+		events: &events,
+		result: &generator.AnimationGenerationResult{
+			Frames:    makeImageRegions(3, "edited"),
+			RawFrames: makeImageRegions(3, "raw"),
+		},
+	}
+	executor := generator.NewExecutorWithDependencies(nil, nil, &generationAssetWriterStub{
+		events:      &events,
+		parentAsset: parent,
+	}, generator.ExecutorDependencies{
+		Animations: animations,
+		References: editFrameReferenceStore(t, 3),
+	})
+
+	result, err := executor.Generate(context.Background(), generator.EditFrames, json.RawMessage(`{
+		"asset_id":7,"project_id":11,"animation_id":42,"frame_ids":[2],"prompt":"change pose"
+	}`))
+	if err != nil {
+		t.Fatalf("edit legacy frames: %v", err)
+	}
+	if animations.request == nil {
+		t.Fatal("expected animation generation request")
+	}
+	if animations.request.FrameWidth != 48 || animations.request.FrameHeight != 48 {
+		t.Fatalf(
+			"legacy frame edit must use resolved 1.5x dimensions: got %dx%d",
+			animations.request.FrameWidth,
+			animations.request.FrameHeight,
+		)
+	}
+
+	_, candidate := decodeExecutionContent(t, result, assetdomain.AssetTypeCharacter)
+	if len(candidate.Animations) != 1 || candidate.Animations[0].Generation == nil {
+		t.Fatalf("expected animation generation metadata: %+v", candidate.Animations)
+	}
+	generation := candidate.Animations[0].Generation
+	if generation.FrameWidth != 48 || generation.FrameHeight != 48 {
+		t.Fatalf(
+			"resolved legacy dimensions must be persisted after frame editing: got %dx%d",
+			generation.FrameWidth,
+			generation.FrameHeight,
+		)
+	}
+}
+
 func TestExecutorEditFramesClampsBoundaryReferences(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -269,7 +330,10 @@ func editFramesAsset(t *testing.T, frameCount int) assetdomain.Asset {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return assetdomain.Asset{ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Description: "hero", Version: 3, Content: encoded}
+	return assetdomain.Asset{
+		ID: 7, ProjectID: 11, Type: assetdomain.AssetTypeCharacter, Name: "hero", Description: "hero", Version: 3,
+		Dimensions: json.RawMessage(`{"width":32,"height":32}`), Content: encoded,
+	}
 }
 
 func editFrameReferenceStore(t *testing.T, frameCount int) *executorReferenceStoreStub {

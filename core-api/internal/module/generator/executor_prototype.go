@@ -271,7 +271,8 @@ func (e *executor) generatePrototypeResources(
 			FrameWidth:                int(dimensions.Width),
 			FrameHeight:               int(dimensions.Height),
 			RenderScale:               imageprocessor.PrototypeRenderScale,
-			Margin:                    AnimationFrameMargin(int(dimensions.Width), int(dimensions.Height)),
+			Margin:                    0,
+			UseExactMargin:            true,
 			AlphaThreshold:            imageprocessor.PixelAlphaThreshold,
 			Anchor:                    imageprocessor.AnimationAnchorCenter,
 			NormalizeContentScale:     !isObjectPrototypeTask(taskType),
@@ -453,21 +454,9 @@ func prototypePixelPostProcessOptions(taskType TaskType, width, height int) imag
 	default:
 		options = PrototypePixelResizeOptions(width, height)
 	}
-	if isObjectPrototypeTask(taskType) {
-		// Objects need animation room too, but preserving the complete supersampled
-		// split frame makes the visible object much smaller than the intended
-		// drawable area. Refit the alpha content into the target canvas minus the
-		// canonical safety margin, matching the browser converter's content-fit
-		// geometry without allowing the object to touch the canvas edge.
-		options.Margin = AnimationFrameMargin(width, height)
-		options.CropContent = true
-		options.PreserveCanvasGeometry = false
-		return options
-	}
-
-	// Character prototype frames already encode the shared pose scale and the
-	// action/safety margin expected by animation generation. Preserve the whole
-	// frame rather than fitting each pose independently.
+	// Prototype frames use their complete logical canvas. Animation movement
+	// space is provided by the independently configured animation frame rather
+	// than shrinking characters or objects inside their prototypes.
 	options.Margin = 0
 	options.CropContent = false
 	options.PreserveCanvasGeometry = true

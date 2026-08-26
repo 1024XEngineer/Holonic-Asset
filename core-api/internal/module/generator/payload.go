@@ -58,6 +58,8 @@ type CreateAnimationPayload struct {
 	CreativeBrief string `json:"creative_brief"`
 	Style         string `json:"style,omitempty"`
 	FrameCount    int    `json:"frame_count,omitempty"`
+	FrameWidth    int    `json:"frame_width,omitempty"`
+	FrameHeight   int    `json:"frame_height,omitempty"`
 	FPS           int    `json:"fps,omitempty"`
 	Resolution    string `json:"resolution,omitempty"`
 	Duration      int    `json:"duration,omitempty"`
@@ -128,7 +130,7 @@ const (
 
 var sceneryLayerPlanJSONSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["layers"],"properties":{"layers":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["name","creative_brief"],"properties":{"name":{"type":"string","minLength":1},"creative_brief":{"type":"string","minLength":1}}}}}}`)
 
-var sceneryLayerLayoutJSONSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["layers"],"properties":{"layers":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["id","position","scale","rotation","opacity","zIndex"],"properties":{"id":{"type":"integer","minimum":1},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number"},"y":{"type":"number"}}},"scale":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","exclusiveMinimum":0},"y":{"type":"number","exclusiveMinimum":0}}},"rotation":{"type":"number"},"opacity":{"type":"number","minimum":0,"maximum":1},"zIndex":{"type":"integer"}}}}}}`)
+var sceneryLayerLayoutJSONSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["approved","review_notes","layers"],"properties":{"approved":{"type":"boolean"},"review_notes":{"type":"string","minLength":1},"layers":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["id","position","scale","rotation","opacity","zIndex"],"properties":{"id":{"type":"integer","minimum":1},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number"},"y":{"type":"number"}}},"scale":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","exclusiveMinimum":0},"y":{"type":"number","exclusiveMinimum":0}}},"rotation":{"type":"number"},"opacity":{"type":"number","minimum":0,"maximum":1},"zIndex":{"type":"integer"}}}}}}`)
 
 type sceneryLayerPlanResponse struct {
 	Layers *[]sceneryLayerPlanCandidate `json:"layers"`
@@ -137,6 +139,9 @@ type sceneryLayerPlanResponse struct {
 type sceneryLayerPlanCandidate struct {
 	Name          *string `json:"name"`
 	CreativeBrief *string `json:"creative_brief"`
+	Brief         *string `json:"brief,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	Prompt        *string `json:"prompt,omitempty"`
 }
 
 type SceneryLayoutVector struct {
@@ -161,7 +166,9 @@ type LaidOutSceneryLayer struct {
 }
 
 type sceneryLayoutResponse struct {
-	Layers *[]sceneryLayoutCandidate `json:"layers"`
+	Approved    *bool                     `json:"approved"`
+	ReviewNotes *string                   `json:"review_notes"`
+	Layers      *[]sceneryLayoutCandidate `json:"layers"`
 }
 
 type sceneryLayoutCandidate struct {

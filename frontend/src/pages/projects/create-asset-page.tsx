@@ -5,7 +5,12 @@ import { useTranslation } from "react-i18next";
 import { CreateAssetForm } from "@/features/generation";
 import { assetKindSchema } from "@/model/asset";
 import { useEnqueueGenerationMutation } from "@/model/generation";
-import { useProjectListQuery } from "@/model/project";
+import {
+  useCreateProjectTagMutation,
+  useProjectListQuery,
+  useProjectTagsQuery,
+  useUpdateProjectTagMutation,
+} from "@/model/project";
 
 export function CreateAssetPage({
   projectId,
@@ -17,6 +22,9 @@ export function CreateAssetPage({
   const { t } = useTranslation(["generation", "common", "projects"]);
   const navigate = useNavigate();
   const { data: projects = [] } = useProjectListQuery();
+  const { data: projectTags = [] } = useProjectTagsQuery(projectId);
+  const createTagMutation = useCreateProjectTagMutation();
+  const updateTagMutation = useUpdateProjectTagMutation();
   const {
     error: enqueueError,
     isPending: isEnqueuePending,
@@ -26,6 +34,7 @@ export function CreateAssetPage({
   const project = projects.find((item) => item.id === projectId);
   const kindResult = assetKindSchema.safeParse(rawKind);
   const kind = kindResult.success ? kindResult.data : undefined;
+  const availableTags = projectTags;
 
   if (!project || !kind) return null;
 
@@ -53,10 +62,22 @@ export function CreateAssetPage({
         </header>
         <section className="mt-12 border bg-background p-7 shadow-sm sm:p-10 lg:mt-14 lg:p-10">
           <CreateAssetForm
+            availableTags={availableTags}
             kind={kind}
             onCancel={goBack}
             error={enqueueError}
             isSubmitting={isEnqueuePending}
+            onCreateTag={(tag) =>
+              createTagMutation.mutateAsync({ projectId, tag })
+            }
+            onUpdateTag={(currentTag, tag) => {
+              if (!currentTag.tagId) return tag;
+              return updateTagMutation.mutateAsync({
+                projectId,
+                tagId: currentTag.tagId,
+                tag,
+              });
+            }}
             onCreate={async (request) => {
               resetEnqueue();
               try {

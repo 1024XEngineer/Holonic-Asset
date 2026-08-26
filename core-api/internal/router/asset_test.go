@@ -86,7 +86,7 @@ func (s *assetRouterStub) Delete(
 
 func TestAssetRoutesBindPathParameters(t *testing.T) {
 	assetStub := &assetRouterStub{}
-	e := router.Register(assetStub, nil, nil, nil)
+	e := router.Register(assetStub, nil, nil, nil, nil)
 
 	t.Run("get assets", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/42/assets", nil)
@@ -225,7 +225,7 @@ func TestAssetRoutesBindPathParameters(t *testing.T) {
 }
 
 func TestAssetRoutesRejectZeroPathIDs(t *testing.T) {
-	e := router.Register(&assetRouterStub{}, nil, nil, nil)
+	e := router.Register(&assetRouterStub{}, nil, nil, nil, nil)
 
 	for _, path := range []string{
 		"/api/v1/projects/0/assets",
@@ -254,7 +254,7 @@ func TestAssetUpdateRejectsImmutableAndNonAttributeFields(t *testing.T) {
 	} {
 		t.Run(field, func(t *testing.T) {
 			stub := &assetRouterStub{}
-			e := router.Register(stub, nil, nil, nil)
+			e := router.Register(stub, nil, nil, nil, nil)
 			request := httptest.NewRequest(
 				http.MethodPut,
 				"/api/v1/asset/update",

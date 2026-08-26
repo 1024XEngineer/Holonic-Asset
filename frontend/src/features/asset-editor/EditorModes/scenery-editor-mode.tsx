@@ -1,4 +1,4 @@
-import type { AssetWorkspaceData } from "@/model";
+import { useAssetExport, type AssetWorkspaceData } from "@/model";
 
 import { SceneryAssetTree } from "../AssetTree/scenery-asset-tree";
 import {
@@ -6,6 +6,7 @@ import {
   useSceneryCanvasStateMachine,
 } from "../Canvas/SceneryCanvas";
 import { Inspector } from "../Inspector/inspector";
+import { downloadAssetExport } from "../download-asset-export";
 import { EditorModeFrame } from "./editor-mode-frame";
 
 export type SceneryEditorModeProps = {
@@ -17,11 +18,22 @@ const emptySceneryLayers = [] as const;
 
 export function SceneryEditorMode({ data, onBack }: SceneryEditorModeProps) {
   const { asset, projectName, record } = data;
+  const { exportAsset, isExporting } = useAssetExport();
   const canvas = useSceneryCanvasStateMachine(
     record.mode === "scenery" ? record.scenery.layers : emptySceneryLayers,
   );
   if (record.mode !== "scenery") return null;
   const { layers, dimensions } = record.scenery;
+  const handleExport = async () => {
+    const assetId = Number(asset.id);
+    if (!Number.isSafeInteger(assetId) || assetId <= 0) return;
+    try {
+      const result = await exportAsset(assetId);
+      if (result) downloadAssetExport(result);
+    } catch {
+      // The export hook exposes the failure state for the header lifecycle.
+    }
+  };
   const selectedLayerId = canvas.selectedLayerIds[0] ?? null;
   const selectedLayer =
     layers.find((layer) => layer.id === selectedLayerId) ?? null;
@@ -33,6 +45,9 @@ export function SceneryEditorMode({ data, onBack }: SceneryEditorModeProps) {
       version={asset.version}
       projectName={projectName}
       onBack={onBack}
+      canExport
+      isExporting={isExporting}
+      onExport={handleExport}
     >
       <SceneryAssetTree
         layers={layers}

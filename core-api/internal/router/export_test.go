@@ -31,7 +31,7 @@ func (exportRouteManagerStub) Handle(context.Context, *taskdomain.Task) (any, er
 
 func TestExportRouteReturnsNotFoundForUnavailableAssetVersion(t *testing.T) {
 	exportHandler := handler.NewExportHandler(exportRouteManagerStub{})
-	server := router.RegisterWithExport(nil, nil, nil, nil, exportHandler)
+	server := router.RegisterWithExport(nil, nil, nil, nil, nil, exportHandler)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/asset/export", strings.NewReader(`{"assetId":7,"version":9}`))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	response := httptest.NewRecorder()

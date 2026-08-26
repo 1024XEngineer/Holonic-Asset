@@ -10,6 +10,13 @@ export {
   useDeleteAssetMutation,
   useUpdateAssetMutation,
 } from "./library";
+export type { AssetAttributes } from "./types";
+export type {
+  AssetContent,
+  AssetContentForKind,
+  AssetContentKind,
+  EditableAssetContent,
+} from "./content";
 export type {
   AssetCanvasSize,
   AssetGroup,
@@ -19,18 +26,28 @@ export type {
 } from "./library";
 export {
   describeAssetRecordChanges,
+  assetRecordApi,
+  getTilesetCandidateItemIds,
   getCoreTilesetCandidateItemIds,
+  toSpriteContentCandidate,
   toCoreSpriteCandidateRecord,
+  toTilesetContentCandidate,
   toCoreTilesetCandidateRecord,
   useRecordQuery,
   useSaveAssetRevisionMutation,
+  useRollbackAssetRecordMutation,
 } from "./record";
 export type {
+  AssetRecordApi,
+  AssetRecordState,
+  AssetSnapshot,
+  AssetSnapshotForKind,
   AssetCanvasPosition,
   AssetRecord,
   AssetWorkspaceApi,
   AssetRecordForKind,
   AssetRecordSaveResult,
+  AssetRecordRollbackResult,
   AssetWorkspaceAsset,
   AssetWorkspaceData,
   AssetWorkspaceDataForKind,
@@ -39,6 +56,7 @@ export type {
   CharacterAssetRecord,
   GetAssetRecordInput,
   SaveAssetRecordInput,
+  RollbackAssetRecordInput,
   SceneryAssetKind,
   SceneryAssetRecord,
   SceneryCanvasDimensions,
@@ -86,6 +104,7 @@ export {
   type AssetKind,
   type AssetRevision,
   type AssetRevisionStatus,
+  type AssetTag,
   type CharacterAnimation,
   type CharacterAnimationClip,
   type CharacterSpriteSheet,
@@ -94,4 +113,14 @@ export {
   type ProjectAsset,
   type SceneryAssetData,
   type SceneryLayer,
+} from "./types";
+export {
+  assetTagSchema,
+  defaultAssetTagColor,
+  getRandomAssetTagColor,
+  getTagBadgeStyle,
+  hexToRgb,
+  mergeAssetTags,
+  normalizeAssetTag,
+  presetAssetTagColors,
 } from "./types";

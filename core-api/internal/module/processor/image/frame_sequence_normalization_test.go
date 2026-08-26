@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,35 @@ func TestNormalizeAnimationImageStabilizesFramesWithSharedCrop(t *testing.T) {
 	}
 	if result.Report.SharedCrop.Width <= 0 || result.Report.SharedCrop.Height <= 0 {
 		t.Fatalf("invalid shared crop: %+v", result.Report.SharedCrop)
+	}
+}
+
+func TestNormalizeAnimationImageSupportsIntentionalZeroMargin(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	fillRect(src, image.Rect(8, 8, 24, 24), color.NRGBA{R: 220, G: 70, B: 40, A: 255})
+
+	legacy, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 1, Rows: 1, FrameWidth: 32, FrameHeight: 32, Margin: 0,
+	})
+	if err != nil {
+		t.Fatalf("normalize with legacy zero margin: %v", err)
+	}
+	exact, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 1, Rows: 1, FrameWidth: 32, FrameHeight: 32,
+		Margin: 0, UseExactMargin: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize with exact zero margin: %v", err)
+	}
+
+	if legacy.Report.Margin != defaultAssetMargin(32, 32) {
+		t.Fatalf("legacy margin = %d, want default %d", legacy.Report.Margin, defaultAssetMargin(32, 32))
+	}
+	if exact.Report.Margin != 0 {
+		t.Fatalf("exact margin = %d, want 0", exact.Report.Margin)
+	}
+	if exact.Report.Scale <= legacy.Report.Scale {
+		t.Fatalf("exact zero margin scale = %f, want greater than legacy scale %f", exact.Report.Scale, legacy.Report.Scale)
 	}
 }
 
@@ -358,5 +388,147 @@ func TestNormalizeAnimationImagePreservesBrightGreenSubjectOnGreenMatte(t *testi
 		if !foundGreen {
 			t.Fatalf("frame %d lost bright green subject", index)
 		}
+	}
+}
+
+func TestNormalizeAnimationImageCompensatesExpandedReferenceScaleAcrossSequence(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 200, 100))
+	body := color.NRGBA{R: 220, G: 70, B: 40, A: 255}
+	fillRect(src, image.Rect(40, 35, 60, 65), body)
+	fillRect(src, image.Rect(142, 37, 162, 67), body)
+
+	base, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 100, FrameHeight: 100,
+		Anchor: AnimationAnchorFeet, PreserveSourceCellScale: true,
+		PreserveHorizontalMotion: true, PreserveVerticalMotion: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize base source-cell scale: %v", err)
+	}
+	compensated, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 2, Rows: 1, FrameWidth: 100, FrameHeight: 100,
+		Anchor: AnimationAnchorFeet, PreserveSourceCellScale: true,
+		SourceCellScaleMultiplier: 1.875,
+		PreserveHorizontalMotion:  true, PreserveVerticalMotion: true,
+	})
+	if err != nil {
+		t.Fatalf("normalize compensated source-cell scale: %v", err)
+	}
+	if got, want := compensated.Report.RequestedSourceCellScaleMultiplier, 1.875; math.Abs(got-want) > 0.001 {
+		t.Fatalf("requested scale multiplier = %f, want %f", got, want)
+	}
+	if got, want := compensated.Report.AppliedSourceCellScaleMultiplier, 1.875; math.Abs(got-want) > 0.001 {
+		t.Fatalf("applied scale multiplier = %f, want %f", got, want)
+	}
+	if len(compensated.Report.Warnings) != 0 {
+		t.Fatalf("unexpected compensation warnings: %v", compensated.Report.Warnings)
+	}
+
+	baseBounds := animationResultContentBounds(t, base)
+	compensatedBounds := animationResultContentBounds(t, compensated)
+	for index := range baseBounds {
+		if got, want := compensatedBounds[index].Dx(), int(math.Round(float64(baseBounds[index].Dx())*1.875)); absInt(got-want) > 2 {
+			t.Fatalf("frame %d compensated width = %d, want about %d (base %d)", index, got, want, baseBounds[index].Dx())
+		}
+		if got, want := compensatedBounds[index].Dy(), int(math.Round(float64(baseBounds[index].Dy())*1.875)); absInt(got-want) > 2 {
+			t.Fatalf("frame %d compensated height = %d, want about %d (base %d)", index, got, want, baseBounds[index].Dy())
+		}
+	}
+	baseMotion := rectangleCenterX(baseBounds[1]) - rectangleCenterX(baseBounds[0])
+	compensatedMotion := rectangleCenterX(compensatedBounds[1]) - rectangleCenterX(compensatedBounds[0])
+	if math.Abs(compensatedMotion-baseMotion*1.875) > 1.1 {
+		t.Fatalf("compensated horizontal motion = %.2f, want about %.2f", compensatedMotion, baseMotion*1.875)
+	}
+}
+
+func TestNormalizeAnimationImageClampsScaleCompensationBeforeClipping(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 100, 100))
+	fillRect(src, image.Rect(5, 15, 95, 85), color.NRGBA{R: 220, G: 70, B: 40, A: 255})
+
+	result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+		Columns: 1, Rows: 1, FrameWidth: 100, FrameHeight: 100,
+		Anchor: AnimationAnchorCenter, PreserveSourceCellScale: true,
+		SourceCellScaleMultiplier: 1.875,
+	})
+	if err != nil {
+		t.Fatalf("normalize clamped source-cell scale: %v", err)
+	}
+	if result.Report.AppliedSourceCellScaleMultiplier >= result.Report.RequestedSourceCellScaleMultiplier {
+		t.Fatalf("scale compensation was not clamped: requested=%f applied=%f", result.Report.RequestedSourceCellScaleMultiplier, result.Report.AppliedSourceCellScaleMultiplier)
+	}
+	if len(result.Report.Warnings) == 0 {
+		t.Fatal("expected a clipping-prevention warning")
+	}
+	bounds := animationResultContentBounds(t, result)[0]
+	if bounds.Min.X < 0 || bounds.Min.Y < 0 || bounds.Max.X > 100 || bounds.Max.Y > 100 {
+		t.Fatalf("clamped content escaped target canvas: %v", bounds)
+	}
+}
+
+func animationResultContentBounds(t *testing.T, result *normalizedAnimation) []image.Rectangle {
+	t.Helper()
+	bounds := make([]image.Rectangle, len(result.Frames))
+	for index, frame := range result.Frames {
+		decoded, err := DecodeBase64Image(frame.ImageBase64)
+		if err != nil {
+			t.Fatalf("decode normalized frame %d: %v", index, err)
+		}
+		frameBounds, ok := alphaBoundsNRGBA(toNRGBA(decoded), defaultImageSplitAlphaThreshold)
+		if !ok {
+			t.Fatalf("normalized frame %d has no foreground", index)
+		}
+		bounds[index] = frameBounds
+	}
+	return bounds
+}
+
+func rectangleCenterX(bounds image.Rectangle) float64 {
+	return float64(bounds.Min.X+bounds.Max.X) / 2
+}
+
+func TestNormalizeAnimationImageBackgroundOptionsCoverMatteAndChromaPaths(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, src.Bounds(), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(5, 3, 15, 18), color.NRGBA{R: 230, G: 40, B: 30, A: 255})
+	fillRect(src, image.Rect(25, 3, 35, 18), color.NRGBA{R: 230, G: 40, B: 30, A: 255})
+
+	tests := []struct {
+		name       string
+		background AnimationBackgroundOptions
+	}{
+		{name: "auto matte", background: AnimationBackgroundOptions{MatteColor: "  auto  "}},
+		{name: "explicit matte", background: AnimationBackgroundOptions{MatteColor: "#00ff00"}},
+		{
+			name: "border connected",
+			background: AnimationBackgroundOptions{
+				MatteColor:          "#00ff00",
+				BorderConnectedOnly: true,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+				Columns: 2, Rows: 1,
+				FrameWidth: 24, FrameHeight: 24,
+				Background: &test.background,
+			})
+			if err != nil {
+				t.Fatalf("normalize animation background: %v", err)
+			}
+			if result.Report.BackgroundRemovalReport == nil {
+				t.Fatal("expected background removal report")
+			}
+			for index, frame := range result.Frames {
+				if frame.ContentBounds == nil {
+					t.Fatalf("frame %d has no visible content", index)
+				}
+			}
+		})
+	}
+
+	_, _, err := removeAnimationBackground(src, AnimationBackgroundOptions{MatteColor: "invalid-color"})
+	if err == nil || !strings.Contains(err.Error(), "parse animation matte color") {
+		t.Fatalf("expected matte parsing error, got %v", err)
 	}
 }

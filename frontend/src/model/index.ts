@@ -11,9 +11,12 @@ export {
   getAnimationFrameDuration,
   getEffectiveAnimationFps,
   getDefaultAssetCanvasSize,
+  getTilesetCandidateItemIds,
   getCoreTilesetCandidateItemIds,
   recordQueryOptions,
+  toSpriteContentCandidate,
   toCoreSpriteCandidateRecord,
+  toTilesetContentCandidate,
   toCoreTilesetCandidateRecord,
   describeAssetRecordChanges,
   useAddAudioTrackMutation,
@@ -25,6 +28,7 @@ export {
   useGenerateAudioVariationMutation,
   useRecordQuery,
   useSaveAssetRevisionMutation,
+  useRollbackAssetRecordMutation,
   useUpdateAudioTrackMutation,
 } from "./asset";
 export type {
@@ -42,6 +46,11 @@ export type {
   AssetRevision,
   AssetRevisionStatus,
   AssetCanvasPosition,
+  AssetAttributes,
+  AssetRecordState,
+  AssetSnapshot,
+  AssetSnapshotForKind,
+  EditableAssetContent,
   AssetDirection,
   AssetRecord,
   AssetWorkspaceApi,
@@ -80,6 +89,13 @@ export type {
 } from "./asset";
 export type { ItemTile } from "./item-tile";
 export { coreAssetApi } from "./asset/library/asset.api";
+export { coreExportApi, useAssetExport } from "./export";
+export type {
+  AssetExportResponse,
+  AssetExportState,
+  CreateAssetExportRequest,
+  CreateAssetExportResponse,
+} from "./export";
 export type {
   AssetAnimationFrameResponse,
   AssetAnimationResponse,
@@ -87,6 +103,8 @@ export type {
   AssetContent,
   AssetContentByType,
   AssetContentMetadata,
+  BackendSpriteContent,
+  BackendSpriteContentPatch,
   CoreSpriteAssetContent,
   CoreSpriteAssetContentPatch,
   AssetDetailResponse,

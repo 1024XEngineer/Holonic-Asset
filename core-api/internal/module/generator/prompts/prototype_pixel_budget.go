@@ -7,20 +7,13 @@ import (
 )
 
 // prototypeLogicalPixelRules tells the image model about the final sprite grid,
-// not just the much larger provider canvas. Post-processing keeps the shared
-// animation safety margin, so the visible subject has a smaller real
-// pixel budget than the nominal output dimensions.
+// not just the much larger provider canvas. Prototype generation uses the full
+// logical canvas; independent animation frames provide movement space.
 func prototypeLogicalPixelRules(dimensions assetdomain.Size, subject string) string {
 	width, height := int(dimensions.Width), int(dimensions.Height)
-	margin := max(1, min(width, height)*3/16)
-	innerWidth := max(1, width-2*margin)
-	innerHeight := max(1, height-2*margin)
-
-	// Detail tiering must follow the drawable logical grid. A nominal 32x32
-	// prototype with the canonical animation margin is actually a 20x20 sprite;
-	// treating it as a 32px sprite encourages detail that cannot survive
-	// final-size reduction.
-	tierRule := logicalPixelTierRule(innerWidth, innerHeight, subject)
+	// Detail tiering follows the complete prototype grid. The prototype no longer
+	// reserves animation padding inside its own canvas.
+	tierRule := logicalPixelTierRule(width, height, subject)
 	subjectRule := `- Express identifying materials and construction using a few high-contrast color clusters rather than fine texture.
 - If the object depends on internal linework such as a structural division, opening, rim, spoke, panel boundary, or seam, keep only the indispensable identity-bearing paths. Draw each retained path as one simplified, continuous, consistently coloured logical-pixel line. Do not render it as broken dots, doubled parallel bands, several antialiased shades, or a thick stripe.
 - For an elongated object such as a weapon, tool, pole, staff, spear, rod, banner, or other long prop, do not compress the whole design into a thin centred line or fit it into a square silhouette. Use the available drawable area along its long axis, keep the complete functional end and the grip/shaft as one connected readable silhouette, and simplify ornaments before shrinking the main form. Reserve enough short-axis pixels for the functional end to remain unmistakable.`
@@ -37,14 +30,14 @@ func prototypeLogicalPixelRules(dimensions assetdomain.Size, subject string) str
 
 	return fmt.Sprintf(`Final logical-pixel budget:
 - Design each direction view for an actual final canvas of %d x %d pixels, not for the provider's high-resolution render canvas.
-- Post-processing crops the visible subject and fits it into at most %d x %d drawable logical pixels while retaining the fixed %d-pixel safety margin used by prototype and animation frames. Do not add extra padding to imitate this margin.
-- Choose complexity from the %d x %d drawable region, not from the nominal %d x %d canvas. Details that only look readable on the provider's large render will be destroyed during final-size reduction.
+- Use the full %d x %d logical prototype canvas. Do not reserve internal padding for animation; animation movement space is supplied by a separate, larger frame canvas.
+- Choose complexity from this %d x %d logical grid. Details that only look readable on the provider's large render will be destroyed during final-size reduction.
 - Treat every final logical pixel as one deliberate square color block. Keep a uniform logical pixel grid across the entire subject.
 - Every important feature must survive on that final grid as whole pixels. Do not invent lines, highlights, facial marks, texture, or gaps thinner than one final logical pixel; make defining features at least two logical pixels wide where the budget permits.
 - Use flat color clusters with hard boundaries and strong value separation. Do not encode form through smooth shading, internal gradients, transparency fades, or high-resolution micro-detail that will be averaged away.
 %s
 %s
-%s`, width, height, innerWidth, innerHeight, margin, innerWidth, innerHeight, width, height, smallCanvasRule, subjectRule, tierRule)
+%s`, width, height, width, height, width, height, smallCanvasRule, subjectRule, tierRule)
 }
 
 func logicalPixelTierRule(width, height int, subject string) string {

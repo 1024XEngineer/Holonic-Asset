@@ -96,7 +96,7 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 
 			// 1. Live layer planning
 			t.Logf("[%s] Calling real QNA LLM planSceneryLayers for %q...", tc.name, tc.assetName)
-			plan, err := exec.planSceneryLayers(ctx, payload)
+			plan, err := exec.planSceneryLayers(ctx, payload, "")
 			if err != nil {
 				t.Fatalf("[%s] live planSceneryLayers failed: %v", tc.name, err)
 			}
@@ -124,10 +124,11 @@ func TestLiveSceneryPlanningAndLayoutWithRealLLM(t *testing.T) {
 
 			// 3. Live layout analysis
 			t.Logf("[%s] Calling real QNA LLM analyzeSceneryLayout...", tc.name)
-			laidOut, err := exec.analyzeSceneryLayout(ctx, payload, processedLayers)
+			approved, notes, laidOut, err := exec.analyzeSceneryLayout(ctx, payload, processedLayers)
 			if err != nil {
 				t.Fatalf("[%s] live analyzeSceneryLayout failed: %v", tc.name, err)
 			}
+			t.Logf("[%s] layout review decision: approved=%v, notes=%q", tc.name, approved, notes)
 			if len(laidOut) != len(processedLayers) {
 				t.Fatalf("[%s] laidOut count %d != processedLayers count %d", tc.name, len(laidOut), len(processedLayers))
 			}
@@ -246,7 +247,7 @@ func TestLiveSceneryFullGenerationReal16x9(t *testing.T) {
 	}
 
 	t.Logf("=== Step 1: Planning Scenery Layers (1536x1024, 16:9) ===")
-	plan, err := exec.planSceneryLayers(ctx, payload)
+	plan, err := exec.planSceneryLayers(ctx, payload, "")
 	if err != nil {
 		t.Fatalf("plan scenery layers failed: %v", err)
 	}
@@ -263,10 +264,11 @@ func TestLiveSceneryFullGenerationReal16x9(t *testing.T) {
 	t.Logf("Generated %d processed layers successfully", len(layers))
 
 	t.Logf("=== Step 3: Analyzing Scenery Layout (Gemini Multimodal) ===")
-	laidOut, err := exec.analyzeSceneryLayout(ctx, payload, layers)
+	approved, reviewNotes, laidOut, err := exec.analyzeSceneryLayout(ctx, payload, layers)
 	if err != nil {
 		t.Fatalf("analyze scenery layout failed: %v", err)
 	}
+	t.Logf("Layout review decision: approved=%v, notes=%q", approved, reviewNotes)
 
 	outDir := t.TempDir()
 

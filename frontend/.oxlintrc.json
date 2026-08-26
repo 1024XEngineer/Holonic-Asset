@@ -104,6 +104,22 @@
               }
             ]
           }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "document",
+            "message": "Model modules must not access the document; move browser effects to the UI layer."
+          },
+          {
+            "object": "window",
+            "allowProperties": [
+              "localStorage",
+              "addEventListener",
+              "removeEventListener"
+            ],
+            "message": "Model modules may only use window for storage synchronization; move other browser effects to the UI layer."
+          }
         ]
       }
     },

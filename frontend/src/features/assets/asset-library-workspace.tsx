@@ -136,10 +136,13 @@ export function AssetLibraryWorkspace({
 
       <AssetEditDialog
         asset={library.editingAsset}
+        availableTags={library.availableTags}
         error={library.updateError}
         isSaving={library.isUpdatingAsset}
+        onCreateTag={library.createTag}
         onClose={library.closeAssetEditor}
         onSave={library.updateAsset}
+        onUpdateTag={library.updateTag}
         projectId={project.id}
       />
     </>
