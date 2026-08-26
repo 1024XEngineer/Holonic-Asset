@@ -3,11 +3,14 @@ package handler_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
-	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
+	"github.com/labstack/echo/v4"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/dto"
 	"github.com/1024XEngineer/Holonic-Asset/internal/handler"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/upload"
 	domain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
 )
 
@@ -29,6 +32,11 @@ func (s *referenceResolverStub) ResolveReference(_ context.Context, reference st
 }
 
 type projectManagerStub struct {
+	createErr          error
+	createInput        *domain.Project
+	listErr            error
+	deleteErr          error
+	deleteID           uint
 	updateErr          error
 	updateContext      context.Context
 	update             *domain.ProjectUpdate
@@ -38,16 +46,27 @@ type projectManagerStub struct {
 	generatedReference string
 	generateCtx        context.Context
 	detail             *domain.Project
+	detailErr          error
 	projects           []*domain.Project
 }
 
-func (*projectManagerStub) Create(context.Context, *domain.Project) error { return nil }
+func (s *projectManagerStub) Create(_ context.Context, project *domain.Project) error {
+	s.createInput = project
+	if s.createErr != nil {
+		return s.createErr
+	}
+	project.ID = 101
+	return nil
+}
 
 func (s *projectManagerStub) ListByUID(context.Context, uint) ([]*domain.Project, error) {
-	return s.projects, nil
+	return s.projects, s.listErr
 }
 
 func (s *projectManagerStub) GetDetail(context.Context, uint) (*domain.Project, error) {
+	if s.detailErr != nil {
+		return nil, s.detailErr
+	}
 	if s.detail != nil {
 		return s.detail, nil
 	}
@@ -61,12 +80,176 @@ func (s *projectManagerStub) Update(ctx context.Context, update *domain.ProjectU
 	return s.updateErr
 }
 
-func (*projectManagerStub) Delete(context.Context, uint) error { return nil }
+func (s *projectManagerStub) Delete(_ context.Context, id uint) error {
+	s.deleteID = id
+	return s.deleteErr
+}
 
 func (s *projectManagerStub) GenerateReference(ctx context.Context, project *domain.Project) (string, error) {
 	s.generateCtx = ctx
 	s.generate = project
 	return s.generatedReference, s.generateErr
+}
+
+func TestProjectCreate(t *testing.T) {
+	stub := &projectManagerStub{}
+	h := handler.NewProjectHandler(stub)
+
+	req := dto.CreateProjectRequest{
+		UserID:         1,
+		Name:           "New Adventure",
+		GameType:       "RPG",
+		Perspective:    domain.PerspectiveTopDown,
+		TargetPlatform: domain.PlatformTypePC,
+		Description:    "A test game",
+		Reference:      "ref_image",
+		Style:          "16bit",
+	}
+
+	resp, err := h.Create(context.Background(), req)
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if resp.Data.ID != 101 {
+		t.Fatalf("expected project ID 101, got %d", resp.Data.ID)
+	}
+	if stub.createInput == nil || stub.createInput.Name != "New Adventure" {
+		t.Fatalf("unexpected create input: %+v", stub.createInput)
+	}
+}
+
+func TestProjectCreateErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		managerErr error
+		wantStatus int
+	}{
+		{
+			name:       "invalid project",
+			managerErr: domain.ErrInvalidProject,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "untrusted reference",
+			managerErr: upload.ErrUntrustedReference,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid object data",
+			managerErr: upload.ErrInvalidObjectData,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid upload request",
+			managerErr: upload.ErrInvalidUploadRequest,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "project not found",
+			managerErr: domain.ErrProjectNotFound,
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &projectManagerStub{createErr: tt.managerErr}
+			h := handler.NewProjectHandler(stub)
+
+			_, err := h.Create(context.Background(), dto.CreateProjectRequest{})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			var httpErr *echo.HTTPError
+			if errors.As(err, &httpErr) {
+				if httpErr.Code != tt.wantStatus {
+					t.Errorf("got status %d, want %d", httpErr.Code, tt.wantStatus)
+				}
+			} else {
+				t.Fatalf("expected echo.HTTPError, got %v", err)
+			}
+		})
+	}
+}
+
+func TestProjectListByUID(t *testing.T) {
+	stub := &projectManagerStub{
+		projects: []*domain.Project{
+			{ID: 1, UserID: 10, Name: "P1", Reference: "media/p1.png"},
+			{ID: 2, UserID: 10, Name: "P2"},
+		},
+	}
+	resolver := &referenceResolverStub{
+		resolved: map[string]string{
+			"media/p1.png": "https://cdn.example.com/p1.png",
+		},
+	}
+	h := handler.NewProjectHandler(stub, resolver)
+
+	resp, err := h.ListByUID(context.Background(), dto.ListProjectsRequest{UserID: 10})
+	if err != nil {
+		t.Fatalf("list projects: %v", err)
+	}
+	if len(resp.Data.Projects) != 2 {
+		t.Fatalf("expected 2 projects, got %d", len(resp.Data.Projects))
+	}
+	if resp.Data.Projects[0].Reference != "https://cdn.example.com/p1.png" {
+		t.Errorf("expected resolved reference, got %q", resp.Data.Projects[0].Reference)
+	}
+
+	// Manager error
+	wantErr := errors.New("list db error")
+	hErr := handler.NewProjectHandler(&projectManagerStub{listErr: wantErr})
+	_, err = hErr.ListByUID(context.Background(), dto.ListProjectsRequest{UserID: 10})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
+
+	// Resolver error
+	hResolverErr := handler.NewProjectHandler(stub, &referenceResolverStub{err: errors.New("resolve failed")})
+	_, err = hResolverErr.ListByUID(context.Background(), dto.ListProjectsRequest{UserID: 10})
+	if err == nil {
+		t.Fatal("expected resolver error")
+	}
+}
+
+func TestProjectDelete(t *testing.T) {
+	stub := &projectManagerStub{}
+	h := handler.NewProjectHandler(stub)
+
+	resp, err := h.Delete(context.Background(), dto.DeleteProjectRequest{ProjectID: 88})
+	if err != nil {
+		t.Fatalf("delete project: %v", err)
+	}
+	if !resp.Data.Success {
+		t.Fatal("expected success true")
+	}
+	if stub.deleteID != 88 {
+		t.Fatalf("expected delete ID 88, got %d", stub.deleteID)
+	}
+
+	// Not found error
+	hNotFound := handler.NewProjectHandler(&projectManagerStub{deleteErr: domain.ErrProjectNotFound})
+	_, err = hNotFound.Delete(context.Background(), dto.DeleteProjectRequest{ProjectID: 88})
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusNotFound {
+		t.Fatalf("expected echo.HTTPError 404, got %v", err)
+	}
+}
+
+func TestProjectGetDetailErrors(t *testing.T) {
+	hNotFound := handler.NewProjectHandler(&projectManagerStub{detailErr: domain.ErrProjectNotFound})
+	_, err := hNotFound.GetDetail(context.Background(), dto.ProjectDetailRequest{ProjectID: 999})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusNotFound {
+		t.Fatalf("expected echo.HTTPError 404, got %v", err)
+	}
 }
 
 func TestUpdateForwardsOnlyProvidedFields(t *testing.T) {
