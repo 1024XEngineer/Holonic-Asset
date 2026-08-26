@@ -634,9 +634,8 @@ func framesTargetFromPaths(paths []string) (uint, []uint, error) {
 func animationTargetFromPaths(paths []string) (uint, error) {
 	animationIDs := make(map[uint]struct{}, len(paths))
 	for _, path := range paths {
-		parts := strings.SplitN(path, ".", 3)
-		if len(parts) < 2 || parts[0] != "animations" ||
-			strings.HasPrefix(parts[1], "frames.") {
+		parts := strings.Split(path, ".")
+		if len(parts) != 2 || parts[0] != "animations" {
 			return 0, fmt.Errorf("%s does not identify an animation", path)
 		}
 		id64, err := strconv.ParseUint(parts[1], 10, 0)

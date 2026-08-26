@@ -511,7 +511,7 @@ func TestCreateEditAnimationRequiresAssetAndAnimationIDs(t *testing.T) {
 			name:             "invalid animation target path",
 			assetID:          func() *uint { value := uint(9); return &value }(),
 			targetAssetPaths: []string{"prototype"},
-			want:             "prototype does not identify an animation",
+			want:             "does not identify an animation",
 		},
 		{
 			name:             "zero animation target path",
@@ -520,9 +520,15 @@ func TestCreateEditAnimationRequiresAssetAndAnimationIDs(t *testing.T) {
 			want:             "animation id must be positive",
 		},
 		{
-			name:             "frame path for animation edit",
+			name:             "invalid numeric animation target path",
 			assetID:          func() *uint { value := uint(9); return &value }(),
-			targetAssetPaths: []string{"animations.frames.0"},
+			targetAssetPaths: []string{"animations.+2"},
+			want:             "does not identify an animation",
+		},
+		{
+			name:             "descendant path for animation edit",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"animations.2.frames.0"},
 			want:             "does not identify an animation",
 		},
 		{
