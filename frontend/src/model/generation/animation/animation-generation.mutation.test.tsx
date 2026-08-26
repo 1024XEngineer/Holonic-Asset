@@ -65,6 +65,8 @@ function animationInput() {
     direction: "left" as const,
     creativeBrief: "A relaxed walk",
     frameCount: 8,
+    frameWidth: 48,
+    frameHeight: 48,
     fps: 12,
     duration: 5,
   };

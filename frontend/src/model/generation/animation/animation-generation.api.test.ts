@@ -30,6 +30,8 @@ describe("animationGenerationApi", () => {
         direction: "back_left",
         creativeBrief: "A relaxed looping walk with grounded footfalls",
         frameCount: 8,
+        frameWidth: 48,
+        frameHeight: 48,
         fps: 12,
         duration: 5,
       }),
@@ -52,6 +54,8 @@ describe("animationGenerationApi", () => {
         animation_name: "Walk",
         direction: "back_left",
         frame_count: 8,
+        frame_width: 48,
+        frame_height: 48,
         fps: 12,
         duration: 5,
       },
@@ -62,6 +66,32 @@ describe("animationGenerationApi", () => {
       prompt: "A relaxed looping walk with grounded footfalls",
       assetId: "7",
     });
+  });
+
+  it("includes custom frame dimensions in the generation payload", async () => {
+    await animationGenerationApi.generate({
+      projectId: "11",
+      assetId: "7",
+      assetKind: "object",
+      animationName: "Open",
+      direction: "right",
+      creativeBrief: "Open the lid",
+      frameCount: 6,
+      frameWidth: 96,
+      frameHeight: 128,
+      fps: 12,
+      duration: 4,
+    });
+
+    expect(mocks.create).toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({
+        parameters: expect.objectContaining({
+          frame_width: 96,
+          frame_height: 128,
+        }),
+      }),
+    );
   });
 
   it.each([
@@ -77,6 +107,8 @@ describe("animationGenerationApi", () => {
         direction: "right",
         creativeBrief: "Open the lid",
         frameCount: 6,
+        frameWidth: 48,
+        frameHeight: 48,
         fps: 12,
         duration: 4,
       }),

@@ -20,6 +20,8 @@ export const animationGenerationApi: AnimationGenerationApi = {
         animation_name: input.animationName,
         direction: input.direction,
         frame_count: input.frameCount,
+        frame_width: input.frameWidth,
+        frame_height: input.frameHeight,
         fps: input.fps,
         duration: input.duration,
       },

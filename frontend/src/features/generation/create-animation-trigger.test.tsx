@@ -18,6 +18,7 @@ describe("CreateAnimationTrigger", () => {
         <CreateAnimationTrigger
           perspective="Side-On"
           isGenerating={false}
+          prototypeDimensions={{ width: 32, height: 32 }}
           onGenerate={onGenerate}
         >
           {(openDialog) => (
@@ -53,6 +54,8 @@ describe("CreateAnimationTrigger", () => {
       direction: "left",
       creativeBrief: "A relaxed looping walk",
       frameCount: 8,
+      frameWidth: 48,
+      frameHeight: 48,
       fps: 12,
       duration: 5,
     });
@@ -66,6 +69,7 @@ describe("CreateAnimationTrigger", () => {
         <CreateAnimationTrigger
           perspective="Top-Down"
           isGenerating={false}
+          prototypeDimensions={{ width: 64, height: 32 }}
           onGenerate={onGenerate}
         >
           {(openDialog) => (
@@ -89,6 +93,29 @@ describe("CreateAnimationTrigger", () => {
     const duration = screen.getByRole("spinbutton", {
       name: /^Source duration/,
     });
+    const frameWidth = screen.getByRole("spinbutton", {
+      name: /^Frame width/,
+    });
+    const frameHeight = screen.getByRole("spinbutton", {
+      name: /^Frame height/,
+    });
+    expect((frameWidth as HTMLInputElement).value).toBe("96");
+    expect((frameHeight as HTMLInputElement).value).toBe("48");
+    await user.click(frameWidth);
+    fireEvent.change(frameWidth, { target: { value: "" } });
+    expect(
+      screen.getByText(
+        "Enter whole-number dimensions between 32 and 1024 pixels.",
+      ),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Generate animation",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.change(frameWidth, { target: { value: "96" } });
     fireEvent.change(frames, { target: { value: "" } });
     expect(
       (
@@ -100,6 +127,8 @@ describe("CreateAnimationTrigger", () => {
     fireEvent.change(frames, { target: { value: "16" } });
     fireEvent.change(frameRate, { target: { value: "24" } });
     fireEvent.change(duration, { target: { value: "8" } });
+    fireEvent.change(frameWidth, { target: { value: "128" } });
+    fireEvent.change(frameHeight, { target: { value: "80" } });
     await user.click(
       screen.getByRole("button", { name: "Generate animation" }),
     );
@@ -109,6 +138,8 @@ describe("CreateAnimationTrigger", () => {
       direction: "back",
       creativeBrief: "A fast run",
       frameCount: 16,
+      frameWidth: 128,
+      frameHeight: 80,
       fps: 24,
       duration: 8,
     });
@@ -122,6 +153,7 @@ describe("CreateAnimationTrigger", () => {
         <CreateAnimationTrigger
           perspective="Side-On"
           isGenerating
+          prototypeDimensions={{ width: 32, height: 32 }}
           onGenerate={onGenerate}
         >
           {(openDialog) => (
