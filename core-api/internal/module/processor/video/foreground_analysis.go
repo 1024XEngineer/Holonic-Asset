@@ -9,7 +9,8 @@ import (
 
 func (key ChromaKey) valid() bool {
 	return key.HueMax >= key.HueMin && key.HighSaturationMin > 0 && key.HighValueMin > 0 &&
-		key.BrightSaturationMin > 0 && key.BrightValueMin > 0
+		key.BrightSaturationMin > 0 && key.BrightValueMin > 0 &&
+		key.SafetyMarginRatio >= 0 && key.SafetyMarginRatio < .5
 }
 
 func (key ChromaKey) matches(value color.NRGBA) bool {
@@ -29,8 +30,8 @@ func validateSelectedFrameBounds(frames []image.Image, sourceIndices []int, chro
 		if !ok {
 			return &QualityError{Kind: "foreground", Message: fmt.Sprintf("video: frame %d has no detectable foreground outside the configured chroma key", sourceIndex)}
 		}
-		if !boundsInsideSafetyBand(frame, bounds) {
-			return &QualityError{Kind: "framing", Message: fmt.Sprintf("video: foreground content enters the outer 2.5%% safety band in source frame %d", sourceIndex)}
+		if !boundsInsideSafetyBand(frame, bounds, chromaKey.SafetyMarginRatio) {
+			return &QualityError{Kind: "framing", Message: fmt.Sprintf("video: foreground content enters the configured edge safety band in source frame %d", sourceIndex)}
 		}
 	}
 	return nil
@@ -45,8 +46,8 @@ func validateFrameBoundsAtIndices(frames []image.Image, indices []int, chromaKey
 		if !ok {
 			return &QualityError{Kind: "foreground", Message: fmt.Sprintf("video: frame %d has no detectable foreground outside the configured chroma key", sourceIndex)}
 		}
-		if !boundsInsideSafetyBand(frames[sourceIndex], bounds) {
-			return &QualityError{Kind: "framing", Message: fmt.Sprintf("video: foreground content enters the outer 2.5%% safety band in source frame %d", sourceIndex)}
+		if !boundsInsideSafetyBand(frames[sourceIndex], bounds, chromaKey.SafetyMarginRatio) {
+			return &QualityError{Kind: "framing", Message: fmt.Sprintf("video: foreground content enters the configured edge safety band in source frame %d", sourceIndex)}
 		}
 	}
 	return nil
@@ -54,16 +55,21 @@ func validateFrameBoundsAtIndices(frames []image.Image, indices []int, chromaKey
 
 func frameInsideSafetyBand(frame image.Image, chromaKey ChromaKey) bool {
 	bounds, ok := foregroundBounds(frame, chromaKey)
-	return ok && boundsInsideSafetyBand(frame, bounds)
+	return ok && boundsInsideSafetyBand(frame, bounds, chromaKey.SafetyMarginRatio)
 }
 
-func boundsInsideSafetyBand(frame image.Image, foreground image.Rectangle) bool {
+func boundsInsideSafetyBand(frame image.Image, foreground image.Rectangle, marginRatio float64) bool {
 	frameBounds := frame.Bounds()
-	margin := maxInt(4, int(math.Round(float64(minInt(frameBounds.Dx(), frameBounds.Dy()))*.025)))
-	return foreground.Min.X > frameBounds.Min.X+margin &&
-		foreground.Min.Y > frameBounds.Min.Y+margin &&
-		foreground.Max.X < frameBounds.Max.X-margin &&
-		foreground.Max.Y < frameBounds.Max.Y-margin
+	minimumMargin := 1
+	if marginRatio == 0 {
+		marginRatio = .025
+		minimumMargin = 4
+	}
+	margin := maxInt(minimumMargin, int(math.Round(float64(minInt(frameBounds.Dx(), frameBounds.Dy()))*marginRatio)))
+	return foreground.Min.X >= frameBounds.Min.X+margin &&
+		foreground.Min.Y >= frameBounds.Min.Y+margin &&
+		foreground.Max.X <= frameBounds.Max.X-margin &&
+		foreground.Max.Y <= frameBounds.Max.Y-margin
 }
 
 func foregroundBounds(source image.Image, chromaKey ChromaKey) (image.Rectangle, bool) {

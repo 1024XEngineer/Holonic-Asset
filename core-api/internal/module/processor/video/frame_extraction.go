@@ -43,6 +43,9 @@ type ChromaKey struct {
 	BrightValueMin      uint8
 	// AutoDetect derives the matte hue from frame corners before analysis.
 	AutoDetect bool
+	// SafetyMarginRatio controls the clear border required around detected
+	// foreground. Zero preserves the legacy 2.5% safety band.
+	SafetyMarginRatio float64
 }
 
 // FrameSelector chooses source-frame indices from domain-neutral observations.

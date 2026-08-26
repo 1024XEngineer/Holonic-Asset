@@ -60,8 +60,11 @@ type SplitImageRequest struct {
 	// RenderScale renders animation frames on a supersampled intermediate
 	// canvas. The caller can then reduce those frames once with the final
 	// pixel-art resampler instead of hardening an already tiny silhouette.
-	RenderScale              int             `json:"render_scale,omitempty"`
-	Margin                   int             `json:"margin,omitempty"`
+	RenderScale int `json:"render_scale,omitempty"`
+	Margin      int `json:"margin,omitempty"`
+	// UseExactMargin distinguishes an intentional zero margin from the legacy
+	// omitted-margin behavior, which applies a small proportional default.
+	UseExactMargin           bool            `json:"use_exact_margin,omitempty"`
 	CropPadding              int             `json:"crop_padding,omitempty"`
 	Anchor                   AnimationAnchor `json:"anchor,omitempty"`
 	PreserveHorizontalMotion bool            `json:"preserve_horizontal_motion,omitempty"`
@@ -81,6 +84,11 @@ type SplitImageRequest struct {
 	// the sequence-wide foreground union to the target frame, so differences in
 	// individual frame extents can change apparent foreground scale.
 	PreserveSourceCellScale bool `json:"preserve_source_cell_scale,omitempty"`
+	// SourceCellScaleMultiplier applies one sequence-wide scale on top of the
+	// preserved source-cell transform. It is used when a provider framing retry
+	// deliberately reduces the subject inside a larger reference canvas.
+	// Zero means 1.0 and the value is only valid with PreserveSourceCellScale.
+	SourceCellScaleMultiplier float64 `json:"source_cell_scale_multiplier,omitempty"`
 	// CenterContent is a static-prototype postcondition. It moves each
 	// rendered foreground bbox to the centre of its fixed frame without
 	// changing scale or shape. It must not be enabled for animation frames
@@ -328,18 +336,20 @@ func splitAnimation(input *image.NRGBA, request SplitImageRequest, threshold uin
 		Columns: request.Columns, Rows: request.Rows, FrameCount: request.FrameCount,
 		FrameWidth: request.FrameWidth, FrameHeight: request.FrameHeight,
 		RenderScale: request.RenderScale,
-		Margin:      request.Margin, CropPadding: request.CropPadding,
+		Margin:      request.Margin, UseExactMargin: request.UseExactMargin,
+		CropPadding:    request.CropPadding,
 		AlphaThreshold: request.AlphaThreshold, Anchor: request.Anchor,
-		PreserveHorizontalMotion: request.PreserveHorizontalMotion,
-		PreserveVerticalMotion:   request.PreserveVerticalMotion,
-		NormalizeContentScale:    request.NormalizeContentScale,
-		NormalizeContentArea:     request.NormalizeContentArea,
-		PreserveSourceCellScale:  request.PreserveSourceCellScale,
-		CenterContent:            request.CenterContent,
-		MaxStabilizationShift:    request.MaxStabilizationShift,
-		DetectGridBounds:         request.DetectGridBounds && !request.ForceProportionalGrid,
-		AllowEmptyFrames:         request.AllowEmptyRegions,
-		Background:               background,
+		PreserveHorizontalMotion:  request.PreserveHorizontalMotion,
+		PreserveVerticalMotion:    request.PreserveVerticalMotion,
+		NormalizeContentScale:     request.NormalizeContentScale,
+		NormalizeContentArea:      request.NormalizeContentArea,
+		PreserveSourceCellScale:   request.PreserveSourceCellScale,
+		SourceCellScaleMultiplier: request.SourceCellScaleMultiplier,
+		CenterContent:             request.CenterContent,
+		MaxStabilizationShift:     request.MaxStabilizationShift,
+		DetectGridBounds:          request.DetectGridBounds && !request.ForceProportionalGrid,
+		AllowEmptyFrames:          request.AllowEmptyRegions,
+		Background:                background,
 	})
 	if err != nil {
 		return nil, err

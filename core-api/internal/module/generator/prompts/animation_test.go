@@ -21,7 +21,11 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 		"complete follow-through and recovery",
 		"strict temporal order",
 		"do not map it to a generic motion preset",
-		"maintain at least 15% uninterrupted empty space",
+		"keep full-frame reference scale/root exactly",
+		"matte border is movement room",
+		"never resize the subject to force margins",
+		"spray, projectiles, particles, trails, glow, and shadows",
+		"inside a visible matte edge",
 		"pure green #00FF00 by default",
 		"pure magenta #FF00FF only when the subject contains substantial colours close to pure green",
 		"never recolour, desaturate, gray out, or remove green subject pixels",
@@ -34,6 +38,53 @@ func TestBuildAnimationVideoPreservesSemanticActionWithoutClassification(t *test
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("prompt does not contain %q:\n%s", expected, prompt)
+		}
+	}
+}
+
+func TestBuildAnimationVideoDescribesIndependentFrameCanvasWithoutRescaling(t *testing.T) {
+	prompt := BuildAnimationVideo(AnimationOptions{
+		Description:     "hero",
+		Action:          "wide sword swing",
+		FrameCount:      8,
+		PrototypeWidth:  32,
+		PrototypeHeight: 48,
+		FrameWidth:      64,
+		FrameHeight:     72,
+	})
+	for _, expected := range []string{
+		"prototype 32x48 -> frame 64x72",
+		"keep reference scale/root exactly",
+		"matte border is movement room",
+		"never resize the subject",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("prompt does not contain %q:\n%s", expected, prompt)
+		}
+	}
+	for _, unexpected := range []string{"inner 70%", "at least 15%", "inner 64%", "at least 18%"} {
+		if strings.Contains(prompt, unexpected) {
+			t.Fatalf("prompt still imposes fixed framing %q:\n%s", unexpected, prompt)
+		}
+	}
+}
+
+func TestAnimationVideoFramingRetryPreservesConfiguredSubjectScale(t *testing.T) {
+	retry := BuildAnimationVideoRetry("base", "framing")
+	for _, expected := range []string{
+		"preserve the exact subject scale, root placement, and existing matte border",
+		"use the existing matte border as movement room",
+		"never invent an arbitrary percentage margin by resizing the subject",
+		"projectiles, liquid, spray, particles, trails, glow, and shadows",
+		"thin continuous matte line visible at every canvas edge",
+	} {
+		if !strings.Contains(retry, expected) {
+			t.Fatalf("framing retry does not contain %q: %s", expected, retry)
+		}
+	}
+	for _, unexpected := range []string{"inner 64%", "at least 18%", "preserve the smaller scale"} {
+		if strings.Contains(retry, unexpected) {
+			t.Fatalf("framing retry still imposes fixed framing %q: %s", unexpected, retry)
 		}
 	}
 }

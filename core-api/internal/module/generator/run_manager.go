@@ -401,6 +401,8 @@ func buildTaskPayload(request *Request) (any, error) {
 			AnimationName string `json:"animation_name"`
 			Direction     string `json:"direction"`
 			FrameCount    int    `json:"frame_count,omitempty"`
+			FrameWidth    int    `json:"frame_width,omitempty"`
+			FrameHeight   int    `json:"frame_height,omitempty"`
 			FPS           int    `json:"fps,omitempty"`
 			Resolution    string `json:"resolution,omitempty"`
 			Duration      int    `json:"duration,omitempty"`
@@ -414,6 +416,8 @@ func buildTaskPayload(request *Request) (any, error) {
 			Direction:     parameters.Direction,
 			CreativeBrief: request.CreativeBrief,
 			FrameCount:    parameters.FrameCount,
+			FrameWidth:    parameters.FrameWidth,
+			FrameHeight:   parameters.FrameHeight,
 			FPS:           parameters.FPS,
 			Resolution:    parameters.Resolution,
 			Duration:      parameters.Duration,
