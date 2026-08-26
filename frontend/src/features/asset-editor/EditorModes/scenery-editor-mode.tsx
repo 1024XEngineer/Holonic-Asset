@@ -6,6 +6,7 @@ import {
   useSceneryCanvasStateMachine,
 } from "../Canvas/SceneryCanvas";
 import { Inspector } from "../Inspector/inspector";
+import { downloadAssetExport } from "../download-asset-export";
 import { EditorModeFrame } from "./editor-mode-frame";
 
 export type SceneryEditorModeProps = {
@@ -27,7 +28,8 @@ export function SceneryEditorMode({ data, onBack }: SceneryEditorModeProps) {
     const assetId = Number(asset.id);
     if (!Number.isSafeInteger(assetId) || assetId <= 0) return;
     try {
-      await exportAsset(assetId);
+      const result = await exportAsset(assetId);
+      if (result) downloadAssetExport(result);
     } catch {
       // The export hook exposes the failure state for the header lifecycle.
     }

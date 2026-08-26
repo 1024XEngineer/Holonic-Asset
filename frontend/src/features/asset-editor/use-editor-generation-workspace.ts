@@ -13,6 +13,7 @@ import type {
 import { useAssetExport } from "@/model";
 
 import { getEditorStatus } from "./editor-status";
+import { downloadAssetExport } from "./download-asset-export";
 import { useEditorSession } from "./state";
 
 type EditorGenerationWorkspaceInput<Content> = {
@@ -122,7 +123,9 @@ export function useEditorGenerationWorkspace<Content>({
     }
 
     try {
-      await assetExport.exportAsset(assetId);
+      const result = await assetExport.exportAsset(assetId);
+      if (!result) return;
+      downloadAssetExport(result);
       reportAction("Export ready");
     } catch {
       reportAction("Export failed");

@@ -30,21 +30,19 @@ afterEach(() => {
 });
 
 describe("useAssetExport", () => {
-  it("creates, polls, and downloads a completed export", async () => {
+  it("creates, polls, and returns a completed export", async () => {
     const result = completedExport();
     mocks.create.mockResolvedValue({ exportId: 12 });
     mocks.get.mockResolvedValueOnce({ ...result, status: "processing" });
     mocks.get.mockResolvedValue(result);
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click");
     const { result: hook } = renderHook(() => useAssetExport());
 
     const exportPromise = startExport(hook, 9, 2_000);
-    await expect(exportPromise).resolves.toBeUndefined();
+    await expect(exportPromise).resolves.toEqual(result);
 
     expect(mocks.create).toHaveBeenCalledWith({ assetId: 9 });
     expect(mocks.get).toHaveBeenNthCalledWith(1, 12);
     expect(mocks.get).toHaveBeenNthCalledWith(2, 12);
-    expect(click).toHaveBeenCalledOnce();
     expect(hook.current.state).toEqual({ phase: "completed", result });
     expect(hook.current.isExporting).toBe(false);
   });

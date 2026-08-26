@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
 import { coreExportApi } from "./export.api";
-import type { AssetExportResponse, AssetExportState } from "./export.contract";
+import type { AssetExportState } from "./export.contract";
 
 const EXPORT_POLL_INTERVAL_MS = 1_000;
 
@@ -25,8 +25,8 @@ export function useAssetExport() {
         operationRef,
       );
       if (operation !== operationRef.current) return;
-      downloadExport(result);
       setState({ phase: "completed", result });
+      return result;
     } catch (error) {
       if (operation !== operationRef.current) return;
       setState({ phase: "failed", message: getExportErrorMessage(error) });
@@ -68,16 +68,6 @@ async function waitForExport(
       throw new Error(result.error || "Export failed.");
     }
   }
-}
-
-function downloadExport(result: AssetExportResponse) {
-  const link = document.createElement("a");
-  link.href = result.downloadUrl!;
-  link.download = result.fileName || "asset-export.zip";
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 function delay(milliseconds: number) {
