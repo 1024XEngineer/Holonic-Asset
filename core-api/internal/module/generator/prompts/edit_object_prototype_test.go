@@ -32,7 +32,7 @@ func TestEditObjectPrototypeDefinesReferenceRolesAndEditScopes(t *testing.T) {
 		"change only the chest trim to silver",
 		"Top-Down",
 		"<asset_dimensions>\n{\"width\":48,\"height\":48}\n</asset_dimensions>",
-		"at most 30 x 30 drawable logical pixels",
+		"Use the full 48 x 48 logical prototype canvas",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected object edit prompt to contain %q: %s", expected, prompt)

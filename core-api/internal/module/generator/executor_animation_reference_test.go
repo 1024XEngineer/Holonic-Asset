@@ -205,7 +205,7 @@ func (s *animRefProcessorStub) SplitImage(context.Context, *imageprocessor.Split
 func TestPrepareAnimationReferencePreparedImage(t *testing.T) {
 	svc := &animationGenerationService{}
 	t.Run("decode prepared failure", func(t *testing.T) {
-		_, err := svc.prepareAnimationReference(context.Background(), "not-base64", true)
+		_, err := svc.prepareAnimationReference(context.Background(), "not-base64", true, 32, 32, 48, 48)
 		if err == nil {
 			t.Fatal("expected error decoding malformed prepared reference")
 		}
@@ -213,7 +213,7 @@ func TestPrepareAnimationReferencePreparedImage(t *testing.T) {
 
 	t.Run("valid prepared image", func(t *testing.T) {
 		validB64 := createTestPNG(32, 32, nil)
-		res, err := svc.prepareAnimationReference(context.Background(), validB64, true)
+		res, err := svc.prepareAnimationReference(context.Background(), validB64, true, 32, 32, 48, 48)
 		if err != nil || res == "" {
 			t.Fatalf("unexpected error for valid prepared reference: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestPrepareGreenReferenceProcessorErrors(t *testing.T) {
 	t.Run("remove background failure", func(t *testing.T) {
 		proc := &animRefProcessorStub{removeErr: errors.New("bg remove error")}
 		svc := &animationGenerationService{processor: proc}
-		_, err := svc.prepareGreenReference(context.Background(), opaqueB64)
+		_, err := svc.prepareGreenReference(context.Background(), opaqueB64, 32, 32, 48, 48)
 		if err == nil || !strings.Contains(err.Error(), "remove animation reference background") {
 			t.Fatalf("expected remove bg error, got %v", err)
 		}
@@ -241,7 +241,7 @@ func TestPrepareGreenReferenceProcessorErrors(t *testing.T) {
 	t.Run("remove background empty result", func(t *testing.T) {
 		proc := &animRefProcessorStub{removeResult: &imageprocessor.RemoveBackgroundResult{ImageBase64: ""}}
 		svc := &animationGenerationService{processor: proc}
-		_, err := svc.prepareGreenReference(context.Background(), opaqueB64)
+		_, err := svc.prepareGreenReference(context.Background(), opaqueB64, 32, 32, 48, 48)
 		if err == nil || !strings.Contains(err.Error(), "empty result") {
 			t.Fatalf("expected empty result error, got %v", err)
 		}
@@ -253,7 +253,7 @@ func TestPrepareGreenReferenceProcessorErrors(t *testing.T) {
 			resizeErr:    errors.New("resize error"),
 		}
 		svc := &animationGenerationService{processor: proc}
-		_, err := svc.prepareGreenReference(context.Background(), opaqueB64)
+		_, err := svc.prepareGreenReference(context.Background(), opaqueB64, 32, 32, 48, 48)
 		if err == nil || !strings.Contains(err.Error(), "normalize animation reference") {
 			t.Fatalf("expected normalize reference error, got %v", err)
 		}

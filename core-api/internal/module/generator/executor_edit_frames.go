@@ -87,6 +87,16 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		)
 	}
 	generation := animation.Generation
+	dimensions, err := animationFrameDimensions(asset)
+	if err != nil {
+		return nil, err
+	}
+	frameWidth, frameHeight, err := resolveAnimationFrameDimensions(
+		dimensions, generation.FrameWidth, generation.FrameHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
 	description := strings.TrimSpace(asset.Description)
 	if description == "" {
 		description = strings.TrimSpace(asset.Name)
@@ -126,8 +136,8 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		// samples in the original animation.
 		FrameCount:  contextCount,
 		Columns:     min(contextCount, 4),
-		FrameWidth:  generation.FrameWidth,
-		FrameHeight: generation.FrameHeight,
+		FrameWidth:  frameWidth,
+		FrameHeight: frameHeight,
 		FPS:         generation.FPS,
 		Resolution:  generation.Resolution,
 		Duration:    generation.Duration,
@@ -166,6 +176,8 @@ func (e *executor) editFrames(ctx context.Context, payload EditFramesPayload) (j
 		generatedFrames = append(generatedFrames, persisted)
 	}
 
+	generation.FrameWidth = frameWidth
+	generation.FrameHeight = frameHeight
 	animation.Frames = updated
 	encoded, err := assetdomain.EncodeContent(assetdomain.AssetContent{
 		Animations: []assetdomain.Animation{animation},

@@ -42,10 +42,10 @@ func TestCharacterPrototypeIncludesFullBodyStyleAndDirectionLayout(t *testing.T)
 		"Side-On",
 		"<direction_count>\n2\n</direction_count>",
 		"<asset_dimensions>\n{\"width\":48,\"height\":64}\n</asset_dimensions>",
-		"at most 30 x 46 drawable logical pixels",
-		"fixed 9-pixel safety margin",
+		"Use the full 48 x 64 logical prototype canvas",
+		"Do not reserve internal padding for animation",
 		"face symbolic and readable",
-		"small character with 30 x 46 drawable logical pixels",
+		"medium-size character with 48 x 64 drawable logical pixels",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected character prompt to contain %q: %s", expected, prompt)
@@ -107,13 +107,11 @@ func TestCharacterPrototypeAdaptsRulesToLogicalPixelBudget(t *testing.T) {
 		dimensions assetdomain.Size
 		want       string
 	}{
-		{name: "16px nominal / 10px drawable", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "emblem-scale character with only 10 x 10 drawable logical pixels"},
-		{name: "32px nominal / 20px drawable", dimensions: assetdomain.Size{Width: 32, Height: 32}, want: "ultra-small character with only 20 x 20 drawable logical pixels"},
-		{name: "48x64 nominal / 30x46 drawable", dimensions: assetdomain.Size{Width: 48, Height: 64}, want: "small character with 30 x 46 drawable logical pixels"},
-		{name: "64px nominal / 40px drawable", dimensions: assetdomain.Size{Width: 64, Height: 64}, want: "small character with 40 x 40 drawable logical pixels"},
-		{name: "128px nominal / 80px drawable", dimensions: assetdomain.Size{Width: 128, Height: 128}, want: "medium-size character with 80 x 80 drawable logical pixels"},
-		{name: "256px nominal / 160px drawable", dimensions: assetdomain.Size{Width: 256, Height: 256}, want: "character has 160 x 160 drawable logical pixels: permit more material"},
-		{name: "512px nominal / 320px drawable", dimensions: assetdomain.Size{Width: 512, Height: 512}, want: "Even at this larger drawable target, construct the character from deliberate coarse pixel clusters"},
+		{name: "16px full canvas", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "ultra-small character with only 16 x 16 drawable logical pixels"},
+		{name: "32px full canvas", dimensions: assetdomain.Size{Width: 32, Height: 32}, want: "small character with 32 x 32 drawable logical pixels"},
+		{name: "48x64 full canvas", dimensions: assetdomain.Size{Width: 48, Height: 64}, want: "medium-size character with 48 x 64 drawable logical pixels"},
+		{name: "64px full canvas", dimensions: assetdomain.Size{Width: 64, Height: 64}, want: "medium-size character with 64 x 64 drawable logical pixels"},
+		{name: "128px full canvas", dimensions: assetdomain.Size{Width: 128, Height: 128}, want: "This character has 128 x 128 drawable logical pixels"},
 	}
 
 	for _, test := range tests {
@@ -132,7 +130,7 @@ func TestCharacterPrototypeAdaptsRulesToLogicalPixelBudget(t *testing.T) {
 	}
 }
 
-func TestCharacterPrototypeMakesNominal32pxCharacterUseUltraSmallDetailBudget(t *testing.T) {
+func TestCharacterPrototypeMakes32pxCharacterUseSmallDetailBudget(t *testing.T) {
 	prompt := prompts.CharacterPrototype(
 		"player character",
 		"Top-Down",
@@ -142,19 +140,10 @@ func TestCharacterPrototypeMakesNominal32pxCharacterUseUltraSmallDetailBudget(t 
 	)
 
 	for _, expected := range []string{
-		"Choose complexity from the 20 x 20 drawable region, not from the nominal 32 x 32 canvas",
+		"Choose complexity from this 32 x 32 logical grid",
 		"The requested final canvas has a short edge of 32 pixels or less",
-		"ultra-small character with only 20 x 20 drawable logical pixels",
-		"few large connected regions",
-		"6-8 visually distinct color roles",
-		"narrower than three logical pixels",
-		"silhouette readability overrides anatomical separation",
-		"at most one broad shadow or highlight cluster",
-		"Avoid scattered single-pixel highlights",
-		"at most one or two intentional high-contrast marks",
-		"Avoid one-pixel-wide torsos or limbs",
-		"especially in side views",
-		"distinguished primarily by silhouette and large color placement",
+		"small character with 32 x 32 drawable logical pixels",
+		"prioritize silhouette, head/body separation, and a few broad identity accents",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected 32px character prompt to contain %q: %s", expected, prompt)

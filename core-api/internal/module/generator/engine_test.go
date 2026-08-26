@@ -319,7 +319,7 @@ func TestCreateDerivesAnimationStyleAndRejectsRemovedParameters(t *testing.T) {
 			AssetID:       &assetID,
 			Kind:          generator.GenerateAnimation,
 			CreativeBrief: "walk",
-			Parameters:    json.RawMessage(`{"animation_name":"hero walk","direction":"front","frame_count":10}`),
+			Parameters:    json.RawMessage(`{"animation_name":"hero walk","direction":"front","frame_count":10,"frame_width":48,"frame_height":56}`),
 		})
 		if err != nil {
 			t.Fatalf("create generation: %v", err)
@@ -328,12 +328,12 @@ func TestCreateDerivesAnimationStyleAndRejectsRemovedParameters(t *testing.T) {
 		if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
 			t.Fatal(err)
 		}
-		if payload.Style != " clean pixel art " || projects.calls != 1 {
+		if payload.Style != " clean pixel art " || payload.FrameWidth != 48 || payload.FrameHeight != 56 || projects.calls != 1 {
 			t.Fatalf("animation style was not inherited: payload=%+v calls=%d", payload, projects.calls)
 		}
 	})
 
-	for _, field := range []string{"style", "columns", "frame_width", "frame_height", "aspect_ratio"} {
+	for _, field := range []string{"style", "columns", "aspect_ratio"} {
 		t.Run("rejects "+field, func(t *testing.T) {
 			tasks := &taskManagerStub{createID: 17}
 			engine := generator.NewEngine(tasks, nil)

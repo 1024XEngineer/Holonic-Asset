@@ -277,7 +277,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		!strings.Contains(images.request.Prompt, "The subject's correct colours always take precedence") ||
 		!strings.Contains(images.request.Prompt, "<direction_count>\n4\n</direction_count>") ||
 		!strings.Contains(images.request.Prompt, "<asset_dimensions>\n{\"width\":64,\"height\":64}\n</asset_dimensions>") ||
-		!strings.Contains(images.request.Prompt, "at most 40 x 40 drawable logical pixels") ||
+		!strings.Contains(images.request.Prompt, "full 64 x 64 logical prototype canvas") ||
 		images.request.Size != "896x896" ||
 		!reflect.DeepEqual(images.request.ReferenceImages, []string{"reference.png"}) {
 		t.Fatalf("unexpected image request: %+v", images.request)
@@ -300,7 +300,7 @@ func TestExecutorGeneratesCharacterPrototypeBeforeCreatingAsset(t *testing.T) {
 		splitRequest.Columns != 2 || splitRequest.Rows != 2 ||
 		splitRequest.FrameWidth != 64 || splitRequest.FrameHeight != 64 ||
 		splitRequest.RenderScale != imageprocessor.PrototypeRenderScale ||
-		splitRequest.Margin != generator.AnimationFrameMargin(64, 64) ||
+		splitRequest.Margin != 0 || !splitRequest.UseExactMargin ||
 		splitRequest.Anchor != imageprocessor.AnimationAnchorCenter ||
 		!splitRequest.NormalizeContentScale || splitRequest.CenterContent || splitRequest.CropToContent ||
 		!splitRequest.RejectGridBoundaryContent || splitRequest.GridBoundaryMargin != 14 {
@@ -678,11 +678,11 @@ func TestExecutorGeneratesObjectPrototypeBeforeCreatingAsset(t *testing.T) {
 			t.Fatalf("object direction %d did not pass its original split frame to Resize", index)
 		}
 		if request.Options.Width != 128 || request.Options.Height != 128 ||
-			request.Options.Margin != generator.AnimationFrameMargin(128, 128) || !request.Options.CropContent ||
+			request.Options.Margin != 0 || request.Options.CropContent ||
 			request.Options.PaletteSize != 24 || !request.Options.RecoverPixelGrid ||
 			!request.Options.PrequantizeBeforeResize || !request.Options.PreferNearestReduction ||
-			!request.Options.SpritePixelPipeline || request.Options.PreserveCanvasGeometry {
-			t.Fatalf("object direction %d did not fit content inside the animation safety margin: %+v", index, request.Options)
+			!request.Options.SpritePixelPipeline || !request.Options.PreserveCanvasGeometry {
+			t.Fatalf("object direction %d did not preserve the full prototype canvas: %+v", index, request.Options)
 		}
 	}
 	if assets.objectAsset == nil || assets.objectAsset.Name != "chest" ||
