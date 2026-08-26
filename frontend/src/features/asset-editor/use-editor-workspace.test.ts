@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     mutateAsync: vi.fn(),
   },
+  assetExport: {
+    exportAsset: vi.fn(),
+    isExporting: false,
+  },
   applicationMutation: {
     isPending: false,
     mutateAsync: vi.fn(),
@@ -93,6 +97,7 @@ vi.mock("@/model", async (importOriginal) => {
     coreGenerationApi: { create: mocks.coreCreate },
     rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
     useGenerateAnimationMutation: () => mocks.animationMutation,
+    useAssetExport: () => mocks.assetExport,
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
     useGenerationCandidateQuery: () => mocks.candidateQuery,
     useGenerationRunsQuery: () => ({ data: mocks.generationRuns }),
@@ -112,6 +117,8 @@ beforeEach(() => {
   mocks.generationRuns = [];
   mocks.animationMutation.isPending = false;
   mocks.applicationMutation.isPending = false;
+  mocks.assetExport.isExporting = false;
+  mocks.assetExport.exportAsset.mockResolvedValue(undefined);
   mocks.candidateQuery.data = undefined;
   mocks.candidateQuery.isError = false;
   mocks.candidateQuery.isPending = false;
@@ -519,6 +526,7 @@ describe("useEditorWorkspace", () => {
     if (!editor) return;
 
     editor.header.onSave();
+    editor.header.onExport();
     editor.tree.onAnimationGenerate(
       animationRequest({
         animationName: "Open",
@@ -532,6 +540,46 @@ describe("useEditorWorkspace", () => {
       }),
     ).rejects.toThrow("prompt failed");
     await flushPromises();
+  });
+
+  it("saves before exporting a persisted asset", async () => {
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    if (!editor) return;
+
+    editor.header.onExport();
+    await flushPromises();
+
+    expect(mocks.session.save).toHaveBeenCalledOnce();
+    expect(mocks.assetExport.exportAsset).toHaveBeenCalledWith(8);
+  });
+
+  it("reports export failures and skips non-persisted assets", async () => {
+    mocks.assetExport.exportAsset.mockRejectedValue(new Error("export failed"));
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    if (!editor) return;
+
+    editor.header.onExport();
+    await flushPromises();
+    expect(mocks.assetExport.exportAsset).toHaveBeenCalledWith(8);
+
+    mocks.session.snapshot = {
+      ...snapshot(spriteRecord("character")),
+      dirty: false,
+    };
+    const draftEditor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record, "project-x", "asset-x"),
+      onBack: vi.fn(),
+    });
+    draftEditor?.header.onExport();
+    await flushPromises();
+
+    expect(mocks.assetExport.exportAsset).toHaveBeenCalledOnce();
   });
 
   it("skips save and remote prompt creation for clean non-numeric assets", async () => {

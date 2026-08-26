@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     mutateAsync: vi.fn(),
   },
+  assetExport: {
+    exportAsset: vi.fn(),
+    isExporting: false,
+  },
   candidateQuery: {
     data: undefined as
       | {
@@ -89,6 +93,7 @@ vi.mock("@/model", async (importOriginal) => {
     useGenerationCandidateQuery: () => mocks.candidateQuery,
     useGenerationRunsQuery: () => ({ data: mocks.generationRuns }),
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
+    useAssetExport: () => mocks.assetExport,
   };
 });
 
