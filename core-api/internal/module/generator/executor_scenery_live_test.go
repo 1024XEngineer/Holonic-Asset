@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/config"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
@@ -166,4 +171,156 @@ func liveTestPNGDataURI(t *testing.T, w, h int, c color.RGBA) string {
 		t.Fatalf("encode PNG: %v", err)
 	}
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func TestLiveSceneryFullGenerationReal16x9(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("HOLONIC_SCENERY_GENERATE_16X9")) != "1" {
+		t.Skip("set HOLONIC_SCENERY_GENERATE_16X9=1 to run full 16:9 real scenery generation")
+	}
+
+	llmConfig, err := loadLiveLLMConfig()
+	if err != nil {
+		t.Fatalf("load live LLM config: %v", err)
+	}
+	imgConfig, err := loadLiveImageConfig()
+	if err != nil {
+		t.Fatalf("load live Image config: %v", err)
+	}
+
+	llmModels := make([]llmclient.ModelConfig, 0, len(llmConfig.Models))
+	for _, m := range llmConfig.Models {
+		llmModels = append(llmModels, llmclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
+	}
+	llmProvider := llmclient.NewQNAProvider(llmclient.QNAConfig{
+		BaseURL:      llmConfig.BaseURL,
+		APIKey:       llmConfig.APIKey,
+		DefaultModel: llmConfig.DefaultModel,
+		Models:       llmModels,
+	})
+	llmService := llmclient.NewLLMService(llmProvider)
+
+	imageModels := make([]imageclient.ModelConfig, 0, len(imgConfig.Models))
+	for _, m := range imgConfig.Models {
+		imageModels = append(imageModels, imageclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
+	}
+	imageProvider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       imgConfig.BaseURL,
+		APIKey:        imgConfig.APIKey,
+		DefaultModel:  imgConfig.DefaultModel,
+		FallbackModel: imgConfig.FallbackModel,
+		Models:        imageModels,
+	})
+	imageService := imageclient.NewImageGenerationService(imageProvider)
+
+	exec := &executor{
+		llm:       llmService,
+		images:    imageService,
+		processor: imageprocessor.NewProcessor(),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	payload := CreateSceneryPayload{
+		ProjectID:     101,
+		AssetName:     "日落峡谷",
+		CreativeBrief: "A nostalgic 16-bit pixel art sunset canyon landscape with layered crimson mountain ridges in the distance, a pine-covered plateau in the midground, and an ancient rocky trail with glowing camp embers in the foreground",
+		Perspective:   "Side-On",
+		Dimensions:    assetdomain.Size{Width: 1536, Height: 1024},
+		ProjectContext: SceneryProjectContext{
+			Name:           "Sunset Quest",
+			GameType:       "Platformer",
+			TargetPlatform: "PC",
+			Description:    "16-bit pixel art side-scrolling platformer",
+		},
+	}
+
+	t.Logf("=== Step 1: Planning Scenery Layers (1536x1024, 16:9) ===")
+	plan, err := exec.planSceneryLayers(ctx, payload)
+	if err != nil {
+		t.Fatalf("plan scenery layers failed: %v", err)
+	}
+	t.Logf("Planner returned %d layers:", len(plan))
+	for i, l := range plan {
+		t.Logf("  [%d] ID=%d Name=%q Brief=%q", i+1, l.ID, l.Name, l.CreativeBrief)
+	}
+
+	t.Logf("=== Step 2: Generating Scenery Layers (Front-to-Back chained references) ===")
+	layers, err := exec.generateSceneryLayers(ctx, payload, plan)
+	if err != nil {
+		t.Fatalf("generate scenery layers failed: %v", err)
+	}
+	t.Logf("Generated %d processed layers successfully", len(layers))
+
+	t.Logf("=== Step 3: Analyzing Scenery Layout (Gemini Multimodal) ===")
+	laidOut, err := exec.analyzeSceneryLayout(ctx, payload, layers)
+	if err != nil {
+		t.Fatalf("analyze scenery layout failed: %v", err)
+	}
+
+	outDir := t.TempDir()
+
+	// Save each layer PNG
+	for _, l := range laidOut {
+		raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(l.ImageBase64))
+		if err != nil {
+			t.Fatalf("decode layer %d PNG base64: %v", l.ID, err)
+		}
+		filename := filepath.Join(outDir, fmt.Sprintf("scenery_16x9_layer_%d_%s.png", l.ID, sanitizeFilename(l.Name)))
+		if err := os.WriteFile(filename, raw, 0o600); err != nil {
+			t.Fatalf("write layer file %s: %v", filename, err)
+		}
+		t.Logf("Saved Layer %d (%s) -> %s (Layout: pos=(%.1f, %.1f), scale=(%.2f, %.2f), zIndex=%d)",
+			l.ID, l.Name, filename, l.Layout.Position.X, l.Layout.Position.Y, l.Layout.Scale.X, l.Layout.Scale.Y, l.Layout.ZIndex)
+	}
+
+	// Composite final scenery image ordered by zIndex
+	composite := image.NewRGBA(image.Rect(0, 0, int(payload.Dimensions.Width), int(payload.Dimensions.Height)))
+	sortedLayers := append([]LaidOutSceneryLayer(nil), laidOut...)
+	sort.SliceStable(sortedLayers, func(i, j int) bool {
+		return sortedLayers[i].Layout.ZIndex < sortedLayers[j].Layout.ZIndex
+	})
+
+	for _, l := range sortedLayers {
+		raw, _ := base64.StdEncoding.DecodeString(strings.TrimSpace(l.ImageBase64))
+		img, _, err := image.Decode(bytes.NewReader(raw))
+		if err != nil {
+			t.Fatalf("decode layer for composite: %v", err)
+		}
+		draw.Draw(composite, composite.Bounds(), img, image.Point{}, draw.Over)
+	}
+
+	var compBuf bytes.Buffer
+	if err := png.Encode(&compBuf, composite); err != nil {
+		t.Fatalf("encode composite PNG: %v", err)
+	}
+	compFilename := filepath.Join(outDir, "scenery_16x9_composite.png")
+	if err := os.WriteFile(compFilename, compBuf.Bytes(), 0o600); err != nil {
+		t.Fatalf("write composite PNG: %v", err)
+	}
+	t.Logf("Saved Final Scenery Composite -> %s", compFilename)
+}
+
+func sanitizeFilename(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+		} else if r > 127 { // allow unicode letters
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
 }
