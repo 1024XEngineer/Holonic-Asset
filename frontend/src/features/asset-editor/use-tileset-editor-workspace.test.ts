@@ -189,6 +189,7 @@ describe("useTilesetEditorWorkspace", () => {
     expect(editor?.review).toEqual({
       items: [
         {
+          kind: "comparison",
           itemId: "ground",
           currentItem: expect.objectContaining({
             id: "ground",
@@ -225,6 +226,154 @@ describe("useTilesetEditorWorkspace", () => {
       }),
     });
     expect(mocks.session.save).not.toHaveBeenCalled();
+  });
+
+  it("previews a newly generated item without requiring a current item", () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Oak tree",
+        prompt: "Add an oak tree",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "add_tileset_item",
+      status: "awaiting_application",
+      result: {
+        content: {
+          items: [
+            {
+              name: "Oak tree",
+              tiles: [{ position: { x: 2, y: 1 }, url: "/tree.png" }],
+            },
+          ],
+        },
+      },
+    };
+
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.items).toEqual([
+      expect.objectContaining({ id: "ground" }),
+      expect.objectContaining({
+        id: "candidate:0:Oak tree",
+        label: "Oak tree",
+        tileUrls: ["/tree.png"],
+      }),
+    ]);
+    expect(editor?.review?.items).toEqual([
+      {
+        kind: "new-item",
+        itemId: "candidate:0:Oak tree",
+        candidateItem: expect.objectContaining({ label: "Oak tree" }),
+      },
+    ]);
+  });
+
+  it("queues a new item and exposes its additional task", async () => {
+    mocks.stateValues.push({
+      id: "tileset-item-local",
+      name: "Oak tree",
+      prompt: "Add an oak tree",
+      status: "processing",
+    });
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    const request = {
+      itemName: "Oak tree",
+      itemDescription: "Old oak",
+      shape: [[0, 0]] as [number, number][],
+      creativeBrief: "Dense leaves",
+    };
+
+    expect(editor?.header.generationTasks).toEqual([
+      expect.objectContaining({ id: "tileset-item-local" }),
+    ]);
+    await editor?.onGenerateItem(request);
+
+    expect(mocks.coreCreate).toHaveBeenCalledWith(7, {
+      assetId: 8,
+      kind: "add_tileset_item",
+      creative_brief: "Dense leaves",
+      parameters: {
+        item: {
+          name: "Oak tree",
+          description: "Old oak",
+          shape: [[0, 0]],
+        },
+      },
+    });
+  });
+
+  it("reports a failed new item generation without rejecting", async () => {
+    mocks.coreCreate.mockRejectedValueOnce(new Error("offline"));
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    await expect(
+      editor?.onGenerateItem({
+        itemName: "Oak tree",
+        itemDescription: "Old oak",
+        shape: [[0, 0]],
+        creativeBrief: "Dense leaves",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("keeps a newer item task when an older submission finishes", async () => {
+    let resolveFirst!: (value: { generationRunId: number }) => void;
+    mocks.coreCreate.mockImplementationOnce(
+      () =>
+        new Promise<{ generationRunId: number }>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    const request = {
+      itemName: "Oak tree",
+      itemDescription: "Old oak",
+      shape: [[0, 0]] as [number, number][],
+      creativeBrief: "Dense leaves",
+    };
+
+    const first = editor?.onGenerateItem(request);
+    await flushPromises();
+    const second = editor?.onGenerateItem({ ...request, itemName: "Pine" });
+    await second;
+    resolveFirst({ generationRunId: 31 });
+    await first;
+
+    expect(mocks.coreCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects new item generation for temporary asset identifiers", async () => {
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record, {
+        id: "asset-temp",
+        projectId: "project-temp",
+      }),
+      onBack: vi.fn(),
+    });
+
+    await expect(
+      editor?.onGenerateItem({
+        itemName: "Oak tree",
+        itemDescription: "Old oak",
+        shape: [[0, 0]],
+        creativeBrief: "Dense leaves",
+      }),
+    ).rejects.toThrow("persisted identifiers");
   });
 
   it("denies a candidate without changing the editor record", async () => {
@@ -332,6 +481,39 @@ describe("useTilesetEditorWorkspace", () => {
       >;
       return { ...record, tileset: { ...record.tileset, items: [] } };
     };
+
+    const editor = useTilesetEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.review?.items).toEqual([]);
+  });
+
+  it("omits a new-item review when its candidate item is unavailable", () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Oak tree",
+        prompt: "Add an oak tree",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "add_tileset_item",
+      status: "awaiting_application",
+      result: {
+        content: {
+          items: [
+            {
+              name: "Oak tree",
+              tiles: [{ position: { x: 2, y: 1 }, url: "/tree.png" }],
+            },
+          ],
+        },
+      },
+    };
+    mocks.candidateRecordOverride = (record) => record;
 
     const editor = useTilesetEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),

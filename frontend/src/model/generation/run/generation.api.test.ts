@@ -254,6 +254,80 @@ describe("generationApi", () => {
     ]);
   });
 
+  it.each([
+    "generate_tileset",
+    "add_tileset_item",
+    "edit_tileset_item",
+    "edit_tiles",
+  ] as const)("maps %s runs to tileset assets", async (kind) => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 32,
+          projectId: 42,
+          kind,
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({ id: "32", kind: "tileset" }),
+    ]);
+  });
+
+  it.each(["generate_object_prototype", "edit_object_prototype"] as const)(
+    "maps %s runs to object assets",
+    async (kind) => {
+      mocks.core.list.mockResolvedValue({
+        items: [
+          {
+            id: 33,
+            projectId: 42,
+            kind,
+            status: "processing",
+          },
+        ],
+      });
+
+      await expect(generationApi.listRuns("42")).resolves.toEqual([
+        expect.objectContaining({ id: "33", kind: "object" }),
+      ]);
+    },
+  );
+
+  it("uses the character fallback for frame edits without an owner", async () => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 35,
+          projectId: 42,
+          kind: "edit_frames",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({ id: "35", kind: "character" }),
+    ]);
+  });
+
+  it("hides an unknown generation kind", async () => {
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 34,
+          projectId: 42,
+          kind: "unknown_kind" as never,
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([]);
+  });
+
   it("restores generation metadata from browser storage", async () => {
     const request = creationRequest();
     await generationApi.enqueue({ projectId: "42", request });

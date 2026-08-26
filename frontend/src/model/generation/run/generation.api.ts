@@ -187,40 +187,31 @@ function generationKindToAssetKind(
   requestedKind?: CreatableAssetKind,
   resolvedAnimationKind?: "character" | "object",
 ) {
-  if (kind === "generate_scenery") return "scenery" as const;
-  if (
-    kind === "generate_character_prototype" ||
-    kind === "edit_character_prototype"
-  ) {
-    return "character" as const;
+  switch (kind) {
+    case "generate_scenery":
+      return "scenery";
+    case "generate_character_prototype":
+    case "edit_character_prototype":
+      return "character";
+    case "generate_object_prototype":
+    case "edit_object_prototype":
+      return "object";
+    case "generate_tileset":
+    case "add_tileset_item":
+    case "edit_tileset_item":
+    case "edit_tiles":
+      return "tileset";
+    case "generate_animation":
+    case "edit_animation":
+      if (requestedKind === "character" || requestedKind === "object") {
+        return requestedKind;
+      }
+      return resolvedAnimationKind ?? "character";
+    case "edit_frames":
+      return resolvedAnimationKind ?? "character";
+    default:
+      return undefined;
   }
-  if (
-    kind === "generate_object_prototype" ||
-    kind === "edit_object_prototype"
-  ) {
-    return "object" as const;
-  }
-  if (
-    kind === "generate_tileset" ||
-    kind === "edit_tileset_item" ||
-    kind === "edit_tiles"
-  ) {
-    return "tileset" as const;
-  }
-  if (
-    (kind === "generate_animation" || kind === "edit_animation") &&
-    (requestedKind === "character" || requestedKind === "object")
-  ) {
-    return requestedKind;
-  }
-  if (
-    kind === "generate_animation" ||
-    kind === "edit_animation" ||
-    kind === "edit_frames"
-  ) {
-    return resolvedAnimationKind ?? ("character" as const);
-  }
-  return undefined;
 }
 
 async function resolveSpriteAssetKind(

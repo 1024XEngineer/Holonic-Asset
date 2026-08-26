@@ -42,15 +42,9 @@ export function TilesetReviewDialog({
           <DialogTitle>
             {t("tilesetReviewTitle", { value: item.candidateItem.label })}
           </DialogTitle>
-          <DialogDescription>{t("tilesetReviewDescription")}</DialogDescription>
+          <ReviewDescription kind={item.kind} />
         </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ItemComparisonPanel label={t("current")} item={item.currentItem} />
-          <ItemComparisonPanel
-            label={t("generated")}
-            item={item.candidateItem}
-          />
-        </div>
+        <ReviewPanels item={item} />
         <DialogFooter>
           <Button
             type="button"
@@ -71,6 +65,49 @@ export function TilesetReviewDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function ReviewDescription({ kind }: { kind: TilesetItemReview["kind"] }) {
+  const { t } = useTranslation("editor");
+
+  switch (kind) {
+    case "comparison":
+      return (
+        <DialogDescription>{t("tilesetReviewDescription")}</DialogDescription>
+      );
+    case "new-item":
+      return (
+        <DialogDescription>
+          {t("tilesetNewItemReviewDescription")}
+        </DialogDescription>
+      );
+  }
+}
+
+function ReviewPanels({ item }: { item: TilesetItemReview }) {
+  const { t } = useTranslation("editor");
+
+  switch (item.kind) {
+    case "comparison":
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ItemComparisonPanel label={t("current")} item={item.currentItem} />
+          <ItemComparisonPanel
+            label={t("generated")}
+            item={item.candidateItem}
+          />
+        </div>
+      );
+    case "new-item":
+      return (
+        <div className="grid gap-3">
+          <ItemComparisonPanel
+            label={t("generated")}
+            item={item.candidateItem}
+          />
+        </div>
+      );
+  }
 }
 
 function ItemComparisonPanel({
