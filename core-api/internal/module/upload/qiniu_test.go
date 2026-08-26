@@ -523,3 +523,172 @@ func TestPutArtifactValidatesAndUploadsArtifact(t *testing.T) {
 		t.Fatalf("PutArtifact uploader error = %v, want %v", err, putErr)
 	}
 }
+
+func newTestQiniuStorage(t *testing.T) *QiniuStorage {
+	t.Helper()
+	store, err := NewQiniuStorage(validQiniuConfig())
+	if err != nil {
+		t.Fatalf("create test qiniu storage: %v", err)
+	}
+	return store
+}
+
+func TestQiniuStoragePutObject(t *testing.T) {
+	store := newTestQiniuStorage(t)
+
+	// cancelled context
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := store.PutObject(canceledCtx, "assets/img.png", "image/png", []byte("data")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// invalid key
+	if err := store.PutObject(context.Background(), "", "image/png", []byte("data")); !errors.Is(err, ErrInvalidUploadRequest) {
+		t.Fatalf("expected ErrInvalidUploadRequest, got %v", err)
+	}
+
+	// non-image media type
+	if err := store.PutObject(context.Background(), "assets/img.png", "application/json", []byte("data")); !errors.Is(err, ErrInvalidObjectData) {
+		t.Fatalf("expected ErrInvalidObjectData, got %v", err)
+	}
+
+	// success
+	uploader := &formUploaderStub{}
+	store.uploader = uploader
+	if err := store.PutObject(context.Background(), " assets/img.png ", "image/png; charset=utf-8", []byte("pngdata")); err != nil {
+		t.Fatalf("PutObject success error: %v", err)
+	}
+	if uploader.key != "assets/img.png" || string(uploader.data) != "pngdata" {
+		t.Fatalf("unexpected upload: key=%q data=%q", uploader.key, uploader.data)
+	}
+}
+
+func TestQiniuStoragePersistReferenceAt(t *testing.T) {
+	store := newTestQiniuStorage(t)
+
+	// invalid key
+	if err := store.PersistReferenceAt(context.Background(), "", "data:image/png;base64,aGVsbG8="); !errors.Is(err, ErrInvalidUploadRequest) {
+		t.Fatalf("expected ErrInvalidUploadRequest, got %v", err)
+	}
+
+	// invalid data url
+	if err := store.PersistReferenceAt(context.Background(), "assets/test.png", "invalid-url"); !errors.Is(err, ErrInvalidObjectData) {
+		t.Fatalf("expected ErrInvalidObjectData, got %v", err)
+	}
+
+	// success
+	uploader := &formUploaderStub{}
+	store.uploader = uploader
+	raw := []byte("hello png")
+	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(raw)
+	if err := store.PersistReferenceAt(context.Background(), "assets/test.png", dataURL); err != nil {
+		t.Fatalf("PersistReferenceAt error: %v", err)
+	}
+	if uploader.key != "assets/test.png" || string(uploader.data) != string(raw) {
+		t.Fatalf("unexpected upload: key=%q data=%q", uploader.key, uploader.data)
+	}
+}
+
+func TestQiniuStorageDeleteObject(t *testing.T) {
+	store := newTestQiniuStorage(t)
+
+	// cancelled context
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := store.DeleteObject(canceledCtx, "assets/img.png"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// invalid key
+	if err := store.DeleteObject(context.Background(), " "); !errors.Is(err, ErrInvalidUploadRequest) {
+		t.Fatalf("expected ErrInvalidUploadRequest, got %v", err)
+	}
+
+	// bucket error
+	bm := &bucketManagerStub{deleteErr: errors.New("delete failed")}
+	store.bucketManager = bm
+	if err := store.DeleteObject(context.Background(), "assets/img.png"); err == nil {
+		t.Fatal("expected delete error")
+	}
+
+	// success
+	bm.deleteErr = nil
+	bm.deleted = nil
+	if err := store.DeleteObject(context.Background(), " assets/img.png "); err != nil {
+		t.Fatalf("DeleteObject error: %v", err)
+	}
+	if len(bm.deleted) != 1 || bm.deleted[0] != store.bucket+":assets/img.png" {
+		t.Fatalf("unexpected deleted key: %v", bm.deleted)
+	}
+}
+
+func TestQiniuStorageDeleteObjects(t *testing.T) {
+	store := newTestQiniuStorage(t)
+
+	// cancelled context
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := store.DeleteObjects(canceledCtx, []string{"assets/img.png"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// empty slice
+	if err := store.DeleteObjects(context.Background(), nil); err != nil {
+		t.Fatalf("empty slice error: %v", err)
+	}
+
+	// invalid key in slice
+	if err := store.DeleteObjects(context.Background(), []string{""}); !errors.Is(err, ErrInvalidUploadRequest) {
+		t.Fatalf("expected ErrInvalidUploadRequest, got %v", err)
+	}
+
+	// success
+	bm := &bucketManagerStub{
+		batchRet: []qiniustorage.BatchOpRet{
+			{Code: 200},
+			{Code: 200},
+		},
+	}
+	store.bucketManager = bm
+	if err := store.DeleteObjects(context.Background(), []string{"assets/1.png", "assets/2.png"}); err != nil {
+		t.Fatalf("DeleteObjects error: %v", err)
+	}
+	if len(bm.batchOps) != 2 {
+		t.Fatalf("expected 2 batch operations, got %d", len(bm.batchOps))
+	}
+
+	// batch error
+	bm.batchErr = errors.New("batch error")
+	if err := store.DeleteObjects(context.Background(), []string{"assets/1.png", "assets/2.png"}); err == nil {
+		t.Fatal("expected batch error")
+	}
+
+	// partial item error in batch
+	bm.batchErr = nil
+	bm.batchRet = []qiniustorage.BatchOpRet{
+		{Code: 200},
+		{Code: 404},
+	}
+	if err := store.DeleteObjects(context.Background(), []string{"assets/1.png", "assets/2.png"}); err == nil {
+		t.Fatal("expected partial error")
+	}
+}
+
+func TestQiniuStorageNewObjectKey(t *testing.T) {
+	store := newTestQiniuStorage(t)
+
+	// invalid media type
+	if _, err := store.NewObjectKey("application/json"); !errors.Is(err, ErrInvalidObjectData) {
+		t.Fatalf("expected ErrInvalidObjectData, got %v", err)
+	}
+
+	// valid
+	key, err := store.NewObjectKey("image/png")
+	if err != nil {
+		t.Fatalf("NewObjectKey error: %v", err)
+	}
+	if !strings.HasSuffix(key, ".png") {
+		t.Fatalf("expected .png suffix, got %q", key)
+	}
+}

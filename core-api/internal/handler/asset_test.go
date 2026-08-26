@@ -35,6 +35,20 @@ type assetManagerStub struct {
 	rollbackResult  *domain.AssetRecord
 	deletedAssetID  uint
 	deleteErr       error
+	copyAssetID     uint
+	copyNewID       uint
+	copyErr         error
+}
+
+func (s *assetManagerStub) Copy(_ context.Context, assetID uint, _ uint) (uint, error) {
+	s.copyAssetID = assetID
+	if s.copyErr != nil {
+		return 0, s.copyErr
+	}
+	if s.copyNewID != 0 {
+		return s.copyNewID, nil
+	}
+	return 99, nil
 }
 
 func (s *assetManagerStub) CreateRecord(_ context.Context, record *domain.AssetRecord, expectedVersion uint) (*domain.AssetRecord, error) {
@@ -734,4 +748,84 @@ func TestAssetHandlerDeleteRejectsZeroAssetID(t *testing.T) {
 	if !errors.Is(err, echo.ErrBadRequest) {
 		t.Fatalf("expected bad request, got %v", err)
 	}
+}
+
+func TestAssetHandlerCopyAsset(t *testing.T) {
+	// zero asset id
+	h := handler.NewHandler(&assetManagerStub{})
+	_, err := h.CopyAsset(context.Background(), dto.CopyAssetRequest{})
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request on zero asset id, got %v", err)
+	}
+
+	// success
+	stub := &assetManagerStub{copyNewID: 200}
+	hSuccess := handler.NewHandler(stub)
+	resp, err := hSuccess.CopyAsset(context.Background(), dto.CopyAssetRequest{AssetID: 10})
+	if err != nil {
+		t.Fatalf("copy asset: %v", err)
+	}
+	if resp.Data.NewAssetID != 200 {
+		t.Fatalf("expected new asset id 200, got %d", resp.Data.NewAssetID)
+	}
+	if stub.copyAssetID != 10 {
+		t.Fatalf("expected copy asset id 10, got %d", stub.copyAssetID)
+	}
+
+	// manager error
+	wantErr := errors.New("copy failed")
+	hErr := handler.NewHandler(&assetManagerStub{copyErr: wantErr})
+	_, err = hErr.CopyAsset(context.Background(), dto.CopyAssetRequest{AssetID: 10})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+}
+
+func TestAssetHandlerRollBackAsset(t *testing.T) {
+	// zero asset id
+	h := handler.NewHandler(&assetManagerStub{})
+	_, err := h.RollBackAsset(context.Background(), dto.RollBackAssetRequest{Version: 1})
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request on zero asset id, got %v", err)
+	}
+
+	// zero version
+	_, err = h.RollBackAsset(context.Background(), dto.RollBackAssetRequest{AssetID: 1})
+	if !errors.Is(err, echo.ErrBadRequest) {
+		t.Fatalf("expected bad request on zero version, got %v", err)
+	}
+
+	// success
+	stub := &assetManagerStub{
+		rollbackResult: &domain.AssetRecord{
+			AssetID:   5,
+			Version:   2,
+			ContentID: 10,
+		},
+	}
+	hSuccess := handler.NewHandler(stub)
+	resp, err := hSuccess.RollBackAsset(context.Background(), dto.RollBackAssetRequest{AssetID: 5, Version: 2})
+	if err != nil {
+		t.Fatalf("rollback asset: %v", err)
+	}
+	if resp.Data.AssetID != 5 || resp.Data.Version != 2 || resp.Data.ContentID != 10 {
+		t.Fatalf("unexpected rollback response: %+v", resp.Data)
+	}
+
+	// error
+	wantErr := errors.New("rollback failed")
+	hErrStub := handler.NewHandler(&failingRollbackManagerStub{err: wantErr})
+	_, err = hErrStub.RollBackAsset(context.Background(), dto.RollBackAssetRequest{AssetID: 5, Version: 2})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+}
+
+type failingRollbackManagerStub struct {
+	assetManagerStub
+	err error
+}
+
+func (s *failingRollbackManagerStub) RollBackRecord(context.Context, uint, uint) (*domain.AssetRecord, error) {
+	return nil, s.err
 }
