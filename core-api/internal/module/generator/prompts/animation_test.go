@@ -216,3 +216,18 @@ func TestAnimationVideoRetryDoesNotSuppressRequestedChange(t *testing.T) {
 		}
 	}
 }
+
+func TestLimitEdgeCases(t *testing.T) {
+	if got := limit("some text", 0); got != "" {
+		t.Fatalf("expected empty string for maxCharacters=0, got %q", got)
+	}
+	if got := limit("some text", -5); got != "" {
+		t.Fatalf("expected empty string for maxCharacters=-5, got %q", got)
+	}
+	if got := limit("abc", 1); got != "a" {
+		t.Fatalf("expected 'a', got %q", got)
+	}
+	if got := limit("第一句；第二句！第三句？第四句。", 10); !strings.HasSuffix(got, "…") {
+		t.Fatalf("expected punctuation boundary suffix, got %q", got)
+	}
+}
