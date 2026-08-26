@@ -1,4 +1,11 @@
-import { Film, Gauge, LoaderCircle, Sparkles, Timer } from "lucide-react";
+import {
+  Film,
+  Gauge,
+  LoaderCircle,
+  Maximize2,
+  Sparkles,
+  Timer,
+} from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +19,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   assetDirectionsByPerspective,
@@ -23,28 +35,46 @@ import {
 type CreateAnimationTriggerProps = {
   children: (openDialog: () => void) => React.ReactNode;
   isGenerating: boolean;
+  prototypeDimensions?: { width: number; height: number };
   perspective: Perspective;
   onGenerate: (request: GenerateAnimationRequest) => void;
 };
 
 type AnimationRequestDraft = Omit<
   GenerateAnimationRequest,
-  "frameCount" | "fps" | "duration"
+  "frameCount" | "frameWidth" | "frameHeight" | "fps" | "duration"
 > &
-  Partial<Pick<GenerateAnimationRequest, "frameCount" | "fps" | "duration">>;
+  Partial<
+    Pick<
+      GenerateAnimationRequest,
+      "frameCount" | "frameWidth" | "frameHeight" | "fps" | "duration"
+    >
+  >;
 
-const defaultRequest: AnimationRequestDraft = {
-  animationName: "",
-  direction: "front",
-  creativeBrief: "",
-  frameCount: 8,
-  fps: 12,
-  duration: 5,
-};
+const fallbackPrototypeDimensions = { width: 32, height: 32 };
+
+function createDefaultRequest(prototypeDimensions: {
+  width: number;
+  height: number;
+}): AnimationRequestDraft {
+  return {
+    animationName: "",
+    direction: "front",
+    creativeBrief: "",
+    frameCount: 8,
+    frameWidth: Math.ceil(prototypeDimensions.width * 1.5),
+    frameHeight: Math.ceil(prototypeDimensions.height * 1.5),
+    fps: 12,
+    duration: 5,
+  };
+}
+
+const defaultRequest = createDefaultRequest(fallbackPrototypeDimensions);
 
 export function CreateAnimationTrigger({
   children,
   isGenerating,
+  prototypeDimensions = fallbackPrototypeDimensions,
   perspective,
   onGenerate,
 }: CreateAnimationTriggerProps) {
@@ -55,7 +85,7 @@ export function CreateAnimationTrigger({
 
   const openDialog = () => {
     setRequest({
-      ...defaultRequest,
+      ...createDefaultRequest(prototypeDimensions),
       direction: availableDirections[0] ?? "front",
     });
     setOpen(true);
@@ -155,6 +185,36 @@ export function CreateAnimationTrigger({
             />
           </label>
 
+          <div className="grid gap-3 border-t pt-5 sm:grid-cols-2">
+            <NumberField
+              icon={<Maximize2 />}
+              label={t("frameWidth")}
+              value={request.frameWidth}
+              min={32}
+              max={1024}
+              suffix={t("pixelsShort")}
+              tooltip={t("frameSizeInvalid")}
+              onChange={(frameWidth) =>
+                setRequest((current) => ({ ...current, frameWidth }))
+              }
+            />
+            <NumberField
+              icon={<Maximize2 />}
+              label={t("frameHeight")}
+              value={request.frameHeight}
+              min={32}
+              max={1024}
+              suffix={t("pixelsShort")}
+              tooltip={t("frameSizeInvalid")}
+              onChange={(frameHeight) =>
+                setRequest((current) => ({ ...current, frameHeight }))
+              }
+            />
+          </div>
+
+          <p className="-mt-3 text-xs text-muted-foreground">
+            {t("frameSizeDescription")}
+          </p>
           <div className="grid gap-3 border-t pt-5 sm:grid-cols-3">
             <NumberField
               icon={<Film />}
@@ -192,6 +252,8 @@ export function CreateAnimationTrigger({
               frames: request.frameCount ?? "",
               fps: request.fps ?? "",
               seconds: request.duration ?? "",
+              width: request.frameWidth ?? "",
+              height: request.frameHeight ?? "",
             })}
           </p>
 
@@ -223,6 +285,7 @@ function NumberField({
   min,
   max,
   suffix,
+  tooltip,
   onChange,
 }: {
   icon: React.ReactNode;
@@ -231,8 +294,16 @@ function NumberField({
   min: number;
   max: number;
   suffix?: string;
+  tooltip?: string;
   onChange: (value: number | undefined) => void;
 }) {
+  const [focused, setFocused] = useState(false);
+  const invalid =
+    value === undefined ||
+    !Number.isInteger(value) ||
+    value < min ||
+    value > max;
+
   return (
     <label className="grid gap-2 text-sm font-medium">
       <span className="flex items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:text-muted-foreground">
@@ -240,23 +311,36 @@ function NumberField({
         {label}
       </span>
       <span className="relative">
-        <Input
-          type="number"
-          inputMode="numeric"
-          required
-          min={min}
-          max={max}
-          value={value ?? ""}
-          className={suffix ? "pr-8" : undefined}
-          onChange={(event) => {
-            if (event.currentTarget.value === "") {
-              onChange(undefined);
-              return;
+        <Tooltip open={Boolean(tooltip && focused && invalid)}>
+          <TooltipTrigger
+            render={
+              <Input
+                type="number"
+                inputMode="numeric"
+                required
+                min={min}
+                max={max}
+                step={1}
+                aria-invalid={invalid}
+                value={value ?? ""}
+                className={suffix ? "pr-8" : undefined}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onChange={(event) => {
+                  if (event.currentTarget.value === "") {
+                    onChange(undefined);
+                    return;
+                  }
+                  const nextValue = event.currentTarget.valueAsNumber;
+                  if (Number.isFinite(nextValue)) onChange(nextValue);
+                }}
+              />
             }
-            const nextValue = event.currentTarget.valueAsNumber;
-            if (Number.isFinite(nextValue)) onChange(nextValue);
-          }}
-        />
+          />
+          {tooltip ? (
+            <TooltipContent side="bottom">{tooltip}</TooltipContent>
+          ) : null}
+        </Tooltip>
         {suffix ? (
           <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">
             {suffix}

@@ -6,6 +6,8 @@ export const generateAnimationRequestSchema = z.object({
   direction: assetDirectionSchema,
   creativeBrief: z.string().trim().min(1, "Creative brief is required."),
   frameCount: z.number().int().min(1).max(32),
+  frameWidth: z.number().int().min(32).max(1024),
+  frameHeight: z.number().int().min(32).max(1024),
   fps: z.number().int().min(1).max(60),
   duration: z.number().int().min(4).max(15),
 });
