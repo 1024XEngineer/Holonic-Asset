@@ -31,12 +31,22 @@ import {
   type AssetTag,
 } from "@/model/asset";
 
+export type AssetTagCreateHandler = (
+  tag: AssetTag,
+) => AssetTag | undefined | Promise<AssetTag | undefined>;
+export type AssetTagUpdateHandler = (
+  currentTag: AssetTag,
+  nextTag: AssetTag,
+) => AssetTag | undefined | Promise<AssetTag | undefined>;
+
 export function AssetTagPicker({
   availableTags = [],
   className,
   disabled = false,
   id,
   onChange,
+  onCreateTag,
+  onUpdateTag,
   tags,
 }: {
   availableTags?: readonly AssetTag[];
@@ -44,6 +54,8 @@ export function AssetTagPicker({
   disabled?: boolean;
   id: string;
   onChange: (tags: AssetTag[]) => void;
+  onCreateTag?: AssetTagCreateHandler;
+  onUpdateTag?: AssetTagUpdateHandler;
   tags: readonly AssetTag[];
 }) {
   const { t } = useTranslation("common");
@@ -65,6 +77,8 @@ export function AssetTagPicker({
   const [formDescription, setFormDescription] = useState("");
   const [formColor, setFormColor] = useState(defaultAssetTagColor);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [tagSaveError, setTagSaveError] = useState<string>();
 
   // Merge available and current tags behind local edits from this session.
   const allOptions = useMemo(() => {
@@ -97,6 +111,8 @@ export function AssetTagPicker({
     if (!query) return true;
     return allOptions.some((tag) => tag.name.toLocaleLowerCase() === query);
   }, [allOptions, filterQuery]);
+  const canCreateTag = !hasExactMatch && Boolean(filterQuery.trim());
+  const showNoMatching = !canCreateTag && filteredOptions.length === 0;
 
   const selectTag = (tag: AssetTag) => {
     if (selectedNames.has(tag.name.toLocaleLowerCase())) return;
@@ -117,6 +133,7 @@ export function AssetTagPicker({
   };
 
   const openCreateView = (initialName = "") => {
+    setTagSaveError(undefined);
     setEditingTarget(null);
     setFormName(initialName);
     setFormDescription("");
@@ -127,6 +144,7 @@ export function AssetTagPicker({
 
   const openEditView = (tag: AssetTag, event?: React.MouseEvent) => {
     event?.stopPropagation();
+    setTagSaveError(undefined);
     setEditingTarget(tag);
     setFormName(tag.name);
     setFormDescription(tag.description);
@@ -143,16 +161,47 @@ export function AssetTagPicker({
     });
     if (!normalized) return;
 
+    let save:
+      | (() => AssetTag | undefined | Promise<AssetTag | undefined>)
+      | undefined;
+    if (view === "edit" && editingTarget?.tagId && onUpdateTag) {
+      save = () => onUpdateTag(editingTarget, normalized);
+    } else if (view === "create" && onCreateTag) {
+      save = () => onCreateTag(normalized);
+    }
+
+    if (save) {
+      setIsSavingTag(true);
+      setTagSaveError(undefined);
+      void (async () => {
+        try {
+          const persisted = await save();
+          applyTagChange(persisted ?? normalized);
+        } catch (error: unknown) {
+          setTagSaveError(
+            error instanceof Error ? error.message : "Unable to save tag.",
+          );
+        } finally {
+          setIsSavingTag(false);
+        }
+      })();
+      return;
+    }
+
+    applyTagChange(normalized);
+  };
+
+  const applyTagChange = (nextTag: AssetTag) => {
     if (view === "edit" && editingTarget) {
       const oldNameLower = editingTarget.name.toLocaleLowerCase();
       // Update in selected tags if present
       const updatedSelected = tags.map((item) =>
-        item.name.toLocaleLowerCase() === oldNameLower ? normalized : item,
+        item.name.toLocaleLowerCase() === oldNameLower ? nextTag : item,
       );
       // Preserve the edit locally even when the source tag is not selected.
       setLocalTags((prev) =>
         mergeAssetTags(
-          [normalized],
+          [nextTag],
           prev.filter((item) => item.name.toLocaleLowerCase() !== oldNameLower),
         ),
       );
@@ -162,8 +211,8 @@ export function AssetTagPicker({
       onChange(updatedSelected);
     } else {
       // Create new tag
-      setLocalTags((prev) => mergeAssetTags(prev, [normalized]));
-      selectTag(normalized);
+      setLocalTags((prev) => mergeAssetTags(prev, [nextTag]));
+      onChange(mergeAssetTags(tags, [nextTag]));
     }
 
     setFilterQuery("");
@@ -325,7 +374,7 @@ export function AssetTagPicker({
                 ) : null}
 
                 {/* If no exact match and query entered, offer quick create */}
-                {!hasExactMatch && filterQuery.trim() ? (
+                {canCreateTag ? (
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left font-medium text-primary transition-colors hover:bg-primary/10"
@@ -338,7 +387,8 @@ export function AssetTagPicker({
                       })}
                     </span>
                   </button>
-                ) : filteredOptions.length === 0 ? (
+                ) : null}
+                {showNoMatching ? (
                   <div className="py-6 text-center text-xs text-muted-foreground">
                     {t("tags.noMatching")}
                   </div>
@@ -412,7 +462,7 @@ export function AssetTagPicker({
                     id={`${inputId}-tag-name`}
                     autoFocus
                     value={formName}
-                    maxLength={64}
+                    maxLength={100}
                     placeholder={t("tags.tagNamePlaceholder")}
                     aria-label={t("tags.customLabel")}
                     className="h-8 text-xs"
@@ -437,7 +487,7 @@ export function AssetTagPicker({
                   <Input
                     id={`${inputId}-tag-desc`}
                     value={formDescription}
-                    maxLength={128}
+                    maxLength={255}
                     placeholder={t("tags.tagDescriptionPlaceholder")}
                     className="h-8 text-xs"
                     onChange={(e) => setFormDescription(e.target.value)}
@@ -553,13 +603,20 @@ export function AssetTagPicker({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!formName.trim()}
+                  disabled={!formName.trim() || isSavingTag}
                   className="h-7 text-xs"
                   onClick={handleSaveForm}
                 >
-                  {view === "edit" ? t("tags.save") : t("tags.create")}
+                  {isSavingTag || view === "edit"
+                    ? t("tags.save")
+                    : t("tags.create")}
                 </Button>
               </div>
+              {tagSaveError ? (
+                <p className="px-3 pb-3 text-xs text-destructive" role="alert">
+                  {tagSaveError}
+                </p>
+              ) : null}
             </div>
           )}
         </PopoverContent>
