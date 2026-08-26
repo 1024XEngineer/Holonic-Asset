@@ -209,3 +209,72 @@ func TestExecutorEditFramesRequiresDependenciesAndValidPayload(t *testing.T) {
 		})
 	}
 }
+
+func TestExecutorRequiresDependenciesForRemainingTasks(t *testing.T) {
+	events := []string{}
+	writer := &generationAssetWriterStub{events: &events}
+	anim := &animationGenerationServiceStub{events: &events}
+	refs := &executorReferenceStoreStub{}
+
+	t.Run("EditAnimation dependencies and malformed payload", func(t *testing.T) {
+		execWithoutWriter := generator.NewExecutorWithDependencies(nil, nil, nil, generator.ExecutorDependencies{
+			Animations: anim, References: refs,
+		})
+		if _, err := execWithoutWriter.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{}`)); !errors.Is(err, generator.ErrAssetWriterRequired) {
+			t.Fatalf("expected ErrAssetWriterRequired, got %v", err)
+		}
+
+		execWithoutAnim := generator.NewExecutorWithDependencies(nil, nil, writer, generator.ExecutorDependencies{
+			References: refs,
+		})
+		if _, err := execWithoutAnim.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{}`)); !errors.Is(err, generator.ErrAnimationServiceRequired) {
+			t.Fatalf("expected ErrAnimationServiceRequired, got %v", err)
+		}
+
+		execWithoutRefs := generator.NewExecutorWithDependencies(nil, nil, writer, generator.ExecutorDependencies{
+			Animations: anim,
+		})
+		if _, err := execWithoutRefs.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{}`)); !errors.Is(err, generator.ErrAnimationReferenceStoreRequired) {
+			t.Fatalf("expected ErrAnimationReferenceStoreRequired, got %v", err)
+		}
+
+		execFull := generator.NewExecutorWithDependencies(nil, nil, writer, generator.ExecutorDependencies{
+			Animations: anim, References: refs,
+		})
+		if _, err := execFull.Generate(context.Background(), generator.EditAnimation, json.RawMessage(`{`)); err == nil {
+			t.Fatal("expected malformed payload error")
+		}
+	})
+
+	t.Run("GenerateAnimation dependencies and malformed payload", func(t *testing.T) {
+		execWithoutWriter := generator.NewExecutorWithDependencies(nil, nil, nil, generator.ExecutorDependencies{
+			Animations: anim, References: refs,
+		})
+		if _, err := execWithoutWriter.Generate(context.Background(), generator.GenerateAnimation, json.RawMessage(`{}`)); !errors.Is(err, generator.ErrAssetWriterRequired) {
+			t.Fatalf("expected ErrAssetWriterRequired, got %v", err)
+		}
+
+		execFull := generator.NewExecutorWithDependencies(nil, nil, writer, generator.ExecutorDependencies{
+			Animations: anim, References: refs,
+		})
+		if _, err := execFull.Generate(context.Background(), generator.GenerateAnimation, json.RawMessage(`{`)); err == nil {
+			t.Fatal("expected malformed payload error")
+		}
+	})
+
+	t.Run("GenerateScenery invalid payload", func(t *testing.T) {
+		images := &imageGenerationServiceStub{events: &events}
+		processor := &imageProcessorStub{events: &events}
+		assets := &generationAssetWriterStub{events: &events}
+		llm := &dependencyLLMStub{}
+		resources := &dependencyResourceStub{}
+		exec := generator.NewExecutorWithDependencies(images, processor, assets, generator.ExecutorDependencies{
+			LLM: llm, Resources: resources, References: refs,
+		})
+		// Invalid scenery payload (ProjectID = 0)
+		invalidPayload := json.RawMessage(`{"project_id": 0, "asset_name": "Scenery"}`)
+		if _, err := exec.Generate(context.Background(), generator.GenerateScenery, invalidPayload); err == nil {
+			t.Fatal("expected invalid scenery payload error")
+		}
+	})
+}

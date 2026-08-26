@@ -57,6 +57,7 @@ func TestObjectPrototypeDerivesContentPercentageFromTargetDimensions(t *testing.
 		dimensions assetdomain.Size
 		want       string
 	}{
+		{name: "zero edge", dimensions: assetdomain.Size{Width: 0, Height: 0}, want: "approximately 20%"},
 		{name: "very small", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "approximately 20%"},
 		{name: "small sprite baseline", dimensions: assetdomain.Size{Width: 48, Height: 48}, want: "approximately 30%"},
 		{name: "rectangular couch", dimensions: assetdomain.Size{Width: 188, Height: 128}, want: "approximately 44%"},
@@ -165,5 +166,35 @@ func TestObjectPrototypeProtectsElongatedObjectComposition(t *testing.T) {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected elongated-object rule to contain %q: %s", expected, prompt)
 		}
+	}
+}
+
+func TestObjectPrototypeLogicalPixelTiers(t *testing.T) {
+	tests := []struct {
+		name       string
+		dimensions assetdomain.Size
+		want       string
+	}{
+		{name: "emblem scale (<=12)", dimensions: assetdomain.Size{Width: 16, Height: 16}, want: "emblem-scale object with only 10 x 10 drawable logical pixels"},
+		{name: "ultra small (<=24)", dimensions: assetdomain.Size{Width: 32, Height: 32}, want: "ultra-small object with only 20 x 20 drawable logical pixels"},
+		{name: "small (<=40)", dimensions: assetdomain.Size{Width: 64, Height: 64}, want: "small object with 40 x 40 drawable logical pixels"},
+		{name: "medium (<=80)", dimensions: assetdomain.Size{Width: 128, Height: 128}, want: "medium-size object with 80 x 80 drawable logical pixels"},
+		{name: "large (<=160)", dimensions: assetdomain.Size{Width: 256, Height: 256}, want: "object has 160 x 160 drawable logical pixels: permit more material"},
+		{name: "extra large (>160)", dimensions: assetdomain.Size{Width: 512, Height: 512}, want: "Even at this larger drawable target, construct the object from deliberate coarse pixel clusters"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := prompts.ObjectPrototype(
+				"test object",
+				"Top-Down",
+				tt.dimensions,
+				prompts.TransparentBackground(),
+				prompts.PrototypeReferenceState{},
+			)
+			if !strings.Contains(prompt, tt.want) {
+				t.Fatalf("expected prompt to contain %q: %s", tt.want, prompt)
+			}
+		})
 	}
 }
