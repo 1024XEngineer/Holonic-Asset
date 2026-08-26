@@ -5,10 +5,10 @@ import {
   type GenerationTaskListItem,
 } from "@/features/generation";
 import {
-  toCoreSpriteCandidateRecord,
+  toSpriteContentCandidate,
   useGenerateAnimationMutation,
   type AssetWorkspaceData,
-  type CoreSpriteAssetContentPatch,
+  type BackendSpriteContentPatch,
   type GenerateAnimationRequest,
   type GenerationTaskType,
 } from "@/model";
@@ -33,13 +33,13 @@ export function useEditorWorkspace({
     () => (animationTask ? [animationTask] : []),
     [animationTask],
   );
-  const flow = useEditorGenerationWorkspace<CoreSpriteAssetContentPatch>({
+  const flow = useEditorGenerationWorkspace<BackendSpriteContentPatch>({
     data,
     onBack,
     additionalTasks,
     isAdditionalGenerationPending: animationMutation.isPending,
     toCandidateRecord: (record, content) =>
-      toCoreSpriteCandidateRecord(record, asset.perspective, content),
+      toSpriteContentCandidate(record, asset.perspective, content),
   });
   const { snapshot, session, candidateRecord, reportAction } = flow;
 

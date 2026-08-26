@@ -3,10 +3,14 @@ import type {
   AssetRecordResponse,
   TileSetAssetContent,
 } from "../library/asset.contract";
-import type { AssetRecord, AssetWorkspaceData, TilesetItem } from "./types";
-import { createCoreAssetWorkspace } from "./core-asset-workspace";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  TilesetItem,
+} from "../record/types";
+import { createAssetSnapshot } from "../record/record-history.mapper";
 
-export function toCoreTilesetAssetWorkspace({
+export function toTilesetAssetContent({
   projectId,
   projectName,
   detail,
@@ -33,7 +37,7 @@ export function toCoreTilesetAssetWorkspace({
     },
   };
 
-  return createCoreAssetWorkspace({
+  return createAssetSnapshot({
     projectId,
     projectName,
     detail,
@@ -43,7 +47,7 @@ export function toCoreTilesetAssetWorkspace({
   });
 }
 
-export function toCoreTilesetCandidateRecord(
+export function toTilesetContentCandidate(
   record: AssetRecord,
   patch: TileSetAssetContent,
 ): AssetRecord {
@@ -78,7 +82,7 @@ export function toCoreTilesetCandidateRecord(
   };
 }
 
-export function getCoreTilesetCandidateItemIds(
+export function getTilesetCandidateItemIds(
   patch: TileSetAssetContent | undefined,
   items: readonly TilesetItem[],
   gridSize: number,
@@ -117,7 +121,7 @@ export function getCoreTilesetCandidateItemIds(
     .map((item) => item.id);
 }
 
-export function toCoreTilesetAssetContent(
+export function toBackendTilesetContent(
   record: Extract<AssetRecord, { mode: "tileset" }>,
 ) {
   return {

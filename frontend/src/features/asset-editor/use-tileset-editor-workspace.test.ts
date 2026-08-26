@@ -79,11 +79,11 @@ vi.mock("@/model", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/model")>();
   return {
     ...actual,
-    toCoreTilesetCandidateRecord: (
-      ...args: Parameters<typeof actual.toCoreTilesetCandidateRecord>
+    toTilesetContentCandidate: (
+      ...args: Parameters<typeof actual.toTilesetContentCandidate>
     ) =>
       mocks.candidateRecordOverride?.(...args) ??
-      actual.toCoreTilesetCandidateRecord(...args),
+      actual.toTilesetContentCandidate(...args),
     coreGenerationApi: { create: mocks.coreCreate },
     rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
     useGenerationCandidateQuery: () => mocks.candidateQuery,

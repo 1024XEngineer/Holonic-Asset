@@ -1,15 +1,15 @@
 import type {
   AssetAnimationResponse,
   AssetImageResourceResponse,
-  CoreSpriteAssetContent,
-  CoreSpriteAssetContentPatch,
+  BackendSpriteContent,
+  BackendSpriteContentPatch,
 } from "./asset.contract";
 
 export function mergeAssetContentPatch(
-  current: CoreSpriteAssetContent,
-  patch: CoreSpriteAssetContentPatch,
-): CoreSpriteAssetContent {
-  const merged: CoreSpriteAssetContent = {
+  current: BackendSpriteContent,
+  patch: BackendSpriteContentPatch,
+): BackendSpriteContent {
+  const merged: BackendSpriteContent = {
     ...current,
     ...(patch.directionCount === undefined
       ? {}

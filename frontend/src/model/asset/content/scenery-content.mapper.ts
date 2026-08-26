@@ -7,10 +7,10 @@ import type {
   AssetRecord,
   AssetWorkspaceData,
   SceneryCanvasDimensions,
-} from "./types";
-import { createCoreAssetWorkspace } from "./core-asset-workspace";
+} from "../record/types";
+import { createAssetSnapshot } from "../record/record-history.mapper";
 
-export function toCoreSceneryAssetWorkspace({
+export function toSceneryAssetContent({
   projectId,
   projectName,
   detail,
@@ -41,7 +41,7 @@ export function toCoreSceneryAssetWorkspace({
     },
   };
 
-  return createCoreAssetWorkspace({
+  return createAssetSnapshot({
     projectId,
     projectName,
     detail,
@@ -51,17 +51,17 @@ export function toCoreSceneryAssetWorkspace({
   });
 }
 
-export function toCoreSceneryAssetContent(
+export function toBackendSceneryContent(
   record: Extract<AssetRecord, { mode: "scenery" }>,
 ) {
   return {
     layers: record.scenery.layers.map((layer, layerIndex) =>
-      toCoreSceneryLayer(layer, layerIndex),
+      toBackendSceneryLayer(layer, layerIndex),
     ),
   };
 }
 
-function toCoreSceneryLayer(layer: SceneryLayer, index: number) {
+function toBackendSceneryLayer(layer: SceneryLayer, index: number) {
   return {
     id: numericId(layer.id, index + 1),
     name: layer.label,

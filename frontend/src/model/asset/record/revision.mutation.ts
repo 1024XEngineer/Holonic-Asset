@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { assetKeys } from "../library/keys";
 import type { AssetWorkspaceData } from "./types";
-import { assetWorkspaceApi } from "./record.api";
+import { assetRecordApi } from "./record.api";
 import { recordKeys } from "./record.keys";
 import { readAuthenticatedUserId } from "@/model/auth";
 
@@ -10,7 +10,7 @@ export function useSaveAssetRevisionMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: assetWorkspaceApi.saveRevision,
+    mutationFn: assetRecordApi.saveRevision,
     onSuccess: async (saved, { assetId, projectId }) => {
       const userID = readAuthenticatedUserId();
       queryClient.setQueryData(

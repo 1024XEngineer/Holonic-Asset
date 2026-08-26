@@ -24,17 +24,14 @@ vi.mock("../../project", async (importOriginal) => ({
   projectApi: { detail: mocks.projectDetail },
 }));
 
+import { loadAssetSnapshot, saveAssetRevision } from "./record.api";
+import { toSceneryAssetContent } from "../content/scenery-content.mapper";
 import {
-  loadCoreAssetWorkspace,
-  saveCoreAssetRevision,
-} from "./core-asset-record";
-import { toCoreSceneryAssetWorkspace } from "./core-scenery-record";
-import {
-  getCoreTilesetCandidateItemIds,
-  toCoreTilesetAssetWorkspace,
-  toCoreTilesetCandidateRecord,
-} from "./core-tileset-record";
-import { toCoreUISetAssetWorkspace } from "./core-uiset-record";
+  getTilesetCandidateItemIds,
+  toTilesetAssetContent,
+  toTilesetContentCandidate,
+} from "../content/tileset-content.mapper";
+import { toUISetAssetContent } from "../content/uiset-content.mapper";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -82,7 +79,7 @@ describe("Tileset candidates", () => {
       ],
     };
 
-    expect(toCoreTilesetCandidateRecord(record, patch)).toEqual({
+    expect(toTilesetContentCandidate(record, patch)).toEqual({
       ...record,
       tileset: {
         ...record.tileset,
@@ -95,14 +92,15 @@ describe("Tileset candidates", () => {
         ],
       },
     });
-    expect(
-      getCoreTilesetCandidateItemIds(patch, record.tileset.items, 4),
-    ).toEqual(["first", "second"]);
+    expect(getTilesetCandidateItemIds(patch, record.tileset.items, 4)).toEqual([
+      "first",
+      "second",
+    ]);
   });
 
   it("rejects non-Tileset records and ignores unusable review positions", () => {
     expect(() =>
-      toCoreTilesetCandidateRecord(
+      toTilesetContentCandidate(
         {
           mode: "uiset",
           prompt: "Menu",
@@ -112,7 +110,7 @@ describe("Tileset candidates", () => {
       ),
     ).toThrow("require a Tileset asset");
     expect(
-      getCoreTilesetCandidateItemIds(
+      getTilesetCandidateItemIds(
         {
           items: [
             {
@@ -132,12 +130,12 @@ describe("Tileset candidates", () => {
   });
 });
 
-describe("loadCoreAssetWorkspace", () => {
+describe("loadAssetSnapshot", () => {
   it("loads a persisted scenery asset without falling back to mock data", async () => {
     mocks.assetDetail.mockResolvedValue(sceneryDetail());
 
     await expect(
-      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadAssetSnapshot({ projectId: "11", assetId: "9" }),
     ).resolves.toMatchObject({
       projectName: "Demo",
       asset: { id: "9", projectId: "11", kind: "scenery", version: "v3" },
@@ -164,7 +162,7 @@ describe("loadCoreAssetWorkspace", () => {
     mocks.assetDetail.mockResolvedValue(tilesetDetail());
 
     await expect(
-      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadAssetSnapshot({ projectId: "11", assetId: "9" }),
     ).resolves.toMatchObject({
       projectName: "Demo",
       asset: { id: "9", projectId: "11", kind: "tileset", version: "v3" },
@@ -195,7 +193,7 @@ describe("loadCoreAssetWorkspace", () => {
     "rejects a non-persisted asset ID: %s",
     async (assetId) => {
       await expect(
-        loadCoreAssetWorkspace({ projectId: "11", assetId }),
+        loadAssetSnapshot({ projectId: "11", assetId }),
       ).rejects.toThrow("requires a persisted Core API asset");
       expect(mocks.assetDetail).not.toHaveBeenCalled();
     },
@@ -205,7 +203,7 @@ describe("loadCoreAssetWorkspace", () => {
     mocks.assetDetail.mockResolvedValue(audioDetail());
 
     await expect(
-      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadAssetSnapshot({ projectId: "11", assetId: "9" }),
     ).rejects.toThrow("Audio assets do not have editable records.");
   });
 
@@ -215,7 +213,7 @@ describe("loadCoreAssetWorkspace", () => {
       mocks.assetDetail.mockResolvedValue(spriteDetail(type));
 
       await expect(
-        loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+        loadAssetSnapshot({ projectId: "11", assetId: "9" }),
       ).resolves.toMatchObject({
         asset: { kind: type },
         record: { mode: type },
@@ -227,7 +225,7 @@ describe("loadCoreAssetWorkspace", () => {
     mocks.assetDetail.mockResolvedValue(uiSetDetail());
 
     await expect(
-      loadCoreAssetWorkspace({ projectId: "11", assetId: "9" }),
+      loadAssetSnapshot({ projectId: "11", assetId: "9" }),
     ).resolves.toMatchObject({
       asset: { kind: "uiset" },
       record: { mode: "uiset", uiset: { components: [{ label: "Start" }] } },
@@ -235,13 +233,13 @@ describe("loadCoreAssetWorkspace", () => {
   });
 });
 
-describe("saveCoreAssetRevision", () => {
+describe("saveAssetRevision", () => {
   it("persists scenery content and reloads real revision history", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 4 });
     mocks.assetRecords.mockResolvedValue({ records: [sceneryRecord()] });
 
     await expect(
-      saveCoreAssetRevision({
+      saveAssetRevision({
         projectId: "11",
         assetId: "9",
         version: "v3",
@@ -287,7 +285,7 @@ describe("saveCoreAssetRevision", () => {
   });
 
   it("round-trips UI component coordinates through Core content", async () => {
-    const workspace = toCoreUISetAssetWorkspace({
+    const workspace = toUISetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: uiSetDetail(),
@@ -295,7 +293,7 @@ describe("saveCoreAssetRevision", () => {
     });
     mocks.assetRecord.mockResolvedValue({ version: 2 });
 
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       version: "v1",
@@ -334,7 +332,7 @@ describe("saveCoreAssetRevision", () => {
   it("persists Tileset content with and without generated tile URLs", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 2 });
 
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       record: {
@@ -376,7 +374,7 @@ describe("saveCoreAssetRevision", () => {
   it("uses raw UI Set bounds when its canvas dimensions are unavailable", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 2 });
 
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       record: {
@@ -414,7 +412,7 @@ describe("saveCoreAssetRevision", () => {
   it("serializes omitted scenery display fields and optional transform", async () => {
     mocks.assetRecord.mockResolvedValue({ version: 2 });
 
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       record: {
@@ -471,12 +469,12 @@ describe("saveCoreAssetRevision", () => {
       nodePositions: {},
     };
 
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       record: { mode: "character", prompt: "Hero", character: sprite },
     });
-    await saveCoreAssetRevision({
+    await saveAssetRevision({
       projectId: "11",
       assetId: "9",
       record: { mode: "object", prompt: "Chest", object: sprite },
@@ -492,9 +490,9 @@ describe("saveCoreAssetRevision", () => {
   });
 });
 
-describe("toCoreTilesetAssetWorkspace", () => {
+describe("toTilesetAssetContent", () => {
   it("keeps the generated tile URLs aligned with their occupied cells", () => {
-    const workspace = toCoreTilesetAssetWorkspace({
+    const workspace = toTilesetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: tilesetDetail(),
@@ -524,13 +522,13 @@ describe("toCoreTilesetAssetWorkspace", () => {
     const noContent = tilesetDetail();
     delete noContent.content;
 
-    const itemWorkspace = toCoreTilesetAssetWorkspace({
+    const itemWorkspace = toTilesetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: itemWithoutTiles,
       records: [],
     });
-    const emptyWorkspace = toCoreTilesetAssetWorkspace({
+    const emptyWorkspace = toTilesetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: noContent,
@@ -548,9 +546,9 @@ describe("toCoreTilesetAssetWorkspace", () => {
   });
 });
 
-describe("toCoreSceneryAssetWorkspace", () => {
+describe("toSceneryAssetContent", () => {
   it("maps persisted layer resources to scenery canvas layers", () => {
-    const workspace = toCoreSceneryAssetWorkspace({
+    const workspace = toSceneryAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: sceneryDetail(),
@@ -582,7 +580,7 @@ describe("toCoreSceneryAssetWorkspace", () => {
       rotation: 12.4,
     };
 
-    const workspace = toCoreSceneryAssetWorkspace({
+    const workspace = toSceneryAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -630,7 +628,7 @@ describe("toCoreSceneryAssetWorkspace", () => {
     if (!layer) throw new Error("Expected a scenery layer.");
     layer.transform = transform;
 
-    const workspace = toCoreSceneryAssetWorkspace({
+    const workspace = toSceneryAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -652,7 +650,7 @@ describe("toCoreSceneryAssetWorkspace", () => {
     delete layer.opacity;
     delete layer.zIndex;
 
-    const workspace = toCoreSceneryAssetWorkspace({
+    const workspace = toSceneryAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -682,7 +680,7 @@ describe("toCoreSceneryAssetWorkspace", () => {
     const detail = sceneryDetail();
     delete detail.content;
 
-    const workspace = toCoreSceneryAssetWorkspace({
+    const workspace = toSceneryAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail,
@@ -698,7 +696,7 @@ describe("toCoreSceneryAssetWorkspace", () => {
 
 describe("non-image Core asset workspaces", () => {
   it("maps UI Set components without mock defaults", () => {
-    const workspace = toCoreUISetAssetWorkspace({
+    const workspace = toUISetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: uiSetDetail(),
@@ -729,13 +727,13 @@ describe("non-image Core asset workspaces", () => {
     const noContent = uiSetDetail();
     delete noContent.content;
 
-    const emptyWorkspace = toCoreUISetAssetWorkspace({
+    const emptyWorkspace = toUISetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: empty,
       records: [],
     });
-    const noContentWorkspace = toCoreUISetAssetWorkspace({
+    const noContentWorkspace = toUISetAssetContent({
       projectId: "11",
       projectName: "Demo",
       detail: noContent,

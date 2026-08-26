@@ -2,10 +2,14 @@ import type {
   AssetDetailResponse,
   AssetRecordResponse,
 } from "../library/asset.contract";
-import type { AssetRecord, AssetWorkspaceData, UISetComponent } from "./types";
-import { createCoreAssetWorkspace } from "./core-asset-workspace";
+import type {
+  AssetRecord,
+  AssetWorkspaceData,
+  UISetComponent,
+} from "../record/types";
+import { createAssetSnapshot } from "../record/record-history.mapper";
 
-export function toCoreUISetAssetWorkspace({
+export function toUISetAssetContent({
   projectId,
   projectName,
   detail,
@@ -36,7 +40,7 @@ export function toCoreUISetAssetWorkspace({
     },
   };
 
-  return createCoreAssetWorkspace({
+  return createAssetSnapshot({
     projectId,
     projectName,
     detail,
@@ -46,17 +50,21 @@ export function toCoreUISetAssetWorkspace({
   });
 }
 
-export function toCoreUISetAssetContent(
+export function toBackendUISetContent(
   record: Extract<AssetRecord, { mode: "uiset" }>,
 ) {
   return {
     components: record.uiset.components.map((component, componentIndex) =>
-      toCoreUISetComponent(component, componentIndex, record.uiset.dimensions),
+      toBackendUISetComponent(
+        component,
+        componentIndex,
+        record.uiset.dimensions,
+      ),
     ),
   };
 }
 
-function toCoreUISetComponent(
+function toBackendUISetComponent(
   component: UISetComponent,
   index: number,
   dimensions: { width: number; height: number } | undefined,

@@ -1,7 +1,7 @@
 import { buildTilesetGenerationRequest } from "@/features/generation";
 import {
-  getCoreTilesetCandidateItemIds,
-  toCoreTilesetCandidateRecord,
+  getTilesetCandidateItemIds,
+  toTilesetContentCandidate,
   type AssetWorkspaceData,
   type TileSetAssetContent,
 } from "@/model";
@@ -20,7 +20,7 @@ export function useTilesetEditorWorkspace({
   const flow = useEditorGenerationWorkspace<TileSetAssetContent>({
     data,
     onBack,
-    toCandidateRecord: toCoreTilesetCandidateRecord,
+    toCandidateRecord: toTilesetContentCandidate,
   });
 
   if (flow.snapshot.record.mode !== "tileset") return null;
@@ -30,7 +30,7 @@ export function useTilesetEditorWorkspace({
   const isTilesetReview =
     flow.candidateKind === "edit_tileset_item" ||
     flow.candidateKind === "edit_tiles";
-  const changedItemIds = getCoreTilesetCandidateItemIds(
+  const changedItemIds = getTilesetCandidateItemIds(
     flow.candidateContent,
     record.tileset.items,
     record.tileset.gridSize,

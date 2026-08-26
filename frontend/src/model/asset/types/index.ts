@@ -12,6 +12,7 @@ export {
   type AssetDirection,
 } from "./directional-asset";
 export type { AssetRevision, AssetRevisionStatus } from "./asset-revision";
+export type { AssetAttributes } from "./asset-attributes";
 export {
   DEFAULT_ANIMATION_FRAME_DURATION_MS,
   getAnimationFrameDuration,
