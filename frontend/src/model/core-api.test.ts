@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { coreAssetApi } from "./asset/library/core-asset.api";
+import { coreExportApi } from "./export/export.api";
 import { coreGenerationApi } from "./generation/run/core-generation.api";
 import { coreProjectApi } from "./project/core-project.api";
 import { uploadApi } from "./upload/upload.api";
@@ -35,6 +36,9 @@ describe("core API clients", () => {
     await coreAssetApi.update({} as never);
     await coreAssetApi.delete({} as never);
 
+    await coreExportApi.create({ assetId: 9 });
+    await coreExportApi.get(11);
+
     await coreGenerationApi.create(7, {} as never);
     await coreGenerationApi.list(7, { status: "active" });
     await coreGenerationApi.detail(10);
@@ -44,7 +48,7 @@ describe("core API clients", () => {
     await coreGenerationApi.resolveApplication(10, true);
     await uploadApi.createTarget({} as never);
 
-    expect(fetchMock).toHaveBeenCalledTimes(24);
+    expect(fetchMock).toHaveBeenCalledTimes(26);
     expect(fetchMock.mock.calls.map(([request]) => request.url)).toEqual(
       [
         "/auth/login",
@@ -63,6 +67,8 @@ describe("core API clients", () => {
         "/asset/rollback",
         "/asset/update",
         "/asset/delete",
+        "/asset/export",
+        "/export/11",
         "/projects/7/generation-runs",
         "/projects/7/generation-runs?status=active",
         "/generation-runs/10",
@@ -92,6 +98,8 @@ describe("core API clients", () => {
       "DELETE",
       "POST",
       "GET",
+      "POST",
+      "GET",
       "GET",
       "POST",
       "POST",
@@ -102,7 +110,7 @@ describe("core API clients", () => {
     expect(fetchMock.mock.calls[7]?.[0].cache).toBe("no-store");
     expect(fetchMock.mock.calls[8]?.[0].cache).toBe("no-store");
     expect(fetchMock.mock.calls[9]?.[0].cache).toBe("no-store");
-    expect(fetchMock.mock.calls[17]?.[0].cache).toBe("no-store");
-    expect(fetchMock.mock.calls[18]?.[0].cache).toBe("no-store");
+    expect(fetchMock.mock.calls[19]?.[0].cache).toBe("no-store");
+    expect(fetchMock.mock.calls[20]?.[0].cache).toBe("no-store");
   });
 });

@@ -2,12 +2,24 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AssetWorkspaceData, AssetWorkspaceDataForKind } from "@/model";
 import { withI18n } from "@/testing/with-i18n";
 
 import { SceneryEditorMode } from "./scenery-editor-mode";
+
+const mocks = vi.hoisted(() => ({
+  exportAsset: vi.fn(),
+  isExporting: false,
+}));
+
+vi.mock("@/model", async (importOriginal) => ({
+  ...(await importOriginal()),
+  useAssetExport: () => mocks,
+}));
+
+beforeEach(() => vi.clearAllMocks());
 
 afterEach(cleanup);
 
@@ -24,6 +36,7 @@ describe("SceneryEditorMode", () => {
     expect(html).toContain("Scene layers");
     expect(html).toContain("Inspect");
     expect(html).toContain("Preview ready");
+    expect(html).toContain('title="Export"');
   });
 
   it("routes layer selection and visibility events", () => {
@@ -45,6 +58,18 @@ describe("SceneryEditorMode", () => {
     expect(screen.getByRole("button", { name: "Hide Sky" })).toBeTruthy();
   });
 
+  it("starts an export for the persisted scenery asset", () => {
+    render(
+      withI18n(
+        <SceneryEditorMode data={workspaceData} onBack={() => undefined} />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+
+    expect(mocks.exportAsset).toHaveBeenCalledWith(1);
+  });
+
   it("does not render for a non-scenery record", () => {
     const html = renderToStaticMarkup(
       withI18n(
@@ -62,7 +87,7 @@ describe("SceneryEditorMode", () => {
 const workspaceData: AssetWorkspaceDataForKind<"scenery"> = {
   projectName: "Demo project",
   asset: {
-    id: "asset-1",
+    id: "1",
     projectId: "project-1",
     kind: "scenery",
     name: "Forest",

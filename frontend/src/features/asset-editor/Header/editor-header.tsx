@@ -1,4 +1,4 @@
-import { ArrowLeft, Redo2, Save, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Redo2, Save, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +19,13 @@ export type EditorHeaderProps = {
   canRedo: boolean;
   isDirty: boolean;
   isSaving: boolean;
+  canExport: boolean;
+  isExporting: boolean;
   generationTasks: GenerationTaskListItem[];
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
+  onExport: () => void;
 };
 
 export function EditorHeader({
@@ -36,10 +39,13 @@ export function EditorHeader({
   canRedo,
   isDirty,
   isSaving,
+  canExport,
+  isExporting,
   generationTasks,
   onUndo,
   onRedo,
   onSave,
+  onExport,
 }: EditorHeaderProps) {
   const { t } = useTranslation("editor");
   return (
@@ -104,6 +110,18 @@ export function EditorHeader({
           <Save data-icon="inline-start" />
           <span className="hidden sm:inline">
             {isSaving ? t("saving") : t("save")}
+          </span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!canExport || isSaving || isExporting}
+          onClick={onExport}
+          title={canExport ? t("export") : t("exportUnavailable")}
+        >
+          <Download data-icon="inline-start" />
+          <span className="hidden sm:inline">
+            {isExporting ? t("exporting") : t("export")}
           </span>
         </Button>
       </div>
