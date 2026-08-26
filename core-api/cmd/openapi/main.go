@@ -29,6 +29,7 @@ func main() {
 		handler.NewProjectHandler(nil),
 		handler.NewGenerationHandler(nil),
 		handler.NewUploadHandler(nil),
+		handler.NewProjectTagHandler(nil),
 		handler.NewExportHandler(nil),
 		router.Authentication{
 			Router:     handler.NewAuthHandler(nil),

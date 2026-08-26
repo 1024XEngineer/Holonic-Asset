@@ -18,9 +18,10 @@ func Register(
 	pr ProjectRouter,
 	gr GenerationRouter,
 	ur UploadRouter,
+	tr ProjectTagRouter,
 	authentication ...Authentication,
 ) *echo.Echo {
-	return register(as, pr, gr, ur, nil, authentication...)
+	return register(as, pr, gr, ur, tr, nil, authentication...)
 }
 
 // RegisterWithExport assembles the API including the asynchronous export routes.
@@ -29,10 +30,11 @@ func RegisterWithExport(
 	pr ProjectRouter,
 	gr GenerationRouter,
 	ur UploadRouter,
+	tr ProjectTagRouter,
 	er ExportRouter,
 	authentication ...Authentication,
 ) *echo.Echo {
-	return register(as, pr, gr, ur, er, authentication...)
+	return register(as, pr, gr, ur, tr, er, authentication...)
 }
 
 func register(
@@ -40,6 +42,7 @@ func register(
 	pr ProjectRouter,
 	gr GenerationRouter,
 	ur UploadRouter,
+	tr ProjectTagRouter,
 	er ExportRouter,
 	authentication ...Authentication,
 ) *echo.Echo {
@@ -60,6 +63,9 @@ func register(
 	}
 	if as != nil {
 		RegisterAssetRoutes(openAPI, as)
+	}
+	if tr != nil {
+		RegisterProjectTagRoutes(openAPI, tr)
 	}
 	if pr != nil {
 		RegisterProjectRoutes(openAPI, pr)

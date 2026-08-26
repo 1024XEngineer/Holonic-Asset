@@ -80,7 +80,7 @@ func newAppWithServices(
 		references = candidate
 	}
 	projectRepository := repository.NewProjectRepository(projectDao)
-	workspaceModule := workspace.New(projectRepository, assetStore, imageService, references)
+	workspaceModule := workspace.New(projectRepository, assetStore, nil, imageService, references)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
 
 	var assetRouter router.AssetRouter
@@ -88,11 +88,16 @@ func newAppWithServices(
 		assetRouter = handler.NewHandler(workspaceModule.Assets, references)
 	}
 
+	var tagRouter router.ProjectTagRouter
+	if workspaceModule.Tags != nil {
+		tagRouter = handler.NewProjectTagHandler(workspaceModule.Tags)
+	}
+
 	generationHandler := handler.NewGenerationHandler(generator.NewEngine(nil, nil), references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
 
 	return &App{
-		engine: router.Register(assetRouter, projectHandler, generationHandler, uploadHandler),
+		engine: router.Register(assetRouter, projectHandler, generationHandler, uploadHandler, tagRouter),
 	}
 }
 
@@ -125,6 +130,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	}
 	projectStore := InitProjectStore(db)
 	assetStore := InitAssetStore(db)
+	tagStore := InitTagStore(db)
 	taskStore := InitTaskStore(db)
 	imageService := InitImageService(cfg.Image, appLogger)
 	llmService := InitLLMService(cfg.LLM, appLogger)
@@ -153,7 +159,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	}
 
 	// Business modules.
-	workspaceModule := workspace.New(projectStore, assetStore, imageService, references)
+	workspaceModule := workspace.New(projectStore, assetStore, tagStore, imageService, references)
 	videos := InitVideoService(cfg.Video, appLogger)
 	imageProcessor := InitImageProcessor()
 	animations := generator.NewAnimationGenerationServiceWithDependencies(
@@ -188,6 +194,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 	// Transport.
 	assetHandler := handler.NewHandler(workspaceModule.Assets, references)
 	projectHandler := handler.NewProjectHandler(workspaceModule.Projects, references)
+	tagHandler := handler.NewProjectTagHandler(workspaceModule.Tags)
 	generationHandler := handler.NewGenerationHandler(generatorEngine, references)
 	uploadHandler := handler.NewUploadHandler(upload.NewManager(uploadStore))
 	exportHandler := handler.NewExportHandler(exportManager)
@@ -197,6 +204,7 @@ func InitServerFromConfig(ctx context.Context, cfg config.Config) (*App, error) 
 		projectHandler,
 		generationHandler,
 		uploadHandler,
+		tagHandler,
 		exportHandler,
 		router.Authentication{
 			Router:         authHandler,

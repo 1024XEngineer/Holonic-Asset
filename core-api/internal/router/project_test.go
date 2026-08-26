@@ -61,7 +61,7 @@ func (s *projectRouterStub) GenerateReference(
 
 func TestReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 	stub := &projectRouterStub{}
-	e := router.Register(nil, stub, nil, nil)
+	e := router.Register(nil, stub, nil, nil, nil)
 	recorder := serveProjectRequest(
 		t,
 		e,
@@ -89,7 +89,7 @@ func TestReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 
 func TestReferenceGenerationRejectsExplicitEmptyPerspective(t *testing.T) {
 	stub := &projectRouterStub{}
-	e := router.Register(nil, stub, nil, nil)
+	e := router.Register(nil, stub, nil, nil, nil)
 	recorder := serveProjectRequest(
 		t,
 		e,
@@ -105,7 +105,7 @@ func TestReferenceGenerationRejectsExplicitEmptyPerspective(t *testing.T) {
 
 func TestProjectCreateAllowsOmittedClassifications(t *testing.T) {
 	stub := &projectRouterStub{}
-	e := router.Register(nil, stub, nil, nil)
+	e := router.Register(nil, stub, nil, nil, nil)
 	recorder := serveProjectRequest(
 		t,
 		e,
@@ -124,7 +124,7 @@ func TestProjectCreateAllowsOmittedClassifications(t *testing.T) {
 
 func TestProjectCreateUsesOpenAPIContract(t *testing.T) {
 	stub := &projectRouterStub{}
-	e := router.Register(nil, stub, nil, nil)
+	e := router.Register(nil, stub, nil, nil, nil)
 	recorder := serveProjectRequest(
 		t,
 		e,
@@ -233,7 +233,7 @@ func newProjectTestServer(projectDao dao.ProjectDao) *echo.Echo {
 	projectRepository := repository.NewProjectRepository(projectDao)
 	projectManager := project.NewManager(projectRepository, nil)
 	projectHandler := handler.NewProjectHandler(projectManager)
-	return router.Register(nil, projectHandler, nil, nil)
+	return router.Register(nil, projectHandler, nil, nil, nil)
 }
 
 func serveProjectRequest(t *testing.T, e *echo.Echo, method string, path string, body string) *httptest.ResponseRecorder {

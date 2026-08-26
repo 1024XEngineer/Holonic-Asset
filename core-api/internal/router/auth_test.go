@@ -49,6 +49,7 @@ func TestAuthenticationKeepsLoginPublicAndProtectsAPIRoutes(t *testing.T) {
 		nil,
 		nil,
 		handler.NewUploadHandler(upload.NewManager(nil)),
+		nil,
 		router.Authentication{
 			Router: authRouterStub{},
 			Middleware: func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -84,6 +85,7 @@ func TestAuthenticationUsesConfiguredAllowedOrigins(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 		router.Authentication{AllowedOrigins: []string{"https://example.com"}},
 	)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/openapi.json", nil)
@@ -100,6 +102,7 @@ func TestAuthenticationUsesConfiguredAllowedOrigins(t *testing.T) {
 func TestLoginResponseDoesNotExposeInternalErrors(t *testing.T) {
 	internalMessage := "auth: find user: database connection details"
 	server := router.Register(
+		nil,
 		nil,
 		nil,
 		nil,

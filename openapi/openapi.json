@@ -304,6 +304,40 @@
         ],
         "type": "object"
       },
+      "CreateProjectTagRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "tag": {
+            "$ref": "#/components/schemas/ProjectTagResponse"
+          }
+        },
+        "required": [
+          "tag"
+        ],
+        "type": "object"
+      },
       "CreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -419,6 +453,18 @@
         "type": "object"
       },
       "DeleteProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "DeleteProjectTagResponse": {
         "additionalProperties": false,
         "properties": {
           "success": {
@@ -794,6 +840,21 @@
         ],
         "type": "object"
       },
+      "ListProjectTagsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTagResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "tags"
+        ],
+        "type": "object"
+      },
       "ListProjectsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -947,6 +1008,53 @@
           "description",
           "reference",
           "style"
+        ],
+        "type": "object"
+      },
+      "ProjectTagDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "tag": {
+            "$ref": "#/components/schemas/ProjectTagResponse"
+          }
+        },
+        "required": [
+          "tag"
+        ],
+        "type": "object"
+      },
+      "ProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "projectId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tagId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tagId",
+          "projectId",
+          "name",
+          "color"
         ],
         "type": "object"
       },
@@ -1228,6 +1336,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseCreateProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateProjectTagResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseCreateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1315,6 +1448,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/DeleteProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseDeleteProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteProjectTagResponse"
           },
           "message": {
             "const": "success",
@@ -1478,6 +1636,31 @@
         ],
         "type": "object"
       },
+      "SuccessResponseListProjectTagsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ListProjectTagsResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
       "SuccessResponseListProjectsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1540,6 +1723,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProjectDetailResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseProjectTagDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectTagDetailResponse"
           },
           "message": {
             "const": "success",
@@ -1665,6 +1873,31 @@
           },
           "data": {
             "$ref": "#/components/schemas/UpdateProjectResponse"
+          },
+          "message": {
+            "const": "success",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "type": "object"
+      },
+      "SuccessResponseUpdateProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              200
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UpdateProjectTagResponse"
           },
           "message": {
             "const": "success",
@@ -1902,6 +2135,37 @@
         },
         "required": [
           "success"
+        ],
+        "type": "object"
+      },
+      "UpdateProjectTagRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateProjectTagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "tag": {
+            "$ref": "#/components/schemas/ProjectTagResponse"
+          }
+        },
+        "required": [
+          "tag"
         ],
         "type": "object"
       },
@@ -3661,6 +3925,460 @@
         "summary": "Create a generation run",
         "tags": [
           "Generation"
+        ]
+      }
+    },
+    "/projects/{project_id}/tags": {
+      "get": {
+        "operationId": "listProjectTags",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseListProjectTagsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List project tags",
+        "tags": [
+          "Assets"
+        ]
+      },
+      "post": {
+        "operationId": "createProjectTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseCreateProjectTagResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a project tag",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/projects/{project_id}/tags/{tag_id}": {
+      "delete": {
+        "operationId": "deleteProjectTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseDeleteProjectTagResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a project tag",
+        "tags": [
+          "Assets"
+        ]
+      },
+      "get": {
+        "operationId": "getProjectTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseProjectTagDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get a project tag",
+        "tags": [
+          "Assets"
+        ]
+      },
+      "put": {
+        "operationId": "updateProjectTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseUpdateProjectTagResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a project tag",
+        "tags": [
+          "Assets"
         ]
       }
     },

@@ -8,6 +8,7 @@ import (
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/project"
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/tag"
 )
 
 type projectStoreStub struct {
@@ -18,13 +19,20 @@ type assetStoreStub struct {
 	asset.Store
 }
 
-func TestNewGroupsProjectAndAssetManagers(t *testing.T) {
-	module := workspace.New(&projectStoreStub{}, &assetStoreStub{}, nil)
+type tagStoreStub struct {
+	tag.Store
+}
+
+func TestNewGroupsProjectAssetAndTagManagers(t *testing.T) {
+	module := workspace.New(&projectStoreStub{}, &assetStoreStub{}, &tagStoreStub{}, nil)
 	if module.Projects == nil {
 		t.Fatal("expected project manager")
 	}
 	if module.Assets == nil {
 		t.Fatal("expected asset manager")
+	}
+	if module.Tags == nil {
+		t.Fatal("expected tag manager")
 	}
 }
 
@@ -37,7 +45,7 @@ func (*imageServiceStub) Generate(context.Context, *imageclient.GenerateRequest)
 }
 
 func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
-	module := workspace.New(&projectStoreStub{}, nil, &imageServiceStub{})
+	module := workspace.New(&projectStoreStub{}, nil, nil, &imageServiceStub{})
 	result, err := module.Projects.GenerateReference(context.Background(), &project.Project{
 		UserID:         7,
 		Name:           "Prototype",
@@ -54,8 +62,8 @@ func TestNewInjectsImageServiceIntoProjectManager(t *testing.T) {
 }
 
 func TestNewLeavesUnavailableCapabilitiesNil(t *testing.T) {
-	module := workspace.New(nil, nil, nil)
-	if module.Projects != nil || module.Assets != nil {
+	module := workspace.New(nil, nil, nil, nil)
+	if module.Projects != nil || module.Assets != nil || module.Tags != nil {
 		t.Fatalf("expected unavailable capabilities to remain nil: %+v", module)
 	}
 }
