@@ -2,8 +2,8 @@ import type {
   AssetDetailResponse,
   AssetRecordResponse,
   CharacterAssetContent,
-  CoreSpriteAssetContent,
-  CoreSpriteAssetContentPatch,
+  BackendSpriteContent,
+  BackendSpriteContentPatch,
 } from "../library/asset.contract";
 import { coreAssetApi } from "../library/core-asset.api";
 import { mergeAssetContentPatch } from "../library/merge-asset-content";
@@ -20,15 +20,15 @@ import type {
   AssetRecordSaveResult,
   GetAssetRecordInput,
   SaveAssetRecordInput,
-} from "./types";
+} from "../record/types";
 import {
-  createCoreAssetWorkspace,
-  toCoreAssetHistory,
-} from "./core-asset-workspace";
+  createAssetSnapshot,
+  toAssetHistory,
+} from "../record/record-history.mapper";
 
 type CoreSpriteAssetKind = Extract<AssetKind, "character" | "object">;
 
-export async function loadCoreSpriteAssetWorkspace(
+export async function loadSpriteAssetContent(
   input: GetAssetRecordInput,
 ): Promise<AssetWorkspaceData | undefined> {
   const assetId = Number(input.assetId);
@@ -43,7 +43,7 @@ export async function loadCoreSpriteAssetWorkspace(
     projectApi.detail(input.projectId),
     coreAssetApi.records(assetId),
   ]);
-  return toCoreSpriteAssetWorkspace({
+  return toSpriteAssetContent({
     projectId: input.projectId,
     projectName: project.name,
     detail,
@@ -51,7 +51,7 @@ export async function loadCoreSpriteAssetWorkspace(
   });
 }
 
-export async function saveCoreSpriteAssetRevision(
+export async function saveSpriteRevision(
   input: SaveAssetRecordInput,
 ): Promise<AssetRecordSaveResult | undefined> {
   const assetId = Number(input.assetId);
@@ -65,19 +65,19 @@ export async function saveCoreSpriteAssetRevision(
     assetId,
     ...(expectedVersion ? { expectedVersion } : {}),
     ...(input.description ? { description: input.description } : {}),
-    content: toCoreSpriteAssetContent(input.record),
+    content: toBackendSpriteContent(input.record),
   });
   const records = await coreAssetApi.records(assetId);
   return {
     projectId: input.projectId,
     assetId: input.assetId,
     version: `v${saved.version}`,
-    history: toCoreAssetHistory(records.records, saved.version),
+    history: toAssetHistory(records.records, saved.version),
     record: structuredClone(input.record),
   };
 }
 
-export function toCoreSpriteAssetWorkspace({
+export function toSpriteAssetContent({
   projectId,
   projectName,
   detail,
@@ -103,7 +103,7 @@ export function toCoreSpriteAssetWorkspace({
       ? { mode: kind, prompt: detail.description, character: sprite }
       : { mode: kind, prompt: detail.description, object: sprite };
 
-  return createCoreAssetWorkspace({
+  return createAssetSnapshot({
     projectId,
     projectName,
     detail,
@@ -113,10 +113,10 @@ export function toCoreSpriteAssetWorkspace({
   });
 }
 
-export function toCoreSpriteCandidateRecord(
+export function toSpriteContentCandidate(
   record: AssetRecord,
   perspective: AssetWorkspaceData["asset"]["perspective"],
-  patch: CoreSpriteAssetContentPatch,
+  patch: BackendSpriteContentPatch,
 ): AssetRecord {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error(
@@ -125,10 +125,7 @@ export function toCoreSpriteCandidateRecord(
   }
   const currentSprite =
     record.mode === "character" ? record.character : record.object;
-  const content = mergeAssetContentPatch(
-    toCoreSpriteAssetContent(record),
-    patch,
-  );
+  const content = mergeAssetContentPatch(toBackendSpriteContent(record), patch);
   const sprite = {
     prototype: toPrototypeFromContent(
       content.prototype,
@@ -232,9 +229,9 @@ function readURLs(resources: Array<{ url?: string }> | undefined) {
   );
 }
 
-export function toCoreSpriteAssetContent(
+export function toBackendSpriteContent(
   record: AssetRecord,
-): CoreSpriteAssetContent {
+): BackendSpriteContent {
   if (record.mode !== "character" && record.mode !== "object") {
     throw new Error("Core sprite records require a Character or Object asset.");
   }

@@ -35,18 +35,23 @@ export type AssetAnimationResponse = {
   generation?: AnimationGenerationConfig;
 };
 
-export type CoreSpriteAssetContent = AssetContentBase & {
+export type BackendSpriteContent = AssetContentBase & {
   directionCount: number;
   prototype: AssetImageResourceResponse[];
   animations?: AssetAnimationResponse[];
 };
 
-export type CoreSpriteAssetContentPatch = {
+export type BackendSpriteContentPatch = {
   directionCount?: number;
   prototype?: AssetImageResourceResponse[];
   animations?: Array<Omit<AssetAnimationResponse, "id"> & { id?: number }>;
   metadata?: AssetContentMetadata;
 };
+
+/** @deprecated Use BackendSpriteContent. */
+export type CoreSpriteAssetContent = BackendSpriteContent;
+/** @deprecated Use BackendSpriteContentPatch. */
+export type CoreSpriteAssetContentPatch = BackendSpriteContentPatch;
 
 type DirectionalAssetContent<View extends Perspective> = AssetContentBase & {
   directionCount: DirectionCountForPerspective<View>;

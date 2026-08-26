@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CharacterAssetRecord } from "./types";
-import { describeAssetRecordChanges } from "./asset-record-diff";
+import { describeAssetRecordChanges } from "./record-diff";
 
 const prototype = {
   format: "png-sprite-sheet" as const,

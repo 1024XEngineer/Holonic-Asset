@@ -15,15 +15,23 @@ export type {
   TilesetAssetRecord,
   UISetAssetKind,
   UISetAssetRecord,
-} from "./asset-record";
+} from "../../content/types";
 export type {
   AssetWorkspaceAsset,
   AssetWorkspaceData,
   AssetWorkspaceDataForKind,
-} from "./asset-workspace";
+} from "./asset-snapshot";
 export type {
+  AssetRecordState,
+  AssetSnapshot,
+  AssetSnapshotForKind,
+} from "./asset-snapshot";
+export type {
+  AssetRecordApi,
   AssetWorkspaceApi,
   AssetRecordSaveResult,
+  AssetRecordRollbackResult,
   GetAssetRecordInput,
+  RollbackAssetRecordInput,
   SaveAssetRecordInput,
 } from "./record-contract";

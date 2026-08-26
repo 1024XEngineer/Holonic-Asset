@@ -5,7 +5,7 @@ import type {
 import type { AssetRevision } from "../types";
 import type { AssetRecord, AssetWorkspaceData } from "./types";
 
-export function createCoreAssetWorkspace({
+export function createAssetSnapshot({
   projectId,
   projectName,
   detail,
@@ -29,13 +29,13 @@ export function createCoreAssetWorkspace({
       name: detail.name,
       perspective: detail.perspective,
       version: `v${detail.version}`,
-      history: toCoreAssetHistory(records, detail.version),
+      history: toAssetHistory(records, detail.version),
     },
     record,
   } as AssetWorkspaceData;
 }
 
-export function toCoreAssetHistory(
+export function toAssetHistory(
   records: AssetRecordResponse[],
   currentVersion: number,
 ) {
