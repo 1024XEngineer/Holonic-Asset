@@ -120,7 +120,7 @@ describe("useAssetExport", () => {
     mocks.get.mockResolvedValue({ ...completedExport(), exportId: 13 });
     const { result } = renderHook(() => useAssetExport());
 
-    let firstPromise!: Promise<void>;
+    let firstPromise!: Promise<AssetExportResponse | undefined>;
     await act(async () => {
       firstPromise = result.current.exportAsset(9);
       await Promise.resolve();
@@ -139,7 +139,7 @@ async function startExport(
   assetId: number,
   elapsedMilliseconds: number,
 ) {
-  let exportPromise!: Promise<void>;
+  let exportPromise!: Promise<AssetExportResponse | undefined>;
   await act(async () => {
     exportPromise = hook.current.exportAsset(assetId);
     void exportPromise.catch(() => undefined);
