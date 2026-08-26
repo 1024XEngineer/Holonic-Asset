@@ -38,11 +38,14 @@ export function EditorModeFrame({
         canRedo={false}
         isDirty={false}
         isSaving={false}
+        canExport={false}
+        isExporting={false}
         generationTasks={emptyGenerationTasks}
         onBack={onBack}
         onUndo={noAction}
         onRedo={noAction}
         onSave={noAction}
+        onExport={noAction}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {children}

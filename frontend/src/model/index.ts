@@ -80,6 +80,13 @@ export type {
 } from "./asset";
 export type { ItemTile } from "./item-tile";
 export { coreAssetApi } from "./asset/library/asset.api";
+export { coreExportApi, useAssetExport } from "./export";
+export type {
+  AssetExportResponse,
+  AssetExportState,
+  CreateAssetExportRequest,
+  CreateAssetExportResponse,
+} from "./export";
 export type {
   AssetAnimationFrameResponse,
   AssetAnimationResponse,
