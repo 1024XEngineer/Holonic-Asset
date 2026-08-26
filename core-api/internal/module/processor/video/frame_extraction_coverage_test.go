@@ -47,8 +47,8 @@ func TestResolveAutoDetectedChromaKeyEdgeCases(t *testing.T) {
 
 	// 5. Red corners (hue ~0 <= 18 -> HueMin = 0)
 	redImg := image.NewNRGBA(image.Rect(0, 0, 32, 32))
-	for y := 0; y < 32; y++ {
-		for x := 0; x < 32; x++ {
+	for y := range 32 {
+		for x := range 32 {
 			redImg.SetNRGBA(x, y, color.NRGBA{R: 255, G: 0, B: 0, A: 255})
 		}
 	}
@@ -59,8 +59,8 @@ func TestResolveAutoDetectedChromaKeyEdgeCases(t *testing.T) {
 
 	// 6. Green corners (hue ~60 > 18 -> HueMin > 0)
 	greenImg := image.NewNRGBA(image.Rect(0, 0, 32, 32))
-	for y := 0; y < 32; y++ {
-		for x := 0; x < 32; x++ {
+	for y := range 32 {
+		for x := range 32 {
 			greenImg.SetNRGBA(x, y, color.NRGBA{R: 0, G: 255, B: 0, A: 255})
 		}
 	}
