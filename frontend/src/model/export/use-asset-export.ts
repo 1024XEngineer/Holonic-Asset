@@ -34,9 +34,12 @@ export function useAssetExport() {
     }
   }, []);
 
-  useEffect(() => () => {
-    operationRef.current += 1;
-  }, []);
+  useEffect(
+    () => () => {
+      operationRef.current += 1;
+    },
+    [],
+  );
 
   return {
     exportAsset,
@@ -52,11 +55,13 @@ async function waitForExport(
 ) {
   while (true) {
     await delay(EXPORT_POLL_INTERVAL_MS);
-    if (operation !== operationRef.current) throw new Error("Export cancelled.");
+    if (operation !== operationRef.current)
+      throw new Error("Export cancelled.");
 
     const result = await coreExportApi.get(exportId);
     if (result.status === "completed") {
-      if (!result.downloadUrl) throw new Error("Export download is unavailable.");
+      if (!result.downloadUrl)
+        throw new Error("Export download is unavailable.");
       return result;
     }
     if (result.status === "failed" || result.status === "cancelled") {
