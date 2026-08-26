@@ -28,11 +28,13 @@ import (
 const (
 	maxSceneryLayerGenerationAttempts = 3
 	maxSceneryLLMAttempts             = 10
+	maxSceneryPipelineRounds          = 5
 )
 
 func (e *executor) planSceneryLayers(
 	ctx context.Context,
 	payload CreateSceneryPayload,
+	previousCritique string,
 ) ([]SceneryLayerDefinition, error) {
 	prompt := prompts.SceneryPlan(prompts.SceneryPlanInput{
 		AssetName:          payload.AssetName,
@@ -42,6 +44,7 @@ func (e *executor) planSceneryLayers(
 		GameType:           payload.ProjectContext.GameType,
 		TargetPlatform:     payload.ProjectContext.TargetPlatform,
 		ProjectDescription: payload.ProjectContext.Description,
+		PreviousCritique:   previousCritique,
 		Width:              payload.Dimensions.Width,
 		Height:             payload.Dimensions.Height,
 	})
@@ -66,48 +69,64 @@ func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPay
 	startedAt := time.Now()
 	e.logSceneryStage("generate scenery started", payload, "start", startedAt)
 
-	stageStartedAt := time.Now()
-	plan, err := e.planSceneryLayers(ctx, payload)
-	if err != nil {
-		e.logSceneryFailure(payload, "plan_layers", stageStartedAt, err)
-		return nil, err
-	}
-	e.logSceneryStage("scenery layers planned", payload, "plan_layers", stageStartedAt,
-		logger.Int("layer_count", len(plan)),
-	)
-
-	stageStartedAt = time.Now()
-	layers, err := e.generateSceneryLayers(ctx, payload, plan)
-	if err != nil {
-		e.logSceneryFailure(payload, "generate_layers", stageStartedAt, err)
-		return nil, err
-	}
-	e.logSceneryStage("scenery layers generated", payload, "generate_layers", stageStartedAt,
-		logger.Int("layer_count", len(layers)),
-	)
-
-	stageStartedAt = time.Now()
-	laidOut, err := e.analyzeSceneryLayout(ctx, payload, layers)
-	if err != nil {
-		e.logSceneryFailure(payload, "analyze_layout", stageStartedAt, err,
-			logger.Int("layer_count", len(layers)),
+	var lastReviewNotes string
+	var lastLaidOut []LaidOutSceneryLayer
+	for round := 1; round <= maxSceneryPipelineRounds; round++ {
+		stageStartedAt := time.Now()
+		plan, err := e.planSceneryLayers(ctx, payload, lastReviewNotes)
+		if err != nil {
+			e.logSceneryFailure(payload, "plan_layers", stageStartedAt, err, logger.Int("round", round))
+			return nil, err
+		}
+		e.logSceneryStage("scenery layers planned", payload, "plan_layers", stageStartedAt,
+			logger.Int("layer_count", len(plan)),
+			logger.Int("round", round),
 		)
-		return nil, err
-	}
-	e.logSceneryStage("scenery layout analyzed", payload, "analyze_layout", stageStartedAt,
-		logger.Int("layer_count", len(laidOut)),
-	)
 
-	stageStartedAt = time.Now()
-	result, err := e.persistScenery(ctx, payload, laidOut)
+		stageStartedAt = time.Now()
+		layers, err := e.generateSceneryLayers(ctx, payload, plan)
+		if err != nil {
+			e.logSceneryFailure(payload, "generate_layers", stageStartedAt, err, logger.Int("round", round))
+			return nil, err
+		}
+		e.logSceneryStage("scenery layers generated", payload, "generate_layers", stageStartedAt,
+			logger.Int("layer_count", len(layers)),
+			logger.Int("round", round),
+		)
+
+		stageStartedAt = time.Now()
+		approved, reviewNotes, laidOut, err := e.analyzeSceneryLayout(ctx, payload, layers)
+		if err != nil {
+			e.logSceneryFailure(payload, "analyze_layout", stageStartedAt, err,
+				logger.Int("layer_count", len(layers)),
+				logger.Int("round", round),
+			)
+			return nil, err
+		}
+		e.logSceneryStage("scenery layout analyzed", payload, "analyze_layout", stageStartedAt,
+			logger.Int("layer_count", len(laidOut)),
+			logger.Any("approved", approved),
+			logger.String("review_notes", reviewNotes),
+			logger.Int("round", round),
+		)
+
+		lastReviewNotes = reviewNotes
+		lastLaidOut = laidOut
+		if approved || round == maxSceneryPipelineRounds {
+			break
+		}
+	}
+
+	stageStartedAt := time.Now()
+	result, err := e.persistScenery(ctx, payload, lastLaidOut)
 	if err != nil {
 		e.logSceneryFailure(payload, "persist", stageStartedAt, err,
-			logger.Int("layer_count", len(laidOut)),
+			logger.Int("layer_count", len(lastLaidOut)),
 		)
 		return nil, err
 	}
 	e.logSceneryStage("generate scenery completed", payload, "complete", startedAt,
-		logger.Int("layer_count", len(laidOut)),
+		logger.Int("layer_count", len(lastLaidOut)),
 	)
 	return result, nil
 }
@@ -260,12 +279,12 @@ func (e *executor) analyzeSceneryLayout(
 	ctx context.Context,
 	payload CreateSceneryPayload,
 	layers []ProcessedSceneryLayer,
-) ([]LaidOutSceneryLayer, error) {
+) (bool, string, []LaidOutSceneryLayer, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return false, "", nil, err
 	}
 	if len(layers) == 0 {
-		return nil, fmt.Errorf("%w: at least one processed layer is required", ErrInvalidSceneryLayout)
+		return false, "", nil, fmt.Errorf("%w: at least one processed layer is required", ErrInvalidSceneryLayout)
 	}
 	promptLayers := make([]prompts.SceneryLayoutLayerInput, len(layers))
 	images := make([]llmclient.ImageInput, len(layers))
@@ -286,14 +305,14 @@ func (e *executor) analyzeSceneryLayout(
 		ResponseSchema: llmclient.JSONSchema{Name: sceneryLayerLayoutSchemaName, Schema: append([]byte(nil), sceneryLayerLayoutJSONSchema...)},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("generator: analyze scenery layout: %w", err)
+		return false, "", nil, fmt.Errorf("generator: analyze scenery layout: %w", err)
 	}
 	if completion == nil {
-		return nil, fmt.Errorf("%w: LLM returned no completion", ErrInvalidSceneryLayout)
+		return false, "", nil, fmt.Errorf("%w: LLM returned no completion", ErrInvalidSceneryLayout)
 	}
-	layouts, err := decodeSceneryLayouts(completion.JSON, layers, payload.Dimensions)
+	approved, reviewNotes, layouts, err := decodeSceneryLayouts(completion.JSON, layers, payload.Dimensions)
 	if err != nil {
-		return nil, err
+		return false, "", nil, err
 	}
 	result := make([]LaidOutSceneryLayer, len(layers))
 	for index, layer := range layers {
@@ -301,37 +320,44 @@ func (e *executor) analyzeSceneryLayout(
 			ID: layer.ID, Name: layer.Name, ImageBase64: layer.ImageBase64, MediaType: layer.MediaType, Layout: layouts[layer.ID],
 		}
 	}
-	return result, nil
+	return approved, reviewNotes, result, nil
 }
 
-func decodeSceneryLayouts(raw []byte, layers []ProcessedSceneryLayer, dimensions assetdomain.Size) (map[uint]SceneryLayerLayout, error) {
+func decodeSceneryLayouts(raw []byte, layers []ProcessedSceneryLayer, dimensions assetdomain.Size) (bool, string, map[uint]SceneryLayerLayout, error) {
 	invalid := func(reason string) error { return fmt.Errorf("%w: %s", ErrInvalidSceneryLayout, reason) }
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	var response sceneryLayoutResponse
 	if err := decoder.Decode(&response); err != nil {
-		return nil, invalid(err.Error())
+		return false, "", nil, invalid(err.Error())
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
-			return nil, invalid("trailing data")
+			return false, "", nil, invalid("trailing data")
 		}
-		return nil, invalid(err.Error())
+		return false, "", nil, invalid(err.Error())
 	}
+	if response.Approved == nil {
+		return false, "", nil, invalid("layout review approval decision is required")
+	}
+	if response.ReviewNotes == nil || strings.TrimSpace(*response.ReviewNotes) == "" {
+		return false, "", nil, invalid("layout review notes are required")
+	}
+	reviewNotes := strings.TrimSpace(*response.ReviewNotes)
 	if response.Layers == nil {
-		return nil, invalid("layers is required")
+		return false, "", nil, invalid("layers is required")
 	}
 	if len(*response.Layers) != len(layers) {
-		return nil, invalid(fmt.Sprintf("expected %d layer layouts, got %d", len(layers), len(*response.Layers)))
+		return false, "", nil, invalid(fmt.Sprintf("expected %d layer layouts, got %d", len(layers), len(*response.Layers)))
 	}
 	knownIDs := make(map[uint]struct{}, len(layers))
 	for _, layer := range layers {
 		if layer.ID == 0 {
-			return nil, invalid("processed layer ID must be positive")
+			return false, "", nil, invalid("processed layer ID must be positive")
 		}
 		if _, exists := knownIDs[layer.ID]; exists {
-			return nil, invalid(fmt.Sprintf("processed layer ID %d is duplicated", layer.ID))
+			return false, "", nil, invalid(fmt.Sprintf("processed layer ID %d is duplicated", layer.ID))
 		}
 		knownIDs[layer.ID] = struct{}{}
 	}
@@ -339,23 +365,23 @@ func decodeSceneryLayouts(raw []byte, layers []ProcessedSceneryLayer, dimensions
 	for index, candidate := range *response.Layers {
 		layout, id, err := validateSceneryLayoutCandidate(candidate, dimensions)
 		if err != nil {
-			return nil, invalid(fmt.Sprintf("layer layout %d: %v", index+1, err))
+			return false, "", nil, invalid(fmt.Sprintf("layer layout %d: %v", index+1, err))
 		}
 		if _, known := knownIDs[id]; !known {
-			return nil, invalid(fmt.Sprintf("unknown layer ID %d", id))
+			return false, "", nil, invalid(fmt.Sprintf("unknown layer ID %d", id))
 		}
 		if _, duplicate := layouts[id]; duplicate {
-			return nil, invalid(fmt.Sprintf("layer ID %d is duplicated", id))
+			return false, "", nil, invalid(fmt.Sprintf("layer ID %d is duplicated", id))
 		}
 		layouts[id] = layout
 	}
 	for id := range knownIDs {
 		if _, present := layouts[id]; !present {
-			return nil, invalid(fmt.Sprintf("layer ID %d is missing", id))
+			return false, "", nil, invalid(fmt.Sprintf("layer ID %d is missing", id))
 		}
 	}
 	normalizeSceneryLayouts(layouts, layers)
-	return layouts, nil
+	return *response.Approved, reviewNotes, layouts, nil
 }
 
 func normalizeSceneryLayouts(layouts map[uint]SceneryLayerLayout, layers []ProcessedSceneryLayer) {
