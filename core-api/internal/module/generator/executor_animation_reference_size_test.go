@@ -2,6 +2,8 @@ package generator
 
 import (
 	"image"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -104,4 +106,98 @@ func absAnimationReferenceFloat(value float64) float64 {
 		return -value
 	}
 	return value
+}
+
+func TestAnimationReferenceCanvasAndPrototypeSizeHandleInvalidInputs(t *testing.T) {
+	if got, want := animationReferenceCanvasSizeForLongEdge(0), image.Pt(animationReferenceSize, animationReferenceSize); got != want {
+		t.Fatalf("fallback reference canvas = %v, want %v", got, want)
+	}
+
+	if got := animationReferencePrototypeCanvasSize(image.Pt(0, 512), 32, 32, 64, 64); got != (image.Pt(1, 1)) {
+		t.Fatalf("invalid canvas = %v, want 1x1", got)
+	}
+	canvas := animationReferenceCanvasSize()
+	if got := animationReferencePrototypeCanvasSize(canvas, 0, 0, 0, 0); got != canvas {
+		t.Fatalf("invalid prototype/frame dimensions = %v, want unchanged canvas %v", got, canvas)
+	}
+}
+
+func TestNormalizeAnimationGenerationRequestValidatesFrameEditContext(t *testing.T) {
+	valid := AnimationGenerationRequest{
+		ReferenceImage:         "start",
+		EndReferenceImage:      "end",
+		ReferenceImageContext:  true,
+		TargetFrameIndices:     []int{1},
+		ContextReferenceImages: []string{"frame-0", "frame-1"},
+		FrameCount:             2,
+		Columns:                2,
+		FrameWidth:             64,
+		FrameHeight:            64,
+		FPS:                    10,
+		Duration:               5,
+	}
+
+	result, err := normalizeAnimationGenerationRequest(&valid)
+	if err != nil {
+		t.Fatalf("normalize valid frame edit request: %v", err)
+	}
+	for index := range result.ContextReferenceImages {
+		result.ContextReferenceImages[index] += " "
+	}
+	if !reflect.DeepEqual(normalizedContext(result.ContextReferenceImages), []string{"frame-0", "frame-1"}) {
+		t.Fatalf("context references were not trimmed: %v", result.ContextReferenceImages)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*AnimationGenerationRequest)
+		want   string
+	}{
+		{
+			name: "missing end reference",
+			mutate: func(value *AnimationGenerationRequest) {
+				value.EndReferenceImage = " "
+			},
+			want: "end reference image is required",
+		},
+		{
+			name: "wrong context count",
+			mutate: func(value *AnimationGenerationRequest) {
+				value.ContextReferenceImages = value.ContextReferenceImages[:1]
+			},
+			want: "requires 2 context reference images; got 1",
+		},
+		{
+			name: "empty context reference",
+			mutate: func(value *AnimationGenerationRequest) {
+				value.ContextReferenceImages[1] = " "
+			},
+			want: "context reference image 2 is required",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			value := valid
+			test.mutate(&value)
+			_, err := normalizeAnimationGenerationRequest(&value)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func normalizedContext(values []string) []string {
+	trimmed := make([]string, len(values))
+	for index, value := range values {
+		trimmed[index] = strings.TrimSpace(value)
+	}
+	return trimmed
+}
+
+func TestAnimationReferencePrototypeCanvasSizeRejectsNonPositiveOutputScale(t *testing.T) {
+	canvas := image.Pt(1024, 1024)
+	if got, want := animationReferencePrototypeCanvasSize(canvas, 32, 32, -64, 64), canvas; got != want {
+		t.Fatalf("non-positive output scale returned %v, want unchanged canvas %v", got, want)
+	}
 }

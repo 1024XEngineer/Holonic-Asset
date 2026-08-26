@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -483,4 +484,51 @@ func animationResultContentBounds(t *testing.T, result *normalizedAnimation) []i
 
 func rectangleCenterX(bounds image.Rectangle) float64 {
 	return float64(bounds.Min.X+bounds.Max.X) / 2
+}
+
+func TestNormalizeAnimationImageBackgroundOptionsCoverMatteAndChromaPaths(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	fillRect(src, src.Bounds(), color.NRGBA{G: 255, A: 255})
+	fillRect(src, image.Rect(5, 3, 15, 18), color.NRGBA{R: 230, G: 40, B: 30, A: 255})
+	fillRect(src, image.Rect(25, 3, 35, 18), color.NRGBA{R: 230, G: 40, B: 30, A: 255})
+
+	tests := []struct {
+		name       string
+		background AnimationBackgroundOptions
+	}{
+		{name: "auto matte", background: AnimationBackgroundOptions{MatteColor: "  auto  "}},
+		{name: "explicit matte", background: AnimationBackgroundOptions{MatteColor: "#00ff00"}},
+		{
+			name: "border connected",
+			background: AnimationBackgroundOptions{
+				MatteColor:          "#00ff00",
+				BorderConnectedOnly: true,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := normalizeAnimationImage(src, normalizeAnimationRequest{
+				Columns: 2, Rows: 1,
+				FrameWidth: 24, FrameHeight: 24,
+				Background: &test.background,
+			})
+			if err != nil {
+				t.Fatalf("normalize animation background: %v", err)
+			}
+			if result.Report.BackgroundRemovalReport == nil {
+				t.Fatal("expected background removal report")
+			}
+			for index, frame := range result.Frames {
+				if frame.ContentBounds == nil {
+					t.Fatalf("frame %d has no visible content", index)
+				}
+			}
+		})
+	}
+
+	_, _, err := removeAnimationBackground(src, AnimationBackgroundOptions{MatteColor: "invalid-color"})
+	if err == nil || !strings.Contains(err.Error(), "parse animation matte color") {
+		t.Fatalf("expected matte parsing error, got %v", err)
+	}
 }
