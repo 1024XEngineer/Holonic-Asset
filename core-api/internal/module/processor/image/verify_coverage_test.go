@@ -69,8 +69,8 @@ func TestEvaluateTransparencyGateAllProfiles(t *testing.T) {
 		HasAlpha:               true,
 		NontransparentPixels:   100,
 		AlphaMin:               0,
-		AlphaMax:               240,          // < 250
-		TransparentRatio:       0.01,         // < 0.05
+		AlphaMax:               240,  // < 250
+		TransparentRatio:       0.01, // < 0.05
 		TouchesEdge:            true,
 		LargestComponentRatio:  0.50,         // < 0.75
 		AlphaNoiseScore:        0.30,         // > 0.25
@@ -202,8 +202,8 @@ func TestVerifyImageHelperFunctions(t *testing.T) {
 
 	// 6. matteResidueScoreFor with non-saturated and saturated matte
 	residueImg := image.NewNRGBA(image.Rect(0, 0, 16, 16))
-	for y := 0; y < 16; y++ {
-		for x := 0; x < 16; x++ {
+	for y := range 16 {
+		for x := range 16 {
 			residueImg.SetNRGBA(x, y, color.NRGBA{R: 100, G: 100, B: 100, A: 128})
 		}
 	}
@@ -213,8 +213,8 @@ func TestVerifyImageHelperFunctions(t *testing.T) {
 	}
 
 	// Saturated matte
-	for y := 0; y < 16; y++ {
-		for x := 0; x < 16; x++ {
+	for y := range 16 {
+		for x := range 16 {
 			residueImg.SetNRGBA(x, y, color.NRGBA{R: 10, G: 240, B: 10, A: 128})
 		}
 	}
@@ -231,8 +231,8 @@ func TestVerifyImageHelperFunctions(t *testing.T) {
 
 	// 8. detectCheckerboard with alternating 16x16 blocks
 	cbImg := image.NewNRGBA(image.Rect(0, 0, 64, 64))
-	for y := 0; y < 64; y++ {
-		for x := 0; x < 64; x++ {
+	for y := range 64 {
+		for x := range 64 {
 			cell := (x / 16) + (y / 16)
 			if cell%2 == 0 {
 				cbImg.SetNRGBA(x, y, color.NRGBA{R: 200, G: 200, B: 200, A: 255})

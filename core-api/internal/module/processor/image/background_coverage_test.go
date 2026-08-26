@@ -37,8 +37,8 @@ func TestExtractDualAndDualAlignmentReport(t *testing.T) {
 	light := image.NewRGBA(image.Rect(0, 0, w, h))
 
 	// Background: dark is (0,0,0), light is (255,255,255)
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
+	for y := range h {
+		for x := range w {
 			dark.Set(x, y, color.RGBA{0, 0, 0, 255})
 			light.Set(x, y, color.RGBA{255, 255, 255, 255})
 		}
@@ -72,8 +72,8 @@ func TestExtractDualAndDualAlignmentReport(t *testing.T) {
 
 	// 2. Mismatched images with noise and negative deltas
 	noisyLight := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
+	for y := range h {
+		for x := range w {
 			// light is darker than dark (negative delta)
 			noisyLight.Set(x, y, color.RGBA{0, 0, 0, 255})
 			dark.Set(x, y, color.RGBA{255, 100, 50, 255})
@@ -153,8 +153,8 @@ func TestRemoveSmallEdgeComponentsCases(t *testing.T) {
 
 	// 4. Component touching edge that is equal to largest (e.g. only 1 component)
 	onlyEdge := image.NewRGBA(image.Rect(0, 0, 16, 16))
-	for y := 0; y < 5; y++ {
-		for x := 0; x < 5; x++ {
+	for y := range 5 {
+		for x := range 5 {
 			onlyEdge.SetRGBA(x, y, color.RGBA{R: 200, A: 255})
 		}
 	}
@@ -183,7 +183,7 @@ func TestExtractChromaHelperBranches(t *testing.T) {
 	// 3. chromaDominanceAlpha with multi-spill channels (e.g. cyan key [0, 200, 200])
 	cyanKey := MatteColor{0, 200, 200}
 	aCyan := chromaDominanceAlpha(MatteColor{10, 220, 220}, cyanKey)
-	if aCyan >= 255 {
+	if aCyan == 255 {
 		t.Fatalf("expected dominance attenuation for cyan key, got %d", aCyan)
 	}
 
