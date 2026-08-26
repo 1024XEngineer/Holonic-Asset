@@ -124,6 +124,34 @@ describe("TilesetAssetTree", () => {
     expect(html).toContain("No tileset items");
   });
 
+  it("opens the add item form and accepts the default generation callback", () => {
+    render(
+      withI18n(
+        <TilesetAssetTree
+          items={[]}
+          selectedItemIds={[]}
+          isTileSelected={() => false}
+          onToggleItem={vi.fn()}
+          onToggleTile={vi.fn()}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add tileset item" }));
+    fireEvent.change(screen.getByLabelText("Item 1 name"), {
+      target: { value: "Oak tree" },
+    });
+    fireEvent.change(screen.getByLabelText("Item 1 description"), {
+      target: { value: "Old oak" },
+    });
+    fireEvent.change(screen.getByLabelText("Creative brief"), {
+      target: { value: "Dense leaves" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add tileset item" }));
+
+    expect(screen.queryByText("Add a new item to this tileset.")).toBeNull();
+  });
+
   it("does not render a grid for an item without tiles", () => {
     render(
       withI18n(

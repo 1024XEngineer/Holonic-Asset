@@ -1,8 +1,12 @@
-import { ChevronDown, PackageOpen } from "lucide-react";
+import { ChevronDown, PackageOpen, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { TileSelectionGrid } from "@/components/tile-selection-grid";
+import {
+  CreateTilesetItemTrigger,
+  type CreateTilesetItemRequest,
+} from "@/features/generation";
 import { getGridBounds } from "@/lib/grid-bounds";
 import type { TilesetItem } from "@/model";
 
@@ -14,35 +18,58 @@ export function TilesetAssetTree({
   isTileSelected,
   onToggleItem,
   onToggleTile,
+  onGenerateItem = () => undefined,
+  isGeneratingItem = false,
 }: {
   items: readonly TilesetItem[];
   selectedItemIds: readonly string[];
   isTileSelected: (itemId: string, tileIndex: number) => boolean;
   onToggleItem: (itemId: string) => void;
   onToggleTile: (itemId: string, tileIndex: number) => void;
+  onGenerateItem?: (request: CreateTilesetItemRequest) => void;
+  isGeneratingItem?: boolean;
 }) {
-  const { t } = useTranslation("editor");
+  const { t } = useTranslation(["editor", "generation"]);
   const selectedItems = new Set(selectedItemIds);
 
   return (
-    <AssetTree
-      title={t("assetTree")}
-      description={t("tilesetAssetTreeDescription")}
-      count={items.length}
-      emptyMessage={items.length === 0 ? t("noTilesetItems") : undefined}
-      contentClassName="space-y-1"
+    <CreateTilesetItemTrigger
+      isGenerating={isGeneratingItem}
+      onGenerate={onGenerateItem}
     >
-      {items.map((item) => (
-        <TilesetItemNode
-          key={item.id}
-          item={item}
-          selected={selectedItems.has(item.id)}
-          isTileSelected={isTileSelected}
-          onToggleItem={onToggleItem}
-          onToggleTile={onToggleTile}
-        />
-      ))}
-    </AssetTree>
+      {(openDialog) => (
+        <AssetTree
+          title={t("assetTree")}
+          description={t("tilesetAssetTreeDescription")}
+          count={items.length}
+          emptyMessage={items.length === 0 ? t("noTilesetItems") : undefined}
+          contentClassName="space-y-1"
+          headerAction={
+            <button
+              type="button"
+              aria-label={t("generation:addTilesetItem")}
+              title={t("generation:addTilesetItem")}
+              disabled={isGeneratingItem}
+              onClick={openDialog}
+              className="grid size-6 place-items-center rounded-md border border-dashed text-muted-foreground transition-colors hover:border-primary/60 hover:bg-primary/5 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          }
+        >
+          {items.map((item) => (
+            <TilesetItemNode
+              key={item.id}
+              item={item}
+              selected={selectedItems.has(item.id)}
+              isTileSelected={isTileSelected}
+              onToggleItem={onToggleItem}
+              onToggleTile={onToggleTile}
+            />
+          ))}
+        </AssetTree>
+      )}
+    </CreateTilesetItemTrigger>
   );
 }
 

@@ -1,8 +1,42 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTilesetGenerationRequest } from "./tileset-generation-request";
+import {
+  buildAddTilesetItemGenerationRequest,
+  buildTilesetGenerationRequest,
+} from "./tileset-generation-request";
 
 describe("buildTilesetGenerationRequest", () => {
+  it("builds a new item request with its requested footprint", () => {
+    expect(
+      buildAddTilesetItemGenerationRequest({
+        assetId: 9,
+        request: {
+          itemName: " Oak tree ",
+          itemDescription: "A broad old oak",
+          shape: [
+            [0, 0],
+            [1, 0],
+          ],
+          creativeBrief: "Warm pixel-art bark and dense leaves",
+        },
+      }),
+    ).toEqual({
+      assetId: 9,
+      kind: "add_tileset_item",
+      creative_brief: "Warm pixel-art bark and dense leaves",
+      parameters: {
+        item: {
+          name: "Oak tree",
+          description: "A broad old oak",
+          shape: [
+            [0, 0],
+            [1, 0],
+          ],
+        },
+      },
+    });
+  });
+
   it("builds an item edit with its anchor and reference", () => {
     expect(
       buildTilesetGenerationRequest({

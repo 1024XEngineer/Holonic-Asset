@@ -10,6 +10,7 @@ export function AssetTree({
   children,
   emptyMessage,
   footer,
+  headerAction,
   contentClassName,
 }: {
   title: string;
@@ -18,20 +19,24 @@ export function AssetTree({
   children: ReactNode;
   emptyMessage?: string;
   footer?: ReactNode;
+  headerAction?: ReactNode;
   contentClassName?: string;
 }) {
   return (
     <aside className="flex w-full shrink-0 flex-col border-b bg-background lg:h-full lg:w-64 lg:border-b-0 lg:border-r">
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {title}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
-        <span className="font-mono text-[10px] text-muted-foreground">
-          {count}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {count}
+          </span>
+          {headerAction}
+        </div>
       </div>
       <ScrollArea className="max-h-56 flex-1 lg:max-h-none">
         <div className={cn("p-3", contentClassName)}>

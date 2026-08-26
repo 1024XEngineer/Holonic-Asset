@@ -25,6 +25,7 @@ describe("TilesetReviewDialog", () => {
       withI18n(
         <TilesetReviewDialog
           item={{
+            kind: "comparison",
             itemId: "ground",
             currentItem,
             candidateItem: {
@@ -48,6 +49,7 @@ describe("TilesetReviewDialog", () => {
   it("resolves cancel and apply actions", () => {
     const onResolve = vi.fn();
     const item = {
+      kind: "comparison" as const,
       itemId: "empty",
       currentItem: { id: "empty", label: "Empty", tiles: [] },
       candidateItem: { id: "empty", label: "Empty", tiles: [] },
@@ -77,6 +79,7 @@ describe("TilesetReviewDialog", () => {
       withI18n(
         <TilesetReviewDialog
           item={{
+            kind: "comparison",
             itemId: "wall",
             currentItem: {
               id: "wall",
@@ -112,6 +115,7 @@ describe("TilesetReviewDialog", () => {
       withI18n(
         <TilesetReviewDialog
           item={{
+            kind: "comparison",
             itemId: "empty",
             currentItem: { id: "empty", label: "Empty", tiles: [] },
             candidateItem: { id: "empty", label: "Empty", tiles: [] },
@@ -133,5 +137,35 @@ describe("TilesetReviewDialog", () => {
     ).toBe(true);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("renders a new-item review without a current comparison", () => {
+    render(
+      withI18n(
+        <TilesetReviewDialog
+          item={{
+            kind: "new-item",
+            itemId: "candidate:0:Tree",
+            candidateItem: {
+              id: "candidate:0:Tree",
+              label: "Tree",
+              tiles: [[0, 0]],
+              imageUrl: "/tree.png",
+            },
+          }}
+          isResolving={false}
+          onClose={vi.fn()}
+          onResolve={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(screen.getByText("Generated")).toBeTruthy();
+    expect(screen.queryByText("Current")).toBeNull();
+    expect(
+      screen.getByText(
+        "Review the generated item before adding it to this tileset.",
+      ),
+    ).toBeTruthy();
   });
 });
