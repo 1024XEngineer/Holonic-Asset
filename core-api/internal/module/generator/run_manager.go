@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	taskdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/task"
@@ -434,11 +435,18 @@ func buildTaskPayload(request *Request) (any, error) {
 		if request.AssetID != nil {
 			payload.AssetID = *request.AssetID
 		}
+		animationID, err := animationTargetFromPaths(request.TargetAssetPaths)
+		if err != nil {
+			return nil, invalidTaskPayload("%v", err)
+		}
+		if animationID != 0 {
+			payload.AnimationID = animationID
+		}
 		if payload.AssetID == 0 {
 			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
 		}
 		if payload.AnimationID == 0 {
-			return nil, fmt.Errorf("generator: animation id is required for %s", request.Kind)
+			return nil, fmt.Errorf("%w: animation id is required for %s; select animations.<id>", ErrInvalidTaskPayload, request.Kind)
 		}
 		payload.ProjectID = request.ProjectID
 		payload.CreativeBrief = request.CreativeBrief
@@ -546,6 +554,16 @@ func buildTaskPayload(request *Request) (any, error) {
 		if err := decodeParameters(request, &parameters); err != nil {
 			return nil, err
 		}
+		animationID, frameIDs, err := framesTargetFromPaths(request.TargetAssetPaths)
+		if err != nil {
+			return nil, invalidTaskPayload("%v", err)
+		}
+		if animationID != 0 {
+			parameters.AnimationID = animationID
+		}
+		if len(frameIDs) != 0 {
+			parameters.FrameIDs = frameIDs
+		}
 		prompt := strings.TrimSpace(request.CreativeBrief)
 		payload := EditFramesPayload{
 			AssetID:     *request.AssetID,
@@ -567,6 +585,75 @@ func buildTaskPayload(request *Request) (any, error) {
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTaskType, request.Kind)
 	}
+}
+
+// framesTargetFromPaths extracts animation and persisted frame IDs from the
+// canonical asset target paths emitted by the sprite editor. Frame selections
+// are represented by array offsets in target paths while queued edits use
+// stable database IDs.
+func framesTargetFromPaths(paths []string) (uint, []uint, error) {
+	var animationID uint
+	frameIDs := make([]uint, 0, len(paths))
+	seen := make(map[uint]struct{}, len(paths))
+	for _, path := range paths {
+		parts := strings.Split(path, ".")
+		if len(parts) != 4 || parts[0] != "animations" || parts[2] != "frames" {
+			return 0, nil, fmt.Errorf("%s does not identify a frame", path)
+		}
+		animationID64, err := strconv.ParseUint(parts[1], 10, 0)
+		if err != nil || animationID64 == 0 {
+			return 0, nil, fmt.Errorf("%s does not identify a valid animation", path)
+		}
+		frameIndex64, err := strconv.ParseUint(parts[3], 10, 0)
+		if err != nil {
+			return 0, nil, fmt.Errorf("%s does not identify a valid frame index", path)
+		}
+		currentAnimationID := uint(animationID64)
+		if animationID == 0 {
+			animationID = currentAnimationID
+		} else if animationID != currentAnimationID {
+			return 0, nil, fmt.Errorf("edit_frames accepts only one animation")
+		}
+		if frameIndex64 >= 32 {
+			return 0, nil, fmt.Errorf("frame index %d is out of range", frameIndex64)
+		}
+		frameID := uint(frameIndex64 + 1)
+		if _, duplicate := seen[frameID]; duplicate {
+			continue
+		}
+		seen[frameID] = struct{}{}
+		frameIDs = append(frameIDs, frameID)
+	}
+	return animationID, frameIDs, nil
+}
+
+// animationTargetFromPaths extracts an animation ID from the canonical asset
+// target path. The frontend identifies persisted animations by their IDs;
+// accepting this selection keeps edit_animation consistent with prototype
+// edits while retaining explicit identity for the queued task.
+func animationTargetFromPaths(paths []string) (uint, error) {
+	animationIDs := make(map[uint]struct{}, len(paths))
+	for _, path := range paths {
+		parts := strings.Split(path, ".")
+		if len(parts) != 2 || parts[0] != "animations" {
+			return 0, fmt.Errorf("%s does not identify an animation", path)
+		}
+		id64, err := strconv.ParseUint(parts[1], 10, 0)
+		if err != nil {
+			return 0, fmt.Errorf("%s does not identify an animation", path)
+		}
+		if id64 == 0 {
+			return 0, fmt.Errorf("animation id must be positive")
+		}
+		animationIDs[uint(id64)] = struct{}{}
+	}
+	if len(animationIDs) > 1 {
+		return 0, fmt.Errorf("edit_animation accepts only one animation")
+	}
+	for id := range animationIDs {
+		return id, nil
+	}
+	return 0, nil
 }
 
 func decodeStrictParameters(request *Request, payload any) error {

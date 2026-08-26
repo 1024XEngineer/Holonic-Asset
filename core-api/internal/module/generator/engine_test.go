@@ -250,16 +250,56 @@ func TestCreateBuildsUnifiedEditFramesPayload(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsEditFramesPayloadFromTargetPath(t *testing.T) {
+	assetID := uint(57)
+	tasks := &taskManagerStub{createID: 168}
+	engine := generator.NewEngine(tasks, nil)
+
+	runID, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:        42,
+		AssetID:          &assetID,
+		Kind:             generator.EditFrames,
+		CreativeBrief:    "make the stride longer",
+		TargetAssetPaths: []string{"animations.2.frames.0", "animations.2.frames.2"},
+	})
+	if err != nil {
+		t.Fatalf("create frame edit from target path: %v", err)
+	}
+	if runID != 168 || tasks.createdTask == nil || tasks.createdTask.Type != string(generator.EditFrames) {
+		t.Fatalf("unexpected frame edit task: run=%d task=%+v", runID, tasks.createdTask)
+	}
+
+	var payload generator.EditFramesPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode frame edit payload: %v", err)
+	}
+	want := generator.EditFramesPayload{
+		AssetID: 57, ProjectID: 42, AnimationID: 2,
+		FrameIDs: []uint{1, 3}, Prompt: "make the stride longer",
+	}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("unexpected frame edit payload: got %+v want %+v", payload, want)
+	}
+}
+
 func TestCreateEditFramesValidatesParameters(t *testing.T) {
 	assetID := uint(9)
 	tests := []struct {
 		name       string
 		parameters json.RawMessage
+		paths      []string
 		want       string
 		noBrief    bool
 	}{
 		{name: "missing animation", parameters: json.RawMessage(`{"frameIds":[1]}`), want: "animation id is required"},
 		{name: "missing frames", parameters: json.RawMessage(`{"animationId":3}`), want: "frame ids are required"},
+		{name: "invalid animation path", paths: []string{"animations.walk.frames.0"}, want: "does not identify a valid animation"},
+		{name: "invalid frame path", paths: []string{"animations.2.prototype"}, want: "does not identify a frame"},
+		{name: "invalid frame index", paths: []string{"animations.2.frames.first"}, want: "does not identify a valid frame index"},
+		{name: "out-of-range frame index", paths: []string{"animations.2.frames.32"}, want: "frame index 32 is out of range"},
+		{name: "zero animation path", paths: []string{"animations.0.frames.0"}, want: "does not identify a valid animation"},
+		{name: "duplicate frames are deduplicated", paths: []string{"animations.2.frames.0", "animations.2.frames.0"}},
+		{name: "multiple animations", paths: []string{"animations.2.frames.0", "animations.3.frames.1"}, want: "accepts only one animation"},
 		{name: "invalid parameters", parameters: json.RawMessage(`{"animationId":`), want: "decode edit_frames parameters"},
 		{name: "missing creative brief", parameters: json.RawMessage(`{"animationId":3,"frameIds":[1]}`), want: "creative brief is required", noBrief: true},
 	}
@@ -271,17 +311,47 @@ func TestCreateEditFramesValidatesParameters(t *testing.T) {
 			if test.noBrief {
 				brief = "   "
 			}
-			_, err := engine.Create(context.Background(), &generator.Request{
+			runID, err := engine.Create(context.Background(), &generator.Request{
 				ProjectID: 42, AssetID: &assetID, Kind: generator.EditFrames,
-				CreativeBrief: brief, Parameters: test.parameters,
+				CreativeBrief: brief, TargetAssetPaths: test.paths, Parameters: test.parameters,
 			})
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("expected %q, got %v", test.want, err)
+			if test.want != "" {
+				if err == nil || !strings.Contains(err.Error(), test.want) {
+					t.Fatalf("expected %q, got %v", test.want, err)
+				}
+				if tasks.createdTask != nil {
+					t.Fatalf("invalid edit parameters published task: %+v", tasks.createdTask)
+				}
+				return
 			}
-			if tasks.createdTask != nil {
-				t.Fatalf("invalid edit parameters published task: %+v", tasks.createdTask)
+			if err != nil || runID != 17 {
+				t.Fatalf("unexpected edit frames result: run=%d err=%v", runID, err)
 			}
 		})
+	}
+}
+
+func TestCreateEditFramesDeduplicatesTargetPaths(t *testing.T) {
+	assetID := uint(9)
+	tasks := &taskManagerStub{createID: 17}
+	engine := generator.NewEngine(tasks, nil)
+	runID, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:        42,
+		AssetID:          &assetID,
+		Kind:             generator.EditFrames,
+		CreativeBrief:    "make the stride longer",
+		TargetAssetPaths: []string{"animations.2.frames.0", "animations.2.frames.0"},
+	})
+	if err != nil || runID != 17 {
+		t.Fatalf("create deduplicated frame edit: run=%d err=%v", runID, err)
+	}
+
+	var payload generator.EditFramesPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.AnimationID != 2 || !reflect.DeepEqual(payload.FrameIDs, []uint{1}) {
+		t.Fatalf("unexpected deduplicated frame IDs: %+v", payload)
 	}
 }
 
@@ -386,12 +456,45 @@ func TestCreateBuildsEditAnimationPayload(t *testing.T) {
 	}
 }
 
+func TestCreateBuildsEditAnimationPayloadFromTargetPath(t *testing.T) {
+	assetID := uint(57)
+	tasks := &taskManagerStub{createID: 167}
+	engine := generator.NewEngine(tasks, nil)
+
+	runID, err := engine.Create(context.Background(), &generator.Request{
+		ProjectID:        42,
+		AssetID:          &assetID,
+		Kind:             generator.EditAnimation,
+		CreativeBrief:    "make both arms attack",
+		TargetAssetPaths: []string{"animations.2"},
+	})
+	if err != nil {
+		t.Fatalf("create animation edit from target path: %v", err)
+	}
+	if runID != 167 || tasks.createdTask == nil || tasks.createdTask.Type != string(generator.EditAnimation) {
+		t.Fatalf("unexpected animation edit task: run=%d task=%+v", runID, tasks.createdTask)
+	}
+
+	var payload generator.EditAnimationPayload
+	if err := json.Unmarshal(tasks.createdTask.Payload, &payload); err != nil {
+		t.Fatalf("decode animation edit payload: %v", err)
+	}
+	want := generator.EditAnimationPayload{
+		AssetID: 57, AnimationID: 2, ProjectID: 42,
+		CreativeBrief: "make both arms attack",
+	}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("unexpected animation edit payload: got %+v want %+v", payload, want)
+	}
+}
+
 func TestCreateEditAnimationRequiresAssetAndAnimationIDs(t *testing.T) {
 	tests := []struct {
-		name       string
-		assetID    *uint
-		parameters json.RawMessage
-		want       string
+		name             string
+		assetID          *uint
+		parameters       json.RawMessage
+		targetAssetPaths []string
+		want             string
 	}{
 		{
 			name:       "asset id",
@@ -404,20 +507,51 @@ func TestCreateEditAnimationRequiresAssetAndAnimationIDs(t *testing.T) {
 			parameters: json.RawMessage(`{}`),
 			want:       "animation id is required",
 		},
+		{
+			name:             "invalid animation target path",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"prototype"},
+			want:             "does not identify an animation",
+		},
+		{
+			name:             "zero animation target path",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"animations.0"},
+			want:             "animation id must be positive",
+		},
+		{
+			name:             "invalid numeric animation target path",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"animations.+2"},
+			want:             "does not identify an animation",
+		},
+		{
+			name:             "descendant path for animation edit",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"animations.2.frames.0"},
+			want:             "does not identify an animation",
+		},
+		{
+			name:             "multiple animation target paths",
+			assetID:          func() *uint { value := uint(9); return &value }(),
+			targetAssetPaths: []string{"animations.2", "animations.3"},
+			want:             "accepts only one animation",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tasks := &taskManagerStub{createID: 17}
 			engine := generator.NewEngine(tasks, nil)
 			_, err := engine.Create(context.Background(), &generator.Request{
-				ProjectID:     42,
-				AssetID:       tt.assetID,
-				Kind:          generator.EditAnimation,
-				CreativeBrief: "attack with sword",
-				Parameters:    tt.parameters,
+				ProjectID:        42,
+				AssetID:          tt.assetID,
+				Kind:             generator.EditAnimation,
+				CreativeBrief:    "attack with sword",
+				TargetAssetPaths: tt.targetAssetPaths,
+				Parameters:       tt.parameters,
 			})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("expected %q error, got %v", tt.want, err)
+				t.Fatalf("expected invalid payload error containing %q, got %v", tt.want, err)
 			}
 			if tasks.createdTask != nil {
 				t.Fatalf("task published with invalid edit animation identity: %+v", tasks.createdTask)
