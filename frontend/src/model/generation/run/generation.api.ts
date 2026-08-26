@@ -150,6 +150,11 @@ export async function toCreateGenerationRequest(
       asset_name: request.name,
       dimensions: assetCanvasSizeDimensionsSchema.parse(request.canvasSize),
       perspective: request.perspective,
+      tags: (request.tags ?? []).map(({ name, description, color }) => ({
+        name,
+        description,
+        color,
+      })),
       creating_reference: await resolveCreatingReference(
         request.creatingReference,
       ),

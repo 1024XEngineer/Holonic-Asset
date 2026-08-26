@@ -74,6 +74,49 @@ describe("CreateAssetForm", () => {
     });
   });
 
+  it("submits project tags for Nexus Reference matching", async () => {
+    const onCreate = vi.fn();
+    render(
+      withI18n(
+        <CreateAssetForm
+          availableTags={[
+            {
+              name: "warriors",
+              description: "Warrior characters and combat units",
+              color: "#4F46E5",
+            },
+          ]}
+          kind="character"
+          onCancel={vi.fn()}
+          onCreate={onCreate}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Asset name"), {
+      target: { value: "Orchard Keeper" },
+    });
+    fireEvent.change(screen.getByLabelText("Creative brief"), {
+      target: { value: "A veteran guardian" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.click(screen.getByText("warriors"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Character" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tags: [
+          {
+            name: "warriors",
+            description: "Warrior characters and combat units",
+            color: "#4F46E5",
+          },
+        ],
+      }),
+    );
+  });
+
   it("maps a selected scenery aspect ratio to output dimensions", async () => {
     const onCreate = vi.fn();
     render(

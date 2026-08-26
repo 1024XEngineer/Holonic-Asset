@@ -104,6 +104,7 @@ export {
   type AssetKind,
   type AssetRevision,
   type AssetRevisionStatus,
+  type AssetTag,
   type CharacterAnimation,
   type CharacterAnimationClip,
   type CharacterSpriteSheet,
@@ -112,4 +113,14 @@ export {
   type ProjectAsset,
   type SceneryAssetData,
   type SceneryLayer,
+} from "./types";
+export {
+  assetTagSchema,
+  defaultAssetTagColor,
+  getRandomAssetTagColor,
+  getTagBadgeStyle,
+  hexToRgb,
+  mergeAssetTags,
+  normalizeAssetTag,
+  presetAssetTagColors,
 } from "./types";
