@@ -655,6 +655,8 @@ function animationRequest(overrides: Record<string, unknown> = {}) {
     direction: "front" as const,
     creativeBrief: "Walk north",
     frameCount: 8,
+    frameWidth: 48,
+    frameHeight: 48,
     fps: 12,
     duration: 5,
     ...overrides,
