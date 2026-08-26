@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AssetTag, CreatableAssetKind } from "@/model/asset";
+import type {
+  AssetTagCreateHandler,
+  AssetTagUpdateHandler,
+} from "@/components/asset-tag-picker";
 import type { CreationRequest } from "@/model/generation";
 import {
   assetCreationDraftSchema,
@@ -35,6 +39,8 @@ export function CreateAssetForm({
   onCreate,
   error,
   isSubmitting = false,
+  onCreateTag,
+  onUpdateTag,
 }: {
   availableTags?: readonly AssetTag[];
   kind: CreatableAssetKind;
@@ -42,6 +48,8 @@ export function CreateAssetForm({
   onCreate: (request: CreationRequest<File>) => void | Promise<void>;
   error?: Error | null;
   isSubmitting?: boolean;
+  onCreateTag?: AssetTagCreateHandler;
+  onUpdateTag?: AssetTagUpdateHandler;
 }) {
   const { t } = useTranslation(["generation", "common"]);
   const [validationError, setValidationError] = useState<string>();
@@ -118,7 +126,9 @@ export function CreateAssetForm({
       <AssetSpecificFields
         availableTags={availableTags}
         draft={draft}
+        onCreateTag={onCreateTag}
         onChange={setDraft}
+        onUpdateTag={onUpdateTag}
       />
 
       {validationError ? (
@@ -162,11 +172,15 @@ export function CreateAssetForm({
 function AssetSpecificFields({
   availableTags,
   draft,
+  onCreateTag,
   onChange,
+  onUpdateTag,
 }: {
   availableTags: readonly AssetTag[];
   draft: AssetCreationDraft<File>;
+  onCreateTag?: AssetTagCreateHandler;
   onChange: (draft: AssetCreationDraft<File>) => void;
+  onUpdateTag?: AssetTagUpdateHandler;
 }) {
   switch (draft.kind) {
     case "tileset":
@@ -181,7 +195,9 @@ function AssetSpecificFields({
         <VisualAssetFields
           availableTags={availableTags}
           draft={draft}
+          onCreateTag={onCreateTag}
           onChange={onChange}
+          onUpdateTag={onUpdateTag}
         />
       );
     case "audio":

@@ -1,5 +1,9 @@
 import { ImageDropzone } from "@/components/ui/custom/image-dropzone";
-import { AssetTagPicker } from "@/components/asset-tag-picker";
+import {
+  AssetTagPicker,
+  type AssetTagCreateHandler,
+  type AssetTagUpdateHandler,
+} from "@/components/asset-tag-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,10 +42,14 @@ export function VisualAssetFields({
   availableTags = [],
   draft,
   onChange,
+  onCreateTag,
+  onUpdateTag,
 }: {
   availableTags?: readonly AssetTag[];
   draft: VisualAssetCreationDraft<File>;
   onChange: (draft: VisualAssetCreationDraft<File>) => void;
+  onCreateTag?: AssetTagCreateHandler;
+  onUpdateTag?: AssetTagUpdateHandler;
 }) {
   const { t } = useTranslation("generation");
   const isPreset = assetCanvasSizeOptions.includes(
@@ -107,6 +115,8 @@ export function VisualAssetFields({
         availableTags={availableTags}
         id="generation-tags"
         tags={draft.tags}
+        onCreateTag={onCreateTag}
+        onUpdateTag={onUpdateTag}
         onChange={(tags) => onChange({ ...draft, tags })}
       />
 
