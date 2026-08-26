@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withI18n } from "@/testing/with-i18n";
@@ -41,6 +47,39 @@ describe("AssetTagPicker", () => {
 
     expect(onChange).toHaveBeenCalledWith([
       { name: "village", description: "A quiet village", color: "#1A7F37" },
+    ]);
+  });
+
+  it("persists a new tag before applying it to the selection", async () => {
+    const onChange = vi.fn();
+    const onCreateTag = vi.fn().mockResolvedValue({
+      tagId: 9,
+      projectId: 42,
+      name: "village",
+      description: "Reusable",
+      color: "#1A7F37",
+    });
+    render(
+      withI18n(
+        <AssetTagPicker
+          id="asset-tags"
+          onChange={onChange}
+          onCreateTag={onCreateTag}
+          tags={[]}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create new tag" }));
+    fireEvent.change(screen.getByLabelText("Tag name"), {
+      target: { value: "village" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag" }));
+
+    await waitFor(() => expect(onCreateTag).toHaveBeenCalledOnce());
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({ tagId: 9, name: "village" }),
     ]);
   });
 
