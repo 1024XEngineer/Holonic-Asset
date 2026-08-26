@@ -3,7 +3,11 @@ import { AlertCircle, Layers3, Ruler, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { AssetTagPicker } from "@/components/asset-tag-picker";
+import {
+  AssetTagPicker,
+  type AssetTagCreateHandler,
+  type AssetTagUpdateHandler,
+} from "@/components/asset-tag-picker";
 import { DropdownField } from "@/components/ui/custom/dropdown-field";
 import {
   Dialog,
@@ -39,6 +43,8 @@ export function AssetEditDialog({
   isSaving,
   onClose,
   onSave,
+  onCreateTag,
+  onUpdateTag,
   projectId,
 }: {
   asset?: AssetLibraryItem;
@@ -47,6 +53,8 @@ export function AssetEditDialog({
   isSaving: boolean;
   onClose: () => void;
   onSave: (metadata: AssetMetadataUpdate) => void;
+  onCreateTag?: AssetTagCreateHandler;
+  onUpdateTag?: AssetTagUpdateHandler;
   projectId?: string;
 }) {
   const { t } = useTranslation(["assets", "common"]);
@@ -173,6 +181,8 @@ export function AssetEditDialog({
                     availableTags={availableTags}
                     disabled={isSaving}
                     id="asset-tags"
+                    onCreateTag={onCreateTag}
+                    onUpdateTag={onUpdateTag}
                     tags={tags}
                     onChange={(nextTags) => {
                       setValidationError(undefined);

@@ -139,8 +139,10 @@ export function AssetLibraryWorkspace({
         availableTags={library.availableTags}
         error={library.updateError}
         isSaving={library.isUpdatingAsset}
+        onCreateTag={library.createTag}
         onClose={library.closeAssetEditor}
         onSave={library.updateAsset}
+        onUpdateTag={library.updateTag}
         projectId={project.id}
       />
     </>
