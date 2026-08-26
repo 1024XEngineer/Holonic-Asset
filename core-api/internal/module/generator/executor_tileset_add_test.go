@@ -842,5 +842,3 @@ func TestPublishAddedTileSetItemErrors(t *testing.T) {
 		}
 	})
 }
-
-

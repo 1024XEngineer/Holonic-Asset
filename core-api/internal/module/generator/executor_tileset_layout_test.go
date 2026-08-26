@@ -288,4 +288,3 @@ func TestFindFirstTileSetPlacementEdgeCases(t *testing.T) {
 		t.Fatalf("expected not found for empty shape/grid: %v, %v, %v", origin, pos, found)
 	}
 }
-

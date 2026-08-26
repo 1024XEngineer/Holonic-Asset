@@ -40,7 +40,6 @@ func (l *recordingLogger) Sync() error {
 	return nil
 }
 
-
 func TestSceneryLogging(t *testing.T) {
 	payload := CreateSceneryPayload{
 		ProjectID:  12,

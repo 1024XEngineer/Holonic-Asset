@@ -171,4 +171,3 @@ func TestAnimationReferenceErrors(t *testing.T) {
 		}
 	})
 }
-

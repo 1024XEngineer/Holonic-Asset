@@ -54,8 +54,8 @@ func TestVerifyTileSetNoGuideLeak(t *testing.T) {
 	t.Run("near-black guide leak detected", func(t *testing.T) {
 		b64 := createTestPNG(32, 32, func(img *image.RGBA) {
 			// Fill entire cell with near-black (<=20) opaque pixels
-			for y := 0; y < 32; y++ {
-				for x := 0; x < 32; x++ {
+			for y := range 32 {
+				for x := range 32 {
 					img.Set(x, y, color.RGBA{R: 5, G: 5, B: 5, A: 255})
 				}
 			}

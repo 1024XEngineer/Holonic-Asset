@@ -147,9 +147,9 @@ func TestLoadAnimationReference(t *testing.T) {
 	})
 
 	t.Run("transient status retry then success", func(t *testing.T) {
-		var attempts int32
+		var attempts atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			count := atomic.AddInt32(&attempts, 1)
+			count := attempts.Add(1)
 			if count == 1 {
 				w.Header().Set("Request-Id", "retry-req")
 				w.WriteHeader(http.StatusTooManyRequests)
@@ -175,15 +175,15 @@ func TestLoadAnimationReference(t *testing.T) {
 		if canonical == "" {
 			t.Fatal("expected non-empty canonical base64")
 		}
-		if atomic.LoadInt32(&attempts) != 2 {
-			t.Fatalf("expected 2 attempts, got %d", attempts)
+		if attempts.Load() != 2 {
+			t.Fatalf("expected 2 attempts, got %d", attempts.Load())
 		}
 	})
 
 	t.Run("non-transient status fail fast", func(t *testing.T) {
-		var attempts int32
+		var attempts atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			atomic.AddInt32(&attempts, 1)
+			attempts.Add(1)
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte("not found"))
 		}))
@@ -198,8 +198,8 @@ func TestLoadAnimationReference(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if atomic.LoadInt32(&attempts) != 1 {
-			t.Fatalf("expected exactly 1 attempt, got %d", attempts)
+		if attempts.Load() != 1 {
+			t.Fatalf("expected exactly 1 attempt, got %d", attempts.Load())
 		}
 	})
 
@@ -223,9 +223,9 @@ func TestLoadAnimationReference(t *testing.T) {
 	})
 
 	t.Run("retry canceled by context", func(t *testing.T) {
-		var attempts int32
+		var attempts atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			atomic.AddInt32(&attempts, 1)
+			attempts.Add(1)
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}))
 		defer server.Close()
@@ -283,4 +283,3 @@ func TestLoadAnimationReference(t *testing.T) {
 		}
 	})
 }
-

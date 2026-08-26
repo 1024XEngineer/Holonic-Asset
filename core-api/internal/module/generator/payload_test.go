@@ -488,5 +488,3 @@ func TestValidateAddAndEditTilesetPayloadEdgeCases(t *testing.T) {
 		}
 	})
 }
-
-

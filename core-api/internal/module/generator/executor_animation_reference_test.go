@@ -288,4 +288,3 @@ func TestLoadAnimationContextFrames(t *testing.T) {
 		}
 	})
 }
-

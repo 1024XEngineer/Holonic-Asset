@@ -250,7 +250,6 @@ func TestRunReaderListRuns(t *testing.T) {
 	})
 }
 
-
 func TestDecodeRunCursor(t *testing.T) {
 	tests := []struct {
 		cursor  string

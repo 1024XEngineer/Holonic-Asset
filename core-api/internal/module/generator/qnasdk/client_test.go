@@ -214,4 +214,3 @@ func TestClientExecuteBodyReadError(t *testing.T) {
 		t.Fatal("expected error on body read failure")
 	}
 }
-

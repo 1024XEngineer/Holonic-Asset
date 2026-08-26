@@ -205,11 +205,11 @@ func TestPersistTileSetUploads(t *testing.T) {
 	t.Run("upload unprocessed failure triggers cleanup", func(t *testing.T) {
 		multiUploads := []tileSetTileUpload{
 			{
-				itemIndex:      0,
-				tileIndex:      0,
-				position:       TileSetCoordinate{0, 0},
-				region:         imageprocessor.ImageRegion{ImageBase64: "img0", MIMEType: "image/png"},
-				objectKey:      "key-0.png",
+				itemIndex: 0,
+				tileIndex: 0,
+				position:  TileSetCoordinate{0, 0},
+				region:    imageprocessor.ImageRegion{ImageBase64: "img0", MIMEType: "image/png"},
+				objectKey: "key-0.png",
 			},
 			{
 				itemIndex:      1,
@@ -235,7 +235,6 @@ func TestPersistTileSetUploads(t *testing.T) {
 			t.Fatal("expected error")
 		}
 	})
-
 
 	t.Run("canceled context", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
