@@ -1,10 +1,13 @@
 package generator
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"image"
 	"image/color"
 	"image/draw"
+	"image/jpeg"
 	"strings"
 	"sync"
 	"testing"
@@ -536,5 +539,95 @@ func TestAlignTileSetImageToShapeClipsModelSpillFromOmittedCells(t *testing.T) {
 	}
 	if aligned.RGBAAt(4, tileSize+4).A != 0 {
 		t.Fatal("model spill remained visible in an omitted cell")
+	}
+}
+
+func TestNormalizeTileSetCandidatePNG(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			img.SetRGBA(x, y, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+		}
+	}
+	var jpegBuf bytes.Buffer
+	if err := jpeg.Encode(&jpegBuf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode test jpeg: %v", err)
+	}
+	candidate := imageclient.GeneratedImage{
+		Base64:    base64.StdEncoding.EncodeToString(jpegBuf.Bytes()),
+		MediaType: "image/jpeg",
+	}
+	pngB64, err := normalizeTileSetCandidatePNG(candidate)
+	if err != nil {
+		t.Fatalf("normalize candidate PNG: %v", err)
+	}
+	pngBytes, err := base64.StdEncoding.DecodeString(pngB64)
+	if err != nil {
+		t.Fatalf("decode normalized PNG: %v", err)
+	}
+	if !imageprocessor.IsPNGBytes(pngBytes) {
+		t.Fatal("normalized image is not a PNG")
+	}
+}
+
+func TestProcessTileSetItemCandidateNormalizesRawImageToPNG(t *testing.T) {
+	const tileSize = 16
+	img := image.NewRGBA(image.Rect(0, 0, tileSize, tileSize))
+	// Fill with green background and an opaque red box in the middle
+	for y := range tileSize {
+		for x := range tileSize {
+			if x >= 2 && x < tileSize-2 && y >= 2 && y < tileSize-2 {
+				img.SetRGBA(x, y, color.RGBA{R: 180, G: 50, B: 30, A: 255})
+			} else {
+				img.SetRGBA(x, y, color.RGBA{G: 255, A: 255})
+			}
+		}
+	}
+	encodedPNG, err := imageprocessor.EncodePNGBase64(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var jpegBuf bytes.Buffer
+	if err := jpeg.Encode(&jpegBuf, img, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatal(err)
+	}
+	candidate := imageclient.GeneratedImage{
+		Base64:    encodedPNG,
+		MediaType: "image/png",
+	}
+
+	exec := &executor{
+		processor: imageprocessor.NewProcessor(),
+	}
+	request := CreateTileSetPayload{
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize: assetdomain.Size{Width: tileSize, Height: tileSize},
+		},
+	}
+	item := TileSetItemDefinition{Name: "Block", Shape: []TileSetCoordinate{{0, 0}}}
+	result, err := exec.processTileSetItemCandidate(
+		context.Background(),
+		request,
+		item,
+		0,
+		0,
+		1,
+		1,
+		[]TileSetCoordinate{{0, 0}},
+		candidate,
+		assetdomain.PerspectiveTopDown,
+	)
+	if err != nil {
+		t.Fatalf("process candidate: %v", err)
+	}
+	if result.RawMediaType != "image/png" {
+		t.Fatalf("raw media type = %q, want image/png", result.RawMediaType)
+	}
+	if result.MIMEType != "image/png" {
+		t.Fatalf("mime type = %q, want image/png", result.MIMEType)
+	}
+	rawBytes, err := base64.StdEncoding.DecodeString(result.RawImageBase64)
+	if err != nil || !imageprocessor.IsPNGBytes(rawBytes) {
+		t.Fatalf("raw image is not valid PNG bytes")
 	}
 }

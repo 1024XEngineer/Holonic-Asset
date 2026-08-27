@@ -70,6 +70,9 @@ func buildTileSetUploads(
 			if tileIndex == 0 {
 				rawB64 = item.RawImageBase64
 				rawMIME = item.RawMediaType
+				if rawMIME == "" {
+					rawMIME = "image/png"
+				}
 			}
 			uploads = append(uploads, tileSetTileUpload{
 				itemIndex: itemIndex, tileIndex: tileIndex, position: placement.Positions[tileIndex],
@@ -100,7 +103,11 @@ func (e *executor) persistTileSetUploads(
 				return
 			}
 			upload := uploads[index]
-			dataURL := "data:" + upload.region.MIMEType + ";base64," + upload.region.ImageBase64
+			mimeType := upload.region.MIMEType
+			if mimeType == "" {
+				mimeType = "image/png"
+			}
+			dataURL := "data:" + mimeType + ";base64," + upload.region.ImageBase64
 			if err := e.references.PersistReferenceAt(ctx, upload.objectKey, dataURL); err != nil {
 				errOnce.Do(func() {
 					firstErr = fmt.Errorf("generator: upload Tileset Item %d Tile %d: %w", upload.itemIndex, upload.tileIndex, err)
