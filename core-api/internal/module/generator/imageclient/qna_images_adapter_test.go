@@ -35,19 +35,21 @@ func TestQNAImagesAdapterGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T)
 			t.Fatalf("unexpected authorization header: %q", request.Header.Get("Authorization"))
 		}
 		var payload struct {
-			Model   string   `json:"model"`
-			Prompt  string   `json:"prompt"`
-			Image   []string `json:"image"`
-			Size    string   `json:"size"`
-			Quality string   `json:"quality"`
-			Seed    string   `json:"seed"`
+			Model        string   `json:"model"`
+			Prompt       string   `json:"prompt"`
+			Image        []string `json:"image"`
+			Size         string   `json:"size"`
+			Quality      string   `json:"quality"`
+			Seed         string   `json:"seed"`
+			OutputFormat string   `json:"output_format"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request payload: %v", err)
 		}
 		if payload.Model != "configured-model" || payload.Prompt != "pixel sword" ||
 			payload.Size != "1024x1024" || payload.Quality != "high" ||
-			payload.Seed != "12345" || len(payload.Image) != 0 {
+			payload.Seed != "12345" || len(payload.Image) != 0 ||
+			payload.OutputFormat != "png" {
 			t.Fatalf("unexpected request payload: %+v", payload)
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -125,17 +127,19 @@ func TestQNAImagesAdapterEditSendsReferenceImages(t *testing.T) {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
 		}
 		var payload struct {
-			Prompt string   `json:"prompt"`
-			Image  []string `json:"image"`
-			Mask   string   `json:"mask"`
-			N      int      `json:"n"`
+			Prompt       string   `json:"prompt"`
+			Image        []string `json:"image"`
+			Mask         string   `json:"mask"`
+			N            int      `json:"n"`
+			OutputFormat string   `json:"output_format"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request payload: %v", err)
 		}
 		if payload.Prompt != "make it blue" ||
 			!reflect.DeepEqual(payload.Image, []string{"data:image/png;base64,ref"}) ||
-			payload.Mask != "data:image/png;base64,mask" || payload.N != 2 {
+			payload.Mask != "data:image/png;base64,mask" || payload.N != 2 ||
+			payload.OutputFormat != "png" {
 			t.Fatalf("unexpected edit payload: %+v", payload)
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -156,6 +160,38 @@ func TestQNAImagesAdapterEditSendsReferenceImages(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.Images, []string{"edited-image"}) {
 		t.Fatalf("unexpected images: %+v", result.Images)
+	}
+	if result.OutputFormat != "png" {
+		t.Fatalf("output format = %q, want png", result.OutputFormat)
+	}
+}
+
+func TestQNAImagesAdapterRespectsCustomOutputFormatParam(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			OutputFormat string `json:"output_format"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request payload: %v", err)
+		}
+		if payload.OutputFormat != "webp" {
+			t.Fatalf("output_format = %q, want webp", payload.OutputFormat)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":[{"b64_json":"image"}]}`))
+	}))
+	defer server.Close()
+
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "test-key"})
+	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
+		Prompt: "custom format image",
+		Params: imageclient.Params{"output_format": "webp"},
+	})
+	if err != nil {
+		t.Fatalf("generate image: %v", err)
+	}
+	if result.OutputFormat != "webp" {
+		t.Fatalf("output format = %q, want webp", result.OutputFormat)
 	}
 }
 
