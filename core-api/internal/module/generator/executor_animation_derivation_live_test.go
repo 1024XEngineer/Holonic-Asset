@@ -404,6 +404,7 @@ func TestLiveProductionTopDownAnimationDerivation(t *testing.T) {
 	if absolute, err := filepath.Abs(artifactRoot); err == nil {
 		artifactRoot = absolute
 	}
+	// #nosec G703 -- the operator explicitly selects this opt-in live-test artifact directory.
 	if err := os.MkdirAll(artifactRoot, 0o750); err != nil {
 		t.Fatalf("create artifact directory: %v", err)
 	}
@@ -655,6 +656,7 @@ func resumeProductionDerivationPrototype(
 	references *productionDerivationReferenceStore,
 ) error {
 	objectRoot := filepath.Join(artifactRoot, "object_store")
+	// #nosec G703 -- objectRoot is an explicit live-test checkpoint directory.
 	if err := filepath.WalkDir(objectRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -662,7 +664,7 @@ func resumeProductionDerivationPrototype(
 		if entry.IsDir() {
 			return nil
 		}
-		content, err := os.ReadFile(path) // #nosec G304 -- path belongs to the explicit live-test checkpoint.
+		content, err := os.ReadFile(path) // #nosec G304,G122 -- path belongs to the explicit live-test checkpoint.
 		if err != nil {
 			return err
 		}
@@ -712,7 +714,9 @@ func resumeProductionDerivationSource(
 	assets *productionDerivationAssetStore,
 	videos *productionDerivationVideoService,
 ) error {
-	raw, err := os.ReadFile(filepath.Join(artifactRoot, sourcePhase, "task_result.json"))
+	raw, err := os.ReadFile( // #nosec G304,G703 -- the operator explicitly selects this live-test checkpoint.
+		filepath.Join(artifactRoot, sourcePhase, "task_result.json"),
+	)
 	if err != nil {
 		return err
 	}
@@ -736,7 +740,9 @@ func resumeProductionDerivationSource(
 	var response struct {
 		RequestID string `json:"requestId"`
 	}
-	responseRaw, err := os.ReadFile(filepath.Join(artifactRoot, sourcePhase, "video_model_call_01", "response.json"))
+	responseRaw, err := os.ReadFile( // #nosec G304,G703 -- the operator explicitly selects this live-test checkpoint.
+		filepath.Join(artifactRoot, sourcePhase, "video_model_call_01", "response.json"),
+	)
 	if err == nil {
 		_ = json.Unmarshal(responseRaw, &response)
 	}
@@ -752,7 +758,9 @@ func resumeProductionDerivationVideoDirections(
 	assets *productionDerivationAssetStore,
 	videos *productionDerivationVideoService,
 ) error {
-	raw, err := os.ReadFile(filepath.Join(artifactRoot, derivationPhase, "task_result.json"))
+	raw, err := os.ReadFile( // #nosec G304,G703 -- the operator explicitly selects this live-test checkpoint.
+		filepath.Join(artifactRoot, derivationPhase, "task_result.json"),
+	)
 	if err != nil {
 		return err
 	}
@@ -786,13 +794,15 @@ func resumeProductionDerivationVideoDirections(
 		var result struct {
 			VideoRequestID string `json:"videoRequestId"`
 		}
-		resultRaw, readErr := os.ReadFile(filepath.Join(
-			artifactRoot,
-			derivationPhase,
-			"formal_animation_service",
-			direction,
-			"result.json",
-		))
+		resultRaw, readErr := os.ReadFile( // #nosec G304,G703 -- the operator explicitly selects this checkpoint.
+			filepath.Join(
+				artifactRoot,
+				derivationPhase,
+				"formal_animation_service",
+				direction,
+				"result.json",
+			),
+		)
 		if readErr == nil {
 			_ = json.Unmarshal(resultRaw, &result)
 		}
@@ -818,6 +828,7 @@ func executeLiveTask(
 	if err != nil {
 		t.Fatalf("encode %s payload: %v", taskType, err)
 	}
+	// #nosec G703 -- the operator explicitly selects this opt-in live-test artifact directory.
 	if err := os.MkdirAll(filepath.Join(artifactRoot, phase), 0o750); err != nil {
 		t.Fatalf("create %s artifact directory: %v", phase, err)
 	}
@@ -830,7 +841,9 @@ func executeLiveTask(
 	if err != nil {
 		t.Fatalf("execute %s: %v", taskType, err)
 	}
-	if err := os.WriteFile(filepath.Join(artifactRoot, phase, "task_result.json"), result, 0o600); err != nil {
+	if err := os.WriteFile( // #nosec G703 -- the operator explicitly selects this live-test artifact directory.
+		filepath.Join(artifactRoot, phase, "task_result.json"), result, 0o600,
+	); err != nil {
 		t.Fatalf("write %s result: %v", taskType, err)
 	}
 	t.Logf("completed %s (%s) in %s", taskType, phase, time.Since(started).Round(time.Second))
@@ -982,10 +995,11 @@ func writeLiveJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
+	// #nosec G703 -- path is constructed beneath the operator-selected live-test artifact directory.
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, encoded, 0o600)
+	return os.WriteFile(path, encoded, 0o600) // #nosec G703 -- path is limited to live-test artifacts.
 }
 
 func writeLiveDataURL(path string, value string) error {
@@ -1010,22 +1024,27 @@ func writeLiveBase64(path string, value string) error {
 	if err != nil {
 		return err
 	}
+	// #nosec G703 -- path is constructed beneath the operator-selected live-test artifact directory.
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, decoded, 0o600)
+	return os.WriteFile(path, decoded, 0o600) // #nosec G703 -- path is limited to live-test artifacts.
 }
 
 func writeLivePNG(path string, source image.Image) error {
+	// #nosec G703 -- path is constructed beneath the operator-selected live-test artifact directory.
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	file, err := os.Create(path) // #nosec G304 -- path is controlled by this opt-in live test.
+	file, err := os.Create(path) // #nosec G304,G703 -- path is controlled by this opt-in live test.
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	return png.Encode(file, source)
+	if err := png.Encode(file, source); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 var _ AssetWriter = (*productionDerivationAssetStore)(nil)
