@@ -154,6 +154,7 @@ func (p *QNAChatCompletionsAdapter) call(
 	payload := chatCompletionRequest{
 		Model: model,
 		N:     request.N,
+		Seed:  request.Params["seed"],
 		Messages: []chatMessage{
 			{
 				Role:    "user",
@@ -521,6 +522,7 @@ func chatErrorMessage(body []byte) string {
 type chatCompletionRequest struct {
 	Model    string        `json:"model"`
 	N        int           `json:"n,omitempty"`
+	Seed     string        `json:"seed,omitempty"`
 	Messages []chatMessage `json:"messages"`
 	Stream   bool          `json:"stream"`
 }

@@ -201,7 +201,7 @@ func TestProjectValidateReferenceGenerationAcceptsHTTPReferences(t *testing.T) {
 	}
 }
 
-func TestProjectValidateReferenceGenerationRejectsNilAndInvalidReferences(t *testing.T) {
+func TestProjectValidateReferenceGenerationIgnoresReferenceInput(t *testing.T) {
 	if err := (*domain.Project)(nil).ValidateReferenceGeneration(); !errors.Is(err, domain.ErrInvalidProject) {
 		t.Fatalf("expected nil project error, got %v", err)
 	}
@@ -218,8 +218,8 @@ func TestProjectValidateReferenceGenerationRejectsNilAndInvalidReferences(t *tes
 			TargetPlatform: domain.PlatformTypePC,
 			Reference:      reference,
 		}
-		if err := project.ValidateReferenceGeneration(); !errors.Is(err, domain.ErrInvalidProject) {
-			t.Errorf("reference %q should be rejected: %v", reference, err)
+		if err := project.ValidateReferenceGeneration(); err != nil {
+			t.Errorf("reference %q should be ignored, got error: %v", reference, err)
 		}
 	}
 }

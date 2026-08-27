@@ -630,7 +630,6 @@ export interface components {
              * @enum {string}
              */
             perspective: "Top-Down" | "Side-On" | "Isometric";
-            reference?: string;
             style?: string;
             /** @enum {string} */
             targetPlatform?: "" | "PC" | "Mobile" | "Web";

@@ -621,9 +621,6 @@
             ],
             "type": "string"
           },
-          "reference": {
-            "type": "string"
-          },
           "style": {
             "type": "string"
           },
