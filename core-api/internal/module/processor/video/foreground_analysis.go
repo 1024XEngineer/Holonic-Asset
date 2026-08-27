@@ -72,6 +72,12 @@ func boundsInsideSafetyBand(frame image.Image, foreground image.Rectangle, margi
 		foreground.Max.Y <= frameBounds.Max.Y-margin
 }
 
+// ForegroundBounds exposes deterministic chroma-key foreground bounds to
+// callers that need the same subject measurement used by framing validation.
+func ForegroundBounds(source image.Image, chromaKey ChromaKey) (image.Rectangle, bool) {
+	return foregroundBounds(source, chromaKey)
+}
+
 func foregroundBounds(source image.Image, chromaKey ChromaKey) (image.Rectangle, bool) {
 	bounds := source.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()

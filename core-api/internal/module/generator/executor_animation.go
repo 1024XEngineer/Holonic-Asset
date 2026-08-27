@@ -370,6 +370,7 @@ func (s *animationGenerationService) Generate(
 		processed, processErr := s.processVideoWithSourceCellScale(
 			ctx,
 			video,
+			greenReference,
 			options,
 			sourceCellScaleMultiplier,
 		)
@@ -414,6 +415,7 @@ func (s *animationGenerationService) Generate(
 func (s *animationGenerationService) processVideoWithSourceCellScale(
 	ctx context.Context,
 	video []byte,
+	referenceBase64 string,
 	request AnimationGenerationRequest,
 	sourceCellScaleMultiplier float64,
 ) (*AnimationGenerationResult, error) {
@@ -455,6 +457,21 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		if err := validateEditFrameContinuity(request, processed.Frames); err != nil {
 			return nil, err
 		}
+	}
+	if referenceBase64 != "" {
+		subjectScaleReference, decodeErr := imageprocessor.DecodeBase64Image(referenceBase64)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("generator: decode animation subject-scale reference: %w", decodeErr)
+		}
+		subjectScaleMultiplier, measureErr := animationSubjectScaleMultiplier(
+			subjectScaleReference,
+			processed.Frames,
+			chromaKey,
+		)
+		if measureErr != nil {
+			return nil, measureErr
+		}
+		sourceCellScaleMultiplier *= subjectScaleMultiplier
 	}
 	rawFrames := make([]imageprocessor.ImageRegion, 0, len(processed.Frames))
 	for index, frame := range processed.Frames {
