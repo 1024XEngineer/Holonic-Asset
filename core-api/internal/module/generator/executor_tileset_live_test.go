@@ -627,3 +627,163 @@ func TestLiveSequentialTileSetItemGenerationWithUnprocessedReference(t *testing.
 		t.Logf("Saved multi-item sequence tileset composite to: %s", compositePath)
 	}
 }
+
+func TestLiveSideOnFlatTilesetGeneration(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("HOLONIC_LLM_INTEGRATION")) != "1" {
+		t.Skip("set HOLONIC_LLM_INTEGRATION=1 to run side-on flat tileset generation test")
+	}
+
+	imageCfg, err := loadLiveImageConfig()
+	if err != nil {
+		t.Fatalf("load live image config: %v", err)
+	}
+	imageModels := make([]imageclient.ModelConfig, 0, len(imageCfg.Models))
+	for _, m := range imageCfg.Models {
+		imageModels = append(imageModels, imageclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
+	}
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       imageCfg.BaseURL,
+		APIKey:        imageCfg.APIKey,
+		DefaultModel:  imageCfg.DefaultModel,
+		FallbackModel: imageCfg.FallbackModel,
+		Models:        imageModels,
+	})
+	capturing := &capturingImageService{
+		inner: imageclient.NewImageGenerationService(provider),
+	}
+	processor := imageprocessor.NewProcessor()
+
+	artifactDir := "/Users/lx/.gemini/antigravity/brain/e61e5a24-43e3-4309-bb3d-470f55bca4ac"
+	_ = os.MkdirAll(artifactDir, 0o750)
+
+	references := &liveTileSetReferenceStore{
+		objects: make(map[string]string),
+		diskDir: artifactDir,
+	}
+
+	assets := &tileSetWorkflowAssets{
+		asset: assetdomain.Asset{
+			ID:          300,
+			ProjectID:   99,
+			Type:        assetdomain.AssetTypeTileSet,
+			Version:     1,
+			Perspective: assetdomain.PerspectiveSideOn,
+			Dimensions:  json.RawMessage(`{"tileSize":{"width":32,"height":32},"tileAmount":{"columns":8,"rows":8}}`),
+		},
+		content: assetdomain.AssetContent{Items: nil},
+	}
+
+	projectStub := &tileSetGenerationProjectStub{
+		project: &projectdomain.Project{
+			ID:             99,
+			Name:           "Retro Platformer",
+			GameType:       "2D Side-Scrolling Platformer",
+			Description:    "A classic 16-bit 2D side-scrolling action platformer with medieval castle ruins and dungeons.",
+			Style:          "16-bit classic 2D pixel art, crisp hard edges, flat orthographic side elevation",
+			TargetPlatform: projectdomain.PlatformTypePC,
+			Perspective:    projectdomain.PerspectiveSideOn,
+		},
+	}
+
+	exec := &executor{
+		images:     capturing,
+		processor:  processor,
+		assets:     assets,
+		projects:   projectStub,
+		references: references,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	t.Log("=== Starting live Side-On Flat Tileset Generation ===")
+	startTime := time.Now()
+
+	createPayload := CreateTileSetPayload{
+		AssetName:     "Castle Platform Tiles",
+		ProjectID:     99,
+		CreativeBrief: "Flat 2D side-scrolling platformer stone castle brick wall and ground platform with green moss top trim, strictly flat 2D orthographic side elevation with no top surface slope or 3D angle",
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize:   assetdomain.Size{Width: 32, Height: 32},
+			TileAmount: assetdomain.TileAmount{Columns: 8, Rows: 8},
+		},
+		Items: []TileSetItemDefinition{
+			{
+				Name:        "Castle Stone Platform",
+				Description: "Flat 2D stone brick platform with moss on top edge, pure orthographic side view",
+				Shape: []TileSetCoordinate{
+					{0, 0}, {1, 0},
+					{0, 1}, {1, 1},
+				},
+			},
+		},
+	}
+	createBytes, err := json.Marshal(createPayload)
+	if err != nil {
+		t.Fatalf("marshal create payload: %v", err)
+	}
+
+	_, err = exec.Generate(ctx, GenerateTileSet, createBytes)
+	if err != nil {
+		t.Fatalf("GenerateTileSet failed: %v", err)
+	}
+	t.Logf("Side-On Generation succeeded in %.2fs!", time.Since(startTime).Seconds())
+
+	content := assets.content
+	if len(content.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(content.Items))
+	}
+	item := content.Items[0]
+	t.Logf("Generated Item: %s with %d tiles", item.Name, len(item.Tiles))
+
+	// Save composite preview
+	gridCols, gridRows := 4, 4
+	tileW, tileH := 32, 32
+	canvas := image.NewRGBA(image.Rect(0, 0, gridCols*tileW, gridRows*tileH))
+
+	for y := range gridRows * tileH {
+		for x := range gridCols * tileW {
+			if (x/tileW+y/tileH)%2 == 0 {
+				canvas.SetRGBA(x, y, color.RGBA{R: 35, G: 38, B: 45, A: 255})
+			} else {
+				canvas.SetRGBA(x, y, color.RGBA{R: 45, G: 48, B: 55, A: 255})
+			}
+		}
+	}
+
+	for _, tile := range item.Tiles {
+		if tile.URL == nil {
+			continue
+		}
+		dataURI, ok := references.objects[*tile.URL]
+		if !ok {
+			continue
+		}
+		img := decodeDataURIToImage(t, dataURI)
+		destRect := image.Rect(tile.Position.X*tileW, tile.Position.Y*tileH, (tile.Position.X+1)*tileW, (tile.Position.Y+1)*tileH)
+		draw.Draw(canvas, destRect, img, image.Point{}, draw.Over)
+		t.Logf("  Tile (%d, %d) -> %s", tile.Position.X, tile.Position.Y, *tile.URL)
+	}
+
+	resultPath := filepath.Join(artifactDir, "side_on_tileset_result.png")
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, canvas); err == nil {
+		_ = os.WriteFile(resultPath, buf.Bytes(), 0o600)
+		t.Logf("Saved Side-On tileset preview to: %s", resultPath)
+	}
+
+	// Also write raw image
+	rawB64 := capturing.GetLastGenerated()
+	if rawB64 != "" {
+		if rawDecoded, err := base64.StdEncoding.DecodeString(rawB64); err == nil {
+			rawPath := filepath.Join(artifactDir, "side_on_tileset_raw.png")
+			_ = os.WriteFile(rawPath, rawDecoded, 0o600)
+			t.Logf("Saved Side-On raw model image to: %s", rawPath)
+		}
+	}
+}
