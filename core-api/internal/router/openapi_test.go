@@ -94,8 +94,8 @@ func TestOpenAPIIncludesHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(document.Components.Schemas["GenerateReferenceRequest"], &generateReferenceSchema); err != nil {
 		t.Fatalf("decode GenerateReferenceRequest schema: %v", err)
 	}
-	if _, ok := generateReferenceSchema.Properties["reference"]; !ok {
-		t.Fatal("GenerateReferenceRequest must expose the optional current project reference")
+	if _, ok := generateReferenceSchema.Properties["reference"]; ok {
+		t.Fatal("GenerateReferenceRequest must not expose a reference input")
 	}
 
 	for _, schemaName := range []string{"AssetDetailResponse", "AssetListItemResponse", "UpdateAssetResponse", "RecordAssetResponse"} {

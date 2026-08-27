@@ -2,18 +2,20 @@ package project
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 )
 
 const (
-	referenceSize               = "auto"
-	referenceQuality            = "medium"
-	referenceRegenerationPrompt = `REFERENCE REGENERATION
-The supplied reference image is the user's current result and they are dissatisfied with it. Generate a clearly new alternative instead of reproducing the same composition. Keep only useful high-level cues such as visual language, palette relationships, sprite scale, and material treatment. Change the composition, layout, staging, silhouettes, and scene details while following the current project brief.`
+	referenceSize    = "auto"
+	referenceQuality = "medium"
 )
 
 var (
@@ -115,31 +117,16 @@ func (m *manager) GenerateReference(ctx context.Context, project *Project) (stri
 		return "", ErrImageServiceRequired
 	}
 
-	reference := strings.TrimSpace(project.Reference)
 	prompt := buildReferencePrompt(project)
-	if reference != "" {
-		prompt += "\n\n" + referenceRegenerationPrompt
-	}
 
 	request := &imageclient.GenerateRequest{
 		Prompt: prompt,
 		Size:   referenceSize,
 		Params: imageclient.Params{
 			"quality": referenceQuality,
+			"seed":    randomReferenceSeed(),
 		},
 		MaxAttempts: 2,
-	}
-	if reference != "" {
-		// Refresh private URLs before sending them to the image provider so an
-		// expiring frontend URL does not become stale during generation.
-		if m.references != nil {
-			resolved, err := m.references.ResolveReference(ctx, reference)
-			if err != nil {
-				return "", fmt.Errorf("project: resolve reference: %w", err)
-			}
-			reference = resolved
-		}
-		request.ReferenceImages = []string{reference}
 	}
 
 	generated, err := m.imageClient.Generate(ctx, request)
@@ -171,6 +158,15 @@ func referenceDataURL(image imageclient.GeneratedImage) string {
 		mediaType = "image/png"
 	}
 	return "data:" + mediaType + ";base64," + image.Base64
+}
+
+func randomReferenceSeed() string {
+	const maxSeed = int64(1_000_000_000)
+	value, err := rand.Int(rand.Reader, big.NewInt(maxSeed))
+	if err == nil {
+		return strconv.FormatInt(value.Int64(), 10)
+	}
+	return strconv.FormatInt(time.Now().UnixNano()%maxSeed, 10)
 }
 
 var _ Manager = (*manager)(nil)

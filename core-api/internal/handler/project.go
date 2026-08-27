@@ -59,7 +59,6 @@ func (h *ProjectHandler) GenerateReference(
 		Perspective:    request.Perspective,
 		TargetPlatform: request.TargetPlatform,
 		Description:    request.Description,
-		Reference:      request.Reference,
 		Style:          request.Style,
 	}
 

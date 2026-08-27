@@ -120,6 +120,7 @@ describe("projectApi", () => {
     expect(mocks.core.create).toHaveBeenCalledWith({
       userID: 4927310,
       ...coreFields(input),
+      reference: input.reference,
     });
 
     await expect(projectApi.generateReference(input)).resolves.toBe(
@@ -167,7 +168,6 @@ function coreFields(project: CreateProjectInput | ProjectSummary) {
     perspective: project.perspective,
     targetPlatform: "PC",
     description: project.description,
-    reference: project.reference,
     style: project.style,
   };
 }

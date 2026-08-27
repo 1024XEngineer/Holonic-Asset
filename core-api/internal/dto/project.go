@@ -35,7 +35,6 @@ type GenerateReferenceRequest struct {
 	Perspective    domain.Perspective  `json:"perspective,omitempty" enum:"Top-Down,Side-On,Isometric" default:"Top-Down"`
 	TargetPlatform domain.PlatformType `json:"targetPlatform,omitempty" enum:",PC,Mobile,Web"`
 	Description    string              `json:"description,omitempty"`
-	Reference      string              `json:"reference,omitempty"`
 	Style          string              `json:"style,omitempty"`
 }
 

@@ -36,6 +36,7 @@ func TestQNAChatCompletionsAdapterGenerateSuccessMarkdownURL(t *testing.T) {
 		var req struct {
 			Model    string `json:"model"`
 			N        int    `json:"n"`
+			Seed     string `json:"seed"`
 			Messages []struct {
 				Role    string `json:"role"`
 				Content []struct {
@@ -52,6 +53,9 @@ func TestQNAChatCompletionsAdapterGenerateSuccessMarkdownURL(t *testing.T) {
 		}
 		if req.N != 2 {
 			t.Fatalf("candidate count = %d, want 2", req.N)
+		}
+		if req.Seed != "67890" {
+			t.Fatalf("seed = %q, want 67890", req.Seed)
 		}
 		if len(req.Messages) != 1 || len(req.Messages[0].Content) != 1 || req.Messages[0].Content[0].Text != "a knight" {
 			t.Fatalf("unexpected content: %+v", req.Messages)
@@ -103,6 +107,7 @@ func TestQNAChatCompletionsAdapterGenerateSuccessMarkdownURL(t *testing.T) {
 		Prompt: "a knight",
 		Size:   "1024x1024",
 		N:      2,
+		Params: imageclient.Params{"seed": "67890"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected generate error: %v", err)

@@ -136,6 +136,7 @@ func (p *QNAImagesAdapter) call(
 		N:       request.N,
 		Size:    providerSize,
 		Quality: request.Params["quality"],
+		Seed:    request.Params["seed"],
 	}
 	var decoded qnaImageResponse
 	if err := p.sdkClient.Execute(ctx, http.MethodPost, strings.TrimPrefix(path, "/v1/"), payload, &decoded); err != nil {
@@ -254,6 +255,7 @@ type qnaImageRequest struct {
 	N       int      `json:"n,omitempty"`
 	Size    string   `json:"size,omitempty"`
 	Quality string   `json:"quality,omitempty"`
+	Seed    string   `json:"seed,omitempty"`
 }
 
 type qnaImageResponse struct {

@@ -40,12 +40,14 @@ func TestQNAImagesAdapterGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T)
 			Image   []string `json:"image"`
 			Size    string   `json:"size"`
 			Quality string   `json:"quality"`
+			Seed    string   `json:"seed"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request payload: %v", err)
 		}
 		if payload.Model != "configured-model" || payload.Prompt != "pixel sword" ||
-			payload.Size != "1024x1024" || payload.Quality != "high" || len(payload.Image) != 0 {
+			payload.Size != "1024x1024" || payload.Quality != "high" ||
+			payload.Seed != "12345" || len(payload.Image) != 0 {
 			t.Fatalf("unexpected request payload: %+v", payload)
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -68,7 +70,7 @@ func TestQNAImagesAdapterGenerateUsesConfiguredKeyModelAndEndpoint(t *testing.T)
 	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
 		Prompt: "pixel sword",
 		Size:   "64x64",
-		Params: imageclient.Params{"quality": "high"},
+		Params: imageclient.Params{"quality": "high", "seed": "12345"},
 	})
 	if err != nil {
 		t.Fatalf("generate image: %v", err)

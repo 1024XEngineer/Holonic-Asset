@@ -67,7 +67,7 @@ func TestReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 		e,
 		http.MethodPost,
 		"/api/v1/project/reference/generate",
-		`{"name":"Prototype","description":"养殖游戏","reference":"https://media.example/current-reference.png"}`,
+		`{"name":"Prototype","description":"养殖游戏"}`,
 	)
 
 	if recorder.Code != http.StatusOK {
@@ -78,9 +78,6 @@ func TestReferenceGenerationUsesOpenAPIContract(t *testing.T) {
 	}
 	if stub.generateReferenceRequest.Perspective != project.PerspectiveTopDown {
 		t.Fatalf("expected default perspective, got %q", stub.generateReferenceRequest.Perspective)
-	}
-	if stub.generateReferenceRequest.Reference != "https://media.example/current-reference.png" {
-		t.Fatalf("unexpected generate reference input: %+v", stub.generateReferenceRequest)
 	}
 	if recorder.Body.String() != "{\"code\":200,\"message\":\"success\",\"data\":{\"reference\":\"data:image/png;base64,aGVsbG8=\"}}\n" {
 		t.Fatalf("unexpected generate reference response: %s", recorder.Body.String())
@@ -182,13 +179,6 @@ func TestProjectRoutesRejectInvalidRequests(t *testing.T) {
 			path:           "/api/v1/project/create",
 			body:           `{"userID":7,"name":"Prototype","perspective":""}`,
 			expectedStatus: http.StatusUnprocessableEntity,
-		},
-		{
-			name:           "generate reference with invalid current reference",
-			method:         http.MethodPost,
-			path:           "/api/v1/project/reference/generate",
-			body:           `{"name":"Prototype","reference":"not-an-image-reference"}`,
-			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "list without user ID",
