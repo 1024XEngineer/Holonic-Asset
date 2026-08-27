@@ -40,7 +40,6 @@ func (h *ProjectHandler) Create(
 		Perspective:    request.Perspective,
 		TargetPlatform: request.TargetPlatform,
 		Description:    request.Description,
-		Reference:      request.Reference,
 		Style:          request.Style,
 	}
 	if err := h.manager.Create(c, project); err != nil {
@@ -59,7 +58,6 @@ func (h *ProjectHandler) GenerateReference(
 		Perspective:    request.Perspective,
 		TargetPlatform: request.TargetPlatform,
 		Description:    request.Description,
-		Reference:      request.Reference,
 		Style:          request.Style,
 	}
 

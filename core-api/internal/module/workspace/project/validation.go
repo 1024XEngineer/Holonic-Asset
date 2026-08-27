@@ -3,7 +3,6 @@ package project
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -53,13 +52,7 @@ func (p *Project) ValidateReferenceGeneration() error {
 	if p == nil {
 		return invalidProject("project is required")
 	}
-	if err := p.validateDefinition(); err != nil {
-		return err
-	}
-	if !validReference(p.Reference) {
-		return invalidProject("project reference must be an HTTP(S) URL")
-	}
-	return nil
+	return p.validateDefinition()
 }
 
 func (p *Project) validateDefinition() error {
@@ -94,19 +87,6 @@ func normalizeGameType(gameType string) (string, error) {
 		}
 	}
 	return normalized, nil
-}
-
-func validReference(reference string) bool {
-	reference = strings.TrimSpace(reference)
-	if reference == "" {
-		return true
-	}
-
-	parsed, err := url.ParseRequestURI(reference)
-	if err != nil || parsed.Host == "" {
-		return false
-	}
-	return strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")
 }
 
 func (u *ProjectUpdate) Validate() error {

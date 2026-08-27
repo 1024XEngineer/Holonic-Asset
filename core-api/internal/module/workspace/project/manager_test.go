@@ -345,7 +345,7 @@ func TestCreatePersistsReferenceAsObjectKey(t *testing.T) {
 	}
 }
 
-func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
+func TestGenerateReferencePersistsGeneratedImage(t *testing.T) {
 	project := validProject()
 	project.Reference = "https://cdn.example/reference.png?e=123&token=signed"
 	images := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
@@ -358,11 +358,11 @@ func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate reference: %v", err)
 	}
-	if len(references.resolveCalls) != 2 || references.resolveCalls[0] != project.Reference || references.resolveCalls[1] != "projects/7/generated.png" || references.persistCall != "data:image/png;base64,generated-image-base64" {
+	if len(references.resolveCalls) != 1 || references.resolveCalls[0] != "projects/7/generated.png" || references.persistCall != "data:image/png;base64,generated-image-base64" {
 		t.Fatalf("unexpected reference storage calls: %+v", references)
 	}
-	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
-		t.Fatalf("expected signed input reference, got %+v", images.request.ReferenceImages)
+	if len(images.request.ReferenceImages) != 0 {
+		t.Fatalf("expected no input reference images to be forwarded, got %+v", images.request.ReferenceImages)
 	}
 	if generated != references.resolved {
 		t.Fatalf("expected generated reference URL %q, got %q", references.resolved, generated)
@@ -371,19 +371,12 @@ func TestGenerateReferenceResolvesInputAndPersistsGeneratedImage(t *testing.T) {
 
 func TestGenerateReferencePropagatesReferenceStorageErrors(t *testing.T) {
 	project := validProject()
-	project.Reference = "https://example.com/input.png"
 	service := &imageGenerationServiceStub{result: &imageclient.GenerateResult{
 		Images: []imageclient.GeneratedImage{{Base64: "generated"}},
 	}}
-	resolveInputErr := errors.New("resolve input reference")
-	_, err := domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{resolveErr: resolveInputErr}).GenerateReference(context.Background(), project)
-	if !errors.Is(err, resolveInputErr) || !strings.Contains(err.Error(), "resolve reference") {
-		t.Fatalf("expected input reference error, got %v", err)
-	}
 
-	project.Reference = ""
 	persistErr := errors.New("persist generated reference")
-	_, err = domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{persistErr: persistErr}).GenerateReference(context.Background(), project)
+	_, err := domain.NewManager(&projectStoreStub{}, service, &referenceStoreStub{persistErr: persistErr}).GenerateReference(context.Background(), project)
 	if !errors.Is(err, persistErr) || !strings.Contains(err.Error(), "persist generated reference") {
 		t.Fatalf("expected generated persistence error, got %v", err)
 	}
@@ -536,11 +529,14 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 	if images.request.Params["quality"] != "medium" {
 		t.Fatalf("expected medium quality generation, got %+v", images.request.Params)
 	}
+	if images.request.Params["seed"] == "" {
+		t.Fatalf("expected random seed generation, got %+v", images.request.Params)
+	}
 	if images.request.MaxAttempts != 2 {
 		t.Fatalf("expected MaxAttempts 2, got %d", images.request.MaxAttempts)
 	}
-	if len(images.request.ReferenceImages) != 1 || images.request.ReferenceImages[0] != references.resolved {
-		t.Fatalf("expected resolved project reference to be forwarded, got %+v", images.request.ReferenceImages)
+	if len(images.request.ReferenceImages) != 0 {
+		t.Fatalf("expected no input reference images to be forwarded, got %+v", images.request.ReferenceImages)
 	}
 
 	for _, fragment := range []string{
@@ -560,9 +556,6 @@ func TestGenerateReferenceBuildsProjectScreenshotPromptAndReturnsURL(t *testing.
 		"NO GENERATED TEXT",
 		"zero generated text or pseudo-text",
 		"REFERENCE IMAGE",
-		"REFERENCE REGENERATION",
-		"user's current result",
-		"clearly new alternative",
 	} {
 		if !strings.Contains(images.request.Prompt, fragment) {
 			t.Errorf("expected prompt to contain %q", fragment)
@@ -679,7 +672,7 @@ func TestGenerateReferenceLetsTheModelFollowExplicitUISetRequests(t *testing.T) 
 	}
 }
 
-func TestGenerateReferenceRejectsInvalidReferenceFormats(t *testing.T) {
+func TestGenerateReferenceIgnoresReferenceInput(t *testing.T) {
 	tests := []struct {
 		name      string
 		reference string
@@ -696,18 +689,22 @@ func TestGenerateReferenceRejectsInvalidReferenceFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			project := validProject()
 			project.Reference = tc.reference
-			images := &imageGenerationServiceStub{}
+			images := &imageGenerationServiceStub{
+				result: &imageclient.GenerateResult{
+					Images: []imageclient.GeneratedImage{{Base64: "generated-image-base64", MediaType: "image/png"}},
+				},
+			}
 			manager := domain.NewManager(&projectStoreStub{}, images)
 
 			generated, err := manager.GenerateReference(context.Background(), project)
-			if !errors.Is(err, domain.ErrInvalidProject) {
-				t.Fatalf("expected invalid project error, got %v", err)
+			if err != nil {
+				t.Fatalf("expected reference %q to be ignored, got error: %v", tc.reference, err)
 			}
-			if generated != "" {
-				t.Fatalf("expected no generated reference, got %q", generated)
+			if generated == "" {
+				t.Fatal("expected a generated reference")
 			}
-			if images.request != nil {
-				t.Fatalf("expected invalid reference not to reach image service, got %+v", images.request)
+			if len(images.request.ReferenceImages) != 0 {
+				t.Fatalf("expected no reference images to be forwarded, got %+v", images.request.ReferenceImages)
 			}
 		})
 	}

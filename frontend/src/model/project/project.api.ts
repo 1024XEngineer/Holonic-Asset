@@ -56,6 +56,7 @@ export const projectApi: ProjectApi = {
     const response = await coreProjectApi.create({
       userID: readAuthenticatedUserId(),
       ...toCoreProjectFields(input),
+      reference: input.reference,
     });
 
     return {
@@ -79,6 +80,7 @@ export const projectApi: ProjectApi = {
     await coreProjectApi.update({
       projectID: Number(project.id),
       ...toCoreProjectFields(project),
+      reference: project.reference,
     });
     return project;
   },
@@ -96,7 +98,6 @@ function toCoreProjectFields(
     perspective: input.perspective,
     targetPlatform: toCorePlatform(input.platform),
     description: input.description,
-    reference: input.reference,
     style: input.style,
   };
 }

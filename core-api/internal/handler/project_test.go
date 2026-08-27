@@ -319,7 +319,6 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 		Perspective:    domain.PerspectiveTopDown,
 		TargetPlatform: domain.PlatformTypePC,
 		Description:    "A small village adventure",
-		Reference:      "https://media.example/current-reference.png",
 		Style:          "warm pixel art",
 	}
 	response, err := projectHandler.GenerateReference(ctx, request)
@@ -335,8 +334,8 @@ func TestGenerateReferenceForwardsProjectDefinitionAndReturnsReference(t *testin
 	if stub.generate.UserID != 0 {
 		t.Fatalf("expected reference generation not to require a user ID, got %d", stub.generate.UserID)
 	}
-	if stub.generate.Reference != request.Reference {
-		t.Fatalf("expected project reference %q to be forwarded, got %q", request.Reference, stub.generate.Reference)
+	if stub.generate.Reference != "" {
+		t.Fatalf("expected no reference input to be forwarded, got %q", stub.generate.Reference)
 	}
 	if response.Code != dto.SuccessCode || response.Message != dto.SuccessMessage {
 		t.Fatalf("unexpected response envelope: %+v", response)
