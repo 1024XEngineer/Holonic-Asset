@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -111,6 +111,50 @@ describe("generation recovery", () => {
     expect(queryClient.getQueryData(assetKey)).toEqual([]);
     expect(mocks.forgetMetadata).toHaveBeenCalledWith("42", ["12"]);
   });
+
+  it("removes a run before its delete request finishes", async () => {
+    const request = deferred<{ deleted: boolean }>();
+    mocks.delete.mockReturnValue(request.promise);
+    const { queryClient, wrapper } = testQueryClient();
+    const projectKey = generationKeys.runs(7, "42");
+    const assetKey = generationKeys.runs(7, "42", "8");
+    queryClient.setQueryData(projectKey, [failedRun()]);
+    queryClient.setQueryData(assetKey, [failedRun()]);
+    const { result } = renderHook(() => useDeleteGenerationRunMutation(), {
+      wrapper,
+    });
+
+    act(() => result.current.mutate({ projectId: "42", runId: "12" }));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(projectKey)).toEqual([]);
+      expect(queryClient.getQueryData(assetKey)).toEqual([]);
+    });
+    expect(result.current.isPending).toBe(true);
+
+    await act(() => request.resolve({ deleted: true }));
+  });
+
+  it("restores a run when optimistic deletion fails", async () => {
+    mocks.delete.mockRejectedValue(new Error("delete failed"));
+    const { queryClient, wrapper } = testQueryClient();
+    const projectKey = generationKeys.runs(7, "42");
+    const assetKey = generationKeys.runs(7, "42", "8");
+    queryClient.setQueryData(projectKey, [failedRun()]);
+    queryClient.setQueryData(assetKey, [failedRun()]);
+    const { result } = renderHook(() => useDeleteGenerationRunMutation(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ projectId: "42", runId: "12" }),
+      ).rejects.toThrow("delete failed");
+    });
+
+    expect(queryClient.getQueryData(projectKey)).toEqual([failedRun()]);
+    expect(queryClient.getQueryData(assetKey)).toEqual([failedRun()]);
+  });
 });
 
 function testQueryClient() {
@@ -136,4 +180,12 @@ function failedRun(): GenerationRun {
     prompt: "Brass lantern",
     canvasSize: "64 × 64 px",
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
