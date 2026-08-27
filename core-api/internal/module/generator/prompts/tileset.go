@@ -39,7 +39,7 @@ ITEM:
 - Perspective: %s
 
 OUTPUT CONTRACT:
-- Return exactly one complete Item image whose canvas is the occupied cells' bounding rectangle.
+- Return exactly one complete Item image in PNG format whose canvas is the occupied cells' bounding rectangle.
 - Preserve the guide grid and keep every occupied cell aligned to the same pixel density.
 - Keep one connected opaque Item across all occupied cells; never separate neighbouring Tiles with matte or transparent lines.
 - Fill all protected regions and any unoccupied background area outside the Item with one flat, opaque pure green #00ff00 matte for deterministic background removal. Do not draw a black background box, white glow, or checkerboard pattern.
@@ -86,7 +86,7 @@ NON-OVERRIDABLE RULES:
 - Item name: %s
 - Tile size: %dx%d pixels
 - Perspective: %s
-- Return exactly one Tile image on the specified pure-green matte and no variants.`
+- Return exactly one Tile image in PNG format on the specified pure-green matte and no variants.`
 
 // TileSetTileEdit constrains one independently edited Tile.
 func TileSetTileEdit(
@@ -124,7 +124,7 @@ NON-OVERRIDABLE RULES:
 - Occupied cells: %s
 - Tile size: %dx%d pixels
 - Perspective: %s
-- Return exactly one complete Item image on the specified pure-green matte and no variants. Do not add transparency checkerboards, text, scenery, or extra previews.`
+- Return exactly one complete Item image in PNG format on the specified pure-green matte and no variants. Do not add transparency checkerboards, text, scenery, or extra previews.`
 
 // TileSetItemEdit constrains regeneration of a complete persisted Item.
 func TileSetItemEdit(
