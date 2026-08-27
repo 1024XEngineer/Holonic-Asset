@@ -324,6 +324,14 @@ func resolveAutoDetectedChromaKey(frames []image.Image, key ChromaKey) ChromaKey
 	return key
 }
 
+// ResolveChromaKey derives the matte from the frames' corners, mirroring the
+// resolution the processor applies during frame validation. Callers that measure
+// foreground bounds directly (for example subject-scale compensation) use this so
+// their measurement matches the matte the provider actually produced.
+func ResolveChromaKey(frames []image.Image, key ChromaKey) ChromaKey {
+	return resolveAutoDetectedChromaKey(frames, key)
+}
+
 func averageColorChannel(sum, count uint64) uint8 {
 	if count == 0 {
 		return 0

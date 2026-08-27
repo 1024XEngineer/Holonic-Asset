@@ -614,12 +614,6 @@ func animationOpaqueArea(img *image.NRGBA, threshold uint8) int {
 	return area
 }
 
-// centerAnimationFrameContent is deliberately a translation-only postcondition.
-// Shared-crop registration aligns an anchor, but a generated static direction
-// can still have a different silhouette bbox relative to that anchor. For
-// prototype objects the frame itself is the contract: every view must occupy
-// the same centre band. Recentring here cannot invent or delete pixels and it
-// leaves the fixed animation/action margin intact.
 // maximumCenteredAnimationScale returns the largest uniform scale that keeps
 // the sequence-wide registered foreground inside a centered target rectangle.
 // The same value is used for every frame, so retry compensation cannot introduce
@@ -652,6 +646,13 @@ func maximumCenteredAnimationScale(
 	}
 	return maxScale
 }
+
+// centerAnimationFrameContent is deliberately a translation-only postcondition.
+// Shared-crop registration aligns an anchor, but a generated static direction
+// can still have a different silhouette bbox relative to that anchor. For
+// prototype objects the frame itself is the contract: every view must occupy
+// the same centre band. Recentring here cannot invent or delete pixels and it
+// leaves the fixed animation/action margin intact.
 
 func centerAnimationFrameContent(frame *image.NRGBA, threshold uint8) (*image.NRGBA, image.Point) {
 	if frame == nil {

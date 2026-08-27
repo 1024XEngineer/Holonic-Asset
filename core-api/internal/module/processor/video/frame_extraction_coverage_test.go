@@ -70,6 +70,26 @@ func TestResolveAutoDetectedChromaKeyEdgeCases(t *testing.T) {
 	}
 }
 
+func TestResolveChromaKeyDelegatesToAutoDetect(t *testing.T) {
+	t.Parallel()
+
+	key := ChromaKey{AutoDetect: true, HighSaturationMin: 50, HighValueMin: 50, BrightSaturationMin: 30, BrightValueMin: 150}
+	if res := ResolveChromaKey(nil, key); !res.AutoDetect {
+		t.Fatal("expected empty frames to return key unchanged")
+	}
+
+	greenImg := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for y := range 32 {
+		for x := range 32 {
+			greenImg.SetNRGBA(x, y, color.NRGBA{R: 0, G: 255, B: 0, A: 255})
+		}
+	}
+	resolved := ResolveChromaKey([]image.Image{greenImg}, key)
+	if resolved.AutoDetect || resolved.HueMin == 0 {
+		t.Fatalf("expected exported ResolveChromaKey to detect green matte, got HueMin=%d AutoDetect=%v", resolved.HueMin, resolved.AutoDetect)
+	}
+}
+
 func TestAverageColorChannelAndClampOpenCVHue(t *testing.T) {
 	t.Parallel()
 
