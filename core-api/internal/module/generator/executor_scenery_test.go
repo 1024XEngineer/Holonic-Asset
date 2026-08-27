@@ -2,9 +2,10 @@ package generator_test
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/color"
 	"reflect"
 	"strings"
 	"testing"
@@ -99,7 +100,13 @@ func (s *sceneryProcessorStub) Resize(_ context.Context, request *imageprocessor
 	if s.resized != nil {
 		return s.resized, nil
 	}
-	return &imageprocessor.ResizeResult{ImageBase64: base64.StdEncoding.EncodeToString([]byte("processed:" + request.ImageBase64)), MIMEType: "image/png"}, nil
+	fixture := image.NewRGBA(image.Rect(0, 0, request.Options.Width, request.Options.Height))
+	fixture.SetRGBA(0, 0, color.RGBA{R: uint8(len(s.resizeRequests) & 0xff), A: 255})
+	encoded, err := imageprocessor.EncodePNGBase64(fixture)
+	if err != nil {
+		return nil, err
+	}
+	return &imageprocessor.ResizeResult{ImageBase64: encoded, MIMEType: "image/png"}, nil
 }
 
 func (s *sceneryProcessorStub) Verify(_ context.Context, request *imageprocessor.VerifyRequest) (*imageprocessor.VerificationReport, error) {
@@ -220,7 +227,7 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate scenery: %v", err)
 	}
-	wantEvents := []string{"llm", "image", "resize", "verify", "image", "remove", "resize", "verify", "llm", "create_scenery_asset"}
+	wantEvents := []string{"llm", "image", "remove", "resize", "verify", "image", "resize", "verify", "llm", "create_scenery_asset"}
 	if !reflect.DeepEqual(events, wantEvents) {
 		t.Fatalf("unexpected workflow: got %v want %v", events, wantEvents)
 	}
@@ -228,15 +235,23 @@ func TestExecutorPlansAndAnalyzesSceneryAroundLayerGeneration(t *testing.T) {
 		t.Fatalf("expected text planning followed by multimodal layout: %+v", llm.requests)
 	}
 	if len(images.requests) != 2 || images.requests[0].Size != "640x360" ||
-		!strings.Contains(images.requests[0].Prompt, "warm sky") || !strings.Contains(images.requests[1].Prompt, "distant peaks") {
+		!strings.Contains(images.requests[0].Prompt, "distant peaks") || !strings.Contains(images.requests[1].Prompt, "warm sky") {
 		t.Fatalf("planner output was not passed to image generation: %+v", images.requests)
 	}
-	if len(processor.verifyRequests) != 2 || processor.verifyRequests[0].Profile != imageprocessor.ProfileOpaqueBackground ||
-		processor.verifyRequests[1].Profile != imageprocessor.ProfileGeneric {
+	if len(images.requests[0].ReferenceImages) != 0 || len(images.requests[1].ReferenceImages) != 1 ||
+		!strings.HasPrefix(images.requests[1].ReferenceImages[0], "data:image/png;base64,") {
+		t.Fatalf("foreground preview was not chained into backdrop generation: %+v", images.requests)
+	}
+	if !strings.Contains(images.requests[1].Prompt, "cumulative transparent preview") ||
+		!strings.Contains(images.requests[1].Prompt, "Generate only the requested layer behind the preview") {
+		t.Fatalf("backdrop prompt omitted chained reference semantics: %s", images.requests[1].Prompt)
+	}
+	if len(processor.verifyRequests) != 2 || processor.verifyRequests[0].Profile != imageprocessor.ProfileGeneric ||
+		processor.verifyRequests[1].Profile != imageprocessor.ProfileOpaqueBackground {
 		t.Fatalf("unexpected scenery verification profiles: %+v", processor.verifyRequests)
 	}
-	if len(processor.resizeRequests) != 2 || !processor.resizeRequests[0].Options.CoverCanvas ||
-		processor.resizeRequests[1].Options.CoverCanvas {
+	if len(processor.resizeRequests) != 2 || processor.resizeRequests[0].Options.CoverCanvas ||
+		!processor.resizeRequests[1].Options.CoverCanvas {
 		t.Fatalf("unexpected scenery resize modes: %+v", processor.resizeRequests)
 	}
 	var decoded generator.ExecutionResult
