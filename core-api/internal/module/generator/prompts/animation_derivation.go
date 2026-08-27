@@ -61,18 +61,18 @@ func BuildAnimationDerivationVideo(options AnimationDerivationOptions) string {
 
 	builder.WriteString("CRITICAL ORIENTATION LOCK:\n")
 	builder.WriteString("- FRAME 1 MUST reproduce Image 1: same character, equipment, scale, root position, pose, and facing direction.\n")
-	builder.WriteString(fmt.Sprintf("- Maintain Image 1's exact facing direction (%s) in EVERY frame.\n", targetOrientation))
+	fmt.Fprintf(&builder, "- Maintain Image 1's exact facing direction (%s) in EVERY frame.\n", targetOrientation)
 	builder.WriteString("- NO TURNING, ROTATING, MIRRORING, side view, three-quarter view, or opposite view.\n\n")
 
 	builder.WriteString("MULTI-REFERENCE CONTRACT:\n")
 	builder.WriteString("- Image 1 alone defines TARGET CHARACTER APPEARANCE, opening pose, scale, position, and TARGET FACING ORIENTATION.\n")
-	builder.WriteString(fmt.Sprintf("- Image 2 is an animation frame sheet viewed from %s. Read its cells chronologically from left to right, then top to bottom.\n", sourceOrientation))
+	fmt.Fprintf(&builder, "- Image 2 is an animation frame sheet viewed from %s. Read its cells chronologically from left to right, then top to bottom.\n", sourceOrientation)
 	builder.WriteString("- Use Image 2 ONLY for SOURCE ACTION PHASES, MOTION AMPLITUDE, VFX SHAPE/SCALE, and CYCLE TIMING.\n")
 	builder.WriteString("- NEVER copy Image 2's character orientation, camera, position, identity, sheet/grid layout, multiple copies, or empty cells.\n\n")
 
 	builder.WriteString("TASK DIRECTIVE:\n")
 	if action != "" {
-		builder.WriteString(fmt.Sprintf("- Animate the character from Image 1 performing the %q action.\n", action))
+		fmt.Fprintf(&builder, "- Animate the character from Image 1 performing the %q action.\n", action)
 	} else {
 		builder.WriteString("- Animate the character from Image 1 performing the reference action from Image 2.\n")
 	}
@@ -82,18 +82,18 @@ func BuildAnimationDerivationVideo(options AnimationDerivationOptions) string {
 	builder.WriteString("- When shortening an effect for containment, compress ONLY its longitudinal reach along the target facing axis. Preserve its lateral width, particle density, opacity, texture, turbulence, timing, terminal burst/splash, and overall visual intensity; do not uniformly scale down or weaken the effect.\n")
 	builder.WriteString("- Complete one cycle: exact Image 1 rest pose, preparation, climax, recovery, then the same rest pose and orientation.\n")
 	if options.FrameCount > 0 {
-		builder.WriteString(fmt.Sprintf("- Preserve enough distinct action phases for extraction into exactly %d ordered animation frames.\n", options.FrameCount))
+		fmt.Fprintf(&builder, "- Preserve enough distinct action phases for extraction into exactly %d ordered animation frames.\n", options.FrameCount)
 	}
 	if options.FrameWidth > 0 && options.FrameHeight > 0 {
-		builder.WriteString(fmt.Sprintf("- Compose for a %dx%d output frame without changing the Image 1 character scale.\n", options.FrameWidth, options.FrameHeight))
+		fmt.Fprintf(&builder, "- Compose for a %dx%d output frame without changing the Image 1 character scale.\n", options.FrameWidth, options.FrameHeight)
 	}
 	builder.WriteString("\n")
 
 	if description != "" {
-		builder.WriteString(fmt.Sprintf("CHARACTER CONTEXT:\n- %s\n\n", description))
+		fmt.Fprintf(&builder, "CHARACTER CONTEXT:\n- %s\n\n", description)
 	}
 
-	builder.WriteString(fmt.Sprintf("RENDER STYLE:\n- %s\n- Solid chroma green background (#00FF00). Crisp pixel art game sprite asset.", style))
+	fmt.Fprintf(&builder, "RENDER STYLE:\n- %s\n- Solid chroma green background (#00FF00). Crisp pixel art game sprite asset.", style)
 
 	return limit(builder.String(), MaxAnimationVideoCharacters)
 }
@@ -120,28 +120,28 @@ func BuildAnimationDerivationImage(options AnimationImageDerivationOptions) stri
 	var builder strings.Builder
 	builder.WriteString("EDIT THE SUPPLIED COMPOSITE REFERENCE INTO ONE PRODUCTION ANIMATION FRAME SHEET.\n\n")
 	builder.WriteString("REFERENCE COMPOSITE:\n")
-	builder.WriteString(fmt.Sprintf("- The TOP panel is the authoritative character/object prototype for %s.\n", targetOrientation))
-	builder.WriteString(fmt.Sprintf("- The LOWER panel is a chronological %dx%d action sheet viewed from %s; read left to right, then top to bottom.\n", columns, rows, sourceOrientation))
+	fmt.Fprintf(&builder, "- The TOP panel is the authoritative character/object prototype for %s.\n", targetOrientation)
+	fmt.Fprintf(&builder, "- The LOWER panel is a chronological %dx%d action sheet viewed from %s; read left to right, then top to bottom.\n", columns, rows, sourceOrientation)
 	builder.WriteString("- Use the top panel for identity, equipment, proportions, colours, scale, and facing direction.\n")
 	builder.WriteString("- Use the lower panel only for pose phases, movement arcs, timing, effects, and per-frame placement.\n\n")
 	builder.WriteString("REDRAW RULES:\n")
-	builder.WriteString(fmt.Sprintf("- Redraw every source action cell in %s without mirroring symbols, asymmetric equipment, clothing, or markings.\n", targetOrientation))
+	fmt.Fprintf(&builder, "- Redraw every source action cell in %s without mirroring symbols, asymmetric equipment, clothing, or markings.\n", targetOrientation)
 	builder.WriteString("- Preserve exact chronological phase correspondence: output cell N must represent source cell N.\n")
 	if action := limit(options.Action, maxAnimationActionLength); action != "" {
-		builder.WriteString(fmt.Sprintf("- Preserve the complete %q action and its recovery into the loop pose.\n", action))
+		fmt.Fprintf(&builder, "- Preserve the complete %q action and its recovery into the loop pose.\n", action)
 	}
 	if description := limit(options.Description, maxAnimationDescriptionLength); description != "" {
-		builder.WriteString(fmt.Sprintf("- Subject context: %s.\n", description))
+		fmt.Fprintf(&builder, "- Subject context: %s.\n", description)
 	}
 	builder.WriteString("- Keep the subject root position, apparent scale, animation timing, and effects consistent across cells.\n")
 	builder.WriteString("- Keep every subject and effect fully inside its own cell; never cross a grid boundary.\n\n")
 	builder.WriteString("OUTPUT CONTRACT:\n")
-	builder.WriteString(fmt.Sprintf("- Output ONLY one %dx%d grid containing exactly %d chronological frames.\n", columns, rows, options.FrameCount))
+	fmt.Fprintf(&builder, "- Output ONLY one %dx%d grid containing exactly %d chronological frames.\n", columns, rows, options.FrameCount)
 	if options.FrameWidth > 0 && options.FrameHeight > 0 {
-		builder.WriteString(fmt.Sprintf("- Each logical cell represents a %dx%d frame.\n", options.FrameWidth, options.FrameHeight))
+		fmt.Fprintf(&builder, "- Each logical cell represents a %dx%d frame.\n", options.FrameWidth, options.FrameHeight)
 	}
 	builder.WriteString("- Do not output the top prototype panel, labels, guides, borders, captions, or extra cells.\n")
 	builder.WriteString("- Use a flat solid chroma-green (#00FF00) background in every cell.\n")
-	builder.WriteString(fmt.Sprintf("- Render style: %s. Crisp pixel-art game sprite asset.", style))
+	fmt.Fprintf(&builder, "- Render style: %s. Crisp pixel-art game sprite asset.", style)
 	return builder.String()
 }
