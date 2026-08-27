@@ -770,8 +770,8 @@ func TestQNAProviderRoutesMultiReferenceSeedance25(t *testing.T) {
 		AspectRatio string   `json:"aspect_ratio"`
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch {
-		case request.Method == http.MethodPost:
+		switch request.Method {
+		case http.MethodPost:
 			requestedPath = request.URL.Path
 			_ = json.NewDecoder(request.Body).Decode(&receivedBody)
 			_ = json.NewEncoder(writer).Encode(map[string]any{
