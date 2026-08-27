@@ -2,21 +2,23 @@ package imageclient
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	generatedImageDownloadTimeout        = 30 * time.Second
+	generatedImageDownloadTimeout        = 45 * time.Second
 	generatedImageDialTimeout            = 10 * time.Second
-	generatedImageResponseHeaderTimeout  = 15 * time.Second
-	generatedImageTLSHandshakeTimeout    = 10 * time.Second
+	generatedImageResponseHeaderTimeout  = 30 * time.Second
+	generatedImageTLSHandshakeTimeout    = 15 * time.Second
 	generatedImageMaxResponseHeaderBytes = 1 << 20
 )
 
@@ -58,6 +60,8 @@ func newGeneratedImageHTTPClient() *http.Client {
 	transport.ResponseHeaderTimeout = generatedImageResponseHeaderTimeout
 	transport.TLSHandshakeTimeout = generatedImageTLSHandshakeTimeout
 	transport.MaxResponseHeaderBytes = generatedImageMaxResponseHeaderBytes
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 
 	return &http.Client{
 		Transport: transport,
@@ -164,5 +168,9 @@ func (d generatedImageDialer) resolve(ctx context.Context, host string) ([]netip
 	if len(addresses) == 0 {
 		return nil, fmt.Errorf("resolve generated image host %q: no IP addresses", host)
 	}
+	// Prefer IPv4 addresses first to prevent stalling on unreachable IPv6 SLAAC routes.
+	sort.SliceStable(addresses, func(i, j int) bool {
+		return addresses[i].Is4() && !addresses[j].Is4()
+	})
 	return addresses, nil
 }

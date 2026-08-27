@@ -32,8 +32,9 @@ func InitDB(ctx context.Context, cfg *config.DBConfig, l logger.Logger) (*gorm.D
 
 	db, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
 		Logger: gormlogger.New(gormLoggerFunc(l.Warn), gormlogger.Config{
-			SlowThreshold: 200 * time.Millisecond,
-			LogLevel:      gormlogger.Warn,
+			SlowThreshold:             200 * time.Millisecond,
+			LogLevel:                  gormlogger.Warn,
+			IgnoreRecordNotFoundError: true,
 		}),
 	})
 	if err != nil {
