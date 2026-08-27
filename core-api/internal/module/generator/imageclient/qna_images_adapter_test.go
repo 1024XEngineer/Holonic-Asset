@@ -195,6 +195,26 @@ func TestQNAImagesAdapterRespectsCustomOutputFormatParam(t *testing.T) {
 	}
 }
 
+func TestQNAImagesAdapterGenerateDefaultsToPNGWhenResponseOmitsOutputFormat(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":[{"b64_json":"image"}]}`))
+	}))
+	defer server.Close()
+
+	provider := imageclient.NewQNAImagesAdapter(imageclient.QNAImagesAdapterConfig{BaseURL: server.URL, APIKey: "test-key"})
+	result, err := provider.Generate(context.Background(), &imageclient.ProviderRequest{
+		Prompt: "image without output_format in response",
+		Params: imageclient.Params{"output_format": "   "},
+	})
+	if err != nil {
+		t.Fatalf("generate image: %v", err)
+	}
+	if result.OutputFormat != "png" {
+		t.Fatalf("output format = %q, want png", result.OutputFormat)
+	}
+}
+
 func TestQNAImagesAdapterEditRetriesWithoutMaskWhenProviderRejectsDocumentedFormat(t *testing.T) {
 	requests := 0
 	providerLogger := &imageProviderLoggerStub{}

@@ -631,3 +631,45 @@ func TestProcessTileSetItemCandidateNormalizesRawImageToPNG(t *testing.T) {
 		t.Fatalf("raw image is not valid PNG bytes")
 	}
 }
+
+func TestNormalizeTileSetCandidatePNGRejectsInvalidBase64(t *testing.T) {
+	candidate := imageclient.GeneratedImage{
+		Base64:    "not-a-valid-image",
+		MediaType: "image/png",
+	}
+	_, err := normalizeTileSetCandidatePNG(candidate)
+	if err == nil {
+		t.Fatal("expected error for invalid candidate base64, got nil")
+	}
+}
+
+func TestProcessTileSetItemCandidateRejectsInvalidCandidateImage(t *testing.T) {
+	exec := &executor{
+		processor: imageprocessor.NewProcessor(),
+	}
+	request := CreateTileSetPayload{
+		Dimensions: assetdomain.TileSetDimensions{
+			TileSize: assetdomain.Size{Width: 16, Height: 16},
+		},
+	}
+	item := TileSetItemDefinition{Name: "Block", Shape: []TileSetCoordinate{{0, 0}}}
+	candidate := imageclient.GeneratedImage{
+		Base64:    "invalid-data",
+		MediaType: "image/jpeg",
+	}
+	_, err := exec.processTileSetItemCandidate(
+		context.Background(),
+		request,
+		item,
+		0,
+		0,
+		1,
+		1,
+		[]TileSetCoordinate{{0, 0}},
+		candidate,
+		assetdomain.PerspectiveTopDown,
+	)
+	if err == nil {
+		t.Fatal("expected error for invalid candidate, got nil")
+	}
+}
