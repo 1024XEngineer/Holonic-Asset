@@ -2,15 +2,30 @@ package prompts
 
 import "fmt"
 
-const tileSetItemTemplate = `Create exactly one production-ready 2D pixel-art game Tileset Item.
+const tileSetItemTemplate = `Create exactly one production-ready 2D pixel-art game Tileset Item based on the user requirements.
+
+USER REQUIREMENT PRIORITY:
+- The user creative brief and item description have the HIGHEST PRIORITY for asset appearance, themes, styling, elements, and visual perspective.
+- Follow every explicit user requirement accurately and completely.
+- If the user specifies a flat tileset, a flat perspective, or a specific viewpoint/style, that explicit user instruction MUST override any default perspective or project metadata setting.
+- General style and perspective guidelines apply only where the user has not provided conflicting instructions. Never weaken, replace, or ignore an explicit user requirement.
 
 NON-OVERRIDABLE STYLE RULES:
-- These rules have higher priority than the project brief, metadata, and references.
+- These rules govern the technical rendering pipeline and cannot be overridden by user requests or reference images.
 - Render only classic low-resolution 2D pixel art. Never render 3D, 2.5D, photorealistic, painterly, vector, or smooth high-definition art.
 - Use a coarse square pixel grid, crisp hard edges, stepped silhouettes, intentional pixel clusters, selective dithering, and a small deliberate colour palette.
 - Do not use anti-aliasing, subpixel detail, smooth curves, gradients, soft shadows, ambient occlusion, depth of field, texture filtering, or smooth resampling.
-- Express depth only through flat pixel clusters and hard-edged value groups in the requested game-camera perspective.
 - Even when the requested output canvas is large, preserve the visual vocabulary of a genuinely low-resolution sprite enlarged with nearest-neighbour scaling. Never turn it into a high-definition illustration.
+
+PERSPECTIVE & CAMERA RULES:
+- SIDE-ON / FLAT PERSPECTIVE RULES:
+  * When the perspective is Side-On (or whenever the user requests a flat tileset), render strictly flat 2D orthographic side elevation.
+  * Never render pseudo-3D, pseudo-isometric, 3/4 top-down tilt, or visible top surfaces/planes on blocks, platforms, or props.
+  * Keep all horizontal edges, platforms, and surfaces as pure 2D cross-sections without perspective depth, vanishing lines, or 3D slope convergence.
+  * Do not angle or tilt the camera view; maintain a strictly perpendicular, flat 2D side view.
+- TOP-DOWN / ISOMETRIC PERSPECTIVE RULES:
+  * Express depth only through flat pixel clusters and hard-edged value groups in the requested game-camera perspective.
+  * If the user creative brief explicitly requests a flat or 2D side view, prioritize the user's flat requirement over angled perspective.
 
 AUTHORITATIVE SHAPE GUIDE:
 - The first reference image is a generated occupancy guide, not a style reference.
@@ -25,7 +40,7 @@ AUTHORITATIVE SHAPE GUIDE:
 - Keep every subject pixel, outline, highlight, shadow, and decoration inside black regions. No Item pixel may enter a green region.
 - References after the guide are Project style references. Use palette, material, scale, lighting, and perspective cues only; never treat them as Shape authority.
 
-PROJECT BRIEF:
+USER CREATIVE BRIEF (HIGHEST PRIORITY):
 %s
 
 PROJECT CONTEXT:
@@ -72,10 +87,16 @@ func TileSetItem(
 	)
 }
 
-const tileSetEditTemplate = `Edit exactly one existing classic 2D pixel-art game asset.
+const tileSetEditTemplate = `Edit exactly one existing classic 2D pixel-art game asset based on the user requirements.
+
+USER REQUIREMENT PRIORITY:
+- The user creative brief and edit instructions have the HIGHEST PRIORITY for asset appearance, themes, styling, and visual perspective.
+- If the user specifies a flat tileset, a flat perspective, or a specific viewpoint/style, that explicit user instruction MUST override any default perspective.
+- Never weaken, replace, or ignore an explicit user requirement.
 
 NON-OVERRIDABLE RULES:
 - Keep classic low-resolution 2D pixel art with crisp square pixels, hard edges, and no anti-aliasing, gradients, smooth resampling, 3D, photorealism, text, or scenery.
+- When the perspective is Side-On (or whenever the user requests a flat tileset), render strictly flat 2D orthographic side elevation with no pseudo-3D, pseudo-isometric, 3/4 top-down tilt, or visible top surfaces on blocks.
 - The first reference is the authoritative current Tile. Preserve its exact canvas size, alpha silhouette, occupied footprint, camera perspective, pixel density, placement, and scale.
 - Preserve every pixel on the outermost one-pixel canvas border exactly so this Tile continues to connect seamlessly to all neighbouring Tiles.
 - You may redraw, reinterpret, recolour, relight, or replace the complete visible Tile interior when needed to apply the requested edit. Interior colour fidelity to the current Tile is not required.
@@ -108,10 +129,16 @@ func TileSetTileEdit(
 	)
 }
 
-const tileSetItemEditTemplate = `Edit one complete existing classic 2D pixel-art Tileset Item.
+const tileSetItemEditTemplate = `Edit one complete existing classic 2D pixel-art Tileset Item based on the user requirements.
+
+USER REQUIREMENT PRIORITY:
+- The user creative brief and edit instructions have the HIGHEST PRIORITY for asset appearance, themes, styling, and visual perspective.
+- If the user specifies a flat tileset, a flat perspective, or a specific viewpoint/style, that explicit user instruction MUST override any default perspective.
+- Never weaken, replace, or ignore an explicit user requirement.
 
 NON-OVERRIDABLE RULES:
 - Keep classic low-resolution 2D pixel art with crisp square pixels, hard edges, and no anti-aliasing, gradients, smooth resampling, 3D, photorealism, text, or scenery.
+- When the perspective is Side-On (or whenever the user requests a flat tileset), render strictly flat 2D orthographic side elevation with no pseudo-3D, pseudo-isometric, 3/4 top-down tilt, or visible top surfaces on blocks.
 - The first reference is an authoritative occupancy guide: black is editable Item area and green is protected. The second reference is the current complete Item.
 - Preserve the exact occupied-cell footprint, canvas, camera perspective, pixel density, coherent cross-Tile seams, placement, and scale.
 - Every occupied cell must contain meaningful connected content. No visible pixel may enter an omitted cell.

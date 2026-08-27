@@ -79,3 +79,49 @@ func TestTileSetTileEditAllowsInteriorRedrawAndPreservesStructure(t *testing.T) 
 		}
 	}
 }
+
+func TestTileSetItemEnforcesSideOnFlatnessAndUserRequirementPriority(t *testing.T) {
+	prompt := TileSetItem(
+		"flat stone platform tiles for side scrolling 2D game",
+		"Platformer project",
+		"Stone Platform",
+		"Flat stone platform",
+		"[[0,0], [1,0], [2,0]]",
+		32,
+		32,
+		"Side-On",
+	)
+
+	required := []string{
+		"USER REQUIREMENT PRIORITY",
+		"HIGHEST PRIORITY",
+		"override any default perspective",
+		"SIDE-ON / FLAT PERSPECTIVE RULES",
+		"strictly flat 2D orthographic side elevation",
+		"Never render pseudo-3D, pseudo-isometric, 3/4 top-down tilt, or visible top surfaces/planes",
+		"pure 2D cross-sections without perspective depth",
+	}
+	for _, val := range required {
+		if !strings.Contains(prompt, val) {
+			t.Fatalf("prompt does not contain %q:\n%s", val, prompt)
+		}
+	}
+}
+
+func TestTileSetEditsEnforceSideOnFlatnessAndUserPriority(t *testing.T) {
+	tileEditPrompt := TileSetTileEdit("make it flat mossy stone", "Platformer", "Platform", 32, 32, "Side-On")
+	itemEditPrompt := TileSetItemEdit("make it flat mossy stone", "Platformer", "Platform", "[[0,0]]", 32, 32, "Side-On")
+
+	for _, p := range []string{tileEditPrompt, itemEditPrompt} {
+		for _, required := range []string{
+			"USER REQUIREMENT PRIORITY",
+			"HIGHEST PRIORITY",
+			"override any default perspective",
+			"strictly flat 2D orthographic side elevation with no pseudo-3D",
+		} {
+			if !strings.Contains(p, required) {
+				t.Fatalf("edit prompt does not contain %q:\n%s", required, p)
+			}
+		}
+	}
+}
