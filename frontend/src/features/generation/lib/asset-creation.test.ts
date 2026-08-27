@@ -129,6 +129,14 @@ describe("asset creation", () => {
     },
   );
 
+  it("inherits custom project perspective for visual assets", () => {
+    const draft = createAssetCreationDraft("character", "", "Side-On");
+    expect(draft).toMatchObject({
+      kind: "character",
+      perspective: "Side-On",
+    });
+  });
+
   it("trims tileset item metadata", () => {
     const draft = createAssetCreationDraft("tileset");
     if (draft.kind !== "tileset") throw new Error("expected tileset draft");

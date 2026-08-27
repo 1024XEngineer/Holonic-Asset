@@ -64,6 +64,7 @@ export function CreateAssetPage({
           <CreateAssetForm
             availableTags={availableTags}
             kind={kind}
+            defaultPerspective={project.perspective}
             onCancel={goBack}
             error={enqueueError}
             isSubmitting={isEnqueuePending}

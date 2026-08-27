@@ -58,7 +58,7 @@ export function ProjectSettingsDialog({
   return (
     <>
       <Dialog open onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("edit")}</DialogTitle>
             <DialogDescription>
@@ -76,7 +76,7 @@ export function ProjectSettingsDialog({
               <form.Field name="name">
                 {(field) => (
                   <label className="grid gap-2 text-sm font-medium sm:col-span-2">
-                    Project name
+                    {t("projectName")}
                     <Input
                       required
                       value={field.state.value}
@@ -151,9 +151,9 @@ export function ProjectSettingsDialog({
               <form.Field name="description">
                 {(field) => (
                   <label className="grid gap-2 text-sm font-medium sm:col-span-2">
-                    Game description
+                    {t("gameDescription")}
                     <Textarea
-                      className="min-h-28 resize-y"
+                      className="max-h-36 min-h-28 overflow-y-auto resize-none"
                       value={field.state.value}
                       onChange={(event) =>
                         field.handleChange(event.target.value)
