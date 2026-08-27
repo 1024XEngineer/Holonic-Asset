@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AssetTag, CreatableAssetKind } from "@/model/asset";
+import type { Perspective } from "@/model/project";
 import type {
   AssetTagCreateHandler,
   AssetTagUpdateHandler,
@@ -35,6 +36,7 @@ const assetNamePlaceholderKeys = {
 export function CreateAssetForm({
   availableTags = [],
   kind,
+  defaultPerspective,
   onCancel,
   onCreate,
   error,
@@ -44,6 +46,7 @@ export function CreateAssetForm({
 }: {
   availableTags?: readonly AssetTag[];
   kind: CreatableAssetKind;
+  defaultPerspective?: Perspective;
   onCancel: () => void;
   onCreate: (request: CreationRequest<File>) => void | Promise<void>;
   error?: Error | null;
@@ -54,7 +57,9 @@ export function CreateAssetForm({
   const { t } = useTranslation(["generation", "common"]);
   const [validationError, setValidationError] = useState<string>();
   const [localSubmissionReady, setLocalSubmissionReady] = useState(false);
-  const [initialDraft] = useState(() => createAssetCreationDraft<File>(kind));
+  const [initialDraft] = useState(() =>
+    createAssetCreationDraft<File>(kind, "", defaultPerspective),
+  );
   const form = useForm({
     defaultValues: { draft: initialDraft },
     onSubmit: async ({ value }) => {
@@ -97,7 +102,7 @@ export function CreateAssetForm({
         void form.handleSubmit();
       }}
     >
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         <label className="grid gap-2 text-sm font-medium">
           {t("assetName")}
           <Input
@@ -109,7 +114,7 @@ export function CreateAssetForm({
             }
           />
         </label>
-        <label className="grid gap-2 text-sm font-medium lg:col-span-2">
+        <label className="grid gap-2 text-sm font-medium">
           {t("creativeBrief")}
           <Textarea
             required

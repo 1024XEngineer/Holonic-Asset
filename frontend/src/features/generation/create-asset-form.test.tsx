@@ -214,4 +214,36 @@ describe("CreateAssetForm", () => {
     );
     expect(onCreate).not.toHaveBeenCalled();
   });
+
+  it("submits with inherited project perspective by default", async () => {
+    const onCreate = vi.fn();
+    render(
+      withI18n(
+        <CreateAssetForm
+          defaultPerspective="Side-On"
+          kind="character"
+          onCancel={vi.fn()}
+          onCreate={onCreate}
+        />,
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Asset name"), {
+      target: { value: "Side Runner" },
+    });
+    fireEvent.change(screen.getByLabelText("Creative brief"), {
+      target: { value: "A side view runner" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Perspective" }).textContent,
+    ).toContain("Side-On");
+    fireEvent.click(screen.getByRole("button", { name: "Create Character" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        perspective: "Side-On",
+      }),
+    );
+  });
 });

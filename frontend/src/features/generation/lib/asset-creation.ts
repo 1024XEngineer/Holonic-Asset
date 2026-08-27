@@ -2,7 +2,11 @@ import type { CreatableAssetKind } from "@/model/asset";
 import { assetCanvasSizeSchema, assetTagSchema } from "@/model/asset";
 import type { CreationRequest } from "@/model/generation";
 import { getDefaultAssetCanvasSize } from "@/model";
-import { perspectiveOptions, perspectiveSchema } from "@/model/project";
+import {
+  perspectiveOptions,
+  perspectiveSchema,
+  type Perspective,
+} from "@/model/project";
 import { z } from "zod";
 
 import {
@@ -107,6 +111,7 @@ export const assetCreationDraftSchema = z.discriminatedUnion("kind", [
 export function createAssetCreationDraft<CreatingReference = unknown>(
   kind: CreatableAssetKind,
   initialPrompt = "",
+  perspective: Perspective = perspectiveOptions[0],
 ): AssetCreationDraft<CreatingReference> {
   const common = {
     name: "",
@@ -146,7 +151,7 @@ export function createAssetCreationDraft<CreatingReference = unknown>(
       return {
         ...common,
         kind,
-        perspective: perspectiveOptions[0],
+        perspective,
         tags: [],
         creatingReference: undefined,
       };
