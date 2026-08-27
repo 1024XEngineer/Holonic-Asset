@@ -28,6 +28,8 @@ const (
 	defaultAnimationResolution          = "720p"
 	defaultAnimationDuration            = 5
 	defaultAnimationAspectRatio         = "1:1"
+	animationDerivationVideoModel       = "bytedance/seedance-2.5"
+	animationDerivationReferenceMinEdge = 300
 	animationVideoAttempts              = 2
 	animationReferenceSize              = 1024
 	animationExpandedReferenceSize      = 1920
@@ -144,10 +146,16 @@ type AnimationGenerationRequest struct {
 	// complete local-edit interval. The continuity gate temporarily replaces the
 	// target positions in this sequence before accepting generated output.
 	ContextReferenceImages []string
-	FrameCount             int
-	Columns                int
-	FrameWidth             int
-	FrameHeight            int
+	// DerivationSourceImage is a complete chronological frame sheet for the
+	// source direction. When set, the video model receives it together with the
+	// target-direction prototype and retargets the action into that direction.
+	DerivationSourceImage string
+	TargetOrientation     string
+	SourceOrientation     string
+	FrameCount            int
+	Columns               int
+	FrameWidth            int
+	FrameHeight           int
 	// PrototypeWidth and PrototypeHeight describe the source prototype canvas.
 	// They let reference preparation add animation padding without reducing the
 	// subject relative to its prototype.
@@ -344,26 +352,58 @@ func (s *animationGenerationService) Generate(
 	currentReferenceLongEdge := initialReferenceLongEdge
 
 	var referenceImages []videoclient.ReferenceImage
-	if len(options.ContextReferenceImages) > 0 {
+	model := ""
+	videoAspectRatio := options.AspectRatio
+	baseVideoPrompt := prompts.BuildAnimationVideo(promptOptions)
+	if options.DerivationSourceImage != "" {
+		sourceReference, loadErr := s.loadAnimationReference(ctx, options.DerivationSourceImage)
+		if loadErr != nil {
+			return nil, fmt.Errorf("generator: load animation derivation source sheet: %w", loadErr)
+		}
+		sourceSheet, decodeErr := imageprocessor.DecodeBase64Image(sourceReference)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("generator: decode animation derivation source sheet: %w", decodeErr)
+		}
+		preparedSourceSheet := scaleAnimationDerivationReference(sourceSheet, animationDerivationReferenceMinEdge)
+		encodedSourceSheet, encodeErr := imageprocessor.EncodePNGBase64(preparedSourceSheet)
+		if encodeErr != nil {
+			return nil, fmt.Errorf("generator: encode animation derivation source sheet: %w", encodeErr)
+		}
+		referenceImages = []videoclient.ReferenceImage{
+			{Base64: greenReference, MediaType: "image/png"},
+			{Base64: encodedSourceSheet, MediaType: "image/png"},
+		}
+		baseVideoPrompt = prompts.BuildAnimationDerivationVideo(prompts.AnimationDerivationOptions{
+			Description:       options.Description,
+			Style:             options.Style,
+			Action:            options.Action,
+			TargetOrientation: options.TargetOrientation,
+			SourceOrientation: options.SourceOrientation,
+			FrameCount:        options.FrameCount,
+			FrameWidth:        options.FrameWidth,
+			FrameHeight:       options.FrameHeight,
+		})
+		model = animationDerivationVideoModel
+		videoAspectRatio = "adaptive"
+	} else if len(options.ContextReferenceImages) > 0 {
 		referenceImages = make([]videoclient.ReferenceImage, 0, 1+len(options.ContextReferenceImages))
 		referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"})
 		for _, ref := range options.ContextReferenceImages {
 			referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: ref, MediaType: "image/png"})
 		}
 	}
-
-	baseVideoPrompt := prompts.BuildAnimationVideo(promptOptions)
 	videoPrompt := baseVideoPrompt
 	var lastQualityError error
 	for attempt := 1; attempt <= animationVideoAttempts; attempt++ {
 		videoResult, generateErr := s.videos.Generate(ctx, &videoclient.GenerateRequest{
 			Prompt:          videoPrompt,
+			Model:           model,
 			StartImage:      videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"},
 			ReferenceImages: referenceImages,
 			EndImage:        endReference,
 			Resolution:      options.Resolution,
 			Duration:        options.Duration,
-			AspectRatio:     options.AspectRatio,
+			AspectRatio:     videoAspectRatio,
 			GenerateAudio:   false,
 		})
 		if generateErr != nil {
@@ -415,10 +455,32 @@ func (s *animationGenerationService) Generate(
 					return nil, fmt.Errorf("generator: expand animation end reference after framing failure: %w", err)
 				}
 			}
+			if len(referenceImages) > 0 {
+				referenceImages[0].Base64 = greenReference
+			}
 		}
 		videoPrompt = prompts.BuildAnimationVideoRetry(baseVideoPrompt, qualityError.Kind)
 	}
 	return nil, fmt.Errorf("generator: process animation video: %w", lastQualityError)
+}
+
+func scaleAnimationDerivationReference(source image.Image, minimumEdge int) image.Image {
+	if source == nil || minimumEdge <= 0 {
+		return source
+	}
+	width, height := source.Bounds().Dx(), source.Bounds().Dy()
+	shortEdge := min(width, height)
+	if shortEdge <= 0 || shortEdge >= minimumEdge {
+		return source
+	}
+	scale := (minimumEdge + shortEdge - 1) / shortEdge
+	scaled := image.NewNRGBA(image.Rect(0, 0, width*scale, height*scale))
+	for y := 0; y < scaled.Bounds().Dy(); y++ {
+		for x := 0; x < scaled.Bounds().Dx(); x++ {
+			scaled.Set(x, y, source.At(source.Bounds().Min.X+x/scale, source.Bounds().Min.Y+y/scale))
+		}
+	}
+	return scaled
 }
 
 func (s *animationGenerationService) processVideoWithSourceCellScale(
@@ -697,6 +759,7 @@ func animationFrameDimensions(asset assetdomain.Asset) (assetdomain.Size, error)
 }
 
 type generatedAnimationCandidate struct {
+	GroupID    uint                                   `json:"groupId,omitempty"`
 	Name       string                                 `json:"name"`
 	Frames     []assetdomain.Frame                    `json:"frames"`
 	Generation *assetdomain.AnimationGenerationConfig `json:"generation,omitempty"`

@@ -182,8 +182,14 @@ func (p *qnaFalQueueAdapter) Generate(
 		)
 	}
 	createPath := p.createPath
+	resultPath := p.resultPath
+	model := strings.Trim(strings.TrimSpace(request.Model), "/")
+	if model != "" && p.createPath == DefaultQNACreatePath {
+		createPath = path.Join("/queue", model, "image-to-video")
+		resultPath = path.Join("/queue", model, "requests")
+	}
 	aspectRatio := firstNonEmpty(request.AspectRatio, p.aspectRatio)
-	if len(request.ReferenceImageURLs) > 1 || strings.Contains(strings.ToLower(p.createPath), "seedance-2.5") {
+	if len(request.ReferenceImageURLs) > 1 {
 		if strings.Contains(createPath, "image-to-video") && len(request.ReferenceImageURLs) > 1 {
 			createPath = strings.Replace(createPath, "image-to-video", "reference-to-video", 1)
 		}
@@ -226,7 +232,7 @@ func (p *qnaFalQueueAdapter) Generate(
 		)
 	}
 
-	return p.waitForTask(ctx, strings.TrimSpace(created.RequestID), p.resultPath)
+	return p.waitForTask(ctx, strings.TrimSpace(created.RequestID), resultPath)
 }
 
 func (p *qnaFalQueueAdapter) createTask(

@@ -170,6 +170,27 @@ func (e *executor) Generate(
 			return nil, err
 		}
 		return e.generateAnimation(ctx, request)
+	case DeriveAnimation:
+		if e.assets == nil {
+			return nil, ErrAssetWriterRequired
+		}
+		if e.animations == nil {
+			return nil, ErrAnimationServiceRequired
+		}
+		if e.images == nil {
+			return nil, ErrImageServiceRequired
+		}
+		if e.processor == nil {
+			return nil, ErrImageProcessorRequired
+		}
+		if e.references == nil {
+			return nil, ErrAnimationReferenceStoreRequired
+		}
+		request := DeriveAnimationPayload{}
+		if err := decodeExecutionPayload(taskType, payload, &request); err != nil {
+			return nil, err
+		}
+		return e.deriveAnimation(ctx, request)
 	case GenerateScenery:
 		if err := e.requireSceneryDependencies(); err != nil {
 			return nil, err

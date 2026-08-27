@@ -16,6 +16,18 @@ func (s *animationGenerationService) pixelProcessAnimationFrames(
 	regions []imageprocessor.ImageRegion,
 	columns, frameWidth, frameHeight int,
 ) ([]imageprocessor.ImageRegion, string, error) {
+	return pixelProcessAnimationFrames(ctx, s.processor, regions, columns, frameWidth, frameHeight)
+}
+
+func pixelProcessAnimationFrames(
+	ctx context.Context,
+	processor imageprocessor.Processor,
+	regions []imageprocessor.ImageRegion,
+	columns, frameWidth, frameHeight int,
+) ([]imageprocessor.ImageRegion, string, error) {
+	if processor == nil {
+		return nil, "", ErrImageProcessorRequired
+	}
 	options := AnimationPixelResizeOptions(frameWidth, frameHeight)
 	processedRegions := make([]imageprocessor.ImageRegion, 0, len(regions))
 	processedImages := make([]image.Image, 0, len(regions))
@@ -48,7 +60,7 @@ func (s *animationGenerationService) pixelProcessAnimationFrames(
 		if err != nil {
 			return nil, "", fmt.Errorf("generator: encode shared-palette animation frame %d: %w", index+1, err)
 		}
-		resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+		resized, err := processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: quantizedBase64,
 			Options:     options,
 		})
