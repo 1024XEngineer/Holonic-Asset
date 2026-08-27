@@ -11,6 +11,25 @@ import (
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 )
 
+func scaleAnimationDerivationReference(source image.Image, minimumEdge int) image.Image {
+	if source == nil || minimumEdge <= 0 {
+		return source
+	}
+	width, height := source.Bounds().Dx(), source.Bounds().Dy()
+	shortEdge := min(width, height)
+	if shortEdge <= 0 || shortEdge >= minimumEdge {
+		return source
+	}
+	scale := (minimumEdge + shortEdge - 1) / shortEdge
+	scaled := image.NewNRGBA(image.Rect(0, 0, width*scale, height*scale))
+	for y := range height * scale {
+		for x := range width * scale {
+			scaled.Set(x, y, source.At(source.Bounds().Min.X+x/scale, source.Bounds().Min.Y+y/scale))
+		}
+	}
+	return scaled
+}
+
 func (s *animationGenerationService) pixelProcessAnimationFrames(
 	ctx context.Context,
 	regions []imageprocessor.ImageRegion,

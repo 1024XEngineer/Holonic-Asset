@@ -464,25 +464,6 @@ func (s *animationGenerationService) Generate(
 	return nil, fmt.Errorf("generator: process animation video: %w", lastQualityError)
 }
 
-func scaleAnimationDerivationReference(source image.Image, minimumEdge int) image.Image {
-	if source == nil || minimumEdge <= 0 {
-		return source
-	}
-	width, height := source.Bounds().Dx(), source.Bounds().Dy()
-	shortEdge := min(width, height)
-	if shortEdge <= 0 || shortEdge >= minimumEdge {
-		return source
-	}
-	scale := (minimumEdge + shortEdge - 1) / shortEdge
-	scaled := image.NewNRGBA(image.Rect(0, 0, width*scale, height*scale))
-	for y := 0; y < scaled.Bounds().Dy(); y++ {
-		for x := 0; x < scaled.Bounds().Dx(); x++ {
-			scaled.Set(x, y, source.At(source.Bounds().Min.X+x/scale, source.Bounds().Min.Y+y/scale))
-		}
-	}
-	return scaled
-}
-
 func (s *animationGenerationService) processVideoWithSourceCellScale(
 	ctx context.Context,
 	video []byte,
