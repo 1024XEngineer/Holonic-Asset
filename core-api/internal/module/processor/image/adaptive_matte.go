@@ -17,12 +17,23 @@ var AnimationMatteCandidates = []MatteColor{
 	{255, 0, 0},   // red
 }
 
+// MatteSafetyDistanceFloor is the minimum acceptable Euclidean RGB distance
+// between any visible subject pixel and the chosen matte. A candidate whose
+// closest subject pixel is nearer than this value would be incorrectly removed
+// during global chroma keying, so the caller must retain conservative
+// border-connected extraction instead.
+const MatteSafetyDistanceFloor = 25.0
+
 // SelectAnimationMatteColor chooses a saturated matte whose distance from the
 // visible subject is largest. Transparent pixels are ignored, so the result is
 // stable for both transparent prototypes and already-keyed references.
-func SelectAnimationMatteColor(subject image.Image) MatteColor {
+//
+// The returned bool indicates whether the chosen matte is subject-safe: when
+// false the caller must not enable global chroma removal because no candidate
+// is far enough from every visible subject pixel.
+func SelectAnimationMatteColor(subject image.Image) (MatteColor, bool) {
 	if subject == nil || subject.Bounds().Empty() {
-		return AnimationMatteCandidates[0]
+		return AnimationMatteCandidates[0], true
 	}
 
 	distances := make([][]float64, len(AnimationMatteCandidates))
@@ -44,15 +55,13 @@ func SelectAnimationMatteColor(subject image.Image) MatteColor {
 		}
 	}
 	if visible == 0 {
-		return AnimationMatteCandidates[0]
+		return AnimationMatteCandidates[0], true
 	}
 
 	best := 0
 	bestScore := -1.0
 	for index, values := range distances {
 		slices.Sort(values)
-		// A low percentile prevents a large flat region from hiding a small but
-		// important subject colour. The mean breaks ties between candidates.
 		percentile := values[min(len(values)-1, max(0, len(values)/20))]
 		mean := 0.0
 		for _, value := range values {
@@ -64,7 +73,9 @@ func SelectAnimationMatteColor(subject image.Image) MatteColor {
 			best, bestScore = index, score
 		}
 	}
-	return AnimationMatteCandidates[best]
+
+	safe := distances[best][0] >= MatteSafetyDistanceFloor
+	return AnimationMatteCandidates[best], safe
 }
 
 // PrepareAnimationForeground converts an opaque source with a sampled matte to
@@ -79,10 +90,6 @@ func PrepareAnimationForeground(source image.Image) image.Image {
 		return ToRGBA(source)
 	}
 	matte := EstimateMatteColor(source)
-	// A prepared reference may legitimately contain the historical green key
-	// inside the subject (clothing, hair, or a prop). Preserve any component
-	// enclosed by the silhouette while clearing the outside matte; the later
-	// selected matte is deliberately different from these subject colours.
 	foreground, _ := extractBorderConnectedChromaWithReport(source, &matte, DefaultChromaSettings())
 	return foreground
 }

@@ -162,6 +162,7 @@ type AnimationGenerationRequest struct {
 	continuityReferenceFrames []image.Image
 	matteColor                imageprocessor.MatteColor
 	matteColorSet             bool
+	matteColorSafe            bool
 }
 
 type AnimationGenerationResult struct {
@@ -304,7 +305,7 @@ func (s *animationGenerationService) Generate(
 			return nil, err
 		}
 	}
-	greenReference, matte, err := s.prepareAdaptiveAnimationReference(
+	greenReference, matte, matteSafe, err := s.prepareAdaptiveAnimationReference(
 		ctx, options.ReferenceImage, options.ReferenceImagePrepared,
 		options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
 		nil,
@@ -314,6 +315,7 @@ func (s *animationGenerationService) Generate(
 	}
 	options.matteColor = matte
 	options.matteColorSet = true
+	options.matteColorSafe = matteSafe
 	promptOptions := prompts.AnimationOptions{
 		Description: options.Description, Style: options.Style, Action: options.Action,
 		OriginalAction: options.OriginalAction, FrameCount: options.FrameCount,
@@ -324,7 +326,7 @@ func (s *animationGenerationService) Generate(
 	}
 	var endReference *videoclient.ReferenceImage
 	if options.EndReferenceImage != "" {
-		greenEndReference, _, prepareErr := s.prepareAdaptiveAnimationReference(
+		greenEndReference, _, _, prepareErr := s.prepareAdaptiveAnimationReference(
 			ctx, options.EndReferenceImage, options.ReferenceImagePrepared,
 			options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
 			&matte,
@@ -455,7 +457,7 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		return nil, err
 	}
 	if request.ReferenceImageContext {
-		if err := validateEditFrameContinuity(request, processed.Frames); err != nil {
+		if err := validateEditFrameContinuity(request, processed.Frames, chromaKey); err != nil {
 			return nil, err
 		}
 	}
@@ -501,9 +503,11 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 	// key enclosed holes globally because that colour is subject-safe.
 	matteColor := "auto"
 	borderConnectedOnly := true
-	if request.matteColorSet {
+	if request.matteColorSet && request.matteColorSafe {
 		matteColor = imageprocessor.ColorToHex(request.matteColor)
 		borderConnectedOnly = false
+	} else if request.matteColorSet {
+		matteColor = imageprocessor.ColorToHex(request.matteColor)
 	}
 	normalized, err := s.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 		ImageBase64:               encoded,

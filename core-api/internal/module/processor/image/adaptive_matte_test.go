@@ -14,9 +14,12 @@ func TestSelectAnimationMatteColorAvoidsSubstantialGreenSubject(t *testing.T) {
 		}
 	}
 
-	selected := SelectAnimationMatteColor(subject)
+	selected, safe := SelectAnimationMatteColor(subject)
 	if selected == (MatteColor{0, 255, 0}) {
 		t.Fatalf("selected green matte for a green subject: %#v", selected)
+	}
+	if !safe {
+		t.Fatalf("expected green subject to produce a safe matte with a non-green candidate")
 	}
 }
 
@@ -61,4 +64,71 @@ func TestPrepareAnimationForegroundPreservesExactOldMatteInsideSubject(t *testin
 	if got := foreground.RGBAAt(24, 24); got.A != 255 || got.G != 255 || got.R != 0 || got.B != 0 {
 		t.Fatalf("enclosed green subject detail = %#v, want opaque preserved detail", got)
 	}
+}
+
+func TestSelectAnimationMatteColorReturnsUnsafeWhenSubjectContainsAllCandidates(t *testing.T) {
+	// Create a subject that has pixels of every candidate colour, so no
+	// candidate is far enough from all subject pixels.
+	subject := image.NewNRGBA(image.Rect(0, 0, 120, 120))
+	for index, candidate := range AnimationMatteCandidates {
+		x0 := index * 20
+		for y := range 120 {
+			for x := x0; x < x0+20; x++ {
+				subject.SetNRGBA(x, y, color.NRGBA{R: candidate[0], G: candidate[1], B: candidate[2], A: 255})
+			}
+		}
+	}
+
+	_, safe := SelectAnimationMatteColor(subject)
+	if safe {
+		t.Fatal("expected unsafe result when subject contains all candidate colours")
+	}
+}
+
+func TestSelectAnimationMatteColorReturnsSafeForMonoGreenSubject(t *testing.T) {
+	subject := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	for y := 4; y < 28; y++ {
+		for x := 4; x < 28; x++ {
+			subject.SetNRGBA(x, y, color.NRGBA{G: 255, A: 255})
+		}
+	}
+
+	_, safe := SelectAnimationMatteColor(subject)
+	if !safe {
+		t.Fatal("expected safe result for mono-green subject")
+	}
+}
+
+func TestMatteSafetyDistanceFloorRejectsNearMatchCandidate(t *testing.T) {
+	// Six blocks, each offset from a different candidate by (±10,±10,±10).
+	// Every candidate is within MatteSafetyDistanceFloor of its own block,
+	// so no matter which candidate wins, it must be reported as unsafe.
+	subject := image.NewNRGBA(image.Rect(0, 0, 120, 120))
+	for index, candidate := range AnimationMatteCandidates {
+		r := uint8(clamp255(int(candidate[0])-10+index*3) & 0xff)
+		g := uint8(clamp255(int(candidate[1])-10+index*3) & 0xff)
+		b := uint8(clamp255(int(candidate[2])-10+index*3) & 0xff)
+		x0 := (index % 3) * 40
+		y0 := (index / 3) * 60
+		for y := y0; y < y0+60; y++ {
+			for x := x0; x < x0+40; x++ {
+				subject.SetNRGBA(x, y, color.NRGBA{R: r, G: g, B: b, A: 255})
+			}
+		}
+	}
+
+	selected, safe := SelectAnimationMatteColor(subject)
+	if safe {
+		t.Fatalf("expected unsafe when every candidate is within floor of its own block; selected %v", selected)
+	}
+}
+
+func clamp255(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return v
 }

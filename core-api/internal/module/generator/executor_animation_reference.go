@@ -22,14 +22,14 @@ func (s *animationGenerationService) prepareAdaptiveAnimationReference(
 	prototypeWidth, prototypeHeight int,
 	frameWidth, frameHeight int,
 	matteOverride *imageprocessor.MatteColor,
-) (string, imageprocessor.MatteColor, error) {
+) (string, imageprocessor.MatteColor, bool, error) {
 	reference, err := s.loadAnimationReference(ctx, reference)
 	if err != nil {
-		return "", imageprocessor.MatteColor{}, err
+		return "", imageprocessor.MatteColor{}, false, err
 	}
 	referenceImage, err := imageprocessor.DecodeBase64Image(reference)
 	if err != nil {
-		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode animation reference: %w", err)
+		return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: decode animation reference: %w", err)
 	}
 
 	var foreground image.Image
@@ -43,22 +43,22 @@ func (s *animationGenerationService) prepareAdaptiveAnimationReference(
 				MatteColor:  "auto",
 			})
 			if removeErr != nil {
-				return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: remove animation reference background: %w", removeErr)
+				return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: remove animation reference background: %w", removeErr)
 			}
 			if removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
-				return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: remove animation reference background: empty result")
+				return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: remove animation reference background: empty result")
 			}
 			foregroundBase64 = removed.ImageBase64
 		}
 		foreground, err = imageprocessor.DecodeBase64Image(foregroundBase64)
 		if err != nil {
-			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode normalized animation foreground: %w", err)
+			return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: decode normalized animation foreground: %w", err)
 		}
 	}
 	if foreground == nil || foreground.Bounds().Empty() {
-		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: animation reference foreground is empty")
+		return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: animation reference foreground is empty")
 	}
-	matte := imageprocessor.SelectAnimationMatteColor(foreground)
+	matte, matteSafe := imageprocessor.SelectAnimationMatteColor(foreground)
 	if matteOverride != nil {
 		matte = *matteOverride
 	}
@@ -75,7 +75,7 @@ func (s *animationGenerationService) prepareAdaptiveAnimationReference(
 		)
 		foregroundBase64, encodeErr := imageprocessor.EncodePNGBase64(foreground)
 		if encodeErr != nil {
-			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: encode animation foreground: %w", encodeErr)
+			return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: encode animation foreground: %w", encodeErr)
 		}
 		resized, resizeErr := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: foregroundBase64,
@@ -85,22 +85,22 @@ func (s *animationGenerationService) prepareAdaptiveAnimationReference(
 			},
 		})
 		if resizeErr != nil {
-			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: normalize animation reference: %w", resizeErr)
+			return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: normalize animation reference: %w", resizeErr)
 		}
 		if resized == nil || strings.TrimSpace(resized.ImageBase64) == "" {
-			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: normalize animation reference: empty result")
+			return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: normalize animation reference: empty result")
 		}
 		foreground, err = imageprocessor.DecodeBase64Image(resized.ImageBase64)
 		if err != nil {
-			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode normalized animation reference: %w", err)
+			return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: decode normalized animation reference: %w", err)
 		}
 	}
 	canvas := imageprocessor.CompositeAnimationMatte(foreground, matte, canvasSize)
 	encoded, err := imageprocessor.EncodePNGBase64(canvas)
 	if err != nil {
-		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: encode adaptive animation reference: %w", err)
+		return "", imageprocessor.MatteColor{}, false, fmt.Errorf("generator: encode adaptive animation reference: %w", err)
 	}
-	return encoded, matte, nil
+	return encoded, matte, matteSafe, nil
 }
 
 func animationReferenceLongEdge(referenceBase64 string) (int, error) {
