@@ -67,6 +67,18 @@ func TestForegroundBoundsHandlesEmptyAndOffsetImages(t *testing.T) {
 	}
 }
 
+func TestForegroundBoundsMatchesInternalMeasurement(t *testing.T) {
+	frame := testGreenFrame(96, 96)
+	drawSubject(frame, image.Rect(30, 20, 66, 88))
+	bounds, ok := ForegroundBounds(frame, testGreenChromaKey)
+	if !ok || bounds != image.Rect(30, 20, 66, 88) {
+		t.Fatalf("unexpected exported foreground bounds: %v, ok=%v", bounds, ok)
+	}
+	if _, ok := ForegroundBounds(image.NewNRGBA(image.Rectangle{}), testGreenChromaKey); ok {
+		t.Fatal("expected empty image to have no foreground via exported ForegroundBounds")
+	}
+}
+
 func TestConfiguredSafetyMarginAllowsEffectsNearButNotOnFrameEdge(t *testing.T) {
 	frame := testGreenFrame(256, 256)
 	drawSubject(frame, image.Rect(1, 80, 200, 176))
