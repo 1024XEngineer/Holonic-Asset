@@ -116,6 +116,9 @@ func TestProjectCreate(t *testing.T) {
 	if stub.createInput == nil || stub.createInput.Name != "New Adventure" {
 		t.Fatalf("unexpected create input: %+v", stub.createInput)
 	}
+	if stub.createInput.Reference != req.Reference {
+		t.Fatalf("expected project reference %q to be forwarded, got %q", req.Reference, stub.createInput.Reference)
+	}
 }
 
 func TestProjectCreateErrors(t *testing.T) {
