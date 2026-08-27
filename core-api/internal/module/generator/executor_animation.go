@@ -68,32 +68,6 @@ const (
 	animationChromaBrightValueMin      = 180
 )
 
-func animationFrameSelectionOptions(frameCount int) videoprocessor.FrameIntervalSelectionOptions {
-	return videoprocessor.FrameIntervalSelectionOptions{
-		SampleCount:              frameCount,
-		MinimumSpanFrames:        animationMinLoopSpanFrames,
-		MinimumSpanRatio:         animationMinLoopSpanRatio,
-		MinimumStartWindowFrames: animationMinStartWindow,
-		StartWindowRatio:         animationInitialWindowRatio,
-		PreferFirstFrame:         true,
-		MinimumForegroundRatio:   animationMinForegroundRatio,
-		EndpointMSEQuantile:      animationEndpointQuantile,
-		ChangeScaleQuantile:      animationRichnessQuantile,
-		ChangeBaselineQuantile:   animationMotionQuantile,
-		Weights: videoprocessor.FrameIntervalSelectionWeights{
-			EndpointSimilarity:    animationEndpointWeight,
-			MeanAdjacentMSE:       animationRichnessWeight,
-			CentroidStability:     animationCentroidStabilityWeight,
-			LinearCentroidMotion:  animationTranslationWeight,
-			FirstFrameSimilarity:  animationInitialFrameWeight,
-			Compactness:           animationLoopCompactnessWeight,
-			GeometryCoverage:      animationPoseCoverageWeight,
-			ChangeCoverage:        animationMotionCoverageWeight,
-			PostIntervalStability: animationRecoveryWeight,
-		},
-	}
-}
-
 type AnimationLoopSelection struct {
 	CandidateFPS       int     `json:"candidate_fps"`
 	StartFrame         int     `json:"start_frame"`
