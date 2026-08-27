@@ -4,8 +4,14 @@ import { readAuthenticatedUserId } from "@/model/auth";
 
 import { coreGenerationApi } from "./core-generation.api";
 import { forgetGenerationRunMetadata } from "./generation.api";
+import {
+  refreshGenerationRunCacheInBackground,
+  removeGenerationRunFromCache,
+  restoreGenerationRunCache,
+} from "./generation-run-cache";
 import { generationKeys } from "./keys";
 import type { GenerationRun } from "./types";
+import { useOptimisticDeleteMutation } from "@/model/optimistic-delete.mutation";
 
 export type GenerationRecoveryInput = {
   projectId: string;
@@ -43,14 +49,34 @@ export function useRetryGenerationRunMutation() {
 export function useDeleteGenerationRunMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useOptimisticDeleteMutation({
     mutationFn: deleteGenerationRun,
-    onSuccess: (_response, input) => {
+    mutationKey: ["generation", "delete"],
+    removeFromCache: async (input) => {
       const userId = readAuthenticatedUserId();
-      queryClient.setQueriesData<GenerationRun[]>(
-        { queryKey: generationKeys.runs(userId, input.projectId) },
-        (current) => current?.filter((run) => run.id !== input.runId),
+      await queryClient.cancelQueries({
+        queryKey: generationKeys.runs(userId, input.projectId),
+      });
+      return removeGenerationRunFromCache(
+        queryClient,
+        userId,
+        input.projectId,
+        input.runId,
       );
+    },
+    restoreCache: (_input, snapshot) => {
+      restoreGenerationRunCache(queryClient, snapshot);
+    },
+    isSameScope: (variables, input) => variables?.projectId === input.projectId,
+    refreshCache: (input) => {
+      const userId = readAuthenticatedUserId();
+      refreshGenerationRunCacheInBackground(
+        queryClient,
+        userId,
+        input.projectId,
+      );
+    },
+    onSuccess: (_response, input) => {
       forgetGenerationRunMetadata(input.projectId, [input.runId]);
     },
   });

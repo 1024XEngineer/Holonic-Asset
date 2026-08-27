@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { assetApi } from "./asset.api";
 import {
@@ -8,6 +8,7 @@ import {
 } from "./asset-library-cache";
 import { assetKeys } from "./keys";
 import { readAuthenticatedUserId } from "@/model/auth";
+import { useOptimisticDeleteMutation } from "@/model/optimistic-delete.mutation";
 
 type DeleteAssetInput = { projectId: string; assetId: string };
 const deleteAssetMutationKey = ["assets", "delete"] as const;
@@ -16,10 +17,10 @@ export function useDeleteAssetMutation() {
   const queryClient = useQueryClient();
   const userID = readAuthenticatedUserId();
 
-  return useMutation({
+  return useOptimisticDeleteMutation({
     mutationKey: deleteAssetMutationKey,
     mutationFn: ({ assetId }: DeleteAssetInput) => assetApi.delete(assetId),
-    onMutate: async ({ projectId, assetId }) => {
+    removeFromCache: async ({ projectId, assetId }) => {
       const queryKey = assetKeys.library(userID, projectId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = removeAssetFromLibraryCache(
@@ -30,8 +31,7 @@ export function useDeleteAssetMutation() {
       );
       return { projectId, snapshot };
     },
-    onError: (_error, { projectId }, context) => {
-      if (!context) return;
+    restoreCache: ({ projectId }, context) => {
       restoreAssetLibraryCache(
         queryClient,
         userID,
@@ -39,17 +39,9 @@ export function useDeleteAssetMutation() {
         context.snapshot,
       );
     },
-    onSettled: (_data, _error, { projectId }) => {
-      if (
-        queryClient.isMutating({
-          mutationKey: deleteAssetMutationKey,
-          predicate: (mutation) =>
-            (mutation.state.variables as DeleteAssetInput | undefined)
-              ?.projectId === projectId,
-        }) !== 1
-      ) {
-        return;
-      }
+    isSameScope: (variables, { projectId }) =>
+      variables?.projectId === projectId,
+    refreshCache: ({ projectId }) => {
       refreshAssetLibraryCacheInBackground(queryClient, userID, projectId);
     },
   });
