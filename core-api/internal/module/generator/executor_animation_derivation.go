@@ -635,7 +635,7 @@ func (e *executor) loadAnimationFrameImage(
 		if err == nil {
 			return loaded, nil
 		}
-		return nil, fmt.Errorf("load processed frame: %v; load unprocessed frame: %w", processedErr, err)
+		return nil, fmt.Errorf("load processed frame: %w; load unprocessed frame: %w", processedErr, err)
 	}
 	return nil, processedErr
 }
