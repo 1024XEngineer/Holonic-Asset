@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -220,6 +221,34 @@ func TestDecodeFrameConfigAndResolveFFmpeg(t *testing.T) {
 	t.Setenv("PATH", "")
 	if _, err := resolveFFmpeg(""); err == nil {
 		t.Fatal("expected missing ffmpeg error")
+	}
+}
+
+func TestRunFrameExtractionUsesCurrentFFmpegFrameSyncOption(t *testing.T) {
+	directory := t.TempDir()
+	argsPath := filepath.Join(directory, "args.txt")
+	executable := writeFakeFFmpeg(t, directory, `printf '%s\n' "$@" > `+strconv.Quote(argsPath))
+	err := runFrameExtraction(
+		context.Background(),
+		executable,
+		filepath.Join(directory, "input.mp4"),
+		filepath.Join(directory, "frame_%05d.png"),
+		"fps=12,format=rgba",
+		8,
+	)
+	if err != nil {
+		t.Fatalf("run frame extraction: %v", err)
+	}
+	arguments, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read ffmpeg arguments: %v", err)
+	}
+	value := string(arguments)
+	if !strings.Contains(value, "-fps_mode\npassthrough\n") {
+		t.Fatalf("current frame sync option is missing: %s", value)
+	}
+	if strings.Contains(value, "-vsync\n") {
+		t.Fatalf("deprecated frame sync option is still present: %s", value)
 	}
 }
 
