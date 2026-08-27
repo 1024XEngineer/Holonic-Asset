@@ -11,105 +11,96 @@ import (
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 )
 
-// prepareAnimationReference preserves prepared green-screen pixels while padding
-// their canvas when needed. Other callers use transparent-prototype normalization.
-func (s *animationGenerationService) prepareAnimationReference(
+// prepareAdaptiveAnimationReference removes any existing matte, selects a
+// subject-safe saturated colour, and composes the provider reference with that
+// colour. The selected matte is returned so prompt, video analysis, and frame
+// extraction use one contract.
+func (s *animationGenerationService) prepareAdaptiveAnimationReference(
 	ctx context.Context,
 	reference string,
 	prepared bool,
 	prototypeWidth, prototypeHeight int,
 	frameWidth, frameHeight int,
-) (string, error) {
+	matteOverride *imageprocessor.MatteColor,
+) (string, imageprocessor.MatteColor, error) {
 	reference, err := s.loadAnimationReference(ctx, reference)
 	if err != nil {
-		return "", err
-	}
-	if !prepared {
-		return s.prepareGreenReference(
-			ctx, reference, prototypeWidth, prototypeHeight, frameWidth, frameHeight,
-		)
+		return "", imageprocessor.MatteColor{}, err
 	}
 	referenceImage, err := imageprocessor.DecodeBase64Image(reference)
 	if err != nil {
-		return "", fmt.Errorf("generator: decode prepared animation reference: %w", err)
-	}
-	preparedImage := padPreparedAnimationReference(referenceImage)
-	encoded, err := imageprocessor.EncodePNGBase64(preparedImage)
-	if err != nil {
-		return "", fmt.Errorf("generator: encode prepared animation reference: %w", err)
-	}
-	return encoded, nil
-}
-
-func (s *animationGenerationService) prepareGreenReference(
-	ctx context.Context,
-	referenceBase64 string,
-	prototypeWidth, prototypeHeight int,
-	frameWidth, frameHeight int,
-) (string, error) {
-	foregroundBase64 := referenceBase64
-	reference, err := imageprocessor.DecodeBase64Image(referenceBase64)
-	if err != nil {
-		return "", fmt.Errorf("generator: decode animation reference: %w", err)
-	}
-	if !animationImageHasTransparency(reference) {
-		removed, removeErr := s.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
-			ImageBase64: referenceBase64,
-			MatteColor:  "auto",
-		})
-		if removeErr != nil {
-			return "", fmt.Errorf("generator: remove animation reference background: %w", removeErr)
-		}
-		if removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
-			return "", fmt.Errorf("generator: remove animation reference background: empty result")
-		}
-		foregroundBase64 = removed.ImageBase64
+		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode animation reference: %w", err)
 	}
 
-	// Preserve the prototype canvas with one uniform scale. The generated video is
-	// later contained inside the requested frame, so reference preparation must
-	// use the inverse of that same contain scale. Scaling width and height
-	// independently distorts the prototype and makes the final animation subject
-	// smaller whenever the provider and target ratios are not identical.
+	var foreground image.Image
+	if prepared {
+		foreground = imageprocessor.PrepareAnimationForeground(referenceImage)
+	} else {
+		foregroundBase64 := reference
+		if !animationImageHasTransparency(referenceImage) {
+			removed, removeErr := s.processor.RemoveBackground(ctx, &imageprocessor.RemoveBackgroundRequest{
+				ImageBase64: reference,
+				MatteColor:  "auto",
+			})
+			if removeErr != nil {
+				return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: remove animation reference background: %w", removeErr)
+			}
+			if removed == nil || strings.TrimSpace(removed.ImageBase64) == "" {
+				return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: remove animation reference background: empty result")
+			}
+			foregroundBase64 = removed.ImageBase64
+		}
+		foreground, err = imageprocessor.DecodeBase64Image(foregroundBase64)
+		if err != nil {
+			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode normalized animation foreground: %w", err)
+		}
+	}
+	if foreground == nil || foreground.Bounds().Empty() {
+		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: animation reference foreground is empty")
+	}
+	matte := imageprocessor.SelectAnimationMatteColor(foreground)
+	if matteOverride != nil {
+		matte = *matteOverride
+	}
+
 	canvasSize := animationReferenceCanvasSize()
-	referenceSize := animationReferencePrototypeCanvasSize(
-		canvasSize,
-		prototypeWidth,
-		prototypeHeight,
-		frameWidth,
-		frameHeight,
-	)
-	referenceWidth, referenceHeight := referenceSize.X, referenceSize.Y
-	resizeOptions := imageprocessor.DefaultResizeOptions(referenceWidth, referenceHeight)
-	resizeOptions.Margin = 0
-	resizeOptions.CropContent = false
-	resizeOptions.PreserveCanvasGeometry = true
-	resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
-		ImageBase64: foregroundBase64,
-		Options:     resizeOptions,
-	})
-	if err != nil {
-		return "", fmt.Errorf("generator: normalize animation reference: %w", err)
+	if prepared {
+		// Prepared references have already been composed at the intended source
+		// scale. Preserve that geometry exactly (the historic prepared-reference
+		// contract) while replacing their old key colour with the selected matte.
+		canvasSize = image.Pt(max(foreground.Bounds().Dx(), foreground.Bounds().Dy()), max(foreground.Bounds().Dx(), foreground.Bounds().Dy()))
+	} else {
+		referenceSize := animationReferencePrototypeCanvasSize(
+			canvasSize, prototypeWidth, prototypeHeight, frameWidth, frameHeight,
+		)
+		foregroundBase64, encodeErr := imageprocessor.EncodePNGBase64(foreground)
+		if encodeErr != nil {
+			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: encode animation foreground: %w", encodeErr)
+		}
+		resized, resizeErr := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+			ImageBase64: foregroundBase64,
+			Options: imageprocessor.ResizeOptions{
+				Width: referenceSize.X, Height: referenceSize.Y,
+				Margin: 0, CropContent: false, PreserveCanvasGeometry: true,
+			},
+		})
+		if resizeErr != nil {
+			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: normalize animation reference: %w", resizeErr)
+		}
+		if resized == nil || strings.TrimSpace(resized.ImageBase64) == "" {
+			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: normalize animation reference: empty result")
+		}
+		foreground, err = imageprocessor.DecodeBase64Image(resized.ImageBase64)
+		if err != nil {
+			return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: decode normalized animation reference: %w", err)
+		}
 	}
-	if resized == nil || strings.TrimSpace(resized.ImageBase64) == "" {
-		return "", fmt.Errorf("generator: normalize animation reference: empty result")
-	}
-	foreground, err := imageprocessor.DecodeBase64Image(resized.ImageBase64)
-	if err != nil {
-		return "", fmt.Errorf("generator: decode normalized animation reference: %w", err)
-	}
-	canvas := image.NewNRGBA(image.Rect(0, 0, canvasSize.X, canvasSize.Y))
-	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
-	placement := image.Pt(
-		(canvas.Bounds().Dx()-foreground.Bounds().Dx())/2,
-		(canvas.Bounds().Dy()-foreground.Bounds().Dy())/2,
-	)
-	draw.Draw(canvas, foreground.Bounds().Add(placement), foreground, foreground.Bounds().Min, draw.Over)
+	canvas := imageprocessor.CompositeAnimationMatte(foreground, matte, canvasSize)
 	encoded, err := imageprocessor.EncodePNGBase64(canvas)
 	if err != nil {
-		return "", fmt.Errorf("generator: encode green animation reference: %w", err)
+		return "", imageprocessor.MatteColor{}, fmt.Errorf("generator: encode adaptive animation reference: %w", err)
 	}
-	return encoded, nil
+	return encoded, matte, nil
 }
 
 func animationReferenceLongEdge(referenceBase64 string) (int, error) {
@@ -133,10 +124,6 @@ func expandAnimationReferenceCanvas(referenceBase64 string, longEdge int) (strin
 	return encoded, nil
 }
 
-func padPreparedAnimationReference(source image.Image) image.Image {
-	return padAnimationReference(source, 0)
-}
-
 // padAnimationReference only expands the matte canvas. It deliberately keeps
 // the existing reference pixels at their current size so a framing retry shows
 // the video model a smaller subject with more movement room.
@@ -152,7 +139,11 @@ func padAnimationReference(source image.Image, minimumSize int) image.Image {
 		return source
 	}
 	canvas := image.NewNRGBA(image.Rectangle{Max: canvasSize})
-	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+	// The source already carries the selected provider matte. Preserve that
+	// colour when adding retry room instead of reintroducing the historical
+	// green screen around an adaptive reference.
+	matte := color.NRGBAModel.Convert(source.At(source.Bounds().Min.X, source.Bounds().Min.Y)).(color.NRGBA)
+	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: matte}, image.Point{}, draw.Src)
 	placement := image.Pt(
 		(canvasSide-sourceWidth)/2,
 		(canvasSide-sourceHeight)/2,
