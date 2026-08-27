@@ -238,3 +238,29 @@ func TestProcessAnimationVideoRejectsReferenceWithoutForeground(t *testing.T) {
 		t.Fatalf("expected measure error, got %v", err)
 	}
 }
+
+func subjectScaleTestFrameOnMatte(canvasSize, size image.Point, matte color.NRGBA) image.Image {
+	frame := image.NewNRGBA(image.Rectangle{Max: canvasSize})
+	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: matte}, image.Point{}, draw.Src)
+	min := image.Pt((canvasSize.X-size.X)/2, (canvasSize.Y-size.Y)/2)
+	draw.Draw(frame, image.Rectangle{Min: min, Max: min.Add(size)}, &image.Uniform{C: color.NRGBA{R: 140, G: 50, B: 35, A: 255}}, image.Point{}, draw.Src)
+	return frame
+}
+
+func TestAnimationSubjectScaleMultiplierResolvesNonGreenMatte(t *testing.T) {
+	key := animationVideoChromaKey() // AutoDetect enabled
+	reference := subjectScaleTestFrame(image.Pt(60, 80), 0)
+	blueMatte := color.NRGBA{B: 255, A: 255}
+	frames := []image.Image{
+		subjectScaleTestFrameOnMatte(image.Pt(192, 192), image.Pt(60, 80), blueMatte),
+		subjectScaleTestFrameOnMatte(image.Pt(192, 192), image.Pt(60, 80), blueMatte),
+	}
+
+	got, err := animationSubjectScaleMultiplier(reference, frames, key)
+	if err != nil {
+		t.Fatalf("measure subject scale on non-green matte: %v", err)
+	}
+	if math.Abs(got-1.0) > .01 {
+		t.Fatalf("multiplier = %f, want ~1.0 for matching subject on non-green matte", got)
+	}
+}

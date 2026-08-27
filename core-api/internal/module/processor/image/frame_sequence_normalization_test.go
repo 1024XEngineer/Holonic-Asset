@@ -441,7 +441,7 @@ func TestNormalizeAnimationImageCompensatesExpandedReferenceScaleAcrossSequence(
 	}
 }
 
-func TestNormalizeAnimationImageAppliesScaleCompensation(t *testing.T) {
+func TestNormalizeAnimationImageClampsScaleCompensationBeforeClipping(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 100, 100))
 	fillRect(src, image.Rect(5, 15, 95, 85), color.NRGBA{R: 220, G: 70, B: 40, A: 255})
 
@@ -451,10 +451,17 @@ func TestNormalizeAnimationImageAppliesScaleCompensation(t *testing.T) {
 		SourceCellScaleMultiplier: 1.875,
 	})
 	if err != nil {
-		t.Fatalf("normalize source-cell scale: %v", err)
+		t.Fatalf("normalize clamped source-cell scale: %v", err)
 	}
-	if got, want := result.Report.AppliedSourceCellScaleMultiplier, 1.875; math.Abs(got-want) > 0.001 {
-		t.Fatalf("applied scale multiplier = %f, want %f", got, want)
+	if result.Report.AppliedSourceCellScaleMultiplier >= result.Report.RequestedSourceCellScaleMultiplier {
+		t.Fatalf("scale compensation was not clamped: requested=%f applied=%f", result.Report.RequestedSourceCellScaleMultiplier, result.Report.AppliedSourceCellScaleMultiplier)
+	}
+	if len(result.Report.Warnings) == 0 {
+		t.Fatal("expected a clipping-prevention warning")
+	}
+	bounds := animationResultContentBounds(t, result)[0]
+	if bounds.Min.X < 0 || bounds.Min.Y < 0 || bounds.Max.X > 100 || bounds.Max.Y > 100 {
+		t.Fatalf("clamped content escaped target canvas: %v", bounds)
 	}
 }
 

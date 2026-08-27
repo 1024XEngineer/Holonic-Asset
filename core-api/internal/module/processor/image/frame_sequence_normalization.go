@@ -312,9 +312,23 @@ func normalizeAnimationImage(src image.Image, request normalizeAnimationRequest)
 			multiplier = 1
 		}
 		scale = baseScale * multiplier
+		if multiplier > 1 {
+			maxScale := maximumCenteredAnimationScale(shared, renderCrop, frameWidth, frameHeight, margin)
+			if maxScale > 0 && scale > maxScale {
+				// Never make the compensated retry less safe than the existing
+				// source-cell behavior. The provider framing gate should already
+				// keep the base transform inside the canvas.
+				scale = math.Max(baseScale, maxScale)
+				report.Warnings = append(report.Warnings, fmt.Sprintf(
+					"source cell scale compensation clamped from %.4f to %.4f to keep the animation inside the target frame",
+					multiplier,
+					scale/baseScale,
+				))
+			}
+		}
 		if request.SourceCellScaleMultiplier != 0 {
 			report.RequestedSourceCellScaleMultiplier = multiplier
-			report.AppliedSourceCellScaleMultiplier = multiplier
+			report.AppliedSourceCellScaleMultiplier = scale / baseScale
 			report.RegistrationPolicy += "_sequence_scale_compensation"
 		}
 	} else {
@@ -598,6 +612,39 @@ func animationOpaqueArea(img *image.NRGBA, threshold uint8) int {
 		}
 	}
 	return area
+}
+
+// maximumCenteredAnimationScale returns the largest uniform scale that keeps
+// the sequence-wide registered foreground inside a centered target rectangle.
+// The same value is used for every frame, so retry compensation cannot introduce
+// per-frame size jitter or alter their relative motion.
+func maximumCenteredAnimationScale(
+	foreground image.Rectangle,
+	sourceCanvas image.Rectangle,
+	targetWidth, targetHeight, margin int,
+) float64 {
+	if foreground.Empty() || sourceCanvas.Empty() || targetWidth <= 0 || targetHeight <= 0 {
+		return 0
+	}
+	margin = max(0, margin)
+	if margin*2 >= targetWidth || margin*2 >= targetHeight {
+		return 0
+	}
+	sourceCenterX := float64(sourceCanvas.Min.X+sourceCanvas.Max.X) / 2
+	sourceCenterY := float64(sourceCanvas.Min.Y+sourceCanvas.Max.Y) / 2
+	halfSourceWidth := math.Max(sourceCenterX-float64(foreground.Min.X), float64(foreground.Max.X)-sourceCenterX)
+	halfSourceHeight := math.Max(sourceCenterY-float64(foreground.Min.Y), float64(foreground.Max.Y)-sourceCenterY)
+	maxScale := math.Inf(1)
+	if halfSourceWidth > 0 {
+		maxScale = math.Min(maxScale, float64(targetWidth-2*margin)/(2*halfSourceWidth))
+	}
+	if halfSourceHeight > 0 {
+		maxScale = math.Min(maxScale, float64(targetHeight-2*margin)/(2*halfSourceHeight))
+	}
+	if math.IsInf(maxScale, 1) {
+		return 0
+	}
+	return maxScale
 }
 
 // centerAnimationFrameContent is deliberately a translation-only postcondition.

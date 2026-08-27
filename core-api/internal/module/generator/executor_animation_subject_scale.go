@@ -32,10 +32,14 @@ func animationSubjectScaleMultiplier(
 	if len(frames) == 0 {
 		return 1, fmt.Errorf("generator: animation frames are required to measure subject scale")
 	}
-	key := chromaKey
-	key.AutoDetect = false
-	referenceBounds, ok := videoprocessor.ForegroundBounds(reference, key)
-	if !ok || referenceBounds.Empty() || referenceBounds.Dy() <= 0 || referenceBounds.Dx() <= 0 {
+	referenceKey := chromaKey
+	referenceKey.AutoDetect = false
+	frameKey := chromaKey
+	if frameKey.AutoDetect {
+		frameKey = videoprocessor.ResolveChromaKey(frames, frameKey)
+	}
+	referenceBounds, ok := videoprocessor.ForegroundBounds(reference, referenceKey)
+	if !ok {
 		return 1, fmt.Errorf("generator: animation scale reference has no detectable foreground")
 	}
 
@@ -53,14 +57,11 @@ func animationSubjectScaleMultiplier(
 		if frame == nil || frame.Bounds().Empty() {
 			return 1, fmt.Errorf("generator: selected animation frame %d is empty", index+1)
 		}
-		bounds, ok := videoprocessor.ForegroundBounds(frame, key)
-		if !ok || bounds.Empty() || bounds.Dy() <= 0 || bounds.Dx() <= 0 {
+		bounds, ok := videoprocessor.ForegroundBounds(frame, frameKey)
+		if !ok {
 			continue
 		}
 		frameHeight := float64(frame.Bounds().Dy())
-		if frameHeight <= 0 {
-			continue
-		}
 		aspectRatio := float64(bounds.Dx()) / float64(bounds.Dy())
 		divergence := math.Abs(math.Log(aspectRatio / refAspectRatio))
 		metrics = append(metrics, frameMetric{
@@ -87,18 +88,11 @@ func animationSubjectScaleMultiplier(
 			candidateRelativeHeights = append(candidateRelativeHeights, m.relativeHeight)
 		}
 	}
-	if len(candidateRelativeHeights) == 0 {
-		candidateRelativeHeights = append(candidateRelativeHeights, metrics[0].relativeHeight)
-	}
 
 	sort.Float64s(candidateRelativeHeights)
 	medianRelativeHeight := candidateRelativeHeights[len(candidateRelativeHeights)/2]
 	if len(candidateRelativeHeights)%2 == 0 {
 		medianRelativeHeight = (candidateRelativeHeights[len(candidateRelativeHeights)/2-1] + candidateRelativeHeights[len(candidateRelativeHeights)/2]) / 2
-	}
-
-	if medianRelativeHeight <= 0 || math.IsNaN(medianRelativeHeight) || math.IsInf(medianRelativeHeight, 0) {
-		return 1, nil
 	}
 
 	// The reference image (green canvas) and the video frames have different
@@ -107,14 +101,8 @@ func animationSubjectScaleMultiplier(
 	// relative to their respective image heights so we compare the fraction of
 	// the canvas each subject occupies, not absolute pixels.
 	refImgHeight := float64(reference.Bounds().Dy())
-	if refImgHeight <= 0 {
-		return 1, nil
-	}
 	refRelativeHeight := refHeight / refImgHeight
 	multiplier := refRelativeHeight / medianRelativeHeight
-	if !isFinitePositiveAnimationScale(multiplier) {
-		return 1, nil
-	}
 
 	// Minor variations within deadband (+-5%) are treated as 1.0 to avoid
 	// unnecessary fractional resampling.
@@ -123,8 +111,4 @@ func animationSubjectScaleMultiplier(
 	}
 
 	return math.Max(animationSubjectScaleMinMultiplier, math.Min(multiplier, animationSubjectScaleMaxMultiplier)), nil
-}
-
-func isFinitePositiveAnimationScale(value float64) bool {
-	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
 }
