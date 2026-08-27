@@ -761,3 +761,23 @@ func validProject() *domain.Project {
 		TargetPlatform: domain.PlatformTypePC,
 	}
 }
+
+func TestGenerateReferenceRejectsInvalidProject(t *testing.T) {
+	images := &imageGenerationServiceStub{
+		result: &imageclient.GenerateResult{
+			Images: []imageclient.GeneratedImage{{Base64: "img", MediaType: "image/png"}},
+		},
+	}
+	manager := domain.NewManager(&projectStoreStub{}, images)
+
+	// nil project
+	if _, err := manager.GenerateReference(context.Background(), nil); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected ErrInvalidProject for nil project, got %v", err)
+	}
+
+	// missing required fields
+	invalid := &domain.Project{Name: "Test"} // missing perspective and platform
+	if _, err := manager.GenerateReference(context.Background(), invalid); !errors.Is(err, domain.ErrInvalidProject) {
+		t.Fatalf("expected ErrInvalidProject for project missing perspective, got %v", err)
+	}
+}

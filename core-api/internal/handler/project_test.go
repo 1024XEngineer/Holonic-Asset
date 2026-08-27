@@ -385,3 +385,80 @@ func TestProjectDetailResolvesPersistedObjectKeyWithoutChangingResponseContract(
 		t.Fatalf("unexpected resolver calls: %v", resolver.calls)
 	}
 }
+
+func TestGetDetailPropagatesReferenceResolverError(t *testing.T) {
+	wantErr := errors.New("resolve failed")
+	resolver := &referenceResolverStub{err: wantErr}
+	projectHandler := handler.NewProjectHandler(&projectManagerStub{
+		detail: &domain.Project{ID: 7, UserID: 101, Name: "Starbound", Reference: "projects/7/reference.png"},
+	}, resolver)
+
+	_, err := projectHandler.GetDetail(context.Background(), dto.ProjectDetailRequest{ProjectID: 7})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected resolver error %v, got %v", wantErr, err)
+	}
+}
+
+func TestGetDetailReturnsProjectWithEmptyReference(t *testing.T) {
+	projectHandler := handler.NewProjectHandler(&projectManagerStub{
+		detail: &domain.Project{ID: 42, UserID: 10, Name: "NoRef", GameType: "RPG"},
+	})
+
+	response, err := projectHandler.GetDetail(context.Background(), dto.ProjectDetailRequest{ProjectID: 42})
+	if err != nil {
+		t.Fatalf("get project detail: %v", err)
+	}
+	if response.Data.Project.Reference != "" {
+		t.Fatalf("expected empty reference, got %q", response.Data.Project.Reference)
+	}
+}
+
+func TestProjectHandlerErrorReturnsNilForNilError(t *testing.T) {
+	// projectHandlerError is not exported, but we can verify the defensive nil path
+	// by testing that handlers with a nil error from the manager don't return an error.
+	// The Create handler always returns nil error on success, which exercises the nil case.
+	stub := &projectManagerStub{}
+	h := handler.NewProjectHandler(stub)
+
+	resp, err := h.Create(context.Background(), dto.CreateProjectRequest{
+		UserID: 1, Name: "Test", GameType: "RPG",
+		Perspective: domain.PerspectiveTopDown, TargetPlatform: domain.PlatformTypePC,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if resp.Data.ID != 101 {
+		t.Fatalf("expected project ID 101, got %d", resp.Data.ID)
+	}
+}
+
+func TestListByUIDPropagatesReferenceResolverError(t *testing.T) {
+	wantErr := errors.New("resolver failed")
+	resolver := &referenceResolverStub{err: wantErr}
+	stub := &projectManagerStub{
+		projects: []*domain.Project{
+			{ID: 1, UserID: 10, Name: "P1", Reference: "media/p1.png"},
+		},
+	}
+	h := handler.NewProjectHandler(stub, resolver)
+
+	_, err := h.ListByUID(context.Background(), dto.ListProjectsRequest{UserID: 10})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected resolver error %v, got %v", wantErr, err)
+	}
+}
+
+func TestListByUIDHandlesNilProjectInList(t *testing.T) {
+	stub := &projectManagerStub{
+		projects: []*domain.Project{
+			{ID: 1, UserID: 10, Name: "P1"},
+			nil, // nil project in list
+		},
+	}
+	h := handler.NewProjectHandler(stub)
+
+	_, err := h.ListByUID(context.Background(), dto.ListProjectsRequest{UserID: 10})
+	if !errors.Is(err, domain.ErrProjectNotFound) {
+		t.Fatalf("expected ErrProjectNotFound, got %v", err)
+	}
+}
