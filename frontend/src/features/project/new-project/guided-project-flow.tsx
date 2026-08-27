@@ -120,7 +120,7 @@ export function GuidedProjectFlow({
                 <textarea
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
-                  className="min-h-28 w-full resize-none rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
+                  className="max-h-36 min-h-28 w-full resize-none overflow-y-auto rounded-md border bg-background px-3 py-2.5 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/25"
                   placeholder={t("gameDescriptionPlaceholder")}
                 />
               </label>
