@@ -174,6 +174,15 @@ func TestGeneratedImageHTTPClientUsesSecureTransport(t *testing.T) {
 		transport.TLSHandshakeTimeout == 0 || transport.MaxResponseHeaderBytes == 0 {
 		t.Fatalf("generated image transport is missing bounds: %+v", transport)
 	}
+	if transport.ForceAttemptHTTP2 {
+		t.Fatal("generated image transport must have ForceAttemptHTTP2 = false")
+	}
+	if transport.TLSClientConfig == nil || len(transport.TLSClientConfig.NextProtos) != 1 || transport.TLSClientConfig.NextProtos[0] != "http/1.1" {
+		t.Fatalf("generated image transport TLSClientConfig.NextProtos = %v, want [\"http/1.1\"]", transport.TLSClientConfig)
+	}
+	if transport.TLSNextProto == nil {
+		t.Fatal("generated image transport must initialize TLSNextProto")
+	}
 
 	privateURL, err := url.Parse("http://169.254.169.254/latest/meta-data")
 	if err != nil {
@@ -185,5 +194,35 @@ func TestGeneratedImageHTTPClientUsesSecureTransport(t *testing.T) {
 	if err := client.CheckRedirect(&http.Request{URL: privateURL}, make([]*http.Request, 10)); err == nil ||
 		!strings.Contains(err.Error(), "redirect limit") {
 		t.Fatalf("redirect limit error = %v", err)
+	}
+}
+
+func TestGeneratedImageDialerPrioritizesIPv4Addresses(t *testing.T) {
+	dialer := generatedImageDialer{
+		lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+			return []netip.Addr{
+				netip.MustParseAddr("240e:1234::1"),
+				netip.MustParseAddr("1.2.3.4"),
+				netip.MustParseAddr("240e:5678::2"),
+				netip.MustParseAddr("5.6.7.8"),
+			}, nil
+		},
+	}
+
+	addrs, err := dialer.resolve(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(addrs) != 4 {
+		t.Fatalf("len(addrs) = %d, want 4", len(addrs))
+	}
+	if !addrs[0].Is4() || !addrs[1].Is4() {
+		t.Fatalf("expected IPv4 addresses first, got: %v", addrs)
+	}
+	if addrs[0].String() != "1.2.3.4" || addrs[1].String() != "5.6.7.8" {
+		t.Fatalf("IPv4 addresses not preserved in order: %v", addrs)
+	}
+	if !addrs[2].Is6() || !addrs[3].Is6() {
+		t.Fatalf("expected IPv6 addresses after IPv4, got: %v", addrs)
 	}
 }

@@ -177,6 +177,12 @@ func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	if transport.DialContext == nil || transport.ResponseHeaderTimeout == 0 || transport.TLSHandshakeTimeout == 0 {
 		t.Fatalf("prototype reference transport is missing bounded timeouts: %+v", transport)
 	}
+	if transport.ForceAttemptHTTP2 {
+		t.Fatal("prototype reference transport must have ForceAttemptHTTP2 = false")
+	}
+	if transport.TLSNextProto == nil {
+		t.Fatal("prototype reference transport must initialize TLSNextProto to disable HTTP/2")
+	}
 
 	redirectURL, err := url.Parse("https://cdn.example.com/redirected-reference.png")
 	if err != nil {
@@ -184,5 +190,52 @@ func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	}
 	if err := client.CheckRedirect(&http.Request{URL: redirectURL}, []*http.Request{{}}); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("redirect error = %v, want redirects disabled", err)
+	}
+}
+
+func TestPrototypeReferenceDialerPrioritizesIPv4Addresses(t *testing.T) {
+	dialer := prototypeReferenceDialer{
+		lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+			return []netip.Addr{
+				netip.MustParseAddr("240e:1234::1"),
+				netip.MustParseAddr("1.2.3.4"),
+				netip.MustParseAddr("240e:5678::2"),
+				netip.MustParseAddr("5.6.7.8"),
+			}, nil
+		},
+	}
+
+	addrs, err := dialer.resolve(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(addrs) != 4 {
+		t.Fatalf("len(addrs) = %d, want 4", len(addrs))
+	}
+	if !addrs[0].Is4() || !addrs[1].Is4() {
+		t.Fatalf("expected IPv4 addresses first, got: %v", addrs)
+	}
+	if addrs[0].String() != "1.2.3.4" || addrs[1].String() != "5.6.7.8" {
+		t.Fatalf("IPv4 addresses not preserved in order: %v", addrs)
+	}
+	if !addrs[2].Is6() || !addrs[3].Is6() {
+		t.Fatalf("expected IPv6 addresses after IPv4, got: %v", addrs)
+	}
+}
+
+func TestLivePrototypeReferenceDownloadAgainstRealQiniuEndpoint(t *testing.T) {
+	client := newPrototypeReferenceHTTPClient()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodHead, "https://xe-6-2.s3.cn-east-1.qiniucs.com", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("download against real Qiniu S3 endpoint failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	t.Logf("Successfully connected to Qiniu S3! Proto=%s, StatusCode=%d", resp.Proto, resp.StatusCode)
+	if resp.Proto != "HTTP/1.1" {
+		t.Fatalf("proto = %q, want HTTP/1.1", resp.Proto)
 	}
 }
