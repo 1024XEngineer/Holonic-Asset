@@ -283,6 +283,7 @@ func derivationTestAsset(t *testing.T, directionCount uint, direction, frameData
 }
 
 func derivationTestFrameDataURL(t *testing.T, subject color.NRGBA) string {
+	t.Helper()
 	return derivationTestFrameDataURLSize(t, 32, subject)
 }
 
