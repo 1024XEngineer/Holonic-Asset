@@ -191,3 +191,49 @@ func TestCompositeAnimationMatteHandlesNilForeground(t *testing.T) {
 		t.Fatalf("expected green background, got %v", got)
 	}
 }
+
+func TestPrepareAnimationForegroundConvertsTransparentSource(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			source.SetNRGBA(x, y, color.NRGBA{R: 100, G: 150, B: 200, A: 128})
+		}
+	}
+	result := PrepareAnimationForeground(source)
+	if result == nil {
+		t.Fatal("expected non-nil result for transparent source")
+	}
+	if result.Bounds().Dx() != 16 || result.Bounds().Dy() != 16 {
+		t.Fatalf("expected 16x16, got %dx%d", result.Bounds().Dx(), result.Bounds().Dy())
+	}
+}
+
+func TestImageHasTransparencyReturnsFalseForOpaqueImage(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	for y := range 8 {
+		for x := range 8 {
+			source.SetNRGBA(x, y, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+		}
+	}
+	if imageHasTransparency(source) {
+		t.Fatal("expected false for fully opaque image")
+	}
+}
+
+func TestImageHasTransparencyReturnsTrueForPartialAlpha(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	for y := range 8 {
+		for x := range 8 {
+			source.SetNRGBA(x, y, color.NRGBA{R: 10, G: 20, B: 30, A: 100})
+		}
+	}
+	if !imageHasTransparency(source) {
+		t.Fatal("expected true for partially transparent image")
+	}
+}
+
+func TestImageHasTransparencyReturnsFalseForNilSource(t *testing.T) {
+	if imageHasTransparency(nil) {
+		t.Fatal("expected false for nil source")
+	}
+}
