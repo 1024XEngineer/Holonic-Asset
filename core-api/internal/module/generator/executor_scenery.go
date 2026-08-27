@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"io"
 	"math"
 	"slices"
@@ -132,7 +135,7 @@ func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPay
 }
 
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {
-	references := []string(nil)
+	baseReferences := []string(nil)
 	reference := payload.CreatingReference
 	if reference == "" {
 		reference = payload.ProjectReference
@@ -145,22 +148,87 @@ func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateScen
 			}
 			reference = resolved
 		}
-		references = []string{reference}
+		baseReferences = []string{reference}
 	}
-	layers := make([]ProcessedSceneryLayer, 0, len(plan))
-	for layerIndex, layer := range plan {
+
+	processedByID := make(map[uint]ProcessedSceneryLayer, len(plan))
+	layers := make([]ProcessedSceneryLayer, len(plan))
+	// Keep planner IDs back-to-front, but generate in reverse so each deeper
+	// layer can use the accumulated foreground composition as spatial context.
+	for layerIndex, layer := range slices.Backward(plan) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		// The planner contract is back-to-front, so the first layer is the
-		// authoritative opaque backdrop used by generation and layout.
-		processed, err := e.generateSceneryLayer(ctx, payload, layer, layerIndex == 0, references)
+		references := append([]string(nil), baseReferences...)
+		if len(processedByID) > 0 {
+			// This in-memory preview is generation context only. Persistence still
+			// stores each processed layer as an independent resource.
+			preview, err := composeSceneryReferencePreview(payload.Dimensions, plan, processedByID)
+			if err != nil {
+				return nil, fmt.Errorf("generator: compose scenery reference preview before layer %d: %w", layer.ID, err)
+			}
+			references = append(references, preview)
+		}
+
+		processed, err := e.generateSceneryLayer(
+			ctx,
+			payload,
+			layer,
+			layerIndex == 0,
+			references,
+			len(processedByID) > 0,
+		)
 		if err != nil {
 			return nil, err
 		}
-		layers = append(layers, *processed)
+		layers[layerIndex] = *processed
+		processedByID[layer.ID] = *processed
 	}
 	return layers, nil
+}
+
+func composeSceneryReferencePreview(
+	dimensions assetdomain.Size,
+	plan []SceneryLayerDefinition,
+	processedByID map[uint]ProcessedSceneryLayer,
+) (string, error) {
+	width, height := int(dimensions.Width), int(dimensions.Height)
+	if width <= 0 || height <= 0 {
+		return "", fmt.Errorf("invalid canvas dimensions %dx%d", width, height)
+	}
+
+	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
+	for _, definition := range plan {
+		layer, present := processedByID[definition.ID]
+		if !present {
+			continue
+		}
+		data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(layer.ImageBase64))
+		if err != nil {
+			return "", fmt.Errorf("decode layer %d base64: %w", layer.ID, err)
+		}
+		source, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", fmt.Errorf("decode layer %d image: %w", layer.ID, err)
+		}
+		if source.Bounds().Dx() != width || source.Bounds().Dy() != height {
+			return "", fmt.Errorf(
+				"layer %d dimensions are %dx%d, expected %dx%d",
+				layer.ID,
+				source.Bounds().Dx(),
+				source.Bounds().Dy(),
+				width,
+				height,
+			)
+		}
+		draw.Draw(canvas, canvas.Bounds(), source, source.Bounds().Min, draw.Over)
+	}
+
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, canvas); err != nil {
+		return "", fmt.Errorf("encode composite PNG: %w", err)
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(encoded.Bytes()), nil
 }
 
 func (e *executor) generateSceneryLayer(
@@ -169,6 +237,7 @@ func (e *executor) generateSceneryLayer(
 	layer SceneryLayerDefinition,
 	isBackmost bool,
 	references []string,
+	hasForegroundReference bool,
 ) (*ProcessedSceneryLayer, error) {
 	prompt := prompts.SceneryLayer(prompts.SceneryLayerInput{
 		AssetName: payload.AssetName, CreativeBrief: payload.CreativeBrief,
@@ -176,7 +245,7 @@ func (e *executor) generateSceneryLayer(
 		TargetPlatform: payload.ProjectContext.TargetPlatform, ProjectDescription: payload.ProjectContext.Description,
 		Width: payload.Dimensions.Width, Height: payload.Dimensions.Height, LayerID: layer.ID,
 		LayerName: layer.Name, LayerCreativeBrief: layer.CreativeBrief, HasReference: len(references) > 0,
-		IsBackmost: isBackmost,
+		HasForegroundReference: hasForegroundReference, IsBackmost: isBackmost,
 	}, prompts.SolidMatteBackground(imageprocessor.DefaultMatteColor))
 
 	var attemptErrors []error
@@ -439,6 +508,9 @@ func validateSceneryLayoutCandidate(candidate sceneryLayoutCandidate, dimensions
 	}
 	if scale.X <= 0 || scale.Y <= 0 {
 		return SceneryLayerLayout{}, 0, fmt.Errorf("scale values must be positive")
+	}
+	if math.Abs(scale.X-scale.Y) > 1e-6 {
+		return SceneryLayerLayout{}, 0, fmt.Errorf("scale x and y must match to preserve the layer aspect ratio")
 	}
 	if candidate.Rotation == nil || !finite(*candidate.Rotation) {
 		return SceneryLayerLayout{}, 0, fmt.Errorf("rotation is required and must be finite")
