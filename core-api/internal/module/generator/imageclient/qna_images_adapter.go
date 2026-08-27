@@ -127,16 +127,22 @@ func (p *QNAImagesAdapter) call(
 		model = p.defaultModel
 	}
 
+	outputFormat := "png"
+	if customFormat, ok := request.Params["output_format"]; ok && strings.TrimSpace(customFormat) != "" {
+		outputFormat = strings.TrimSpace(customFormat)
+	}
+
 	providerSize := normalizeQNAImageSize(request.Size)
 	payload := qnaImageRequest{
-		Model:   model,
-		Prompt:  request.Prompt,
-		Image:   referenceImages,
-		Mask:    request.MaskImage,
-		N:       request.N,
-		Size:    providerSize,
-		Quality: request.Params["quality"],
-		Seed:    request.Params["seed"],
+		Model:        model,
+		Prompt:       request.Prompt,
+		Image:        referenceImages,
+		Mask:         request.MaskImage,
+		N:            request.N,
+		Size:         providerSize,
+		Quality:      request.Params["quality"],
+		Seed:         request.Params["seed"],
+		OutputFormat: outputFormat,
 	}
 	var decoded qnaImageResponse
 	if err := p.sdkClient.Execute(ctx, http.MethodPost, strings.TrimPrefix(path, "/v1/"), payload, &decoded); err != nil {
@@ -166,9 +172,14 @@ func (p *QNAImagesAdapter) call(
 		images = append(images, image.Base64)
 	}
 
+	resultOutputFormat := decoded.OutputFormat
+	if resultOutputFormat == "" {
+		resultOutputFormat = outputFormat
+	}
+
 	return &ProviderResult{
 		Images:       images,
-		OutputFormat: decoded.OutputFormat,
+		OutputFormat: resultOutputFormat,
 		Size:         decoded.Size,
 		CreatedAt:    decoded.Created,
 		Usage: Usage{
@@ -248,14 +259,15 @@ func newQNAError(
 }
 
 type qnaImageRequest struct {
-	Model   string   `json:"model"`
-	Prompt  string   `json:"prompt"`
-	Image   []string `json:"image,omitempty"`
-	Mask    string   `json:"mask,omitempty"`
-	N       int      `json:"n,omitempty"`
-	Size    string   `json:"size,omitempty"`
-	Quality string   `json:"quality,omitempty"`
-	Seed    string   `json:"seed,omitempty"`
+	Model        string   `json:"model"`
+	Prompt       string   `json:"prompt"`
+	Image        []string `json:"image,omitempty"`
+	Mask         string   `json:"mask,omitempty"`
+	N            int      `json:"n,omitempty"`
+	Size         string   `json:"size,omitempty"`
+	Quality      string   `json:"quality,omitempty"`
+	Seed         string   `json:"seed,omitempty"`
+	OutputFormat string   `json:"output_format,omitempty"`
 }
 
 type qnaImageResponse struct {

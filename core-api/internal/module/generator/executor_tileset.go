@@ -345,19 +345,31 @@ func (e *executor) processTileSetItemCandidate(
 	for coordinateIndex, coordinate := range localShape {
 		tiles[coordinateIndex] = split.Regions[coordinate[1]*columns+coordinate[0]]
 	}
+	rawPNGBase64, err := normalizeTileSetCandidatePNG(candidate)
+	if err != nil {
+		return nil, fmt.Errorf("generator: normalize Tileset Item %d candidate %d to PNG: %w", index, candidateIndex, err)
+	}
 	return &processedTileSetItem{
 		Index:          index,
 		Name:           item.Name,
 		Columns:        columns,
 		Rows:           rows,
 		ImageBase64:    aligned,
-		MIMEType:       resized.MIMEType,
-		RawImageBase64: candidate.Base64,
-		RawMediaType:   candidate.MediaType,
+		MIMEType:       "image/png",
+		RawImageBase64: rawPNGBase64,
+		RawMediaType:   "image/png",
 		LocalShape:     localShape,
 		Tiles:          tiles,
 		Perspective:    perspective,
 	}, nil
+}
+
+func normalizeTileSetCandidatePNG(candidate imageclient.GeneratedImage) (string, error) {
+	decoded, err := imageprocessor.DecodeBase64Image(candidate.Base64)
+	if err != nil {
+		return "", fmt.Errorf("decode candidate image: %w", err)
+	}
+	return imageprocessor.EncodePNGBase64(decoded)
 }
 
 func (e *executor) publishTileSet(

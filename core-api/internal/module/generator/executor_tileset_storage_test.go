@@ -162,6 +162,27 @@ func TestBuildTileSetUploads(t *testing.T) {
 			t.Fatalf("expected raw image b64 preserved: %+v", uploads[0])
 		}
 	})
+
+	t.Run("defaults raw media type to image/png when empty", func(t *testing.T) {
+		store := &mockTileSetReferenceStore{}
+		emptyMIMEItems := []processedTileSetItem{
+			{
+				Name: "Wall",
+				Tiles: []imageprocessor.ImageRegion{
+					{ImageBase64: "tile0", MIMEType: "image/png"},
+				},
+				RawImageBase64: "rawB64",
+				RawMediaType:   "",
+			},
+		}
+		uploads, err := buildTileSetUploads(store, emptyMIMEItems, layout)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(uploads) != 1 || uploads[0].rawMediaType != "image/png" {
+			t.Fatalf("expected default rawMediaType image/png, got %+v", uploads)
+		}
+	})
 }
 
 func TestPersistTileSetUploads(t *testing.T) {
@@ -186,6 +207,40 @@ func TestPersistTileSetUploads(t *testing.T) {
 		}
 		if len(keys) != 2 { // key-0.png and key-0-unprocessed.png
 			t.Fatalf("expected 2 keys, got %d (%v)", len(keys), keys)
+		}
+	})
+
+	t.Run("defaults region and raw mime types to image/png when empty", func(t *testing.T) {
+		var persistedDataURLs []string
+		store := &mockTileSetReferenceStore{
+			persistAtFunc: func(_ context.Context, key, dataURL string) error {
+				persistedDataURLs = append(persistedDataURLs, dataURL)
+				return nil
+			},
+		}
+		emptyMIMEUploads := []tileSetTileUpload{
+			{
+				itemIndex:      0,
+				tileIndex:      0,
+				position:       TileSetCoordinate{0, 0},
+				region:         imageprocessor.ImageRegion{ImageBase64: "img0", MIMEType: ""},
+				objectKey:      "key-0.png",
+				rawImageBase64: "raw-0",
+				rawMediaType:   "",
+			},
+		}
+		exec := &executor{references: store}
+		keys, err := exec.persistTileSetUploads(context.Background(), emptyMIMEUploads)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(keys) != 2 {
+			t.Fatalf("expected 2 keys, got %d", len(keys))
+		}
+		if len(persistedDataURLs) != 2 ||
+			persistedDataURLs[0] != "data:image/png;base64,img0" ||
+			persistedDataURLs[1] != "data:image/png;base64,raw-0" {
+			t.Fatalf("unexpected data URLs: %+v", persistedDataURLs)
 		}
 	})
 
