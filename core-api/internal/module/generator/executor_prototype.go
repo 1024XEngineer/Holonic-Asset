@@ -596,9 +596,6 @@ func (e *executor) normalizePrototypeReference(ctx context.Context, reference st
 	if normalized == nil || strings.TrimSpace(normalized.ImageBase64) == "" {
 		return "", fmt.Errorf("empty normalized reference")
 	}
-	if !normalized.Report.Upscaled {
-		return reference, nil
-	}
 	return generatedImageDataURL(imageclient.GeneratedImage{
 		Base64: normalized.ImageBase64, MediaType: normalized.MIMEType,
 	}), nil
