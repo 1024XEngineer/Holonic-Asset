@@ -61,6 +61,9 @@ func newGeneratedImageHTTPClient() *http.Client {
 	transport.TLSHandshakeTimeout = generatedImageTLSHandshakeTimeout
 	transport.MaxResponseHeaderBytes = generatedImageMaxResponseHeaderBytes
 	transport.ForceAttemptHTTP2 = false
+	transport.TLSClientConfig = &tls.Config{
+		NextProtos: []string{"http/1.1"},
+	}
 	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 
 	return &http.Client{

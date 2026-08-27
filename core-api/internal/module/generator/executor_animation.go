@@ -243,6 +243,9 @@ func newDefaultAnimationReferenceHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSHandshakeTimeout = defaultAnimationReferenceTimeout
 	transport.ForceAttemptHTTP2 = false
+	transport.TLSClientConfig = &tls.Config{
+		NextProtos: []string{"http/1.1"},
+	}
 	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 	return &http.Client{
 		Transport: transport,

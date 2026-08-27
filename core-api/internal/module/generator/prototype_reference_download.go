@@ -59,6 +59,9 @@ func newPrototypeReferenceHTTPClient() *http.Client {
 	transport.ResponseHeaderTimeout = defaultPrototypeReferenceHeaderTimeout
 	transport.TLSHandshakeTimeout = defaultPrototypeReferenceTLSHandshaking
 	transport.ForceAttemptHTTP2 = false
+	transport.TLSClientConfig = &tls.Config{
+		NextProtos: []string{"http/1.1"},
+	}
 	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 	return &http.Client{
 		Transport: transport,
