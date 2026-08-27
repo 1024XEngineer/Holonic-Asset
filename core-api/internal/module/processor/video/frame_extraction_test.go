@@ -239,7 +239,7 @@ func TestRunFrameExtractionUsesCurrentFFmpegFrameSyncOption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run frame extraction: %v", err)
 	}
-	arguments, err := os.ReadFile(argsPath)
+	arguments, err := os.ReadFile(argsPath) // #nosec G304 -- argsPath is created under t.TempDir for this test.
 	if err != nil {
 		t.Fatalf("read ffmpeg arguments: %v", err)
 	}
