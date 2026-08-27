@@ -141,14 +141,11 @@ func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateScen
 		reference = payload.ProjectReference
 	}
 	if reference != "" {
-		if e.references != nil {
-			resolved, err := e.references.ResolveReference(ctx, reference)
-			if err != nil {
-				return nil, fmt.Errorf("generator: resolve scenery reference: %w", err)
-			}
-			reference = resolved
+		resolved, err := e.resolveReferences(ctx, GenerateScenery, []string{reference})
+		if err != nil {
+			return nil, fmt.Errorf("generator: resolve scenery reference: %w", err)
 		}
-		baseReferences = []string{reference}
+		baseReferences = resolved
 	}
 
 	processedByID := make(map[uint]ProcessedSceneryLayer, len(plan))
