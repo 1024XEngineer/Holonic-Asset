@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -241,6 +242,8 @@ func NewAnimationGenerationServiceWithDependencies(
 func newDefaultAnimationReferenceHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSHandshakeTimeout = defaultAnimationReferenceTimeout
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 	return &http.Client{
 		Transport: transport,
 		Timeout:   defaultAnimationReferenceTimeout,
