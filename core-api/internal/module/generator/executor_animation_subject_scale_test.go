@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
+	"strings"
 	"testing"
 
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
@@ -155,5 +156,85 @@ func TestProcessAnimationVideoCompensatesUniformSubjectShrink(t *testing.T) {
 		math.Abs(report.AppliedSourceCellScaleMultiplier-80.0/60.0) > .02 {
 		t.Fatalf("shrink compensation not applied: requested=%f applied=%f warnings=%v",
 			report.RequestedSourceCellScaleMultiplier, report.AppliedSourceCellScaleMultiplier, report.Warnings)
+	}
+}
+
+func TestAnimationSubjectScaleMultiplierRejectsInvalidInputs(t *testing.T) {
+	key := animationVideoChromaKey()
+	key.AutoDetect = false
+	validReference := subjectScaleTestFrame(image.Pt(60, 80), 0)
+	validFrame := subjectScaleTestFrame(image.Pt(45, 60), 0)
+	emptyImage := image.NewNRGBA(image.Rectangle{})
+	allGreen := image.NewNRGBA(image.Rect(0, 0, 192, 192))
+	draw.Draw(allGreen, allGreen.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+
+	tests := []struct {
+		name      string
+		reference image.Image
+		frames    []image.Image
+		want      string
+	}{
+		{name: "nil reference", reference: nil, frames: []image.Image{validFrame}, want: "scale reference is empty"},
+		{name: "empty reference", reference: emptyImage, frames: []image.Image{validFrame}, want: "scale reference is empty"},
+		{name: "no frames", reference: validReference, frames: nil, want: "frames are required"},
+		{name: "reference without foreground", reference: allGreen, frames: []image.Image{validFrame}, want: "reference has no detectable foreground"},
+		{name: "nil frame", reference: validReference, frames: []image.Image{nil}, want: "frame 1 is empty"},
+		{name: "empty frame", reference: validReference, frames: []image.Image{emptyImage}, want: "frame 1 is empty"},
+		{name: "frames without foreground", reference: validReference, frames: []image.Image{allGreen}, want: "no measurable foreground"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := animationSubjectScaleMultiplier(test.reference, test.frames, key)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected error containing %q, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func TestProcessAnimationVideoRejectsInvalidReferenceBase64(t *testing.T) {
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{Frames: []image.Image{
+		subjectScaleTestFrame(image.Pt(45, 60), 0),
+		subjectScaleTestFrame(image.Pt(45, 60), 0),
+	}}}}
+	service := &animationGenerationService{
+		processor:      imageprocessor.NewProcessor(),
+		videoProcessor: videoProcessor,
+	}
+	_, err := service.processVideoWithSourceCellScale(
+		context.Background(), []byte("video"), "not-valid-base64", AnimationGenerationRequest{
+			Action: "spray detergent forward attack", FrameCount: 2, Columns: 2,
+			FrameWidth: 64, FrameHeight: 64,
+		}, 1,
+	)
+	if err == nil || !strings.Contains(err.Error(), "decode animation subject-scale reference") {
+		t.Fatalf("expected decode error, got %v", err)
+	}
+}
+
+func TestProcessAnimationVideoRejectsReferenceWithoutForeground(t *testing.T) {
+	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{Frames: []image.Image{
+		subjectScaleTestFrame(image.Pt(45, 60), 0),
+		subjectScaleTestFrame(image.Pt(45, 60), 0),
+	}}}}
+	allGreen := image.NewNRGBA(image.Rect(0, 0, 192, 192))
+	draw.Draw(allGreen, allGreen.Bounds(), &image.Uniform{C: color.NRGBA{G: 255, A: 255}}, image.Point{}, draw.Src)
+	referenceData, err := imageprocessor.EncodePNGBase64(allGreen)
+	if err != nil {
+		t.Fatalf("encode reference: %v", err)
+	}
+	service := &animationGenerationService{
+		processor:      imageprocessor.NewProcessor(),
+		videoProcessor: videoProcessor,
+	}
+	_, err = service.processVideoWithSourceCellScale(
+		context.Background(), []byte("video"), "data:image/png;base64,"+referenceData, AnimationGenerationRequest{
+			Action: "spray detergent forward attack", FrameCount: 2, Columns: 2,
+			FrameWidth: 64, FrameHeight: 64,
+		}, 1,
+	)
+	if err == nil || !strings.Contains(err.Error(), "no detectable foreground") {
+		t.Fatalf("expected measure error, got %v", err)
 	}
 }
