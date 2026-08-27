@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { useTimeout } from "@/hooks/use-timeout";
 import {
-  coreGenerationApi,
-  rememberGenerationRunMetadata,
+  isGenerationRunActive,
+  useEnqueueAssetEditGenerationMutation,
   useGenerationCandidateQuery,
   useGenerationRunsQuery,
   useResolveGenerationApplicationMutation,
@@ -29,12 +28,13 @@ export function useGenerationEditFlow<Content>({
   assetName: string;
 }) {
   const applicationMutation = useResolveGenerationApplicationMutation();
+  const enqueueMutation = useEnqueueAssetEditGenerationMutation();
   const { data: runs = [] } = useGenerationRunsQuery(projectId, assetId);
   const reviewRun = runs.find((run) => run.status === "awaiting_application");
   const candidateQuery = useGenerationCandidateQuery<Content>(reviewRun?.id);
   const [submittedTask, setSubmittedTask] =
     useState<SubmittedAssetEditTask | null>(null);
-  const { schedule: scheduleTaskReset } = useTimeout();
+  const hasActiveRun = runs.some(isGenerationRunActive);
 
   useEffect(() => {
     setSubmittedTask(null);
@@ -47,7 +47,7 @@ export function useGenerationEditFlow<Content>({
     request: CreateGenerationRequest;
     prompt: string;
   }) => {
-    if (submittedTask) return false;
+    if (submittedTask || hasActiveRun) return false;
     const taskId = `prompt-${crypto.randomUUID()}`;
     setSubmittedTask({
       id: taskId,
@@ -59,30 +59,22 @@ export function useGenerationEditFlow<Content>({
       const persistedProjectId = Number(projectId);
       const persistedAssetId = Number(assetId);
       if (
-        Number.isSafeInteger(persistedProjectId) &&
-        Number.isSafeInteger(persistedAssetId)
+        !Number.isSafeInteger(persistedProjectId) ||
+        !Number.isSafeInteger(persistedAssetId)
       ) {
-        const created = await coreGenerationApi.create(
-          persistedProjectId,
-          request,
-        );
-        rememberGenerationRunMetadata(projectId, created.generationRunId, {
-          kind: assetKind,
-          name: `Edit ${assetName}`,
-          prompt,
-          assetId,
-        });
+        return true;
       }
-
-      scheduleTaskReset(() => {
-        setSubmittedTask((current) =>
-          current?.id === taskId ? null : current,
-        );
-      }, 1800);
+      await enqueueMutation.mutateAsync({
+        projectId,
+        assetId,
+        assetKind,
+        assetName,
+        prompt,
+        request,
+      });
       return true;
-    } catch (error) {
+    } finally {
       setSubmittedTask((current) => (current?.id === taskId ? null : current));
-      throw error;
     }
   };
 
@@ -100,7 +92,7 @@ export function useGenerationEditFlow<Content>({
   return {
     runs,
     submittedTask,
-    isSubmitting: submittedTask !== null,
+    isSubmitting: submittedTask !== null || hasActiveRun,
     candidateContent: candidateQuery.data?.result?.content,
     candidateKind: candidateQuery.data?.kind,
     candidateAnimationId: candidateQuery.data?.result?.animation_id,

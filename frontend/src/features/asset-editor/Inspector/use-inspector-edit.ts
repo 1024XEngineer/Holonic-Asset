@@ -81,7 +81,9 @@ export function useEditPrompt({
 }: {
   prompt: string;
   onPromptChange: (value: string) => void;
-  onSubmit: (request: EditPromptSubmitRequest) => void | Promise<void>;
+  onSubmit: (
+    request: EditPromptSubmitRequest,
+  ) => void | boolean | Promise<void | boolean>;
   isSubmitting?: boolean;
   target: InspectorTargetSummary | null;
   canSubmitTarget?: boolean;
@@ -149,10 +151,12 @@ export function useEditPrompt({
 
     setSubmitError(null);
     try {
-      await onSubmit({
+      const submitted = await onSubmit({
         prompt: result.data,
         ...(creatingReference ? { creatingReference } : {}),
       });
+      if (submitted === false) return;
+      onPromptChange("");
       setCreatingReference(null);
       setCreatingReferenceError(null);
     } catch {
