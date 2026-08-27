@@ -132,3 +132,62 @@ func clamp255(v int) int {
 	}
 	return v
 }
+
+func TestSelectAnimationMatteColorReturnsDefaultForNilSubject(t *testing.T) {
+	selected, safe := SelectAnimationMatteColor(nil)
+	if selected != AnimationMatteCandidates[0] {
+		t.Fatalf("expected default candidate, got %v", selected)
+	}
+	if !safe {
+		t.Fatal("expected safe for nil subject")
+	}
+}
+
+func TestSelectAnimationMatteColorReturnsDefaultForEmptySubject(t *testing.T) {
+	selected, safe := SelectAnimationMatteColor(image.NewNRGBA(image.Rect(0, 0, 0, 0)))
+	if selected != AnimationMatteCandidates[0] {
+		t.Fatalf("expected default candidate, got %v", selected)
+	}
+	if !safe {
+		t.Fatal("expected safe for empty subject")
+	}
+}
+
+func TestSelectAnimationMatteColorIgnoresFullyTransparentPixels(t *testing.T) {
+	subject := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			subject.SetNRGBA(x, y, color.NRGBA{G: 255, A: 0})
+		}
+	}
+	_, safe := SelectAnimationMatteColor(subject)
+	if !safe {
+		t.Fatal("expected safe when all pixels are transparent")
+	}
+}
+
+func TestPrepareAnimationForegroundReturnsNilForNilSource(t *testing.T) {
+	if got := PrepareAnimationForeground(nil); got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
+func TestCompositeAnimationMatteClampsTinyCanvas(t *testing.T) {
+	foreground := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	foreground.SetNRGBA(4, 4, color.NRGBA{R: 100, G: 100, B: 100, A: 255})
+	result := CompositeAnimationMatte(foreground, MatteColor{255, 0, 255}, image.Pt(0, 0))
+	if result.Bounds().Dx() < 1 || result.Bounds().Dy() < 1 {
+		t.Fatal("expected at least 1x1 canvas")
+	}
+}
+
+func TestCompositeAnimationMatteHandlesNilForeground(t *testing.T) {
+	result := CompositeAnimationMatte(nil, MatteColor{0, 255, 0}, image.Pt(16, 16))
+	if result.Bounds().Dx() != 16 || result.Bounds().Dy() != 16 {
+		t.Fatalf("expected 16x16 canvas, got %dx%d", result.Bounds().Dx(), result.Bounds().Dy())
+	}
+	got := color.NRGBAModel.Convert(result.At(0, 0)).(color.NRGBA)
+	if got != (color.NRGBA{G: 255, A: 255}) {
+		t.Fatalf("expected green background, got %v", got)
+	}
+}

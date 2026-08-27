@@ -8,7 +8,9 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"math"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -417,5 +419,91 @@ func TestNewSceneryAssetAndBatchID(t *testing.T) {
 	execErr := &executor{resources: resErrStore}
 	if err := execErr.deleteSceneryResources(context.Background(), []string{"k1"}); err == nil {
 		t.Fatal("expected error from deleteSceneryResources")
+	}
+}
+
+type sceneryReferenceRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function sceneryReferenceRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
+func TestDownloadSceneryReferenceReturnsDataURL(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	for y := range 4 {
+		for x := range 4 {
+			img.SetNRGBA(x, y, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	pngBytes := buf.Bytes()
+	exec := &executor{
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(bytes.NewReader(pngBytes)),
+			}, nil
+		})},
+	}
+
+	result, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
+	if err != nil {
+		t.Fatalf("download scenery reference: %v", err)
+	}
+	if !strings.HasPrefix(result, "data:image/png;base64,") {
+		t.Fatalf("expected data URL, got %q", result[:40])
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(result, "data:image/png;base64,"))
+	if err != nil {
+		t.Fatalf("decode base64: %v", err)
+	}
+	if !bytes.Equal(decoded, pngBytes) {
+		t.Fatal("decoded data does not match original PNG bytes")
+	}
+}
+
+func TestDownloadSceneryReferenceRejectsHTTPError(t *testing.T) {
+	exec := &executor{
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader("forbidden")),
+			}, nil
+		})},
+	}
+
+	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
+	if err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("expected HTTP 403 error, got: %v", err)
+	}
+}
+
+func TestDownloadSceneryReferenceDefaultsToPNGContentType(t *testing.T) {
+	img2 := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	var buf2 bytes.Buffer
+	if err := png.Encode(&buf2, img2); err != nil {
+		t.Fatal(err)
+	}
+	pngBytes := buf2.Bytes()
+	exec := &executor{
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{},
+				Body:       io.NopCloser(bytes.NewReader(pngBytes)),
+			}, nil
+		})},
+	}
+
+	result, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref")
+	if err != nil {
+		t.Fatalf("download: %v", err)
+	}
+	if !strings.HasPrefix(result, "data:image/png;base64,") {
+		t.Fatalf("expected default image/png, got %q", result[:30])
 	}
 }
