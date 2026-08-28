@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"io"
 	"math"
 	"net/http"
 	"strings"
@@ -557,28 +556,9 @@ func (e *executor) normalizePrototypeReference(ctx context.Context, reference st
 		if err := validatePrototypeReferenceURL(request.URL); err != nil {
 			return "", err
 		}
-		client := e.referenceHTTPClient
-		if client == nil {
-			client = newPrototypeReferenceHTTPClient()
-		}
-		response, err := client.Do(request)
+		body, err := e.downloadPrototypeReference(ctx, request.URL)
 		if err != nil {
-			return "", fmt.Errorf("download reference: %w", err)
-		}
-		defer func() { _ = response.Body.Close() }()
-		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-			body, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
-			return "", fmt.Errorf("download reference: HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
-		}
-		body, err := io.ReadAll(io.LimitReader(response.Body, maxPrototypeReferenceBytes+1))
-		if err != nil {
-			return "", fmt.Errorf("read reference: %w", err)
-		}
-		if len(body) > maxPrototypeReferenceBytes {
-			return "", fmt.Errorf("reference exceeds %d bytes", maxPrototypeReferenceBytes)
-		}
-		if len(body) == 0 {
-			return "", fmt.Errorf("download reference: empty response")
+			return "", err
 		}
 		imageBase64 = base64.StdEncoding.EncodeToString(body)
 	} else if !strings.HasPrefix(strings.ToLower(reference), "data:image/") {

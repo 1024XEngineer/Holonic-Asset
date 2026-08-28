@@ -3,13 +3,33 @@ package generator
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
+
+type prototypeDownloadRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f prototypeDownloadRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+type prototypeDownloadReadCloser struct {
+	err error
+}
+
+func (r prototypeDownloadReadCloser) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func (prototypeDownloadReadCloser) Close() error {
+	return nil
+}
 
 func TestValidatePrototypeReferenceURLRejectsNonPublicLiteralTargets(t *testing.T) {
 	for _, value := range []string{
@@ -164,8 +184,8 @@ func TestPrototypeReferenceDialerConnectsToPublicLiteralAddress(t *testing.T) {
 
 func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	client := newPrototypeReferenceHTTPClient()
-	if client.Timeout != defaultPrototypeReferenceTimeout {
-		t.Fatalf("client timeout = %s, want %s", client.Timeout, defaultPrototypeReferenceTimeout)
+	if client.Timeout != 2*time.Minute {
+		t.Fatalf("client timeout = %s, want 2m", client.Timeout)
 	}
 	transport, ok := client.Transport.(*http.Transport)
 	if !ok {
@@ -190,6 +210,99 @@ func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	}
 	if err := client.CheckRedirect(&http.Request{URL: redirectURL}, []*http.Request{{}}); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("redirect error = %v, want redirects disabled", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesResponseReadFailure(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       prototypeDownloadReadCloser{err: context.DeadlineExceeded},
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("reference-image")),
+			}, nil
+		}),
+	}}
+
+	body, err := executor.downloadPrototypeReference(context.Background(), parsed)
+	if err != nil {
+		t.Fatalf("download reference: %v", err)
+	}
+	if string(body) != "reference-image" {
+		t.Fatalf("downloaded body = %q, want reference-image", body)
+	}
+	if attempts != 2 {
+		t.Fatalf("download attempts = %d, want 2", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesTransientHTTPStatus(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{
+					StatusCode: http.StatusServiceUnavailable,
+					Body:       io.NopCloser(strings.NewReader("temporarily unavailable")),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("reference-image")),
+			}, nil
+		}),
+	}}
+
+	body, err := executor.downloadPrototypeReference(context.Background(), parsed)
+	if err != nil {
+		t.Fatalf("download reference: %v", err)
+	}
+	if string(body) != "reference-image" {
+		t.Fatalf("downloaded body = %q, want reference-image", body)
+	}
+	if attempts != 2 {
+		t.Fatalf("download attempts = %d, want 2", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceDoesNotRetryDeterministicHTTPStatus(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/missing.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(context.Background(), parsed)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("download error = %v, want HTTP 404", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("download attempts = %d, want 1", attempts)
 	}
 }
 
