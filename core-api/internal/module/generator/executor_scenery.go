@@ -14,8 +14,6 @@ import (
 	"image/png"
 	"io"
 	"math"
-	"mime"
-	"net/http"
 	"slices"
 	"sort"
 	"strings"
@@ -136,34 +134,6 @@ func (e *executor) generateScenery(ctx context.Context, payload CreateSceneryPay
 	return result, nil
 }
 
-func (e *executor) downloadSceneryReference(ctx context.Context, referenceURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, referenceURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("prepare scenery reference request: %w", err)
-	}
-	resp, err := e.referenceHTTPClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("scenery reference download returned HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read scenery reference response: %w", err)
-	}
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "image/png"
-	}
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	if mediaType == "" {
-		mediaType = "image/png"
-	}
-	return "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(body), nil
-}
-
 func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateSceneryPayload, plan []SceneryLayerDefinition) ([]ProcessedSceneryLayer, error) {
 	baseReferences := []string(nil)
 	reference := payload.CreatingReference
@@ -171,21 +141,11 @@ func (e *executor) generateSceneryLayers(ctx context.Context, payload CreateScen
 		reference = payload.ProjectReference
 	}
 	if reference != "" {
-		if e.references != nil {
-			resolved, err := e.references.ResolveReference(ctx, reference)
-			if err != nil {
-				return nil, fmt.Errorf("generator: resolve scenery reference: %w", err)
-			}
-			reference = resolved
+		resolved, err := e.resolveReferences(ctx, GenerateScenery, []string{reference})
+		if err != nil {
+			return nil, fmt.Errorf("generator: resolve scenery reference: %w", err)
 		}
-		if strings.HasPrefix(reference, "http://") || strings.HasPrefix(reference, "https://") {
-			downloaded, err := e.downloadSceneryReference(ctx, reference)
-			if err != nil {
-				return nil, fmt.Errorf("generator: download scenery reference: %w", err)
-			}
-			reference = downloaded
-		}
-		baseReferences = []string{reference}
+		baseReferences = resolved
 	}
 
 	processedByID := make(map[uint]ProcessedSceneryLayer, len(plan))
