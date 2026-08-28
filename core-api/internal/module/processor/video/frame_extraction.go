@@ -43,6 +43,9 @@ type ChromaKey struct {
 	BrightValueMin      uint8
 	// AutoDetect derives the matte hue from frame corners before analysis.
 	AutoDetect bool
+	// MatteLocked keeps AutoDetect as a compatibility marker while preventing
+	// legacy corner sampling from overriding an explicitly selected matte.
+	MatteLocked bool
 	// SafetyMarginRatio controls the clear border required around detected
 	// foreground. Zero preserves the legacy 2.5% safety band.
 	SafetyMarginRatio float64
@@ -106,7 +109,7 @@ func (p *processor) Process(ctx context.Context, source []byte, options ProcessO
 		return nil, err
 	}
 	validationKey := options.ChromaKey
-	if validationKey.AutoDetect {
+	if validationKey.AutoDetect && !validationKey.MatteLocked {
 		validationKey = resolveAutoDetectedChromaKey(frames, validationKey)
 	}
 	if err := validateSelectedFrameBounds(frames, sourceIndices, validationKey); err != nil {
@@ -259,7 +262,7 @@ func decodeFrameAnalyses(paths []string, chromaKey ChromaKey) ([]frameAnalysis, 
 			return nil, err
 		}
 		frame := frames[0]
-		if chromaKey.AutoDetect {
+		if chromaKey.AutoDetect && !chromaKey.MatteLocked {
 			chromaKey = resolveAutoDetectedChromaKey([]image.Image{frame}, chromaKey)
 		}
 		analyses = append(analyses, frameAnalysis{

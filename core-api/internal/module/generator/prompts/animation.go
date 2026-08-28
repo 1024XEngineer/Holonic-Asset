@@ -27,6 +27,7 @@ type AnimationOptions struct {
 	FrameHeight        int
 	LocalFrameEdit     bool
 	TargetFrameIndices []int
+	MatteColor         string
 }
 
 // BuildAnimationVideo converts the user's semantic action specification into
@@ -42,6 +43,15 @@ func BuildAnimationVideo(options AnimationOptions) string {
 	if style == "" {
 		style = DefaultAnimationStyle
 	}
+	matteColor := strings.TrimSpace(options.MatteColor)
+	if matteColor == "" {
+		matteColor = "#00ff00"
+	}
+	matteInstructions := fmt.Sprintf(`BACKGROUND MATTE:
+- the reference background is the uniform chroma matte %s; preserve this exact matte colour in every frame
+- keep the entire subject opaque, including subject details that resemble common chroma colours
+- never paint, tint, or spill the matte colour onto the subject; never replace subject pixels with matte pixels
+- the matte is a technical background only and must not become part of the artwork`, matteColor)
 	referenceInstructions := `REFERENCE IMAGE:
 - the input is exactly ONE isolated canonical subject view from the high-resolution prototype or direction sheet
 - use that subject for identity, scale, and orientation; never turn, mirror, switch views, or invent another direction
@@ -58,12 +68,15 @@ func BuildAnimationVideo(options AnimationOptions) string {
 		if originalAction != "" {
 			originalActionInstruction = fmt.Sprintf("- ORIGINAL ACTION — MUST BE PRESERVED: %s", originalAction)
 		}
-		referenceInstructions = `BOUNDARY FRAME REFERENCES:
+		referenceInstructions = fmt.Sprintf(`BOUNDARY FRAME REFERENCES:
 - start/end inputs are the original unprocessed frames immediately outside the selected interval, clamped at the animation start or end when necessary
 - generate one normal full-frame video that matches the start frame exactly and arrives at the end frame exactly
 - inputs are separate full-frame anchors, never a contact sheet, collage, grid, storyboard, multi-frame canvas, or spritesheet
-- preserve identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries`
+- preserve identity, proportions, details, materials, palette, orientation, scale, camera, and root position at both boundaries
+
+%s`, matteInstructions)
 		actionInstructions = fmt.Sprintf(`LOCAL FRAME EDIT — TARGET OUTPUT SAMPLES: %s (1-based positions out of %d):
+- BOUNDARY ANCHORS: generate one continuous video that matches the start frame exactly and arrives at the end frame exactly
 %s
 - begin the change by the first target, keep it readable across most target samples, and complete it by the last
 - one continuous chronological take; no restart, montage, unrelated motion, or phase reordering; boundary images may omit an internal action extreme
@@ -72,7 +85,7 @@ func BuildAnimationVideo(options AnimationOptions) string {
 - retain the original action's identity and principal phase/extreme, but allow local pose, path, and timing adjustments needed to show the change clearly
 - non-target samples are seam context only: match entry/exit smoothly, but do not force target poses to resemble the originals`, targetFrames, options.FrameCount, originalActionInstruction)
 	}
-	sections := fmt.Sprintf("%s\n\n%s", referenceInstructions, actionInstructions)
+	sections := fmt.Sprintf("%s\n\n%s\n\n%s", referenceInstructions, matteInstructions, actionInstructions)
 	if options.LocalFrameEdit {
 		// Keep the edit requirements before the boundary-reference details so the
 		// provider limit cannot truncate the requested change instructions. A
@@ -88,7 +101,7 @@ func BuildAnimationVideo(options AnimationOptions) string {
 CRITICAL OUTPUT FORMAT — NOT A SPRITESHEET:
 - every frame contains exactly ONE complete subject and its attached or held props; keep spray, projectiles, particles, trails, glow, and shadows inside a visible matte edge
 - normal full-frame video; never a contact sheet, collage, grid, storyboard, spritesheet, multiple views, poses, or copies
-- fixed camera/root on uniform chroma: pure green #00FF00 by default; pure magenta #FF00FF only when the subject contains substantial colours close to pure green
+- fixed camera/root on the exact uniform chroma matte %s selected for this subject; preserve that exact colour in every frame
 %s
 - preserve original colours and saturation; never recolour, desaturate, gray out, or remove green subject pixels
 - matte only in the background; never use its exact colour inside or over the subject
@@ -110,7 +123,7 @@ FRAMING AND BACKGROUND:
 - keep the whole subject, long parts, weapons, tool tips, and every visible effect within the available canvas; this includes projectiles, liquid, spray, particles, trails, glow, and shadows
 - keep at least a thin continuous matte line visible at every canvas edge in every frame; shorten the motion or effect rather than resizing the subject or reaching an edge
 - background is perfectly uniform in the selected matte; never mix mattes`,
-		framingInstructions, description, style, action, options.FrameCount, sections))
+		matteColor, framingInstructions, description, style, action, options.FrameCount, sections))
 	return limit(prompt, MaxAnimationVideoCharacters)
 }
 
@@ -150,7 +163,7 @@ func BuildAnimationVideoRetry(base, issueKind string) string {
 		correction = `Generate a fresh take; the previous take lost the readable subject silhouette.
 - output exactly one subject in every frame; never reproduce a multi-direction reference sheet or show multiple views
 - preserve the exact subject, attached parts, and opaque silhouette in every frame
-- keep the background uniformly pure green #00FF00 by default; use pure magenta #FF00FF only when the subject contains substantial green, with strong colour separation
+- keep the background uniformly in the selected matte colour with strong colour separation from the subject
 - do not fade, dissolve, blur away, or merge any body or object part into the background`
 	}
 	if issueKind == "continuity" {
