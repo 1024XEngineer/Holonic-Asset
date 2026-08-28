@@ -31,6 +31,7 @@ export type AnimationGenerationConfig = {
 export type CharacterAnimationClip = {
   kind: "clip";
   id: string;
+  groupId?: string;
   label: string;
   frameCount: number;
   frameDurations?: Array<number | undefined>;

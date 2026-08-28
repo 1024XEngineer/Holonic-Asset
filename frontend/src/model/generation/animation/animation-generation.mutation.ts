@@ -6,10 +6,22 @@ import { generationKeys } from "../run/keys";
 import type { GenerationRun } from "../run/types";
 
 export function useGenerateAnimationMutation() {
+  return useAnimationGenerationMutation(animationGenerationApi.generate);
+}
+
+export function useDeriveAnimationMutation() {
+  return useAnimationGenerationMutation(animationGenerationApi.derive);
+}
+
+function useAnimationGenerationMutation<
+  Input extends
+    | Parameters<typeof animationGenerationApi.generate>[0]
+    | Parameters<typeof animationGenerationApi.derive>[0],
+>(mutationFn: (input: Input) => Promise<GenerationRun>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: animationGenerationApi.generate,
+    mutationFn,
     onSuccess: (run) => {
       queryClient.setQueryData<GenerationRun[]>(
         generationKeys.runs(

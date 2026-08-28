@@ -3,6 +3,7 @@ import type {
   AssetRevision,
   CharacterAnimation,
   CharacterSpriteSheet,
+  DeriveAnimationRequest,
   GenerateAnimationRequest,
   Perspective,
 } from "@/model";
@@ -28,6 +29,7 @@ export type SpriteEditorModeProps = {
   tree: {
     isGeneratingAnimation: boolean;
     onAnimationGenerate: (request: GenerateAnimationRequest) => void;
+    onAnimationDerive: (request: DeriveAnimationRequest) => void;
     onAnimationRename: (animationId: string, label: string) => void;
     onAnimationDelete: (animationId: string) => void;
   };

@@ -147,6 +147,7 @@ export {
   useDeleteQuickAssetMutation,
   useEnqueueAssetEditGenerationMutation,
   useEnqueueGenerationMutation,
+  useDeriveAnimationMutation,
   useGenerateAnimationMutation,
   useGenerateQuickAssetMutation,
   useGenerationCandidateQuery,
@@ -199,7 +200,10 @@ export type {
 export { uploadApi, uploadFile } from "./upload";
 export type { CreateUploadTargetRequest, UploadTarget } from "./upload";
 export {
+  deriveAnimationRequestSchema,
   generateAnimationRequestSchema,
+  type DeriveAnimationInput,
+  type DeriveAnimationRequest,
   type GenerateAnimationInput,
   type GenerateAnimationRequest,
   type SpriteAssetKind,

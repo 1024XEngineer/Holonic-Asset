@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     mutateAsync: vi.fn(),
   },
+  derivationMutation: {
+    isPending: false,
+    mutateAsync: vi.fn(),
+  },
   assetExport: {
     exportAsset: vi.fn(),
     isExporting: false,
@@ -97,6 +101,7 @@ vi.mock("@/model", async (importOriginal) => {
       mutateAsync: mocks.enqueueAssetEdit,
     }),
     useGenerateAnimationMutation: () => mocks.animationMutation,
+    useDeriveAnimationMutation: () => mocks.derivationMutation,
     useAssetExport: () => mocks.assetExport,
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
     useGenerationCandidateQuery: () => mocks.candidateQuery,
@@ -116,6 +121,7 @@ beforeEach(() => {
   mocks.stateValues.length = 0;
   mocks.generationRuns = [];
   mocks.animationMutation.isPending = false;
+  mocks.derivationMutation.isPending = false;
   mocks.applicationMutation.isPending = false;
   mocks.assetExport.isExporting = false;
   mocks.assetExport.exportAsset.mockResolvedValue(undefined);
@@ -126,6 +132,11 @@ beforeEach(() => {
   mocks.animationMutation.mutateAsync.mockResolvedValue({
     generationId: "generation-1",
     animation: { kind: "clip", label: "Walk", frameCount: 4 },
+  });
+  mocks.derivationMutation.mutateAsync.mockResolvedValue({
+    id: "generation-2",
+    name: "Walk",
+    prompt: "Derive Walk for front",
   });
   mocks.enqueueAssetEdit.mockResolvedValue({ id: "31" });
   mocks.session.save.mockResolvedValue({ status: "saved" });
@@ -455,6 +466,78 @@ describe("useEditorWorkspace", () => {
     });
   });
 
+  it("queues derivation requests and previews their animation candidates", async () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Walk",
+        prompt: "Derive Walk for front",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "derive_animation",
+      status: "awaiting_application",
+      result: {
+        content: {
+          animations: [
+            {
+              id: 12,
+              groupId: 7,
+              name: "Walk front",
+              frames: [{ id: 1, url: "/walk-front.png" }],
+            },
+          ],
+        },
+      },
+    };
+    mocks.stateValues.push(null, null, null);
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    if (!editor) return;
+
+    editor.tree.onAnimationDerive({
+      sourceAnimationId: "7",
+      sourceAnimationName: "Walk",
+      targetDirections: ["front", "back"],
+    });
+    await flushPromises();
+
+    expect(mocks.derivationMutation.mutateAsync).toHaveBeenCalledWith({
+      sourceAnimationId: "7",
+      sourceAnimationName: "Walk",
+      targetDirections: ["front", "back"],
+      projectId: "7",
+      assetId: "8",
+      assetKind: "character",
+    });
+    expect(editor.sprite.animations).toEqual([
+      expect.objectContaining({
+        id: "12",
+        groupId: "7",
+        label: "Walk front",
+      }),
+    ]);
+    expect(editor.generationReview).toMatchObject({
+      kind: "new-animation",
+      nodeId: "12",
+    });
+  });
+
+  it("blocks new animation actions while derivation is pending", () => {
+    mocks.derivationMutation.isPending = true;
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.tree.isGeneratingAnimation).toBe(true);
+  });
+
   it("handles a generation application failure", async () => {
     mocks.generationRuns = [
       {
@@ -507,6 +590,9 @@ describe("useEditorWorkspace", () => {
     mocks.animationMutation.mutateAsync.mockRejectedValue(
       new Error("animation failed"),
     );
+    mocks.derivationMutation.mutateAsync.mockRejectedValue(
+      new Error("derivation failed"),
+    );
     mocks.enqueueAssetEdit.mockRejectedValue(new Error("prompt failed"));
     mocks.stateValues.push(null, null, null);
     const editor = useEditorWorkspace({
@@ -523,6 +609,11 @@ describe("useEditorWorkspace", () => {
         creativeBrief: "Open chest",
       }),
     );
+    editor.tree.onAnimationDerive({
+      sourceAnimationId: "42",
+      sourceAnimationName: "Open",
+      targetDirections: ["back"],
+    });
     await expect(
       editor.inspector.onSubmit({
         prompt: "Refine chest",

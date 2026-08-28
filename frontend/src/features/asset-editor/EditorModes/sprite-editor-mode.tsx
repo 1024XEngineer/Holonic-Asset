@@ -83,6 +83,7 @@ export function SpriteEditorMode({
           onSelect={selectNode}
           onSelectFrame={selectFrame}
           onGenerateAnimation={tree.onAnimationGenerate}
+          onDeriveAnimation={tree.onAnimationDerive}
           onRenameAnimation={tree.onAnimationRename}
           onDeleteAnimation={tree.onAnimationDelete}
           isGeneratingAnimation={tree.isGeneratingAnimation}
