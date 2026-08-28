@@ -447,21 +447,30 @@ func (function sceneryReferenceRoundTripFunc) RoundTrip(request *http.Request) (
 }
 
 func TestGenerateSceneryLayersPassesDownloadedReferenceToImageGeneration(t *testing.T) {
-	referenceBytes := []byte("downloaded-reference")
+	referenceImage := image.NewNRGBA(image.Rect(0, 0, imageprocessor.DefaultReferenceMaxEdge, 1))
+	for x := range imageprocessor.DefaultReferenceMaxEdge {
+		referenceImage.SetNRGBA(x, 0, color.NRGBA{R: 20, G: 40, B: 60, A: 255})
+	}
+	var referenceBuffer bytes.Buffer
+	if err := png.Encode(&referenceBuffer, referenceImage); err != nil {
+		t.Fatalf("encode reference fixture: %v", err)
+	}
+	referenceBytes := referenceBuffer.Bytes()
 	candidate := sceneryPreviewLayer(t, 1, []color.RGBA{{R: 20, G: 40, B: 60, A: 255}, {R: 20, G: 40, B: 60, A: 255}})
 	images := &sceneryLayerImageStub{result: &imageclient.GenerateResult{
 		Images: []imageclient.GeneratedImage{{Base64: candidate.ImageBase64, MediaType: "image/png"}},
 	}}
 	exec := &executor{
-		images:    images,
-		processor: imageprocessor.NewProcessor(),
+		images:     images,
+		processor:  imageprocessor.NewProcessor(),
+		references: &stubReferenceStore{resolved: "https://example.com/reference.png"},
 		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-			if request.Method != http.MethodGet || request.URL.String() != "https://example.com/reference.jpg" {
+			if request.Method != http.MethodGet || request.URL.String() != "https://example.com/reference.png" {
 				t.Fatalf("unexpected reference download request: %s %s", request.Method, request.URL)
 			}
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"image/jpeg"}},
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
 				Body:       io.NopCloser(bytes.NewReader(referenceBytes)),
 			}, nil
 		})},
@@ -469,7 +478,7 @@ func TestGenerateSceneryLayersPassesDownloadedReferenceToImageGeneration(t *test
 
 	layers, err := exec.generateSceneryLayers(context.Background(), CreateSceneryPayload{
 		Dimensions:        assetdomain.Size{Width: 2, Height: 1},
-		CreatingReference: "https://example.com/reference.jpg",
+		CreatingReference: "uploads/reference.png",
 	}, []SceneryLayerDefinition{{ID: 1, Name: "Backdrop"}})
 	if err != nil {
 		t.Fatalf("generate scenery layers with downloaded reference: %v", err)
@@ -480,183 +489,25 @@ func TestGenerateSceneryLayersPassesDownloadedReferenceToImageGeneration(t *test
 	if len(images.requests) != 1 {
 		t.Fatalf("image generation calls = %d, want 1", len(images.requests))
 	}
-	wantReference := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(referenceBytes)
+	wantReference := "data:image/png;base64," + base64.StdEncoding.EncodeToString(referenceBytes)
 	if got := images.requests[0].ReferenceImages; len(got) != 1 || got[0] != wantReference {
 		t.Fatalf("image references = %q, want downloaded data URL %q", got, wantReference)
-	}
-}
-
-func TestDownloadSceneryReferenceReturnsDataURL(t *testing.T) {
-	img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
-	for y := range 4 {
-		for x := range 4 {
-			img.SetNRGBA(x, y, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
-		}
-	}
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		t.Fatal(err)
-	}
-	pngBytes := buf.Bytes()
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"image/png"}},
-				Body:       io.NopCloser(bytes.NewReader(pngBytes)),
-			}, nil
-		})},
-	}
-
-	result, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
-	if err != nil {
-		t.Fatalf("download scenery reference: %v", err)
-	}
-	if !strings.HasPrefix(result, "data:image/png;base64,") {
-		t.Fatalf("expected data URL, got %q", result[:40])
-	}
-	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(result, "data:image/png;base64,"))
-	if err != nil {
-		t.Fatalf("decode base64: %v", err)
-	}
-	if !bytes.Equal(decoded, pngBytes) {
-		t.Fatal("decoded data does not match original PNG bytes")
-	}
-}
-
-func TestDownloadSceneryReferenceRejectsHTTPError(t *testing.T) {
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusForbidden,
-				Body:       io.NopCloser(strings.NewReader("forbidden")),
-			}, nil
-		})},
-	}
-
-	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
-	if err == nil || !strings.Contains(err.Error(), "403") {
-		t.Fatalf("expected HTTP 403 error, got: %v", err)
-	}
-}
-
-func TestDownloadSceneryReferenceDefaultsToPNGContentType(t *testing.T) {
-	img2 := image.NewNRGBA(image.Rect(0, 0, 2, 2))
-	var buf2 bytes.Buffer
-	if err := png.Encode(&buf2, img2); err != nil {
-		t.Fatal(err)
-	}
-	pngBytes := buf2.Bytes()
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{},
-				Body:       io.NopCloser(bytes.NewReader(pngBytes)),
-			}, nil
-		})},
-	}
-
-	result, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref")
-	if err != nil {
-		t.Fatalf("download: %v", err)
-	}
-	if !strings.HasPrefix(result, "data:image/png;base64,") {
-		t.Fatalf("expected default image/png, got %q", result[:30])
-	}
-}
-
-func TestDownloadSceneryReferenceRejectsInvalidURL(t *testing.T) {
-	exec := &executor{referenceHTTPClient: &http.Client{}}
-
-	_, err := exec.downloadSceneryReference(context.Background(), "://invalid-url")
-	if err == nil || !strings.Contains(err.Error(), "prepare scenery reference request") {
-		t.Fatalf("expected invalid request error, got: %v", err)
-	}
-}
-
-func TestDownloadSceneryReferenceDefaultsMalformedContentTypeToPNG(t *testing.T) {
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"; invalid"}},
-				Body:       io.NopCloser(strings.NewReader("image-bytes")),
-			}, nil
-		})},
-	}
-
-	result, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref")
-	if err != nil {
-		t.Fatalf("download malformed content type: %v", err)
-	}
-	if !strings.HasPrefix(result, "data:image/png;base64,") {
-		t.Fatalf("malformed content type did not fall back to PNG: %q", result)
 	}
 }
 
 func TestGenerateSceneryLayersWrapsReferenceDownloadError(t *testing.T) {
 	downloadErr := errors.New("download failed")
 	exec := &executor{
+		references: &stubReferenceStore{resolved: "https://example.com/reference.png"},
 		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, downloadErr
 		})},
 	}
 
 	_, err := exec.generateSceneryLayers(context.Background(), CreateSceneryPayload{
-		CreatingReference: "https://example.com/reference.png",
+		CreatingReference: "uploads/reference.png",
 	}, []SceneryLayerDefinition{{ID: 1}})
-	if !errors.Is(err, downloadErr) || !strings.Contains(err.Error(), "download scenery reference") {
+	if !errors.Is(err, downloadErr) || !strings.Contains(err.Error(), "resolve scenery reference") {
 		t.Fatalf("expected wrapped download error, got: %v", err)
 	}
-}
-
-func TestDownloadSceneryReferenceRejectsConnectionError(t *testing.T) {
-	connectionErr := errors.New("connection refused")
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-			if req.Method != http.MethodGet || req.URL.String() != "https://example.com/ref.png" {
-				t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
-			}
-			return nil, connectionErr
-		})},
-	}
-
-	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
-	if !errors.Is(err, connectionErr) {
-		t.Fatalf("expected connection error, got: %v", err)
-	}
-}
-
-func TestDownloadSceneryReferenceRejectsReadErrorAndClosesBody(t *testing.T) {
-	readErr := errors.New("read failed")
-	body := &sceneryReferenceErrorBody{err: readErr}
-	exec := &executor{
-		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"image/png"}},
-				Body:       body,
-			}, nil
-		})},
-	}
-
-	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
-	if !errors.Is(err, readErr) || !strings.Contains(err.Error(), "read scenery reference response") {
-		t.Fatalf("expected wrapped read error, got: %v", err)
-	}
-	if !body.closed {
-		t.Fatal("response body was not closed after read failure")
-	}
-}
-
-type sceneryReferenceErrorBody struct {
-	err    error
-	closed bool
-}
-
-func (b *sceneryReferenceErrorBody) Read([]byte) (int, error) { return 0, b.err }
-func (b *sceneryReferenceErrorBody) Close() error {
-	b.closed = true
-	return nil
 }

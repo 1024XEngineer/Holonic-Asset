@@ -549,7 +549,7 @@ func TestExecutorNormalizesSmallResolvedReferencesBeforeGeneration(t *testing.T)
 		}
 	}
 	if images.request == nil || !reflect.DeepEqual(images.request.ReferenceImages, []string{
-		"https://references.example/project",
+		"data:image/png;base64,project-canonical",
 		"data:image/png;base64,user-upscaled",
 	}) {
 		t.Fatalf("unexpected normalized reference order: %+v", images.request)
