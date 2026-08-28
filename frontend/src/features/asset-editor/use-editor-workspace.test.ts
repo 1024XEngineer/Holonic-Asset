@@ -466,6 +466,78 @@ describe("useEditorWorkspace", () => {
     });
   });
 
+  it("queues derivation requests and previews their animation candidates", async () => {
+    mocks.generationRuns = [
+      {
+        id: "ready",
+        name: "Walk",
+        prompt: "Derive Walk for front",
+        status: "awaiting_application",
+      },
+    ];
+    mocks.candidateQuery.data = {
+      kind: "derive_animation",
+      status: "awaiting_application",
+      result: {
+        content: {
+          animations: [
+            {
+              id: 12,
+              groupId: 7,
+              name: "Walk front",
+              frames: [{ id: 1, url: "/walk-front.png" }],
+            },
+          ],
+        },
+      },
+    };
+    mocks.stateValues.push(null, null, null);
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+    if (!editor) return;
+
+    editor.tree.onAnimationDerive({
+      sourceAnimationId: "7",
+      sourceAnimationName: "Walk",
+      targetDirections: ["front", "back"],
+    });
+    await flushPromises();
+
+    expect(mocks.derivationMutation.mutateAsync).toHaveBeenCalledWith({
+      sourceAnimationId: "7",
+      sourceAnimationName: "Walk",
+      targetDirections: ["front", "back"],
+      projectId: "7",
+      assetId: "8",
+      assetKind: "character",
+    });
+    expect(editor.sprite.animations).toEqual([
+      expect.objectContaining({
+        id: "12",
+        groupId: "7",
+        label: "Walk front",
+      }),
+    ]);
+    expect(editor.generationReview).toMatchObject({
+      kind: "new-animation",
+      nodeId: "12",
+    });
+  });
+
+  it("blocks new animation actions while derivation is pending", () => {
+    mocks.derivationMutation.isPending = true;
+
+    const editor = useEditorWorkspace({
+      data: workspace(mocks.session.snapshot.record),
+      onBack: vi.fn(),
+    });
+
+    expect(editor?.tree.isGeneratingAnimation).toBe(true);
+  });
+
   it("handles a generation application failure", async () => {
     mocks.generationRuns = [
       {
@@ -518,6 +590,9 @@ describe("useEditorWorkspace", () => {
     mocks.animationMutation.mutateAsync.mockRejectedValue(
       new Error("animation failed"),
     );
+    mocks.derivationMutation.mutateAsync.mockRejectedValue(
+      new Error("derivation failed"),
+    );
     mocks.enqueueAssetEdit.mockRejectedValue(new Error("prompt failed"));
     mocks.stateValues.push(null, null, null);
     const editor = useEditorWorkspace({
@@ -534,6 +609,11 @@ describe("useEditorWorkspace", () => {
         creativeBrief: "Open chest",
       }),
     );
+    editor.tree.onAnimationDerive({
+      sourceAnimationId: "42",
+      sourceAnimationName: "Open",
+      targetDirections: ["back"],
+    });
     await expect(
       editor.inspector.onSubmit({
         prompt: "Refine chest",

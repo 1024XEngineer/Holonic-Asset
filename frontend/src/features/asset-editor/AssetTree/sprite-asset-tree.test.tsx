@@ -67,6 +67,8 @@ describe("SpriteAssetTree", () => {
     expect(screen.queryByRole("button", { name: "Left" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Front" }));
+    fireEvent.click(screen.getByRole("button", { name: "Front" }));
+    fireEvent.click(screen.getByRole("button", { name: "Front" }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Generate directions" }),
