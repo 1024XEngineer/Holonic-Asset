@@ -29,7 +29,7 @@ export function HomeHero() {
             <div className="relative aspect-[3/2] overflow-hidden rounded-[2rem] bg-neutral-950 p-2 shadow-[0_35px_80px_-40px_rgba(0,0,0,.75)]">
               <div className="relative size-full overflow-hidden rounded-[1.55rem]">
                 <img
-                  src="/project/reference/reference-exp.png"
+                  src="/home/hero-screenshot.png"
                   alt={t("previewAlt")}
                   loading="eager"
                   decoding="async"

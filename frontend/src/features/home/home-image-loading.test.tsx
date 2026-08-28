@@ -19,7 +19,7 @@ describe("home image loading", () => {
   it("prioritizes the above-the-fold hero image", () => {
     const { container } = render(<HomeHero />);
     const image = container.querySelector(
-      'img[src="/project/reference/reference-exp.png"]',
+      'img[src="/home/hero-screenshot.png"]',
     );
 
     expect(image).not.toBeNull();
