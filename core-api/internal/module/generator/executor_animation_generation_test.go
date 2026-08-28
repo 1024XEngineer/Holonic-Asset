@@ -693,6 +693,43 @@ func TestProcessAnimationVideoUsesRealAnimationNormalizer(t *testing.T) {
 	}
 }
 
+func TestProcessAnimationVideoKeepsUnsafeExplicitMatteBorderConnected(t *testing.T) {
+	foreground := animationTestForeground(t)
+	processor := &animationProcessorStub{
+		foregroundBase64: foreground,
+		splitResult: &imageprocessor.SplitImageResult{
+			ImageBase64: foreground,
+			Regions: []imageprocessor.ImageRegion{
+				{Index: 0, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 1, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 2, ImageBase64: foreground, MIMEType: "image/png"},
+				{Index: 3, ImageBase64: foreground, MIMEType: "image/png"},
+			},
+		},
+	}
+	service := &animationGenerationService{
+		processor: processor,
+		videoProcessor: &animationVideoProcessorStub{results: []*videoprocessor.Result{{
+			Frames: animationTestVideoFrames(4),
+		}}},
+	}
+	request := AnimationGenerationRequest{
+		FrameCount: 4, Columns: 2, FrameWidth: 64, FrameHeight: 64,
+		matteColorSet: true, matteColor: imageprocessor.MatteColor{0, 255, 255}, matteColorSafe: false,
+	}
+
+	_, err := service.processVideoWithSourceCellScale(context.Background(), []byte("video"), "", request, 1)
+	if err != nil {
+		t.Fatalf("process video: %v", err)
+	}
+	if processor.splitRequest == nil || processor.splitRequest.Background == nil {
+		t.Fatalf("split request did not carry background options: %+v", processor.splitRequest)
+	}
+	if got, want := processor.splitRequest.Background.MatteColor, "#00ffff"; got != want || !processor.splitRequest.Background.BorderConnectedOnly {
+		t.Fatalf("unsafe explicit matte options = %+v, want matte=%q and border-only keying", processor.splitRequest.Background, want)
+	}
+}
+
 func TestProcessAnimationVideoAutoDetectsNonGreenMatte(t *testing.T) {
 	videoProcessor := &animationVideoProcessorStub{results: []*videoprocessor.Result{{
 		Frames: animationTestVideoFramesWithMatte(4, color.NRGBA{R: 235, G: 235, B: 235, A: 255}),
@@ -880,6 +917,20 @@ var _ videoclient.VideoGenerationService = (*animationVideoServiceStub)(nil)
 var _ imageprocessor.Processor = (*animationProcessorStub)(nil)
 var _ videoprocessor.Processor = (*animationVideoProcessorStub)(nil)
 
+func TestPrepareAdaptiveAnimationReferencePropagatesReferenceResolutionError(t *testing.T) {
+	resolverErr := errors.New("reference unavailable")
+	service := &animationGenerationService{
+		referenceResolver: &animationReferenceResolverStub{err: resolverErr},
+	}
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), "stored-reference", false, 32, 32, 16, 16, nil,
+	)
+	if !errors.Is(err, resolverErr) || !strings.Contains(err.Error(), "resolve animation reference") {
+		t.Fatalf("expected wrapped resolver error, got: %v", err)
+	}
+}
+
 func TestPrepareAdaptiveAnimationReferenceRejectsDecodeError(t *testing.T) {
 	service := newAnimationGenerationService(
 		&animationVideoServiceStub{},
@@ -910,6 +961,22 @@ func TestPrepareAdaptiveAnimationReferenceRejectsRemoveBackgroundError(t *testin
 	}
 	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
 		t.Fatalf("unexpected remove-background request: %+v", processor.removeRequests)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsInvalidRemovedForeground(t *testing.T) {
+	processor := &animationProcessorStub{
+		removeResult: &imageprocessor.RemoveBackgroundResult{ImageBase64: "not-base64", MIMEType: "image/png"},
+	}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), animationTestOpaquePrototype(t), false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "decode normalized animation foreground") {
+		t.Fatalf("expected normalized foreground decode error, got: %v", err)
 	}
 }
 
@@ -1044,6 +1111,23 @@ func TestPrepareAdaptiveAnimationReferenceRejectsResizeError(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "normalize animation reference: resize failed") {
 		t.Fatalf("expected resize error, got: %v", err)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsInvalidResizedForeground(t *testing.T) {
+	processor := &animationProcessorStub{
+		foregroundBase64: animationTestForeground(t),
+		resizeResult:     &imageprocessor.ResizeResult{ImageBase64: "not-base64", MIMEType: "image/png"},
+	}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), animationTestOpaquePrototype(t), false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "decode normalized animation reference") {
+		t.Fatalf("expected resized foreground decode error, got: %v", err)
 	}
 }
 
