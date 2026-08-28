@@ -155,15 +155,26 @@ function CapabilityPreview({
 }) {
   if (title === "Scenery") {
     return (
-      <div className="w-[92%]">
+      <div className="relative w-[92%] aspect-[3/2] overflow-hidden rounded-xl">
         <img
-          src="/assets/scenery.png"
+          src="/assets/scenery-layer-1.png"
           alt={sceneryAlt}
           loading="lazy"
           decoding="async"
           fetchPriority="low"
-          className="aspect-[16/10] w-full rounded-xl object-cover"
+          className="absolute inset-0 size-full object-cover"
         />
+        {[2, 3, 4].map((layer) => (
+          <img
+            key={layer}
+            src={`/assets/scenery-layer-${layer}.png`}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute inset-0 size-full object-cover"
+          />
+        ))}
       </div>
     );
   }

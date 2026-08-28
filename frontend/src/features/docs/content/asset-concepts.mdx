@@ -41,11 +41,27 @@ import { DocHeading, DocImage, DocText } from "../doc-text";
 
 <DocText i18nKey="assetConcepts.sceneryBody" />
 
-<DocImage
-  src="/assets/scenery.png"
-  altKey="assetConcepts.sceneryAlt"
-  className="mt-6 block h-auto w-full border border-neutral-950/10 bg-[#edf4ef] [image-rendering:pixelated]"
-/>
+<div className="relative mt-6 aspect-[3/2] w-full overflow-hidden border border-neutral-950/10 bg-[#edf4ef] [image-rendering:pixelated]">
+  <img
+    src="/assets/scenery-layer-1.png"
+    alt="Pixel-art scenery sky"
+    loading="lazy"
+    decoding="async"
+    fetchPriority="low"
+    className="absolute inset-0 size-full object-cover"
+  />
+  {[2, 3, 4].map((layer) => (
+    <img
+      key={layer}
+      src={`/assets/scenery-layer-${layer}.png`}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      fetchPriority="low"
+      className="absolute inset-0 size-full object-cover"
+    />
+  ))}
+</div>
 
 <DocHeading level={2} id="ui-set" i18nKey="assetConcepts.uiSetTitle" />
 
