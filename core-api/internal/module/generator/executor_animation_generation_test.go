@@ -273,6 +273,59 @@ func TestAnimationGenerationPadsPreparedGreenReferenceToSquareCanvas(t *testing.
 	}
 }
 
+func TestAnimationGenerationUsesSeedance25MultiReferenceForDerivation(t *testing.T) {
+	foreground := animationTestForeground(t)
+	videos := &animationVideoServiceStub{}
+	processor := &animationProcessorStub{foregroundBase64: foreground}
+	wantErr := errors.New("stop after derivation provider call")
+	videoProcessor := &animationVideoProcessorStub{errors: []error{wantErr}}
+	service := newAnimationGenerationService(videos, processor, videoProcessor)
+
+	_, err := service.Generate(context.Background(), &AnimationGenerationRequest{
+		Description:           "blue maintenance robot",
+		Style:                 "pixel art",
+		Action:                "spray cleaning liquid",
+		ReferenceImage:        animationTestOpaquePrototype(t),
+		DerivationSourceImage: "data:image/png;base64," + animationTestPreparedGreenReference(t),
+		TargetOrientation:     "Back / North / screen-up view",
+		SourceOrientation:     "Left / West / screen-left view",
+		FrameCount:            4,
+		Columns:               2,
+		FrameWidth:            64,
+		FrameHeight:           64,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("generate derived animation: %v", err)
+	}
+	if len(videos.requests) != 1 {
+		t.Fatalf("video requests = %d, want 1", len(videos.requests))
+	}
+	request := videos.requests[0]
+	if request.Model != animationDerivationVideoModel || request.AspectRatio != "adaptive" {
+		t.Fatalf("unexpected derivation video routing: %+v", request)
+	}
+	if len(request.ReferenceImages) != 2 || request.ReferenceImages[0].Base64 != request.StartImage.Base64 {
+		t.Fatalf("derivation must send target prototype and source sheet: %+v", request.ReferenceImages)
+	}
+	sourceSheet, decodeErr := imageprocessor.DecodeBase64Image(request.ReferenceImages[1].Base64)
+	if decodeErr != nil {
+		t.Fatalf("decode derivation source sheet: %v", decodeErr)
+	}
+	if min(sourceSheet.Bounds().Dx(), sourceSheet.Bounds().Dy()) < animationDerivationReferenceMinEdge {
+		t.Fatalf("derivation source sheet is below provider minimum: %v", sourceSheet.Bounds())
+	}
+	for _, required := range []string{
+		"MULTI-REFERENCE CONTRACT",
+		"Back / North / screen-up view",
+		"Left / West / screen-left view",
+		"Image 2 is an animation frame sheet",
+	} {
+		if !strings.Contains(request.Prompt, required) {
+			t.Errorf("derivation video prompt missing %q: %s", required, request.Prompt)
+		}
+	}
+}
+
 func TestAnimationGenerationUsesParentPrototypeAndRetriesQualityError(t *testing.T) {
 	t.Skip("subject-scale compensation intentionally adjusts the legacy fixed retry multiplier")
 	foreground := animationTestForeground(t)

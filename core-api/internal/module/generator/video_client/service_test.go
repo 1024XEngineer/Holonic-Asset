@@ -98,6 +98,41 @@ func TestVideoGenerationServiceUsesPNGMediaTypeAndDownloads(t *testing.T) {
 	}
 }
 
+func TestVideoGenerationServiceMultiReferenceImages(t *testing.T) {
+	provider := &videoProviderStub{
+		result: &videoclient.ProviderResult{
+			RequestID: "req-multi",
+			VideoURL:  "https://cdn.example.test/multi.mp4",
+		},
+	}
+	service := videoclient.NewVideoGenerationService(provider)
+
+	result, err := service.Generate(context.Background(), &videoclient.GenerateRequest{
+		Prompt: "multi reference animation",
+		Model:  "bytedance/seedance-2.5",
+		ReferenceImages: []videoclient.ReferenceImage{
+			{Base64: "aW1nMQ==", MediaType: "image/png"},
+			{Base64: "aW1nMg==", MediaType: "image/png"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generate video: %v", err)
+	}
+
+	if result.RequestID != "req-multi" || result.VideoURL != "https://cdn.example.test/multi.mp4" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if len(provider.request.ReferenceImageURLs) != 2 {
+		t.Fatalf("expected 2 reference image URLs, got %d", len(provider.request.ReferenceImageURLs))
+	}
+	if provider.request.ReferenceImageURLs[0] != "data:image/png;base64,aW1nMQ==" {
+		t.Errorf("unexpected image url 0: %s", provider.request.ReferenceImageURLs[0])
+	}
+	if provider.request.ReferenceImageURLs[1] != "data:image/png;base64,aW1nMg==" {
+		t.Errorf("unexpected image url 1: %s", provider.request.ReferenceImageURLs[1])
+	}
+}
+
 func TestVideoGenerationServiceRejectsInvalidRequestsAndResponses(t *testing.T) {
 	service := videoclient.NewVideoGenerationService(&videoProviderStub{})
 
