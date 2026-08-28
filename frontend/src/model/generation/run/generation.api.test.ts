@@ -401,6 +401,31 @@ describe("generationApi", () => {
     expect(mocks.assetDetail).not.toHaveBeenCalled();
   });
 
+  it("restores a derived animation kind from the Core asset without local metadata", async () => {
+    mocks.assetDetail.mockResolvedValue({ type: "object" });
+    mocks.core.list.mockResolvedValue({
+      items: [
+        {
+          id: 27,
+          projectId: 42,
+          assetId: 17,
+          kind: "derive_animation",
+          status: "processing",
+        },
+      ],
+    });
+
+    await expect(generationApi.listRuns("42")).resolves.toEqual([
+      expect.objectContaining({
+        id: "27",
+        kind: "object",
+        name: "New object",
+        status: "processing",
+      }),
+    ]);
+    expect(mocks.assetDetail).toHaveBeenCalledWith(17);
+  });
+
   it("restores an animation kind from the Core asset without local metadata", async () => {
     mocks.assetDetail.mockResolvedValue({ type: "object" });
     mocks.core.list.mockResolvedValue({

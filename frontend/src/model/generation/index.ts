@@ -22,8 +22,12 @@ export {
   type QuickGenerationAsset,
 } from "./quick";
 export {
+  deriveAnimationRequestSchema,
   generateAnimationRequestSchema,
+  useDeriveAnimationMutation,
   useGenerateAnimationMutation,
+  type DeriveAnimationInput,
+  type DeriveAnimationRequest,
   type GenerateAnimationInput,
   type GenerateAnimationRequest,
   type SpriteAssetKind,

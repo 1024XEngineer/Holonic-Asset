@@ -1,4 +1,4 @@
-import { assetDirectionSchema } from "@/model/asset";
+import { assetDirectionSchema, type AssetDirection } from "@/model/asset";
 import { z } from "zod";
 
 export const generateAnimationRequestSchema = z.object({
@@ -12,12 +12,28 @@ export const generateAnimationRequestSchema = z.object({
   duration: z.number().int().min(4).max(15),
 });
 
+export const deriveAnimationRequestSchema = z.object({
+  sourceAnimationId: z.string().trim().min(1),
+  sourceAnimationName: z.string().trim().min(1),
+  targetDirections: z.array(assetDirectionSchema).min(1),
+});
+
 export type SpriteAssetKind = "character" | "object";
 export type GenerateAnimationRequest = z.infer<
   typeof generateAnimationRequestSchema
+>;
+export type DeriveAnimationRequest = z.infer<
+  typeof deriveAnimationRequestSchema
 >;
 export type GenerateAnimationInput = GenerateAnimationRequest & {
   projectId: string;
   assetId: string;
   assetKind: SpriteAssetKind;
 };
+export type DeriveAnimationInput = DeriveAnimationRequest & {
+  projectId: string;
+  assetId: string;
+  assetKind: SpriteAssetKind;
+};
+
+export type { AssetDirection };

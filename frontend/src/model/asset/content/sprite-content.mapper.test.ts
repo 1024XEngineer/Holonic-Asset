@@ -273,6 +273,7 @@ describe("toSpriteAssetContent", () => {
             {
               kind: "clip",
               id: "7",
+              groupId: "7",
               label: "Walk",
               frameCount: 2,
               frameDurations: [83, 83],
@@ -314,6 +315,7 @@ describe("toSpriteAssetContent", () => {
         content: expect.objectContaining({
           animations: [
             expect.objectContaining({
+              groupId: 7,
               frames: [
                 { id: 1, url: "/walk-1.png", duration: 83 },
                 { id: 2, url: "/walk-2.png", duration: 83 },
@@ -472,6 +474,7 @@ function characterDetail(): AssetDetailResponse {
       animations: [
         {
           id: 7,
+          groupId: 7,
           name: "Walk",
           generation: walkGeneration,
           frames: [

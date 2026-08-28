@@ -6,9 +6,11 @@ import {
 } from "@/features/generation";
 import {
   toSpriteContentCandidate,
+  useDeriveAnimationMutation,
   useGenerateAnimationMutation,
   type AssetWorkspaceData,
   type BackendSpriteContentPatch,
+  type DeriveAnimationRequest,
   type GenerateAnimationRequest,
   type GenerationTaskType,
 } from "@/model";
@@ -27,6 +29,7 @@ export function useEditorWorkspace({
 }): SpriteEditorModeProps | null {
   const { asset } = data;
   const animationMutation = useGenerateAnimationMutation();
+  const animationDerivationMutation = useDeriveAnimationMutation();
   const [animationTask, setAnimationTask] =
     useState<GenerationTaskListItem | null>(null);
   const additionalTasks = useMemo(
@@ -37,7 +40,8 @@ export function useEditorWorkspace({
     data,
     onBack,
     additionalTasks,
-    isAdditionalGenerationPending: animationMutation.isPending,
+    isAdditionalGenerationPending:
+      animationMutation.isPending || animationDerivationMutation.isPending,
     toCandidateRecord: (record, content) =>
       toSpriteContentCandidate(record, asset.perspective, content),
   });
@@ -52,7 +56,9 @@ export function useEditorWorkspace({
 
   const reviewKind = flow.candidateKind;
   const displayRecord =
-    reviewKind === "generate_animation" && candidateRecord
+    (reviewKind === "generate_animation" ||
+      reviewKind === "derive_animation") &&
+    candidateRecord
       ? candidateRecord
       : snapshot.record;
   const sprite = getSpriteRecordData(displayRecord);
@@ -89,6 +95,30 @@ export function useEditorWorkspace({
     }
   };
 
+  const deriveAnimation = async (request: DeriveAnimationRequest) => {
+    const taskId = `animation-derivation-${crypto.randomUUID()}`;
+    setAnimationTask({
+      id: taskId,
+      name: request.sourceAnimationName,
+      prompt: `Deriving ${request.targetDirections.join(", ")}`,
+      status: "processing",
+    });
+
+    try {
+      await animationDerivationMutation.mutateAsync({
+        ...request,
+        projectId: asset.projectId,
+        assetId: asset.id,
+        assetKind,
+      });
+      reportAction(`${request.sourceAnimationName} derivation queued`);
+    } catch {
+      reportAction("Animation derivation failed");
+    } finally {
+      setAnimationTask((current) => (current?.id === taskId ? null : current));
+    }
+  };
+
   const submitInspectorPrompt = async (request: InspectorSubmitRequest) => {
     const assetId = Number(asset.id);
     await flow.submit({
@@ -116,8 +146,10 @@ export function useEditorWorkspace({
       onPositionChange: () => undefined,
     },
     tree: {
-      isGeneratingAnimation: animationMutation.isPending,
+      isGeneratingAnimation:
+        animationMutation.isPending || animationDerivationMutation.isPending,
       onAnimationGenerate: (request) => void generateAnimation(request),
+      onAnimationDerive: (request) => void deriveAnimation(request),
       onAnimationRename: (animationId, label) =>
         session.dispatch({
           type: "sprite.animation.rename",
@@ -163,11 +195,11 @@ function buildGenerationReview({
   const current = getSpriteRecordData(currentRecord);
   const candidate = getSpriteRecordData(candidateRecord);
 
-  if (taskKind === "generate_animation") {
+  if (taskKind === "generate_animation" || taskKind === "derive_animation") {
     const animation = findCandidateAnimation(
       current.animations ?? [],
       candidate.animations ?? [],
-      animationId,
+      taskKind === "derive_animation" ? undefined : animationId,
     );
     return animation
       ? {
