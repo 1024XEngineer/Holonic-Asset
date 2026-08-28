@@ -116,3 +116,41 @@ describe("animationGenerationApi", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 });
+
+it("queues selected derived animation directions through the generation API", async () => {
+  await expect(
+    animationGenerationApi.derive({
+      projectId: "11",
+      assetId: "7",
+      assetKind: "character",
+      sourceAnimationId: "3",
+      sourceAnimationName: "Walk",
+      targetDirections: ["front", "right"],
+    }),
+  ).resolves.toEqual({
+    id: "91",
+    projectId: "11",
+    assetId: "7",
+    kind: "character",
+    name: "Walk",
+    prompt: "Derive Walk for front, right",
+    canvasSize: "32 × 32 px",
+    status: "pending",
+  });
+
+  expect(mocks.create).toHaveBeenCalledWith(11, {
+    kind: "derive_animation",
+    assetId: 7,
+    creative_brief: "Derive Walk for front, right",
+    parameters: {
+      source_animation_id: 3,
+      target_directions: ["front", "right"],
+    },
+  });
+  expect(mocks.rememberMetadata).toHaveBeenCalledWith("11", 91, {
+    kind: "character",
+    name: "Walk",
+    prompt: "Derive Walk for front, right",
+    assetId: "7",
+  });
+});

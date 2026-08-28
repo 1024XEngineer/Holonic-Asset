@@ -30,6 +30,7 @@ export type AssetAnimationFrameResponse = AssetImageResourceResponse & {
 
 export type AssetAnimationResponse = {
   id: number;
+  groupId?: number;
   name: string;
   frames: AssetAnimationFrameResponse[];
   generation?: AnimationGenerationConfig;

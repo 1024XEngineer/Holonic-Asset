@@ -207,6 +207,7 @@ function generationKindToAssetKind(
     case "edit_tiles":
       return "tileset";
     case "generate_animation":
+    case "derive_animation":
     case "edit_animation":
       if (requestedKind === "character" || requestedKind === "object") {
         return requestedKind;
@@ -228,6 +229,7 @@ async function resolveSpriteAssetKind(
   }
   if (
     (item.kind !== "generate_animation" &&
+      item.kind !== "derive_animation" &&
       item.kind !== "edit_animation" &&
       item.kind !== "edit_frames") ||
     item.assetId === undefined

@@ -198,6 +198,7 @@ function toAnimationsFromContent(
     return {
       kind: "clip",
       id: String(animation.id),
+      ...(animation.groupId ? { groupId: String(animation.groupId) } : {}),
       label: animation.name,
       frameCount: frameUrls.length,
       ...(frames.some((frame) => frame.duration !== undefined)
@@ -247,6 +248,9 @@ export function toBackendSpriteContent(
     })),
     animations: (sprite.animations ?? []).map((animation, animationIndex) => ({
       id: numericId(animation.id, animationIndex + 1),
+      ...(animation.groupId
+        ? { groupId: numericId(animation.groupId, 0) }
+        : {}),
       name: animation.label,
       frames: (animation.spriteSheet?.frameUrls ?? []).map(
         (url, frameIndex) => ({

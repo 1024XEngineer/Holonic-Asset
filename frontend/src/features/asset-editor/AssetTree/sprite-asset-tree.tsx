@@ -1,12 +1,28 @@
-import { ChevronDown, Folder, ImagePlus, Play, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  Folder,
+  GitFork,
+  ImagePlus,
+  Play,
+  Plus,
+} from "lucide-react";
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CreateAnimationTrigger } from "@/features/generation";
-import type {
-  CharacterAnimation,
-  GenerateAnimationRequest,
-  Perspective,
+import {
+  assetDirectionsByPerspective,
+  type AssetDirection,
+  type CharacterAnimation,
+  type DeriveAnimationRequest,
+  type GenerateAnimationRequest,
+  type Perspective,
 } from "@/model";
 
 import {
@@ -25,6 +41,7 @@ export function SpriteAssetTree({
   onSelect,
   onSelectFrame,
   onGenerateAnimation,
+  onDeriveAnimation,
   onRenameAnimation,
   onDeleteAnimation,
   isGeneratingAnimation,
@@ -37,6 +54,7 @@ export function SpriteAssetTree({
   onSelect: (node: AnimatedSpriteNodeId) => void;
   onSelectFrame: (node: AnimatedSpriteNodeId, index: number) => void;
   onGenerateAnimation: (request: GenerateAnimationRequest) => void;
+  onDeriveAnimation: (request: DeriveAnimationRequest) => void;
   onRenameAnimation: (animationId: string, label: string) => void;
   onDeleteAnimation: (animationId: string) => void;
   isGeneratingAnimation: boolean;
@@ -94,6 +112,10 @@ export function SpriteAssetTree({
                   onSelect={onSelect}
                   onSelectFrame={onSelectFrame}
                   onContextMenu={openContextMenu}
+                  perspective={perspective}
+                  animations={animations}
+                  isGenerating={isGeneratingAnimation}
+                  onDerive={onDeriveAnimation}
                 />
               ))}
             </div>
@@ -136,6 +158,10 @@ function AnimationNode({
   onSelect,
   onSelectFrame,
   onContextMenu,
+  perspective,
+  animations,
+  isGenerating,
+  onDerive,
 }: {
   animation: CharacterAnimation;
   selected: boolean;
@@ -146,6 +172,10 @@ function AnimationNode({
     event: MouseEvent<HTMLElement>,
     animation: CharacterAnimation,
   ) => void;
+  perspective: Perspective;
+  animations: CharacterAnimation[];
+  isGenerating: boolean;
+  onDerive: (request: DeriveAnimationRequest) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation("editor");
@@ -165,6 +195,13 @@ function AnimationNode({
             {animation.label}
           </span>
         </button>
+        <DeriveAnimationButton
+          animation={animation}
+          animations={animations}
+          perspective={perspective}
+          isGenerating={isGenerating}
+          onDerive={onDerive}
+        />
         <button
           type="button"
           aria-label={`${open ? t("collapse") : t("expand")} ${animation.label}`}
@@ -185,6 +222,120 @@ function AnimationNode({
         />
       ) : null}
     </div>
+  );
+}
+
+function DeriveAnimationButton({
+  animation,
+  animations,
+  perspective,
+  isGenerating,
+  onDerive,
+}: {
+  animation: CharacterAnimation;
+  animations: CharacterAnimation[];
+  perspective: Perspective;
+  isGenerating: boolean;
+  onDerive: (request: DeriveAnimationRequest) => void;
+}) {
+  const { t } = useTranslation(["editor", "generation"]);
+  const [selectedDirections, setSelectedDirections] = useState<
+    AssetDirection[]
+  >([]);
+  const availableDirections = getAvailableDerivationDirections(
+    animation,
+    animations,
+    perspective,
+  );
+  const canDerive =
+    animation.generation !== undefined && availableDirections.length > 0;
+
+  const toggleDirection = (direction: AssetDirection) => {
+    setSelectedDirections((current) =>
+      current.includes(direction)
+        ? current.filter((value) => value !== direction)
+        : [...current, direction],
+    );
+  };
+
+  return (
+    <Popover
+      onOpenChange={(open) => {
+        if (open) setSelectedDirections([]);
+      }}
+    >
+      <PopoverTrigger
+        aria-label={t("deriveAnimation", { name: animation.label })}
+        title={t("deriveAnimation", { name: animation.label })}
+        disabled={!canDerive || isGenerating}
+        className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+      >
+        <GitFork className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 space-y-3">
+        <div>
+          <p className="text-sm font-medium">{t("deriveAnimationTitle")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("deriveAnimationDescription")}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          {availableDirections.map((direction) => {
+            const selected = selectedDirections.includes(direction);
+            return (
+              <button
+                key={direction}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleDirection(direction)}
+                className={`rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${selected ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              >
+                {t(`generation:directions.${direction}`)}
+              </button>
+            );
+          })}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="w-full"
+          disabled={selectedDirections.length === 0 || isGenerating}
+          onClick={() =>
+            onDerive({
+              sourceAnimationId: animation.id,
+              sourceAnimationName: animation.label,
+              targetDirections: selectedDirections,
+            })
+          }
+        >
+          <GitFork className="size-3.5" />
+          {t("deriveAnimationSubmit")}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function getAvailableDerivationDirections(
+  source: CharacterAnimation,
+  animations: CharacterAnimation[],
+  perspective: Perspective,
+) {
+  const groupId = source.groupId ?? source.id;
+  const occupiedDirections = new Set(
+    animations.flatMap((animation) => {
+      const belongsToGroup =
+        animation.id === source.id ||
+        animation.id === groupId ||
+        animation.groupId === groupId;
+      const direction = animation.generation?.direction as
+        | AssetDirection
+        | undefined;
+      return belongsToGroup && direction ? [direction] : [];
+    }),
+  );
+  return assetDirectionsByPerspective[perspective].filter(
+    (direction) => !occupiedDirections.has(direction),
   );
 }
 
