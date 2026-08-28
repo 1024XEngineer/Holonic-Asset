@@ -84,6 +84,36 @@ func (s *liveTileSetReferenceStore) DeleteObjects(_ context.Context, keys []stri
 	return nil
 }
 
+type livePrototypeAssetStore struct {
+	mu sync.Mutex
+}
+
+func (s *livePrototypeAssetStore) GetDetail(_ context.Context, _ uint) (assetdomain.Asset, error) {
+	return assetdomain.Asset{}, nil
+}
+
+func (s *livePrototypeAssetStore) CreateCharacterAsset(_ context.Context, asset *assetdomain.Asset) (*assetdomain.Asset, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if asset == nil {
+		asset = &assetdomain.Asset{}
+	}
+	asset.ID = 501
+	return asset, nil
+}
+
+func (s *livePrototypeAssetStore) CreateObjectAsset(_ context.Context, _ *assetdomain.Asset) (uint, error) {
+	return 502, nil
+}
+
+func (s *livePrototypeAssetStore) CreateSceneryAsset(_ context.Context, _ *assetdomain.Asset) (uint, error) {
+	return 503, nil
+}
+
+func (s *livePrototypeAssetStore) CreateTileSetAsset(_ context.Context, _ *assetdomain.Asset) (uint, error) {
+	return 504, nil
+}
+
 func loadLiveImageConfig() (config.ImageClientConfig, error) {
 	reader := viper.New()
 	reader.SetConfigFile("../../config/config.yaml")
@@ -771,25 +801,129 @@ func TestLiveSideOnFlatTilesetGeneration(t *testing.T) {
 
 	resultPath := filepath.Join(artifactDir, "side_on_tileset_result.png")
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, canvas); err != nil {
-		t.Fatalf("encode Side-On tileset preview: %v", err)
+	if err := png.Encode(&buf, canvas); err == nil {
+		_ = os.WriteFile(resultPath, buf.Bytes(), 0o600)
+		t.Logf("Saved Side-On tileset preview to: %s", resultPath)
 	}
-	if err := os.WriteFile(resultPath, buf.Bytes(), 0o600); err != nil {
-		t.Fatalf("write Side-On tileset preview: %v", err)
-	}
-	t.Logf("Saved Side-On tileset preview to: %s", resultPath)
 
 	// Also write raw image
 	rawB64 := capturing.GetLastGenerated()
 	if rawB64 != "" {
-		rawDecoded, err := base64.StdEncoding.DecodeString(rawB64)
-		if err != nil {
-			t.Fatalf("decode Side-On raw model image: %v", err)
+		if rawDecoded, err := base64.StdEncoding.DecodeString(rawB64); err == nil {
+			rawPath := filepath.Join(artifactDir, "side_on_tileset_raw.png")
+			_ = os.WriteFile(rawPath, rawDecoded, 0o600)
+			t.Logf("Saved Side-On raw model image to: %s", rawPath)
 		}
-		rawPath := filepath.Join(artifactDir, "side_on_tileset_raw.png")
-		if err := os.WriteFile(rawPath, rawDecoded, 0o600); err != nil {
-			t.Fatalf("write Side-On raw model image: %v", err)
+	}
+}
+
+func TestLiveBase64CharacterPrototypeGeneration(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("HOLONIC_LLM_INTEGRATION")) != "1" {
+		t.Skip("set HOLONIC_LLM_INTEGRATION=1 to run character prototype generation test")
+	}
+
+	imageCfg, err := loadLiveImageConfig()
+	if err != nil {
+		t.Fatalf("load live image config: %v", err)
+	}
+	imageModels := make([]imageclient.ModelConfig, 0, len(imageCfg.Models))
+	for _, m := range imageCfg.Models {
+		imageModels = append(imageModels, imageclient.ModelConfig{
+			Name:     m.Name,
+			Protocol: m.Protocol,
+			BaseURL:  m.BaseURL,
+			APIKey:   m.APIKey,
+		})
+	}
+	provider := imageclient.NewImageProvider(imageclient.FactoryConfig{
+		BaseURL:       imageCfg.BaseURL,
+		APIKey:        imageCfg.APIKey,
+		DefaultModel:  imageCfg.DefaultModel,
+		FallbackModel: imageCfg.FallbackModel,
+		Models:        imageModels,
+	})
+	capturing := &capturingImageService{
+		inner: imageclient.NewImageGenerationService(provider),
+	}
+	processor := imageprocessor.NewProcessor()
+
+	artifactDir := t.TempDir()
+
+	references := &liveTileSetReferenceStore{
+		objects: make(map[string]string),
+		diskDir: artifactDir,
+	}
+
+	// 1. Create a small 32x32 blue pixel art character sample reference in base64
+	refCanvas := image.NewRGBA(image.Rect(0, 0, 32, 32))
+	for y := 8; y < 24; y++ {
+		for x := 10; x < 22; x++ {
+			refCanvas.SetRGBA(x, y, color.RGBA{R: 40, G: 120, B: 220, A: 255})
 		}
-		t.Logf("Saved Side-On raw model image to: %s", rawPath)
+	}
+	// Add eyes/helmet
+	for x := 13; x < 19; x++ {
+		refCanvas.SetRGBA(x, 12, color.RGBA{R: 250, G: 250, B: 100, A: 255})
+	}
+	var refBuf bytes.Buffer
+	if err := png.Encode(&refBuf, refCanvas); err != nil {
+		t.Fatalf("encode sample reference: %v", err)
+	}
+	sampleRefBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(refBuf.Bytes())
+	references.objects["projects/88/style.png"] = sampleRefBase64
+
+	assets := &livePrototypeAssetStore{}
+
+	projectStub := &tileSetGenerationProjectStub{
+		project: &projectdomain.Project{
+			ID:             88,
+			Name:           "Pixel Knight Adventure",
+			GameType:       "2D Side-On Pixel RPG",
+			Description:    "A classic 16-bit side-scrolling platformer with brave pixel knights.",
+			Style:          "16-bit SNES pixel art, clean dark outlines, vibrant palette",
+			TargetPlatform: projectdomain.PlatformTypePC,
+			Perspective:    projectdomain.PerspectiveSideOn,
+			Reference:      "projects/88/style.png",
+		},
+	}
+
+	exec := &executor{
+		images:     capturing,
+		processor:  processor,
+		assets:     assets,
+		projects:   projectStub,
+		references: references,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	payload := json.RawMessage(`{
+		"project_id": 88,
+		"asset_name": "Royal Knight",
+		"creative_brief": "a brave royal knight in shining blue armor with a silver winged helm and golden crest",
+		"perspective": "Side-On",
+		"dimensions": {"width": 48, "height": 48}
+	}`)
+
+	t.Log("=== Generating Character Prototype with Base64 Reference ===")
+	start := time.Now()
+	res, err := exec.Generate(ctx, GenerateCharacterProtoType, payload)
+	if err != nil {
+		t.Fatalf("Live character prototype generation failed: %v", err)
+	}
+	t.Logf("=== Generation succeeded in %.2fs ===", time.Since(start).Seconds())
+	t.Logf("Generated character prototype result metadata: %+v", res)
+
+	rawB64 := capturing.GetLastGenerated()
+	if rawB64 != "" {
+		if rawImg := decodeDataURIToImage(t, "data:image/png;base64,"+rawB64); rawImg != nil {
+			rawPath := filepath.Join(artifactDir, "base64_character_prototype_raw.png")
+			var rawBuf bytes.Buffer
+			if err := png.Encode(&rawBuf, rawImg); err == nil {
+				_ = os.WriteFile(rawPath, rawBuf.Bytes(), 0o600)
+				t.Logf("Saved raw character prototype sheet to: %s", rawPath)
+			}
+		}
 	}
 }

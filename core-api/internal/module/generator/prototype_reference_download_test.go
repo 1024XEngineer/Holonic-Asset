@@ -3,13 +3,50 @@ package generator
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
+
+type prototypeDownloadRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f prototypeDownloadRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+type prototypeDownloadReadCloser struct {
+	err error
+}
+
+func (r prototypeDownloadReadCloser) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func (prototypeDownloadReadCloser) Close() error {
+	return nil
+}
+
+type prototypeDownloadTimeoutError struct{}
+
+func (prototypeDownloadTimeoutError) Error() string   { return "timed out" }
+func (prototypeDownloadTimeoutError) Timeout() bool   { return true }
+func (prototypeDownloadTimeoutError) Temporary() bool { return true }
+
+type prototypeDownloadCancelingTimeoutError struct {
+	cancel context.CancelFunc
+}
+
+func (e prototypeDownloadCancelingTimeoutError) Error() string { return "timed out" }
+func (e prototypeDownloadCancelingTimeoutError) Timeout() bool {
+	e.cancel()
+	return true
+}
+func (prototypeDownloadCancelingTimeoutError) Temporary() bool { return true }
 
 func TestValidatePrototypeReferenceURLRejectsNonPublicLiteralTargets(t *testing.T) {
 	for _, value := range []string{
@@ -164,8 +201,8 @@ func TestPrototypeReferenceDialerConnectsToPublicLiteralAddress(t *testing.T) {
 
 func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	client := newPrototypeReferenceHTTPClient()
-	if client.Timeout != defaultPrototypeReferenceTimeout {
-		t.Fatalf("client timeout = %s, want %s", client.Timeout, defaultPrototypeReferenceTimeout)
+	if client.Timeout != 2*time.Minute {
+		t.Fatalf("client timeout = %s, want 2m", client.Timeout)
 	}
 	transport, ok := client.Transport.(*http.Transport)
 	if !ok {
@@ -190,6 +227,301 @@ func TestPrototypeReferenceHTTPClientUsesBoundedSecureTransport(t *testing.T) {
 	}
 	if err := client.CheckRedirect(&http.Request{URL: redirectURL}, []*http.Request{{}}); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("redirect error = %v, want redirects disabled", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesResponseReadFailure(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       prototypeDownloadReadCloser{err: context.DeadlineExceeded},
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("reference-image")),
+			}, nil
+		}),
+	}}
+
+	body, err := executor.downloadPrototypeReference(context.Background(), parsed)
+	if err != nil {
+		t.Fatalf("download reference: %v", err)
+	}
+	if string(body) != "reference-image" {
+		t.Fatalf("downloaded body = %q, want reference-image", body)
+	}
+	if attempts != 2 {
+		t.Fatalf("download attempts = %d, want 2", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesTransientHTTPStatus(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{
+					StatusCode: http.StatusServiceUnavailable,
+					Body:       io.NopCloser(strings.NewReader("temporarily unavailable")),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("reference-image")),
+			}, nil
+		}),
+	}}
+
+	body, err := executor.downloadPrototypeReference(context.Background(), parsed)
+	if err != nil {
+		t.Fatalf("download reference: %v", err)
+	}
+	if string(body) != "reference-image" {
+		t.Fatalf("downloaded body = %q, want reference-image", body)
+	}
+	if attempts != 2 {
+		t.Fatalf("download attempts = %d, want 2", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceDoesNotRetryDeterministicHTTPStatus(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/missing.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(context.Background(), parsed)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("download error = %v, want HTTP 404", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("download attempts = %d, want 1", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesTransientRequestFailure(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	logs := &recordingLogger{}
+	executor := &executor{
+		logger: logs,
+		referenceHTTPClient: &http.Client{Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return nil, io.EOF
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("reference-image")),
+			}, nil
+		})},
+	}
+
+	body, err := executor.downloadPrototypeReference(context.Background(), parsed)
+	if err != nil {
+		t.Fatalf("download reference: %v", err)
+	}
+	if string(body) != "reference-image" || attempts != 2 {
+		t.Fatalf("downloaded body = %q after %d attempts", body, attempts)
+	}
+	if len(logs.entries) != 2 || logs.entries[0].Level != "warn" || logs.entries[1].Level != "debug" {
+		t.Fatalf("unexpected download logs: %+v", logs.entries)
+	}
+	fields := make(map[string]any, len(logs.entries[0].Fields))
+	for _, field := range logs.entries[0].Fields {
+		fields[field.Key] = field.Val
+	}
+	if fields["source_host"] != "references.example" || fields["endpoint"] != "/reference.png" {
+		t.Fatalf("unexpected reference log fields: %+v", fields)
+	}
+	if fields["will_retry"] != true || fields["errorx"] == nil {
+		t.Fatalf("missing retry error fields: %+v", fields)
+	}
+}
+
+func TestDownloadPrototypeReferenceDefaultClientHonorsCanceledContext(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = (&executor{}).downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want context cancellation", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceStopsWhenRequestRetryIsCanceled(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, prototypeDownloadCancelingTimeoutError{cancel: cancel}
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want retry cancellation", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceRejectsOversizedContentLength(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode:    http.StatusOK,
+				ContentLength: maxPrototypeReferenceBytes + 1,
+				Body:          io.NopCloser(strings.NewReader("oversized")),
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(context.Background(), parsed)
+	if err == nil || !strings.Contains(err.Error(), "reference exceeds") {
+		t.Fatalf("download error = %v, want size limit rejection", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceDoesNotRetryPermanentReadFailure(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       prototypeDownloadReadCloser{err: errors.New("corrupt response")},
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(context.Background(), parsed)
+	if err == nil || !strings.Contains(err.Error(), "read reference") {
+		t.Fatalf("download error = %v, want read failure", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("download attempts = %d, want 1", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceStopsWhenReadRetryIsCanceled(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       prototypeDownloadReadCloser{err: prototypeDownloadCancelingTimeoutError{cancel: cancel}},
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want retry cancellation", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceRetriesEmptyResponses(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	attempts := 0
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(context.Background(), parsed)
+	if err == nil || !strings.Contains(err.Error(), "empty response") {
+		t.Fatalf("download error = %v, want empty response failure", err)
+	}
+	if attempts != defaultPrototypeReferenceMaxRetries+1 {
+		t.Fatalf("download attempts = %d, want %d", attempts, defaultPrototypeReferenceMaxRetries+1)
+	}
+}
+
+func TestPrototypeReferenceRequestTransientClassification(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil"},
+		{name: "canceled", err: context.Canceled},
+		{name: "deadline", err: context.DeadlineExceeded, want: true},
+		{name: "EOF", err: io.EOF, want: true},
+		{name: "wrapped URL error", err: &url.Error{Op: "Get", URL: "https://example.com", Err: io.ErrUnexpectedEOF}, want: true},
+		{name: "network operation", err: &net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset")}, want: true},
+		{name: "network timeout", err: prototypeDownloadTimeoutError{}, want: true},
+		{name: "permanent", err: errors.New("invalid response")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := prototypeReferenceRequestTransient(test.err); got != test.want {
+				t.Fatalf("transient classification = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestSleepBeforePrototypeReferenceRetryStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := sleepBeforePrototypeReferenceRetry(ctx, 2)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("retry wait error = %v, want context cancellation", err)
 	}
 }
 
