@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	generator "github.com/1024XEngineer/Holonic-Asset/internal/module/generator"
@@ -17,6 +18,7 @@ import (
 )
 
 type imageGenerationServiceStub struct {
+	mu       sync.Mutex
 	events   *[]string
 	request  *imageclient.GenerateRequest
 	requests []*imageclient.GenerateRequest
@@ -27,6 +29,7 @@ type imageGenerationServiceStub struct {
 }
 
 type animationGenerationServiceStub struct {
+	mu       sync.Mutex
 	events   *[]string
 	request  *generator.AnimationGenerationRequest
 	requests []*generator.AnimationGenerationRequest
@@ -39,6 +42,8 @@ func (s *animationGenerationServiceStub) Generate(
 	_ context.Context,
 	request *generator.AnimationGenerationRequest,
 ) (*generator.AnimationGenerationResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	*s.events = append(*s.events, "generate_animation")
 	copy := *request
 	copy.TargetFrameIndices = append([]int(nil), request.TargetFrameIndices...)
@@ -71,6 +76,7 @@ type referenceUpload struct {
 }
 
 type executorReferenceStoreStub struct {
+	mu            sync.Mutex
 	resolved      []string
 	resolveValues map[string]string
 	persisted     []string
@@ -82,6 +88,8 @@ type executorReferenceStoreStub struct {
 }
 
 func (s *executorReferenceStoreStub) ResolveReference(_ context.Context, reference string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.resolved = append(s.resolved, reference)
 	if s.resolveErr != nil {
 		return "", s.resolveErr
@@ -93,6 +101,8 @@ func (s *executorReferenceStoreStub) ResolveReference(_ context.Context, referen
 }
 
 func (s *executorReferenceStoreStub) PersistReference(_ context.Context, reference string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.persisted = append(s.persisted, reference)
 	if s.persistErr != nil {
 		return "", s.persistErr
@@ -104,6 +114,8 @@ func (s *executorReferenceStoreStub) PersistReference(_ context.Context, referen
 }
 
 func (s *executorReferenceStoreStub) NewObjectKey(_ string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.events != nil {
 		*s.events = append(*s.events, "allocate_key")
 	}
@@ -111,6 +123,8 @@ func (s *executorReferenceStoreStub) NewObjectKey(_ string) (string, error) {
 }
 
 func (s *executorReferenceStoreStub) PersistReferenceAt(_ context.Context, key, reference string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.events != nil {
 		*s.events = append(*s.events, "persist:"+key)
 	}
@@ -253,6 +267,8 @@ func (s *imageGenerationServiceStub) Generate(
 	_ context.Context,
 	request *imageclient.GenerateRequest,
 ) (*imageclient.GenerateResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	*s.events = append(*s.events, "generate_image")
 	requestCopy := &imageclient.GenerateRequest{
 		Prompt:          request.Prompt,

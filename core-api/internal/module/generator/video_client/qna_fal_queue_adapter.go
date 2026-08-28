@@ -181,7 +181,23 @@ func (p *qnaFalQueueAdapter) Generate(
 			nil,
 		)
 	}
-	createURL, err := p.endpoint(p.createPath)
+	createPath := p.createPath
+	resultPath := p.resultPath
+	model := strings.Trim(strings.TrimSpace(request.Model), "/")
+	if model != "" && p.createPath == DefaultQNACreatePath {
+		createPath = path.Join("/queue", model, "image-to-video")
+		resultPath = path.Join("/queue", model, "requests")
+	}
+	aspectRatio := firstNonEmpty(request.AspectRatio, p.aspectRatio)
+	if len(request.ReferenceImageURLs) > 1 {
+		if strings.Contains(createPath, "image-to-video") && len(request.ReferenceImageURLs) > 1 {
+			createPath = strings.Replace(createPath, "image-to-video", "reference-to-video", 1)
+		}
+		if aspectRatio == "" || aspectRatio == DefaultQNAAspectRatio {
+			aspectRatio = "adaptive"
+		}
+	}
+	createURL, err := p.endpoint(createPath)
 	if err != nil {
 		return nil, err
 	}
@@ -189,10 +205,11 @@ func (p *qnaFalQueueAdapter) Generate(
 	payloadRequest := qnaVideoRequest{
 		Prompt:        prompt,
 		ImageURL:      strings.TrimSpace(request.StartImageURL),
+		ImageURLs:     request.ReferenceImageURLs,
 		EndImageURL:   strings.TrimSpace(request.EndImageURL),
 		Resolution:    firstNonEmpty(request.Resolution, p.resolution),
 		Duration:      fmt.Sprintf("%d", validDuration(request.Duration, p.duration)),
-		AspectRatio:   firstNonEmpty(request.AspectRatio, p.aspectRatio),
+		AspectRatio:   aspectRatio,
 		GenerateAudio: request.GenerateAudio,
 	}
 	// qnaVideoRequest contains only JSON-native scalar fields.
@@ -215,7 +232,7 @@ func (p *qnaFalQueueAdapter) Generate(
 		)
 	}
 
-	return p.waitForTask(ctx, strings.TrimSpace(created.RequestID), p.resultPath)
+	return p.waitForTask(ctx, strings.TrimSpace(created.RequestID), resultPath)
 }
 
 func (p *qnaFalQueueAdapter) createTask(
@@ -845,13 +862,14 @@ func sleepWithContext(ctx context.Context, duration time.Duration) error {
 }
 
 type qnaVideoRequest struct {
-	Prompt        string `json:"prompt"`
-	ImageURL      string `json:"image_url"`
-	EndImageURL   string `json:"end_image_url,omitempty"`
-	Resolution    string `json:"resolution,omitempty"`
-	Duration      string `json:"duration,omitempty"`
-	AspectRatio   string `json:"aspect_ratio,omitempty"`
-	GenerateAudio bool   `json:"generate_audio"`
+	Prompt        string   `json:"prompt"`
+	ImageURL      string   `json:"image_url,omitempty"`
+	ImageURLs     []string `json:"image_urls,omitempty"`
+	EndImageURL   string   `json:"end_image_url,omitempty"`
+	Resolution    string   `json:"resolution,omitempty"`
+	Duration      string   `json:"duration,omitempty"`
+	AspectRatio   string   `json:"aspect_ratio,omitempty"`
+	GenerateAudio bool     `json:"generate_audio"`
 }
 
 type qnaVideoResponse struct {

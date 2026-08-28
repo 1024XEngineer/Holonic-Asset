@@ -242,7 +242,7 @@ func runFrameExtraction(
 		"-hide_banner", "-loglevel", "error",
 		"-i", input,
 		"-vf", filter,
-		"-vsync", "0",
+		"-fps_mode", "passthrough",
 		"-frames:v", fmt.Sprintf("%d", frameLimit),
 		outputPattern,
 	)

@@ -16,8 +16,9 @@ func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) 
 	}
 	content.Prototype = &prototype
 	content.Animations = []domain.Animation{{
-		ID:   3001,
-		Name: "walk",
+		ID:      3001,
+		GroupID: 2999,
+		Name:    "walk",
 		Frames: []domain.Frame{{
 			ID:       2201,
 			URL:      new("https://cdn.example/walk-01.png"),
@@ -55,6 +56,9 @@ func TestAssetContentPreservesPrototypeAndAnimationResourceArrays(t *testing.T) 
 	}
 	if len(decoded.Animations) != 1 || len(decoded.Animations[0].Frames) != 1 || decoded.Animations[0].Frames[0].ID != 2201 {
 		t.Fatalf("animation frames were not preserved: %+v", decoded.Animations)
+	}
+	if decoded.Animations[0].GroupID != 2999 {
+		t.Fatalf("animation group id was not preserved: %+v", decoded.Animations[0])
 	}
 	if decoded.Animations[0].Generation == nil || decoded.Animations[0].Generation.Direction != "south" {
 		t.Fatalf("animation generation config was not preserved: %+v", decoded.Animations[0].Generation)

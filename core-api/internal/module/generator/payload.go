@@ -65,6 +65,16 @@ type CreateAnimationPayload struct {
 	Duration      int    `json:"duration,omitempty"`
 }
 
+// DeriveAnimationPayload creates missing direction variants for one persisted
+// animation. Generation parameters and action semantics are inherited from the
+// source animation so callers cannot accidentally create an inconsistent group.
+type DeriveAnimationPayload struct {
+	AssetID           uint     `json:"asset_id"`
+	ProjectID         uint     `json:"project_id"`
+	SourceAnimationID uint     `json:"source_animation_id"`
+	TargetDirections  []string `json:"target_directions"`
+}
+
 // EditAnimationPayload is the self-contained input consumed by the animation
 // regeneration task handler. The generation parameters are loaded from the
 // persisted animation content; only the latest creative brief is supplied by

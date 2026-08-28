@@ -32,26 +32,47 @@ func (s *videoGenerationService) Generate(
 	if prompt == "" {
 		return nil, invalidRequestError("video prompt is required")
 	}
-	startImageURL, err := referenceDataURL(request.StartImage)
-	if err != nil {
-		return nil, err
+	var referenceImageURLs []string
+	if len(request.ReferenceImages) > 0 {
+		referenceImageURLs = make([]string, 0, len(request.ReferenceImages))
+		for _, ref := range request.ReferenceImages {
+			url, err := referenceDataURL(ref)
+			if err != nil {
+				return nil, err
+			}
+			referenceImageURLs = append(referenceImageURLs, url)
+		}
+	}
+	var startImageURL string
+	if request.StartImage.Base64 != "" {
+		var err error
+		startImageURL, err = referenceDataURL(request.StartImage)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(referenceImageURLs) > 0 {
+		startImageURL = referenceImageURLs[0]
+	} else {
+		return nil, invalidRequestError("start image or reference images are required")
 	}
 	endImageURL := ""
 	if request.EndImage != nil {
+		var err error
 		endImageURL, err = referenceDataURL(*request.EndImage)
 		if err != nil {
 			return nil, err
 		}
 	}
 	providerResult, err := s.provider.Generate(ctx, &ProviderRequest{
-		Prompt:        prompt,
-		Model:         strings.TrimSpace(request.Model),
-		StartImageURL: startImageURL,
-		EndImageURL:   endImageURL,
-		Resolution:    request.Resolution,
-		Duration:      request.Duration,
-		AspectRatio:   request.AspectRatio,
-		GenerateAudio: request.GenerateAudio,
+		Prompt:             prompt,
+		Model:              strings.TrimSpace(request.Model),
+		StartImageURL:      startImageURL,
+		ReferenceImageURLs: referenceImageURLs,
+		EndImageURL:        endImageURL,
+		Resolution:         request.Resolution,
+		Duration:           request.Duration,
+		AspectRatio:        request.AspectRatio,
+		GenerateAudio:      request.GenerateAudio,
 	})
 	if err != nil {
 		return nil, err

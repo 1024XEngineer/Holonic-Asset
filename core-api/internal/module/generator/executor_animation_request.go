@@ -24,6 +24,9 @@ func normalizeAnimationGenerationRequest(
 		value.ContextReferenceImages[index] = strings.TrimSpace(value.ContextReferenceImages[index])
 	}
 	value.ReferenceImage = strings.TrimSpace(value.ReferenceImage)
+	value.DerivationSourceImage = strings.TrimSpace(value.DerivationSourceImage)
+	value.TargetOrientation = strings.TrimSpace(value.TargetOrientation)
+	value.SourceOrientation = strings.TrimSpace(value.SourceOrientation)
 	value.EndReferenceImage = strings.TrimSpace(value.EndReferenceImage)
 	value.Resolution = strings.TrimSpace(value.Resolution)
 	value.AspectRatio = strings.TrimSpace(value.AspectRatio)
@@ -103,6 +106,9 @@ func normalizeAnimationGenerationRequest(
 			value.FrameCount,
 			len(value.ContextReferenceImages),
 		)
+	}
+	if value.ReferenceImageContext && value.DerivationSourceImage != "" {
+		return AnimationGenerationRequest{}, fmt.Errorf("generator: animation frame editing and direction derivation cannot be combined")
 	}
 	for index, reference := range value.ContextReferenceImages {
 		if reference == "" {

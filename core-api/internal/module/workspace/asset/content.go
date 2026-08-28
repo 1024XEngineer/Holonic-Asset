@@ -26,6 +26,7 @@ type Prototype []ImageResource
 
 type Animation struct {
 	ID         uint                       `json:"id"`
+	GroupID    uint                       `json:"groupId,omitempty"`
 	Name       string                     `json:"name"`
 	Frames     []Frame                    `json:"frames"`
 	Generation *AnimationGenerationConfig `json:"generation,omitempty"`

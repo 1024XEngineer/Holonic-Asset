@@ -761,3 +761,64 @@ func TestQNAProviderRoutesConfiguredModelIndependentEndpoints(t *testing.T) {
 		t.Fatalf("unexpected resB: %+v", resB)
 	}
 }
+
+func TestQNAProviderRoutesMultiReferenceSeedance25(t *testing.T) {
+	var requestedPath string
+	var receivedBody struct {
+		Prompt      string   `json:"prompt"`
+		ImageURLs   []string `json:"image_urls"`
+		AspectRatio string   `json:"aspect_ratio"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Method {
+		case http.MethodPost:
+			requestedPath = request.URL.Path
+			_ = json.NewDecoder(request.Body).Decode(&receivedBody)
+			_ = json.NewEncoder(writer).Encode(map[string]any{
+				"status":     "COMPLETED",
+				"request_id": "seedance-req-1",
+				"result": map[string]any{
+					"video": map[string]string{"url": "https://cdn.example.test/seedance-derived.mp4"},
+				},
+			})
+		}
+	}))
+	defer server.Close()
+
+	provider := videoclient.NewQNAProvider(videoclient.QNAConfig{
+		Models: []videoclient.ModelConfig{
+			{
+				Name:     "bytedance/seedance-2.5",
+				Protocol: "fal_queue",
+				BaseURL:  server.URL,
+				APIKey:   "test-seedance-key",
+			},
+		},
+	})
+
+	res, err := provider.Generate(context.Background(), &videoclient.ProviderRequest{
+		Prompt: "derive animation",
+		Model:  "bytedance/seedance-2.5",
+		ReferenceImageURLs: []string{
+			"data:image/png;base64,cHJvdG8=",
+			"data:image/png;base64,c2hlZXQ=",
+		},
+		StartImageURL: "data:image/png;base64,cHJvdG8=",
+	})
+	if err != nil {
+		t.Fatalf("generate seedance multi-ref: %v", err)
+	}
+
+	if res.VideoURL != "https://cdn.example.test/seedance-derived.mp4" {
+		t.Errorf("unexpected video url: %s", res.VideoURL)
+	}
+	if requestedPath != "/queue/bytedance/seedance-2.5/reference-to-video" {
+		t.Errorf("expected reference-to-video route, got %s", requestedPath)
+	}
+	if len(receivedBody.ImageURLs) != 2 {
+		t.Errorf("expected 2 image URLs, got %d", len(receivedBody.ImageURLs))
+	}
+	if receivedBody.AspectRatio != "adaptive" {
+		t.Errorf("expected adaptive aspect ratio, got %s", receivedBody.AspectRatio)
+	}
+}

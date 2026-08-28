@@ -9,13 +9,71 @@ import (
 	"strings"
 
 	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
+	videoprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/video"
 )
+
+func animationFrameSelectionOptions(frameCount int) videoprocessor.FrameIntervalSelectionOptions {
+	return videoprocessor.FrameIntervalSelectionOptions{
+		SampleCount:              frameCount,
+		MinimumSpanFrames:        animationMinLoopSpanFrames,
+		MinimumSpanRatio:         animationMinLoopSpanRatio,
+		MinimumStartWindowFrames: animationMinStartWindow,
+		StartWindowRatio:         animationInitialWindowRatio,
+		PreferFirstFrame:         true,
+		MinimumForegroundRatio:   animationMinForegroundRatio,
+		EndpointMSEQuantile:      animationEndpointQuantile,
+		ChangeScaleQuantile:      animationRichnessQuantile,
+		ChangeBaselineQuantile:   animationMotionQuantile,
+		Weights: videoprocessor.FrameIntervalSelectionWeights{
+			EndpointSimilarity:    animationEndpointWeight,
+			MeanAdjacentMSE:       animationRichnessWeight,
+			CentroidStability:     animationCentroidStabilityWeight,
+			LinearCentroidMotion:  animationTranslationWeight,
+			FirstFrameSimilarity:  animationInitialFrameWeight,
+			Compactness:           animationLoopCompactnessWeight,
+			GeometryCoverage:      animationPoseCoverageWeight,
+			ChangeCoverage:        animationMotionCoverageWeight,
+			PostIntervalStability: animationRecoveryWeight,
+		},
+	}
+}
+
+func scaleAnimationDerivationReference(source image.Image, minimumEdge int) image.Image {
+	if source == nil || minimumEdge <= 0 {
+		return source
+	}
+	width, height := source.Bounds().Dx(), source.Bounds().Dy()
+	shortEdge := min(width, height)
+	if shortEdge <= 0 || shortEdge >= minimumEdge {
+		return source
+	}
+	scale := (minimumEdge + shortEdge - 1) / shortEdge
+	scaled := image.NewNRGBA(image.Rect(0, 0, width*scale, height*scale))
+	for y := range height * scale {
+		for x := range width * scale {
+			scaled.Set(x, y, source.At(source.Bounds().Min.X+x/scale, source.Bounds().Min.Y+y/scale))
+		}
+	}
+	return scaled
+}
 
 func (s *animationGenerationService) pixelProcessAnimationFrames(
 	ctx context.Context,
 	regions []imageprocessor.ImageRegion,
 	columns, frameWidth, frameHeight int,
 ) ([]imageprocessor.ImageRegion, string, error) {
+	return pixelProcessAnimationFrames(ctx, s.processor, regions, columns, frameWidth, frameHeight)
+}
+
+func pixelProcessAnimationFrames(
+	ctx context.Context,
+	processor imageprocessor.Processor,
+	regions []imageprocessor.ImageRegion,
+	columns, frameWidth, frameHeight int,
+) ([]imageprocessor.ImageRegion, string, error) {
+	if processor == nil {
+		return nil, "", ErrImageProcessorRequired
+	}
 	options := AnimationPixelResizeOptions(frameWidth, frameHeight)
 	processedRegions := make([]imageprocessor.ImageRegion, 0, len(regions))
 	processedImages := make([]image.Image, 0, len(regions))
@@ -48,7 +106,7 @@ func (s *animationGenerationService) pixelProcessAnimationFrames(
 		if err != nil {
 			return nil, "", fmt.Errorf("generator: encode shared-palette animation frame %d: %w", index+1, err)
 		}
-		resized, err := s.processor.Resize(ctx, &imageprocessor.ResizeRequest{
+		resized, err := processor.Resize(ctx, &imageprocessor.ResizeRequest{
 			ImageBase64: quantizedBase64,
 			Options:     options,
 		})
