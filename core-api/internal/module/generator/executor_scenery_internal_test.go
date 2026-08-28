@@ -507,3 +507,53 @@ func TestDownloadSceneryReferenceDefaultsToPNGContentType(t *testing.T) {
 		t.Fatalf("expected default image/png, got %q", result[:30])
 	}
 }
+
+func TestDownloadSceneryReferenceRejectsConnectionError(t *testing.T) {
+	connectionErr := errors.New("connection refused")
+	exec := &executor{
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.Method != http.MethodGet || req.URL.String() != "https://example.com/ref.png" {
+				t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
+			}
+			return nil, connectionErr
+		})},
+	}
+
+	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
+	if !errors.Is(err, connectionErr) {
+		t.Fatalf("expected connection error, got: %v", err)
+	}
+}
+
+func TestDownloadSceneryReferenceRejectsReadErrorAndClosesBody(t *testing.T) {
+	readErr := errors.New("read failed")
+	body := &sceneryReferenceErrorBody{err: readErr}
+	exec := &executor{
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       body,
+			}, nil
+		})},
+	}
+
+	_, err := exec.downloadSceneryReference(context.Background(), "https://example.com/ref.png")
+	if !errors.Is(err, readErr) || !strings.Contains(err.Error(), "read scenery reference response") {
+		t.Fatalf("expected wrapped read error, got: %v", err)
+	}
+	if !body.closed {
+		t.Fatal("response body was not closed after read failure")
+	}
+}
+
+type sceneryReferenceErrorBody struct {
+	err    error
+	closed bool
+}
+
+func (b *sceneryReferenceErrorBody) Read([]byte) (int, error) { return 0, b.err }
+func (b *sceneryReferenceErrorBody) Close() error {
+	b.closed = true
+	return nil
+}

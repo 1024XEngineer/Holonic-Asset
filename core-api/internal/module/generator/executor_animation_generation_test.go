@@ -56,7 +56,11 @@ func (s *animationVideoServiceStub) Download(context.Context, string) ([]byte, e
 type animationProcessorStub struct {
 	foregroundBase64 string
 	removeRequests   []*imageprocessor.RemoveBackgroundRequest
+	removeResult     *imageprocessor.RemoveBackgroundResult
+	removeErr        error
 	resizeRequests   []*imageprocessor.ResizeRequest
+	resizeResult     *imageprocessor.ResizeResult
+	resizeErr        error
 	splitRequest     *imageprocessor.SplitImageRequest
 	splitResult      *imageprocessor.SplitImageResult
 	splitErr         error
@@ -68,6 +72,12 @@ func (s *animationProcessorStub) RemoveBackground(
 ) (*imageprocessor.RemoveBackgroundResult, error) {
 	copy := *request
 	s.removeRequests = append(s.removeRequests, &copy)
+	if s.removeErr != nil {
+		return nil, s.removeErr
+	}
+	if s.removeResult != nil {
+		return s.removeResult, nil
+	}
 	return &imageprocessor.RemoveBackgroundResult{
 		ImageBase64: s.foregroundBase64,
 		MIMEType:    "image/png",
@@ -91,6 +101,12 @@ func (s *animationProcessorStub) Resize(
 ) (*imageprocessor.ResizeResult, error) {
 	copy := *request
 	s.resizeRequests = append(s.resizeRequests, &copy)
+	if s.resizeErr != nil {
+		return nil, s.resizeErr
+	}
+	if s.resizeResult != nil {
+		return s.resizeResult, nil
+	}
 	if request.Options.SpritePixelPipeline && request.Options.PreserveCanvasGeometry {
 		return imageprocessor.NewProcessor().Resize(ctx, request)
 	}
@@ -863,3 +879,187 @@ func animationTestVideoFramesWithMatte(count int, matte color.NRGBA) []image.Ima
 var _ videoclient.VideoGenerationService = (*animationVideoServiceStub)(nil)
 var _ imageprocessor.Processor = (*animationProcessorStub)(nil)
 var _ videoprocessor.Processor = (*animationVideoProcessorStub)(nil)
+
+func TestPrepareAdaptiveAnimationReferenceRejectsDecodeError(t *testing.T) {
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{},
+		&animationProcessorStub{foregroundBase64: animationTestForeground(t)},
+		&animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), "not-valid-base64", false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "decode animation reference") {
+		t.Fatalf("expected decode error, got: %v", err)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsRemoveBackgroundError(t *testing.T) {
+	opaque := animationTestOpaquePrototype(t)
+	processor := &animationProcessorStub{removeErr: errors.New("remove failed")}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), opaque, false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "remove animation reference background") {
+		t.Fatalf("expected remove error, got: %v", err)
+	}
+	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
+		t.Fatalf("unexpected remove-background request: %+v", processor.removeRequests)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsEmptyRemoveResult(t *testing.T) {
+	opaque := animationTestOpaquePrototype(t)
+	processor := &animationProcessorStub{
+		removeResult: &imageprocessor.RemoveBackgroundResult{ImageBase64: "   ", MIMEType: "image/png"},
+	}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), opaque, false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "remove animation reference background: empty result") {
+		t.Fatalf("expected empty remove result error, got: %v", err)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceUsesPreparedPath(t *testing.T) {
+	prepared := animationTestPreparedGreenReference(t)
+	processor := &animationProcessorStub{foregroundBase64: animationTestForeground(t)}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	result, matte, matteSafe, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), "data:image/png;base64,"+prepared, true, 32, 32, 16, 16, nil,
+	)
+	if err != nil {
+		t.Fatalf("prepared reference: %v", err)
+	}
+	decoded, err := imageprocessor.DecodeBase64Image(result)
+	if err != nil {
+		t.Fatalf("decode prepared reference: %v", err)
+	}
+	if got, want := decoded.Bounds().Size(), image.Pt(512, 512); got != want {
+		t.Fatalf("prepared reference size = %v, want %v", got, want)
+	}
+	if len(processor.removeRequests) != 0 || len(processor.resizeRequests) != 0 {
+		t.Fatalf("prepared reference used normal processor path: remove=%d resize=%d", len(processor.removeRequests), len(processor.resizeRequests))
+	}
+	if matte != (imageprocessor.MatteColor{0, 255, 255}) || !matteSafe {
+		t.Fatalf("selected matte = %v, safe=%v; want cyan, safe", matte, matteSafe)
+	}
+	if got := color.NRGBAModel.Convert(decoded.At(0, 0)).(color.NRGBA); got != (color.NRGBA{G: 255, B: 255, A: 255}) {
+		t.Fatalf("prepared reference corner = %#v, want selected matte", got)
+	}
+	content := animationReferenceContentBounds(t, decoded)
+	if got, want := content.Size(), image.Pt(64, 368); got != want {
+		t.Fatalf("prepared subject size = %v, want %v", got, want)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceUsesRemoveAndResizePath(t *testing.T) {
+	foreground := animationTestForeground(t)
+	processor := &animationProcessorStub{foregroundBase64: foreground}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	result, matte, matteSafe, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), animationTestOpaquePrototype(t), false, 32, 48, 64, 64, nil,
+	)
+	if err != nil {
+		t.Fatalf("normal reference: %v", err)
+	}
+	if len(processor.removeRequests) != 1 || processor.removeRequests[0].MatteColor != "auto" {
+		t.Fatalf("unexpected remove-background calls: %+v", processor.removeRequests)
+	}
+	if len(processor.resizeRequests) != 1 {
+		t.Fatalf("resize calls = %d, want 1", len(processor.resizeRequests))
+	}
+	request := processor.resizeRequests[0]
+	if request.Options.Margin != 0 || request.Options.CropContent || !request.Options.PreserveCanvasGeometry {
+		t.Fatalf("unexpected reference resize options: %+v", request.Options)
+	}
+	if got, want := request.Options.Width, animationReferencePrototypeCanvasSize(animationReferenceCanvasSize(), 32, 48, 64, 64).X; got != want {
+		t.Fatalf("reference resize width = %d, want %d", got, want)
+	}
+	if got, want := request.Options.Height, animationReferencePrototypeCanvasSize(animationReferenceCanvasSize(), 32, 48, 64, 64).Y; got != want {
+		t.Fatalf("reference resize height = %d, want %d", got, want)
+	}
+	decoded, err := imageprocessor.DecodeBase64Image(result)
+	if err != nil {
+		t.Fatalf("decode normal reference: %v", err)
+	}
+	if got, want := decoded.Bounds().Size(), animationReferenceCanvasSize(); got != want {
+		t.Fatalf("normal reference size = %v, want %v", got, want)
+	}
+	if matte != (imageprocessor.MatteColor{0, 255, 255}) || !matteSafe {
+		t.Fatalf("selected matte = %v, safe=%v; want cyan, safe", matte, matteSafe)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRespectsMatteOverride(t *testing.T) {
+	prepared := animationTestPreparedGreenReference(t)
+	override := imageprocessor.MatteColor{255, 0, 255}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{},
+		&animationProcessorStub{foregroundBase64: animationTestForeground(t)},
+		&animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	result, matte, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), "data:image/png;base64,"+prepared, true, 32, 32, 16, 16, &override,
+	)
+	if err != nil {
+		t.Fatalf("matte override: %v", err)
+	}
+	if matte != override {
+		t.Fatalf("expected matte override %v, got %v", override, matte)
+	}
+	decoded, err := imageprocessor.DecodeBase64Image(result)
+	if err != nil {
+		t.Fatalf("decode override reference: %v", err)
+	}
+	if got := color.NRGBAModel.Convert(decoded.At(0, 0)).(color.NRGBA); got != (color.NRGBA{R: 255, B: 255, A: 255}) {
+		t.Fatalf("override reference corner = %#v, want magenta", got)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsResizeError(t *testing.T) {
+	processor := &animationProcessorStub{foregroundBase64: animationTestForeground(t), resizeErr: errors.New("resize failed")}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), animationTestOpaquePrototype(t), false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "normalize animation reference: resize failed") {
+		t.Fatalf("expected resize error, got: %v", err)
+	}
+}
+
+func TestPrepareAdaptiveAnimationReferenceRejectsEmptyResizeResult(t *testing.T) {
+	processor := &animationProcessorStub{
+		foregroundBase64: animationTestForeground(t),
+		resizeResult:     &imageprocessor.ResizeResult{ImageBase64: "   ", MIMEType: "image/png"},
+	}
+	service := newAnimationGenerationService(
+		&animationVideoServiceStub{}, processor, &animationVideoProcessorStub{},
+	).(*animationGenerationService)
+
+	_, _, _, err := service.prepareAdaptiveAnimationReference(
+		context.Background(), animationTestOpaquePrototype(t), false, 32, 32, 16, 16, nil,
+	)
+	if err == nil || !strings.Contains(err.Error(), "normalize animation reference: empty result") {
+		t.Fatalf("expected empty resize error, got: %v", err)
+	}
+}
