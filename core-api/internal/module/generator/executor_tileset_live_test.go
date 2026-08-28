@@ -658,8 +658,7 @@ func TestLiveSideOnFlatTilesetGeneration(t *testing.T) {
 	}
 	processor := imageprocessor.NewProcessor()
 
-	artifactDir := "/Users/lx/.gemini/antigravity/brain/e61e5a24-43e3-4309-bb3d-470f55bca4ac"
-	_ = os.MkdirAll(artifactDir, 0o750)
+	artifactDir := t.TempDir()
 
 	references := &liveTileSetReferenceStore{
 		objects: make(map[string]string),
@@ -772,18 +771,25 @@ func TestLiveSideOnFlatTilesetGeneration(t *testing.T) {
 
 	resultPath := filepath.Join(artifactDir, "side_on_tileset_result.png")
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, canvas); err == nil {
-		_ = os.WriteFile(resultPath, buf.Bytes(), 0o600)
-		t.Logf("Saved Side-On tileset preview to: %s", resultPath)
+	if err := png.Encode(&buf, canvas); err != nil {
+		t.Fatalf("encode Side-On tileset preview: %v", err)
 	}
+	if err := os.WriteFile(resultPath, buf.Bytes(), 0o600); err != nil {
+		t.Fatalf("write Side-On tileset preview: %v", err)
+	}
+	t.Logf("Saved Side-On tileset preview to: %s", resultPath)
 
 	// Also write raw image
 	rawB64 := capturing.GetLastGenerated()
 	if rawB64 != "" {
-		if rawDecoded, err := base64.StdEncoding.DecodeString(rawB64); err == nil {
-			rawPath := filepath.Join(artifactDir, "side_on_tileset_raw.png")
-			_ = os.WriteFile(rawPath, rawDecoded, 0o600)
-			t.Logf("Saved Side-On raw model image to: %s", rawPath)
+		rawDecoded, err := base64.StdEncoding.DecodeString(rawB64)
+		if err != nil {
+			t.Fatalf("decode Side-On raw model image: %v", err)
 		}
+		rawPath := filepath.Join(artifactDir, "side_on_tileset_raw.png")
+		if err := os.WriteFile(rawPath, rawDecoded, 0o600); err != nil {
+			t.Fatalf("write Side-On raw model image: %v", err)
+		}
+		t.Logf("Saved Side-On raw model image to: %s", rawPath)
 	}
 }
