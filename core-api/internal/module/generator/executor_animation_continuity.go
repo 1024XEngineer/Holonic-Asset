@@ -78,7 +78,7 @@ func animationFrameSafetyMarginRatio(width, height int) float64 {
 	return min(.025, 1/float64(shortEdge))
 }
 
-func validateEditFrameContinuity(request AnimationGenerationRequest, generated []image.Image) error {
+func validateEditFrameContinuity(request AnimationGenerationRequest, generated []image.Image, chromaKey videoprocessor.ChromaKey) error {
 	original := request.continuityReferenceFrames
 	if len(original) != request.FrameCount {
 		return fmt.Errorf("generator: edit frame continuity references contain %d frames; expected %d", len(original), request.FrameCount)
@@ -104,15 +104,15 @@ func validateEditFrameContinuity(request AnimationGenerationRequest, generated [
 		}
 	}
 
-	originalAnalysis, err := videoprocessor.AnalyzeFrameSequence(original, request.FPS, animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight))
+	originalAnalysis, err := videoprocessor.AnalyzeFrameSequence(original, request.FPS, chromaKey)
 	if err != nil {
 		return fmt.Errorf("generator: analyze original edit frame context: %w", err)
 	}
-	finalAnalysis, err := videoprocessor.AnalyzeFrameSequence(finalFrames, request.FPS, animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight))
+	finalAnalysis, err := videoprocessor.AnalyzeFrameSequence(finalFrames, request.FPS, chromaKey)
 	if err != nil {
 		return fmt.Errorf("generator: analyze edited frame context: %w", err)
 	}
-	editDifferences, err := videoprocessor.AnalyzeFramePairs(original, generated, animationVideoChromaKey())
+	editDifferences, err := videoprocessor.AnalyzeFramePairs(original, generated, chromaKey)
 	if err != nil {
 		return fmt.Errorf("generator: compare original and edited frame context: %w", err)
 	}
