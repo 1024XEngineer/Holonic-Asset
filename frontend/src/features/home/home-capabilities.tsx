@@ -19,7 +19,7 @@ const capabilities = [
     docsHref: "/docs/asset-concepts#character",
     icon: ImageIcon,
     preview: {
-      src: "/assets/characters/basketballPlayer/running-4-frames_south.gif",
+      src: "/assets/characters/home-character.gif",
       alt: "Basketball player running south animation",
     },
   },
@@ -32,7 +32,7 @@ const capabilities = [
     docsHref: "/docs/asset-concepts#object",
     icon: Sparkles,
     preview: {
-      src: "/assets/object/blue.gif",
+      src: "/assets/object/home-object.gif",
       alt: "Animated blue object",
     },
   },
@@ -55,7 +55,7 @@ const capabilities = [
     docsHref: "/docs/asset-concepts#tileset",
     icon: Layers3,
     preview: {
-      src: "/assets/split_same_32px_grid_assets/Interior_Props_01.png",
+      src: "/assets/tileset.png",
       alt: "Pixel-art interior tileset preview",
     },
   },
@@ -111,7 +111,6 @@ export function HomeCapabilities() {
                   Icon={Icon}
                   imageAlt={t(`capabilities.${key}.alt`)}
                   sceneryAlt={t("capabilities.scenery.alt")}
-                  sceneryTreesAlt={t("capabilities.scenery.treesAlt")}
                 />
               </div>
 
@@ -147,44 +146,24 @@ function CapabilityPreview({
   Icon,
   imageAlt,
   sceneryAlt,
-  sceneryTreesAlt,
 }: {
   title: string;
   preview: { readonly src: string; readonly alt: string } | undefined;
   Icon: LucideIcon;
   imageAlt: string;
   sceneryAlt: string;
-  sceneryTreesAlt: string;
 }) {
   if (title === "Scenery") {
     return (
       <div className="w-[92%]">
-        <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
-          <img
-            src="/assets/sky.png"
-            alt={sceneryAlt}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute inset-0 size-full object-cover"
-          />
-          <img
-            src="/assets/wind-clean.png"
-            alt=""
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute inset-0 z-10 size-full origin-bottom scale-110 -translate-y-[38%] object-cover"
-          />
-          <img
-            src="/assets/nearby-trees-clean.png"
-            alt={sceneryTreesAlt}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute -left-[6%] -bottom-[10%] h-auto w-[112%] max-w-none mix-blend-multiply"
-          />
-        </div>
+        <img
+          src="/assets/scenery.png"
+          alt={sceneryAlt}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          className="aspect-[16/10] w-full rounded-xl object-cover"
+        />
       </div>
     );
   }
