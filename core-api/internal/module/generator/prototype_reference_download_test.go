@@ -37,6 +37,17 @@ func (prototypeDownloadTimeoutError) Error() string   { return "timed out" }
 func (prototypeDownloadTimeoutError) Timeout() bool   { return true }
 func (prototypeDownloadTimeoutError) Temporary() bool { return true }
 
+type prototypeDownloadCancelingTimeoutError struct {
+	cancel context.CancelFunc
+}
+
+func (e prototypeDownloadCancelingTimeoutError) Error() string { return "timed out" }
+func (e prototypeDownloadCancelingTimeoutError) Timeout() bool {
+	e.cancel()
+	return true
+}
+func (prototypeDownloadCancelingTimeoutError) Temporary() bool { return true }
+
 func TestValidatePrototypeReferenceURLRejectsNonPublicLiteralTargets(t *testing.T) {
 	for _, value := range []string{
 		"http://127.0.0.1/reference.png",
@@ -355,6 +366,38 @@ func TestDownloadPrototypeReferenceRetriesTransientRequestFailure(t *testing.T) 
 	}
 }
 
+func TestDownloadPrototypeReferenceDefaultClientHonorsCanceledContext(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = (&executor{}).downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want context cancellation", err)
+	}
+}
+
+func TestDownloadPrototypeReferenceStopsWhenRequestRetryIsCanceled(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, prototypeDownloadCancelingTimeoutError{cancel: cancel}
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want retry cancellation", err)
+	}
+}
+
 func TestDownloadPrototypeReferenceRejectsOversizedContentLength(t *testing.T) {
 	parsed, err := url.Parse("https://references.example/reference.png")
 	if err != nil {
@@ -398,6 +441,27 @@ func TestDownloadPrototypeReferenceDoesNotRetryPermanentReadFailure(t *testing.T
 	}
 	if attempts != 1 {
 		t.Fatalf("download attempts = %d, want 1", attempts)
+	}
+}
+
+func TestDownloadPrototypeReferenceStopsWhenReadRetryIsCanceled(t *testing.T) {
+	parsed, err := url.Parse("https://references.example/reference.png")
+	if err != nil {
+		t.Fatalf("parse reference URL: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	executor := &executor{referenceHTTPClient: &http.Client{
+		Transport: prototypeDownloadRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       prototypeDownloadReadCloser{err: prototypeDownloadCancelingTimeoutError{cancel: cancel}},
+			}, nil
+		}),
+	}}
+
+	_, err = executor.downloadPrototypeReference(ctx, parsed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("download error = %v, want retry cancellation", err)
 	}
 }
 
