@@ -3,6 +3,7 @@ export {
   isGenerationRunActive,
   rememberGenerationRunMetadata,
   useDeleteGenerationRunMutation,
+  useEnqueueAssetEditGenerationMutation,
   useEnqueueGenerationMutation,
   useGenerationCandidateQuery,
   useGenerationRunsQuery,

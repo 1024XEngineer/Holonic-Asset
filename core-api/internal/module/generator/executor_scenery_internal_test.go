@@ -8,13 +8,17 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"math"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/imageclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/generator/llmclient"
 	"github.com/1024XEngineer/Holonic-Asset/internal/module/logger"
+	imageprocessor "github.com/1024XEngineer/Holonic-Asset/internal/module/processor/image"
 	assetdomain "github.com/1024XEngineer/Holonic-Asset/internal/module/workspace/asset"
 )
 
@@ -417,5 +421,93 @@ func TestNewSceneryAssetAndBatchID(t *testing.T) {
 	execErr := &executor{resources: resErrStore}
 	if err := execErr.deleteSceneryResources(context.Background(), []string{"k1"}); err == nil {
 		t.Fatal("expected error from deleteSceneryResources")
+	}
+}
+
+type sceneryLayerImageStub struct {
+	requests []*imageclient.GenerateRequest
+	result   *imageclient.GenerateResult
+	err      error
+}
+
+func (s *sceneryLayerImageStub) Generate(_ context.Context, request *imageclient.GenerateRequest) (*imageclient.GenerateResult, error) {
+	copy := *request
+	copy.ReferenceImages = append([]string(nil), request.ReferenceImages...)
+	s.requests = append(s.requests, &copy)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.result, nil
+}
+
+type sceneryReferenceRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function sceneryReferenceRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
+func TestGenerateSceneryLayersPassesDownloadedReferenceToImageGeneration(t *testing.T) {
+	referenceImage := image.NewNRGBA(image.Rect(0, 0, imageprocessor.DefaultReferenceMaxEdge, 1))
+	for x := range imageprocessor.DefaultReferenceMaxEdge {
+		referenceImage.SetNRGBA(x, 0, color.NRGBA{R: 20, G: 40, B: 60, A: 255})
+	}
+	var referenceBuffer bytes.Buffer
+	if err := png.Encode(&referenceBuffer, referenceImage); err != nil {
+		t.Fatalf("encode reference fixture: %v", err)
+	}
+	referenceBytes := referenceBuffer.Bytes()
+	candidate := sceneryPreviewLayer(t, 1, []color.RGBA{{R: 20, G: 40, B: 60, A: 255}, {R: 20, G: 40, B: 60, A: 255}})
+	images := &sceneryLayerImageStub{result: &imageclient.GenerateResult{
+		Images: []imageclient.GeneratedImage{{Base64: candidate.ImageBase64, MediaType: "image/png"}},
+	}}
+	exec := &executor{
+		images:     images,
+		processor:  imageprocessor.NewProcessor(),
+		references: &stubReferenceStore{resolved: "https://example.com/reference.png"},
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if request.Method != http.MethodGet || request.URL.String() != "https://example.com/reference.png" {
+				t.Fatalf("unexpected reference download request: %s %s", request.Method, request.URL)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(bytes.NewReader(referenceBytes)),
+			}, nil
+		})},
+	}
+
+	layers, err := exec.generateSceneryLayers(context.Background(), CreateSceneryPayload{
+		Dimensions:        assetdomain.Size{Width: 2, Height: 1},
+		CreatingReference: "uploads/reference.png",
+	}, []SceneryLayerDefinition{{ID: 1, Name: "Backdrop"}})
+	if err != nil {
+		t.Fatalf("generate scenery layers with downloaded reference: %v", err)
+	}
+	if len(layers) != 1 || layers[0].ID != 1 {
+		t.Fatalf("unexpected generated layers: %+v", layers)
+	}
+	if len(images.requests) != 1 {
+		t.Fatalf("image generation calls = %d, want 1", len(images.requests))
+	}
+	wantReference := "data:image/png;base64," + base64.StdEncoding.EncodeToString(referenceBytes)
+	if got := images.requests[0].ReferenceImages; len(got) != 1 || got[0] != wantReference {
+		t.Fatalf("image references = %q, want downloaded data URL %q", got, wantReference)
+	}
+}
+
+func TestGenerateSceneryLayersWrapsReferenceDownloadError(t *testing.T) {
+	downloadErr := errors.New("download failed")
+	exec := &executor{
+		references: &stubReferenceStore{resolved: "https://example.com/reference.png"},
+		referenceHTTPClient: &http.Client{Transport: sceneryReferenceRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, downloadErr
+		})},
+	}
+
+	_, err := exec.generateSceneryLayers(context.Background(), CreateSceneryPayload{
+		CreatingReference: "uploads/reference.png",
+	}, []SceneryLayerDefinition{{ID: 1}})
+	if !errors.Is(err, downloadErr) || !strings.Contains(err.Error(), "resolve scenery reference") {
+		t.Fatalf("expected wrapped download error, got: %v", err)
 	}
 }

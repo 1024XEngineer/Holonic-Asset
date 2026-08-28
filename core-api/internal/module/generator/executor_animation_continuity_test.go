@@ -33,7 +33,7 @@ func TestValidateEditFrameContinuityAcceptsComparableNeighborMotion(t *testing.T
 		continuityReferenceFrames: original,
 	}
 
-	if err := validateEditFrameContinuity(request, generated); err != nil {
+	if err := validateEditFrameContinuity(request, generated, animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight)); err != nil {
 		t.Fatalf("expected smooth local edit to pass: %v", err)
 	}
 }
@@ -69,7 +69,7 @@ func TestValidateEditFrameContinuityRejectsAbruptPoseAndRootChanges(t *testing.T
 				FrameCount:                3,
 				FPS:                       10,
 				continuityReferenceFrames: original,
-			}, generated)
+			}, generated, animationVideoChromaKeyForFrame(96, 96))
 			var qualityError *videoprocessor.QualityError
 			if !errors.As(err, &qualityError) || qualityError.Kind != "continuity" || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %s continuity rejection, got %v", test.want, err)
@@ -97,7 +97,7 @@ func TestValidateEditFrameContinuityRejectsCollapsedOriginalMotion(t *testing.T)
 		FrameCount:                3,
 		FPS:                       10,
 		continuityReferenceFrames: original,
-	}, generated)
+	}, generated, animationVideoChromaKeyForFrame(96, 96))
 	var qualityError *videoprocessor.QualityError
 	if !errors.As(err, &qualityError) || qualityError.Kind != "motion_preservation" ||
 		!strings.Contains(err.Error(), "overall motion excursion") {
@@ -119,7 +119,7 @@ func TestValidateEditFrameContinuityRejectsNoOpEdit(t *testing.T) {
 		FrameCount:                len(original),
 		FPS:                       10,
 		continuityReferenceFrames: original,
-	}, append([]image.Image(nil), original...))
+	}, append([]image.Image(nil), original...), animationVideoChromaKeyForFrame(96, 96))
 	var qualityError *videoprocessor.QualityError
 	if !errors.As(err, &qualityError) || qualityError.Kind != "edit_application" ||
 		!strings.Contains(err.Error(), "not visibly applied") {
@@ -146,7 +146,7 @@ func TestValidateEditFrameContinuityAcceptsVisibleAdditiveGesture(t *testing.T) 
 		FrameCount:                len(original),
 		FPS:                       10,
 		continuityReferenceFrames: original,
-	}, generated)
+	}, generated, animationVideoChromaKeyForFrame(96, 96))
 	if err != nil {
 		t.Fatalf("expected visible additive gesture to pass: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestValidateEditFrameContinuityAllowsLargeMotionInsideTargetInterval(t *tes
 		FrameCount:                len(original),
 		FPS:                       10,
 		continuityReferenceFrames: original,
-	}, generated)
+	}, generated, animationVideoChromaKeyForFrame(96, 96))
 	if err != nil {
 		t.Fatalf("expected clear internal target motion with smooth seams to pass: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestValidateEditFrameContinuityRejectsDisorderedMotionPhases(t *testing.T) 
 		FrameCount:                len(targets),
 		FPS:                       10,
 		continuityReferenceFrames: original,
-	}, generated)
+	}, generated, animationVideoChromaKeyForFrame(96, 96))
 	var qualityError *videoprocessor.QualityError
 	if !errors.As(err, &qualityError) || qualityError.Kind != "temporal_coherence" ||
 		!strings.Contains(err.Error(), "vertical pose extent changes direction") {

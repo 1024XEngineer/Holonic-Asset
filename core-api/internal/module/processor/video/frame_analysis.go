@@ -63,7 +63,7 @@ func AnalyzeFrameSequence(frames []image.Image, fps int, chromaKey ChromaKey) (F
 	if !chromaKey.valid() {
 		return FrameSequenceAnalysis{}, fmt.Errorf("video: valid chroma key settings are required")
 	}
-	if chromaKey.AutoDetect {
+	if chromaKey.AutoDetect && !chromaKey.MatteLocked {
 		chromaKey = resolveAutoDetectedChromaKey(frames, chromaKey)
 	}
 	analyses := make([]frameAnalysis, len(frames))
@@ -103,7 +103,7 @@ func AnalyzeFramePairs(
 			return nil, fmt.Errorf("video: candidate frame sequence image %d is empty", index)
 		}
 		leftKey, rightKey := chromaKey, chromaKey
-		if chromaKey.AutoDetect {
+		if chromaKey.AutoDetect && !chromaKey.MatteLocked {
 			leftKey = resolveAutoDetectedChromaKey([]image.Image{original[index]}, chromaKey)
 			rightKey = resolveAutoDetectedChromaKey([]image.Image{candidate[index]}, chromaKey)
 		}

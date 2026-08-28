@@ -200,7 +200,7 @@ func prototypeReferenceRequestTransient(err error) bool {
 		return true
 	}
 	var networkErr net.Error
-	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
+	return errors.As(err, &networkErr) && networkErr.Timeout()
 }
 
 func sleepBeforePrototypeReferenceRetry(ctx context.Context, attempt int) error {

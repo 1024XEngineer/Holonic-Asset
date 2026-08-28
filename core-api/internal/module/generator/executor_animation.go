@@ -160,6 +160,9 @@ type AnimationGenerationRequest struct {
 	AspectRatio     string
 
 	continuityReferenceFrames []image.Image
+	matteColor                imageprocessor.MatteColor
+	matteColorSet             bool
+	matteColorSafe            bool
 }
 
 type AnimationGenerationResult struct {
@@ -302,41 +305,31 @@ func (s *animationGenerationService) Generate(
 			return nil, err
 		}
 	}
-	promptOptions := prompts.AnimationOptions{
-		Description:        options.Description,
-		Style:              options.Style,
-		Action:             options.Action,
-		OriginalAction:     options.OriginalAction,
-		FrameCount:         options.FrameCount,
-		PrototypeWidth:     options.PrototypeWidth,
-		PrototypeHeight:    options.PrototypeHeight,
-		FrameWidth:         options.FrameWidth,
-		FrameHeight:        options.FrameHeight,
-		LocalFrameEdit:     options.ReferenceImageContext,
-		TargetFrameIndices: options.TargetFrameIndices,
-	}
-	greenReference, err := s.prepareAnimationReference(
-		ctx,
-		options.ReferenceImage,
-		options.ReferenceImagePrepared,
-		options.PrototypeWidth,
-		options.PrototypeHeight,
-		options.FrameWidth,
-		options.FrameHeight,
+	greenReference, matte, matteSafe, err := s.prepareAdaptiveAnimationReference(
+		ctx, options.ReferenceImage, options.ReferenceImagePrepared,
+		options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
+		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
+	options.matteColor = matte
+	options.matteColorSet = true
+	options.matteColorSafe = matteSafe
+	promptOptions := prompts.AnimationOptions{
+		Description: options.Description, Style: options.Style, Action: options.Action,
+		OriginalAction: options.OriginalAction, FrameCount: options.FrameCount,
+		PrototypeWidth: options.PrototypeWidth, PrototypeHeight: options.PrototypeHeight,
+		FrameWidth: options.FrameWidth, FrameHeight: options.FrameHeight,
+		LocalFrameEdit: options.ReferenceImageContext, TargetFrameIndices: options.TargetFrameIndices,
+		MatteColor: imageprocessor.ColorToHex(matte),
+	}
 	var endReference *videoclient.ReferenceImage
 	if options.EndReferenceImage != "" {
-		greenEndReference, prepareErr := s.prepareAnimationReference(
-			ctx,
-			options.EndReferenceImage,
-			options.ReferenceImagePrepared,
-			options.PrototypeWidth,
-			options.PrototypeHeight,
-			options.FrameWidth,
-			options.FrameHeight,
+		greenEndReference, _, _, prepareErr := s.prepareAdaptiveAnimationReference(
+			ctx, options.EndReferenceImage, options.ReferenceImagePrepared,
+			options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
+			&matte,
 		)
 		if prepareErr != nil {
 			return nil, fmt.Errorf("generator: prepare end animation reference: %w", prepareErr)
@@ -430,6 +423,10 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 	}
 	var loop AnimationLoopSelection
 	chromaKey := animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight)
+	if request.matteColorSet {
+		chromaKey = videoprocessor.ChromaKeyForMatte(request.matteColor)
+		chromaKey.SafetyMarginRatio = animationFrameSafetyMarginRatio(request.FrameWidth, request.FrameHeight)
+	}
 	processed, err := s.videoProcessor.Process(ctx, video, videoprocessor.ProcessOptions{
 		AnalysisFPS: animationAnalysisFPS,
 		ChromaKey:   chromaKey,
@@ -460,7 +457,7 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		return nil, err
 	}
 	if request.ReferenceImageContext {
-		if err := validateEditFrameContinuity(request, processed.Frames); err != nil {
+		if err := validateEditFrameContinuity(request, processed.Frames, chromaKey); err != nil {
 			return nil, err
 		}
 	}
@@ -501,6 +498,17 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 	if math.Abs(sourceCellScaleMultiplier-1) > 1e-9 {
 		splitSourceCellScaleMultiplier = sourceCellScaleMultiplier
 	}
+	// Direct callers without a chosen matte retain the historical automatic,
+	// conservative keying mode. Generate always selects a matte and can safely
+	// key enclosed holes globally because that colour is subject-safe.
+	matteColor := "auto"
+	borderConnectedOnly := true
+	if request.matteColorSet && request.matteColorSafe {
+		matteColor = imageprocessor.ColorToHex(request.matteColor)
+		borderConnectedOnly = false
+	} else if request.matteColorSet {
+		matteColor = imageprocessor.ColorToHex(request.matteColor)
+	}
 	normalized, err := s.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 		ImageBase64:               encoded,
 		Mode:                      imageprocessor.ImageSplitModeAnimation,
@@ -516,14 +524,12 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		PreserveVerticalMotion:    true,
 		PreserveSourceCellScale:   true,
 		SourceCellScaleMultiplier: splitSourceCellScaleMultiplier,
-		// The video prompt asks for a matte, but providers can return a
-		// different (or compressed) background colour. Sample the frame
-		// borders instead of assuming an exact pure-green key; otherwise
-		// normalization may receive an entirely opaque sheet and cannot
-		// compute the character bounds.
+		// Generate carries one explicitly selected, subject-safe matte through
+		// the reference, prompt, analysis, and extraction paths. Legacy direct
+		// callers retain automatic border sampling and conservative keying.
 		Background: &imageprocessor.AnimationBackgroundOptions{
-			MatteColor:          "auto",
-			BorderConnectedOnly: true,
+			MatteColor:          matteColor,
+			BorderConnectedOnly: borderConnectedOnly,
 		},
 	})
 	if err != nil {
