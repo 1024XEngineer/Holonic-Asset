@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withI18n } from "@/testing/with-i18n";
 
@@ -121,7 +127,46 @@ vi.mock("../Inspector/inspector", () => ({
 
 import { AssetCanvasEditorMode } from "./asset-canvas-editor-mode";
 
+afterEach(cleanup);
+
 describe("AssetCanvasEditorMode tileset wiring", () => {
+  it("clears the selected tiles after an edit is submitted", async () => {
+    mocks.canvas.send.mockClear();
+    mocks.editor.onSubmit.mockResolvedValueOnce(true);
+    render(
+      withI18n(
+        <AssetCanvasEditorMode
+          data={{
+            projectName: "Project",
+            asset: {
+              id: "8",
+              projectId: "7",
+              kind: "tileset",
+              name: "Tileset",
+              perspective: "Top-Down",
+              version: "v1",
+              history: [],
+            },
+            record: {
+              mode: "tileset",
+              prompt: "Add moss",
+              tileset: { gridSize: 4, items: mocks.editor.sourceItems },
+            },
+          }}
+          onBack={vi.fn()}
+        />,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "submit edit" }));
+
+    await waitFor(() =>
+      expect(mocks.canvas.send).toHaveBeenCalledWith({
+        type: "selection.cleared",
+      }),
+    );
+  });
+
   it("routes tree, canvas, review, and inspector events", () => {
     mocks.editor.review = {
       items: [],

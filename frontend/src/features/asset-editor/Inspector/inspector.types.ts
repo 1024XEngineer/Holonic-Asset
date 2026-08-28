@@ -101,7 +101,9 @@ export type TilesetInspectorProps = {
   targetError: string | null;
   isSubmitting?: boolean;
   onPromptChange: (value: string) => void;
-  onSubmit: (request: EditPromptSubmitRequest) => void | Promise<void>;
+  onSubmit: (
+    request: EditPromptSubmitRequest,
+  ) => void | boolean | Promise<void | boolean>;
   onClearSelection: () => void;
 };
 

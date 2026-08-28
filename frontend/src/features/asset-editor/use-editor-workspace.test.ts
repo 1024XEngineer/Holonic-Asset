@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     mutateAsync: vi.fn(),
   },
-  coreCreate: vi.fn(),
+  enqueueAssetEdit: vi.fn(),
   candidateQuery: {
     data: undefined as
       | {
@@ -41,7 +41,6 @@ const mocks = vi.hoisted(() => ({
     projectId?: string;
     error?: string;
   }>,
-  rememberGenerationRunMetadata: vi.fn(),
   schedules: [] as Array<{ callback: () => void; delay: number }>,
   session: {
     dispatch: vi.fn(),
@@ -94,8 +93,9 @@ vi.mock("@/model", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/model")>();
   return {
     ...actual,
-    coreGenerationApi: { create: mocks.coreCreate },
-    rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
+    useEnqueueAssetEditGenerationMutation: () => ({
+      mutateAsync: mocks.enqueueAssetEdit,
+    }),
     useGenerateAnimationMutation: () => mocks.animationMutation,
     useAssetExport: () => mocks.assetExport,
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
@@ -127,7 +127,7 @@ beforeEach(() => {
     generationId: "generation-1",
     animation: { kind: "clip", label: "Walk", frameCount: 4 },
   });
-  mocks.coreCreate.mockResolvedValue({ generationRunId: 31 });
+  mocks.enqueueAssetEdit.mockResolvedValue({ id: "31" });
   mocks.session.save.mockResolvedValue({ status: "saved" });
   mocks.session.snapshot = snapshot(spriteRecord("character"));
 });
@@ -223,18 +223,8 @@ describe("useEditorWorkspace", () => {
         assetKind: "character",
       }),
     );
-    expect(mocks.coreCreate).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ assetId: 8, kind: "edit_character_prototype" }),
-    );
-    expect(mocks.rememberGenerationRunMetadata).toHaveBeenCalledWith("7", 31, {
-      kind: "character",
-      name: "Edit Asset",
-      prompt: "Refine hero",
-      assetId: "8",
-    });
+    expect(mocks.enqueueAssetEdit).not.toHaveBeenCalled();
     expect(mocks.schedules.map(({ delay }) => delay)).toContain(2400);
-    expect(mocks.schedules.map(({ delay }) => delay)).toContain(1800);
   });
 
   it("starts the inspector edit prompt empty instead of using the asset description", () => {
@@ -279,7 +269,7 @@ describe("useEditorWorkspace", () => {
 
     expect(editor.header.generationTasks).toEqual([animationTask, promptTask]);
     expect(editor.inspector.isSubmitting).toBe(true);
-    expect(mocks.coreCreate).not.toHaveBeenCalled();
+    expect(mocks.enqueueAssetEdit).not.toHaveBeenCalled();
   });
 
   it("previews an awaiting result in the editor and offers apply or deny", async () => {
@@ -517,7 +507,7 @@ describe("useEditorWorkspace", () => {
     mocks.animationMutation.mutateAsync.mockRejectedValue(
       new Error("animation failed"),
     );
-    mocks.coreCreate.mockRejectedValue(new Error("prompt failed"));
+    mocks.enqueueAssetEdit.mockRejectedValue(new Error("prompt failed"));
     mocks.stateValues.push(null, null, null);
     const editor = useEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),
@@ -601,7 +591,7 @@ describe("useEditorWorkspace", () => {
     });
 
     expect(mocks.session.save).not.toHaveBeenCalled();
-    expect(mocks.coreCreate).not.toHaveBeenCalled();
+    expect(mocks.enqueueAssetEdit).not.toHaveBeenCalled();
   });
 });
 

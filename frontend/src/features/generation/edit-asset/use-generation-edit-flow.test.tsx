@@ -5,17 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   applicationMutation: { isPending: false, mutateAsync: vi.fn() },
-  coreCreate: vi.fn(),
-  rememberGenerationRunMetadata: vi.fn(),
-}));
-
-vi.mock("@/hooks/use-timeout", () => ({
-  useTimeout: () => ({ schedule: vi.fn() }),
+  enqueueMutation: { mutateAsync: vi.fn() },
 }));
 
 vi.mock("@/model", () => ({
-  coreGenerationApi: { create: mocks.coreCreate },
-  rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
+  isGenerationRunActive: (run: { status: string }) =>
+    run.status === "pending" || run.status === "processing",
+  useEnqueueAssetEditGenerationMutation: () => mocks.enqueueMutation,
   useGenerationCandidateQuery: () => ({ data: undefined }),
   useGenerationRunsQuery: () => ({ data: [] }),
   useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
@@ -27,15 +23,15 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.coreCreate.mockResolvedValue({ generationRunId: 31 });
+  mocks.enqueueMutation.mutateAsync.mockResolvedValue({ id: "31" });
 });
 
 describe("useGenerationEditFlow", () => {
   it("drops a second submission while the first one is active", async () => {
-    let resolveCreate!: (value: { generationRunId: number }) => void;
-    mocks.coreCreate.mockImplementationOnce(
+    let resolveCreate!: (value: { id: string }) => void;
+    mocks.enqueueMutation.mutateAsync.mockImplementationOnce(
       () =>
-        new Promise<{ generationRunId: number }>((resolve) => {
+        new Promise<{ id: string }>((resolve) => {
           resolveCreate = resolve;
         }),
     );
@@ -69,11 +65,11 @@ describe("useGenerationEditFlow", () => {
       ),
     ).resolves.toBe(false);
 
-    resolveCreate({ generationRunId: 31 });
+    resolveCreate({ id: "31" });
     await act(async () => {
       await firstSubmission;
     });
 
-    expect(mocks.coreCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueMutation.mutateAsync).toHaveBeenCalledTimes(1);
   });
 });

@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
         }
       | undefined,
   },
-  coreCreate: vi.fn(),
+  enqueueAssetEdit: vi.fn(),
   generationRuns: [] as Array<{
     id: string;
     name: string;
@@ -33,7 +33,6 @@ const mocks = vi.hoisted(() => ({
     status: string;
     error?: string;
   }>,
-  rememberGenerationRunMetadata: vi.fn(),
   session: {
     dispatch: vi.fn(),
     save: vi.fn(),
@@ -88,8 +87,9 @@ vi.mock("@/model", async (importOriginal) => {
     ) =>
       mocks.candidateRecordOverride?.(...args) ??
       actual.toTilesetContentCandidate(...args),
-    coreGenerationApi: { create: mocks.coreCreate },
-    rememberGenerationRunMetadata: mocks.rememberGenerationRunMetadata,
+    useEnqueueAssetEditGenerationMutation: () => ({
+      mutateAsync: mocks.enqueueAssetEdit,
+    }),
     useGenerationCandidateQuery: () => mocks.candidateQuery,
     useGenerationRunsQuery: () => ({ data: mocks.generationRuns }),
     useResolveGenerationApplicationMutation: () => mocks.applicationMutation,
@@ -109,7 +109,7 @@ beforeEach(() => {
   mocks.applicationMutation.isPending = false;
   mocks.applicationMutation.mutateAsync.mockResolvedValue(undefined);
   mocks.candidateRecordOverride = undefined;
-  mocks.coreCreate.mockResolvedValue({ generationRunId: 31 });
+  mocks.enqueueAssetEdit.mockResolvedValue({ id: "31" });
   mocks.session.save.mockResolvedValue({ status: "saved" });
   mocks.session.snapshot = snapshot(tilesetRecord());
 });
@@ -144,20 +144,21 @@ describe("useTilesetEditorWorkspace", () => {
       },
     );
 
-    expect(mocks.coreCreate).toHaveBeenCalledWith(7, {
-      assetId: 8,
-      kind: "edit_tileset_item",
-      creative_brief: "Add moss",
-      parameters: {
-        target: { position: { x: 0, y: 0 } },
-        creating_reference: "uploads/moss.png",
-      },
-    });
-    expect(mocks.rememberGenerationRunMetadata).toHaveBeenCalledWith("7", 31, {
-      kind: "tileset",
-      name: "Edit Asset",
-      prompt: "Add moss",
+    expect(mocks.enqueueAssetEdit).toHaveBeenCalledWith({
+      projectId: "7",
       assetId: "8",
+      assetKind: "tileset",
+      assetName: "Asset",
+      prompt: "Add moss",
+      request: {
+        assetId: 8,
+        kind: "edit_tileset_item",
+        creative_brief: "Add moss",
+        parameters: {
+          target: { position: { x: 0, y: 0 } },
+          creating_reference: "uploads/moss.png",
+        },
+      },
     });
   });
 
@@ -302,22 +303,29 @@ describe("useTilesetEditorWorkspace", () => {
     ]);
     await editor?.onGenerateItem(request);
 
-    expect(mocks.coreCreate).toHaveBeenCalledWith(7, {
-      assetId: 8,
-      kind: "add_tileset_item",
-      creative_brief: "Dense leaves",
-      parameters: {
-        item: {
-          name: "Oak tree",
-          description: "Old oak",
-          shape: [[0, 0]],
+    expect(mocks.enqueueAssetEdit).toHaveBeenCalledWith({
+      projectId: "7",
+      assetId: "8",
+      assetKind: "tileset",
+      assetName: "Asset",
+      prompt: "Dense leaves",
+      request: {
+        assetId: 8,
+        kind: "add_tileset_item",
+        creative_brief: "Dense leaves",
+        parameters: {
+          item: {
+            name: "Oak tree",
+            description: "Old oak",
+            shape: [[0, 0]],
+          },
         },
       },
     });
   });
 
   it("reports a failed new item generation without rejecting", async () => {
-    mocks.coreCreate.mockRejectedValueOnce(new Error("offline"));
+    mocks.enqueueAssetEdit.mockRejectedValueOnce(new Error("offline"));
     const editor = useTilesetEditorWorkspace({
       data: workspace(mocks.session.snapshot.record),
       onBack: vi.fn(),
@@ -334,10 +342,10 @@ describe("useTilesetEditorWorkspace", () => {
   });
 
   it("keeps a newer item task when an older submission finishes", async () => {
-    let resolveFirst!: (value: { generationRunId: number }) => void;
-    mocks.coreCreate.mockImplementationOnce(
+    let resolveFirst!: (value: { id: string }) => void;
+    mocks.enqueueAssetEdit.mockImplementationOnce(
       () =>
-        new Promise<{ generationRunId: number }>((resolve) => {
+        new Promise<{ id: string }>((resolve) => {
           resolveFirst = resolve;
         }),
     );
@@ -356,10 +364,10 @@ describe("useTilesetEditorWorkspace", () => {
     await flushPromises();
     const second = editor?.onGenerateItem({ ...request, itemName: "Pine" });
     await second;
-    resolveFirst({ generationRunId: 31 });
+    resolveFirst({ id: "31" });
     await first;
 
-    expect(mocks.coreCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.enqueueAssetEdit).toHaveBeenCalledTimes(2);
   });
 
   it("rejects new item generation for temporary asset identifiers", async () => {

@@ -131,11 +131,12 @@ function ConnectedTilesetEditor({
           targetError={targetError}
           isSubmitting={editor.isSubmitting}
           onPromptChange={editor.onPromptChange}
-          onSubmit={(request) =>
-            resolution.target
-              ? editor.onSubmit(request, resolution.target)
-              : undefined
-          }
+          onSubmit={async (request) => {
+            if (!resolution.target) return false;
+            const submitted = await editor.onSubmit(request, resolution.target);
+            if (submitted) canvas.send({ type: "selection.cleared" });
+            return submitted;
+          }}
           onClearSelection={() => canvas.send({ type: "selection.cleared" })}
         />
       </div>
