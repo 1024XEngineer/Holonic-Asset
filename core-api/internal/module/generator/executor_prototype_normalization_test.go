@@ -13,8 +13,10 @@ import (
 var errPrototypeNormalizerNotImplemented = errors.New("prototype normalizer stub method was called")
 
 type prototypeNormalizerProcessor struct {
-	flipResult *imageprocessor.FlipHorizontalResult
-	flipErr    error
+	flipResult      *imageprocessor.FlipHorizontalResult
+	flipErr         error
+	normalizeResult *imageprocessor.NormalizeReferenceResult
+	normalizeErr    error
 }
 
 func (p *prototypeNormalizerProcessor) RemoveBackground(context.Context, *imageprocessor.RemoveBackgroundRequest) (*imageprocessor.RemoveBackgroundResult, error) {
@@ -22,6 +24,9 @@ func (p *prototypeNormalizerProcessor) RemoveBackground(context.Context, *imagep
 }
 
 func (p *prototypeNormalizerProcessor) NormalizeReference(context.Context, *imageprocessor.NormalizeReferenceRequest) (*imageprocessor.NormalizeReferenceResult, error) {
+	if p.normalizeResult != nil || p.normalizeErr != nil {
+		return p.normalizeResult, p.normalizeErr
+	}
 	return nil, errPrototypeNormalizerNotImplemented
 }
 
@@ -61,6 +66,27 @@ func (prototypeProcessorWithoutFlip) Verify(context.Context, *imageprocessor.Ver
 
 func (prototypeProcessorWithoutFlip) SplitImage(context.Context, *imageprocessor.SplitImageRequest) (*imageprocessor.SplitImageResult, error) {
 	return nil, errPrototypeNormalizerNotImplemented
+}
+
+func TestNormalizePrototypeReferencePreservesExistingDataURL(t *testing.T) {
+	t.Parallel()
+
+	const reference = "data:image/png;base64,cG5n"
+	executor := &executor{processor: &prototypeNormalizerProcessor{
+		normalizeResult: &imageprocessor.NormalizeReferenceResult{
+			ImageBase64: reference,
+			MIMEType:    "image/png",
+			Report:      imageprocessor.ReferenceNormalizationReport{Scale: 1},
+		},
+	}}
+
+	got, err := executor.normalizePrototypeReference(context.Background(), reference)
+	if err != nil {
+		t.Fatalf("normalize existing data URL: %v", err)
+	}
+	if got != reference {
+		t.Fatalf("normalized reference = %q, want %q", got, reference)
+	}
 }
 
 func TestNormalizeSideOnRegions(t *testing.T) {
