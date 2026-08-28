@@ -92,7 +92,7 @@ export function useTilesetEditorWorkspace({
     ) {
       throw new Error("Tileset editing requires persisted identifiers.");
     }
-    await flow.submit({
+    return flow.submit({
       prompt: request.prompt,
       request: buildTilesetGenerationRequest({
         assetId,
