@@ -52,6 +52,17 @@ func (e *Engine) handleAnimation(
 	return e.execute(ctx, GenerateAnimation, message.Payload)
 }
 
+func (e *Engine) handleDeriveAnimation(
+	ctx context.Context,
+	message *taskdomain.Task,
+) (any, error) {
+	payload := DeriveAnimationPayload{}
+	if err := decodeTaskPayload(message, &payload); err != nil {
+		return nil, err
+	}
+	return e.execute(ctx, DeriveAnimation, message.Payload)
+}
+
 func (e *Engine) handleEditAnimation(
 	ctx context.Context,
 	message *taskdomain.Task,
@@ -190,6 +201,7 @@ func (e *Engine) registerTaskHandlers(manager taskdomain.Manager) {
 	manager.Register(string(EditObjectProtoType), taskdomain.HandlerFunc(e.handleEditObjectPrototype))
 	manager.Register(string(GenerateObjectProtoType), taskdomain.HandlerFunc(e.handleObjectPrototype))
 	manager.Register(string(GenerateAnimation), taskdomain.HandlerFunc(e.handleAnimation))
+	manager.Register(string(DeriveAnimation), taskdomain.HandlerFunc(e.handleDeriveAnimation))
 	manager.Register(string(GenerateScenery), taskdomain.HandlerFunc(e.handleScenery))
 	manager.Register(string(EditAnimation), taskdomain.HandlerFunc(e.handleEditAnimation))
 	manager.Register(string(GenerateTileSet), taskdomain.HandlerFunc(e.handleTileSet))

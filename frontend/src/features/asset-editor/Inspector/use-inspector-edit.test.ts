@@ -80,6 +80,25 @@ beforeEach(() => {
 });
 
 describe("useInspectorEdit", () => {
+  it("clears the prompt after a successful submission", async () => {
+    mocks.stateValues.push(null, null, false, null);
+    const onPromptChange = vi.fn();
+    const inspector = useInspectorEdit({
+      selectedNodes: ["walk"],
+      selectedFrames: [],
+      prompt: "Refine the walk",
+      animations,
+      prototype,
+      onPromptChange,
+      onSubmit: vi.fn().mockResolvedValue(undefined),
+    });
+
+    inspector.handleSubmit({ preventDefault: vi.fn() } as never);
+    await flushPromises();
+
+    expect(onPromptChange).toHaveBeenCalledWith("");
+  });
+
   it("submits a validated prompt with its reference", async () => {
     const creatingReference = {
       fileName: "hero.png",

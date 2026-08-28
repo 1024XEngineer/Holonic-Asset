@@ -67,6 +67,18 @@ func TestForegroundBoundsHandlesEmptyAndOffsetImages(t *testing.T) {
 	}
 }
 
+func TestForegroundBoundsMatchesInternalMeasurement(t *testing.T) {
+	frame := testGreenFrame(96, 96)
+	drawSubject(frame, image.Rect(30, 20, 66, 88))
+	bounds, ok := ForegroundBounds(frame, testGreenChromaKey)
+	if !ok || bounds != image.Rect(30, 20, 66, 88) {
+		t.Fatalf("unexpected exported foreground bounds: %v, ok=%v", bounds, ok)
+	}
+	if _, ok := ForegroundBounds(image.NewNRGBA(image.Rectangle{}), testGreenChromaKey); ok {
+		t.Fatal("expected empty image to have no foreground via exported ForegroundBounds")
+	}
+}
+
 func TestConfiguredSafetyMarginAllowsEffectsNearButNotOnFrameEdge(t *testing.T) {
 	frame := testGreenFrame(256, 256)
 	drawSubject(frame, image.Rect(1, 80, 200, 176))
@@ -84,5 +96,45 @@ func TestConfiguredSafetyMarginAllowsEffectsNearButNotOnFrameEdge(t *testing.T) 
 	drawSubject(touching, image.Rect(0, 80, 200, 176))
 	if frameInsideSafetyBand(touching, configured) {
 		t.Fatal("configured margin must still reject foreground touching the frame edge")
+	}
+}
+
+func TestChromaKeyForMatteGreenProducesExpectedHueWindow(t *testing.T) {
+	key := ChromaKeyForMatte([3]uint8{0, 255, 0})
+	if !key.MatteLocked {
+		t.Fatal("expected MatteLocked to be true")
+	}
+	if !key.AutoDetect {
+		t.Fatal("expected AutoDetect to be true")
+	}
+	if key.HighSaturationMin != 80 || key.HighValueMin != 80 {
+		t.Fatalf("unexpected saturation/value thresholds: %+v", key)
+	}
+	if key.HueMin >= key.HueMax {
+		t.Fatalf("expected HueMin < HueMax, got %d >= %d", key.HueMin, key.HueMax)
+	}
+}
+
+func TestChromaKeyForMatteMagentaProducesMidHueRange(t *testing.T) {
+	key := ChromaKeyForMatte([3]uint8{255, 0, 255})
+	if key.HueMax > 179 {
+		t.Fatalf("HueMax should not exceed OpenCV max, got %d", key.HueMax)
+	}
+	if key.HueMin >= key.HueMax {
+		t.Fatalf("expected HueMin < HueMax for magenta, got %d >= %d", key.HueMin, key.HueMax)
+	}
+}
+
+func TestChromaKeyForMatteRedWrapsCorrectly(t *testing.T) {
+	key := ChromaKeyForMatte([3]uint8{255, 0, 0})
+	if key.HueMin >= key.HueMax {
+		t.Fatalf("expected valid hue window for red, got min=%d max=%d", key.HueMin, key.HueMax)
+	}
+}
+
+func TestChromaKeyForMatteBlueProducesHighHueRange(t *testing.T) {
+	key := ChromaKeyForMatte([3]uint8{0, 0, 255})
+	if key.HueMin > key.HueMax {
+		t.Fatalf("expected HueMin <= HueMax for blue, got %d > %d", key.HueMin, key.HueMax)
 	}
 }

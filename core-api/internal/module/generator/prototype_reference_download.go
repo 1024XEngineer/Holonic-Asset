@@ -2,21 +2,23 @@ package generator
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	defaultPrototypeReferenceTimeout        = 30 * time.Second
+	defaultPrototypeReferenceTimeout        = 45 * time.Second
 	defaultPrototypeReferenceDialTimeout    = 10 * time.Second
-	defaultPrototypeReferenceHeaderTimeout  = 15 * time.Second
-	defaultPrototypeReferenceTLSHandshaking = 10 * time.Second
+	defaultPrototypeReferenceHeaderTimeout  = 30 * time.Second
+	defaultPrototypeReferenceTLSHandshaking = 15 * time.Second
 )
 
 var blockedPrototypeReferencePrefixes = []netip.Prefix{
@@ -56,6 +58,11 @@ func newPrototypeReferenceHTTPClient() *http.Client {
 	transport.DialContext = secureDialer.DialContext
 	transport.ResponseHeaderTimeout = defaultPrototypeReferenceHeaderTimeout
 	transport.TLSHandshakeTimeout = defaultPrototypeReferenceTLSHandshaking
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSClientConfig = &tls.Config{
+		NextProtos: []string{"http/1.1"},
+	}
+	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 	return &http.Client{
 		Transport: transport,
 		Timeout:   defaultPrototypeReferenceTimeout,
@@ -158,5 +165,8 @@ func (d prototypeReferenceDialer) resolve(ctx context.Context, host string) ([]n
 	if len(addresses) == 0 {
 		return nil, fmt.Errorf("resolve prototype reference host %q: no IP addresses", host)
 	}
+	sort.SliceStable(addresses, func(i, j int) bool {
+		return addresses[i].Is4() && !addresses[j].Is4()
+	})
 	return addresses, nil
 }

@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"image"
+	"image/color"
+	"image/draw"
 	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -52,6 +55,45 @@ func TestProcessorPropagatesExtractionAndSelectionErrors(t *testing.T) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
 		})
+	}
+}
+
+func TestProcessorKeepsLockedMatteInsteadOfSamplingFrameCorners(t *testing.T) {
+	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
+	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{R: 255, B: 255, A: 255}}, image.Point{}, draw.Src)
+	drawSubject(frame, image.Rect(30, 18, 66, 88))
+
+	key := ChromaKeyForMatte([3]uint8{0, 255, 0})
+	_, err := newProcessor(frameExtractorStub{frames: []image.Image{frame}}).Process(
+		context.Background(), []byte("video"), ProcessOptions{
+			ChromaKey: key,
+			Select:    func(FrameSequenceAnalysis) ([]int, error) { return []int{0}, nil },
+		},
+	)
+	var qualityErr *QualityError
+	if !errors.As(err, &qualityErr) || qualityErr.Kind != "framing" {
+		t.Fatalf("locked green matte must not be replaced by magenta frame corners, got %v", err)
+	}
+}
+
+func TestDecodeFrameAnalysesKeepsLockedMatteInsteadOfSamplingFrameCorners(t *testing.T) {
+	directory := t.TempDir()
+	frame := image.NewNRGBA(image.Rect(0, 0, 96, 96))
+	draw.Draw(frame, frame.Bounds(), &image.Uniform{C: color.NRGBA{R: 255, B: 255, A: 255}}, image.Point{}, draw.Src)
+	drawSubject(frame, image.Rect(30, 18, 66, 88))
+	path := filepath.Join(directory, "analysis.png")
+	writeFramePNG(t, path, frame)
+
+	analyses, err := decodeFrameAnalyses([]string{path}, ChromaKeyForMatte([3]uint8{0, 255, 0}))
+	if err != nil {
+		t.Fatalf("decode locked-matte analysis: %v", err)
+	}
+	if len(analyses) != 1 || analyses[0].descriptor.foreground != analysisSize*analysisSize {
+		got := 0
+		if len(analyses) == 1 {
+			got = analyses[0].descriptor.foreground
+		}
+		t.Fatalf("locked green matte should leave the resized magenta frame as foreground: got %d, want %d", got, analysisSize*analysisSize)
 	}
 }
 
@@ -220,6 +262,34 @@ func TestDecodeFrameConfigAndResolveFFmpeg(t *testing.T) {
 	t.Setenv("PATH", "")
 	if _, err := resolveFFmpeg(""); err == nil {
 		t.Fatal("expected missing ffmpeg error")
+	}
+}
+
+func TestRunFrameExtractionUsesCurrentFFmpegFrameSyncOption(t *testing.T) {
+	directory := t.TempDir()
+	argsPath := filepath.Join(directory, "args.txt")
+	executable := writeFakeFFmpeg(t, directory, `printf '%s\n' "$@" > `+strconv.Quote(argsPath))
+	err := runFrameExtraction(
+		context.Background(),
+		executable,
+		filepath.Join(directory, "input.mp4"),
+		filepath.Join(directory, "frame_%05d.png"),
+		"fps=12,format=rgba",
+		8,
+	)
+	if err != nil {
+		t.Fatalf("run frame extraction: %v", err)
+	}
+	arguments, err := os.ReadFile(argsPath) // #nosec G304 -- argsPath is created under t.TempDir for this test.
+	if err != nil {
+		t.Fatalf("read ffmpeg arguments: %v", err)
+	}
+	value := string(arguments)
+	if !strings.Contains(value, "-fps_mode\npassthrough\n") {
+		t.Fatalf("current frame sync option is missing: %s", value)
+	}
+	if strings.Contains(value, "-vsync\n") {
+		t.Fatalf("deprecated frame sync option is still present: %s", value)
 	}
 }
 

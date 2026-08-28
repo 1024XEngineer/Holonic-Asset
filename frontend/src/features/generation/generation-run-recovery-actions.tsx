@@ -1,4 +1,5 @@
 import { LoaderCircle, RotateCcw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -36,6 +37,7 @@ export function GenerationRunRecoveryActions({
   const { t } = useTranslation(["generation", "common"]);
   const retryMutation = useRetryGenerationRunMutation();
   const deleteMutation = useDeleteGenerationRunMutation();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const isRetrying = retryMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const actionError = retryMutation.error ?? deleteMutation.error;
@@ -67,7 +69,10 @@ export function GenerationRunRecoveryActions({
           )}
           {t("retry")}
         </Button>
-        <AlertDialog>
+        <AlertDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+        >
           <AlertDialogTrigger
             render={
               <Button
@@ -103,6 +108,7 @@ export function GenerationRunRecoveryActions({
               <AlertDialogAction
                 variant="destructive"
                 onClick={() => {
+                  setIsDeleteDialogOpen(false);
                   retryMutation.reset();
                   deleteMutation.mutate(target);
                 }}

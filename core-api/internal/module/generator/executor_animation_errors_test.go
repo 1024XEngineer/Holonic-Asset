@@ -168,7 +168,7 @@ func TestProcessAnimationVideoRejectsInvalidProcessorResults(t *testing.T) {
 				videoProcessor: &animationVideoProcessorStub{results: []*videoprocessor.Result{test.processed}},
 				processor:      &animationProcessorStub{splitResult: test.split},
 			}
-			_, err := service.processVideoWithSourceCellScale(context.Background(), []byte("video"), request, 1)
+			_, err := service.processVideoWithSourceCellScale(context.Background(), []byte("video"), "", request, 1)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q, got %v", test.want, err)
 			}
@@ -269,7 +269,7 @@ func TestProcessAnimationVideoUsesOrderedContextSelection(t *testing.T) {
 	// boundary samples to exercise the edit-context selector and loop metadata.
 	videoProcessor.results = nil
 	videoProcessor.errors = []error{errors.New("capture options")}
-	_, _ = service.processVideoWithSourceCellScale(context.Background(), []byte("video"), AnimationGenerationRequest{
+	_, _ = service.processVideoWithSourceCellScale(context.Background(), []byte("video"), "", AnimationGenerationRequest{
 		ReferenceImageContext: true, FrameCount: 3, Columns: 3, FrameWidth: 32, FrameHeight: 32,
 	}, 1)
 	if len(videoProcessor.options) != 1 || videoProcessor.options[0].Select == nil {

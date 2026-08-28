@@ -131,6 +131,7 @@ describe("GenerationTaskDropdown", () => {
       projectId: "7",
       runId: "run-3",
     });
+    expect(screen.queryByText("Delete failed task “Jump”?")).toBeNull();
   });
 
   it("shows pending feedback and failures for recovery actions", () => {

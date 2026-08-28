@@ -72,6 +72,12 @@ func boundsInsideSafetyBand(frame image.Image, foreground image.Rectangle, margi
 		foreground.Max.Y <= frameBounds.Max.Y-margin
 }
 
+// ForegroundBounds exposes deterministic chroma-key foreground bounds to
+// callers that need the same subject measurement used by framing validation.
+func ForegroundBounds(source image.Image, chromaKey ChromaKey) (image.Rectangle, bool) {
+	return foregroundBounds(source, chromaKey)
+}
+
 func foregroundBounds(source image.Image, chromaKey ChromaKey) (image.Rectangle, bool) {
 	bounds := source.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()
@@ -145,4 +151,27 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ChromaKeyForMatte builds a fixed-hue key from an explicit RGB matte. Unlike
+// AutoDetect, this keeps analysis and extraction synchronized with the colour
+// selected for the provider reference image.
+func ChromaKeyForMatte(matte [3]uint8) ChromaKey {
+	hue, _, _ := rgbToOpenCVHSV(matte[0], matte[1], matte[2])
+	const hueWindow uint8 = 18
+	minHue := 0
+	if hue > hueWindow {
+		minHue = int(hue - hueWindow)
+	}
+	maxHue := minInt(179, int(hue)+int(hueWindow))
+	return ChromaKey{
+		HueMin:              uint8(minHue & 0xff),
+		HueMax:              uint8(maxHue & 0xff),
+		HighSaturationMin:   80,
+		HighValueMin:        80,
+		BrightSaturationMin: 50,
+		BrightValueMin:      180,
+		AutoDetect:          true,
+		MatteLocked:         true,
+	}
 }

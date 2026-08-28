@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,8 @@ const (
 	defaultAnimationResolution          = "720p"
 	defaultAnimationDuration            = 5
 	defaultAnimationAspectRatio         = "1:1"
+	animationDerivationVideoModel       = "bytedance/seedance-2.5"
+	animationDerivationReferenceMinEdge = 300
 	animationVideoAttempts              = 2
 	animationReferenceSize              = 1024
 	animationExpandedReferenceSize      = 1920
@@ -65,32 +68,6 @@ const (
 	animationChromaBrightSaturationMin = 50
 	animationChromaBrightValueMin      = 180
 )
-
-func animationFrameSelectionOptions(frameCount int) videoprocessor.FrameIntervalSelectionOptions {
-	return videoprocessor.FrameIntervalSelectionOptions{
-		SampleCount:              frameCount,
-		MinimumSpanFrames:        animationMinLoopSpanFrames,
-		MinimumSpanRatio:         animationMinLoopSpanRatio,
-		MinimumStartWindowFrames: animationMinStartWindow,
-		StartWindowRatio:         animationInitialWindowRatio,
-		PreferFirstFrame:         true,
-		MinimumForegroundRatio:   animationMinForegroundRatio,
-		EndpointMSEQuantile:      animationEndpointQuantile,
-		ChangeScaleQuantile:      animationRichnessQuantile,
-		ChangeBaselineQuantile:   animationMotionQuantile,
-		Weights: videoprocessor.FrameIntervalSelectionWeights{
-			EndpointSimilarity:    animationEndpointWeight,
-			MeanAdjacentMSE:       animationRichnessWeight,
-			CentroidStability:     animationCentroidStabilityWeight,
-			LinearCentroidMotion:  animationTranslationWeight,
-			FirstFrameSimilarity:  animationInitialFrameWeight,
-			Compactness:           animationLoopCompactnessWeight,
-			GeometryCoverage:      animationPoseCoverageWeight,
-			ChangeCoverage:        animationMotionCoverageWeight,
-			PostIntervalStability: animationRecoveryWeight,
-		},
-	}
-}
 
 type AnimationLoopSelection struct {
 	CandidateFPS       int     `json:"candidate_fps"`
@@ -144,10 +121,16 @@ type AnimationGenerationRequest struct {
 	// complete local-edit interval. The continuity gate temporarily replaces the
 	// target positions in this sequence before accepting generated output.
 	ContextReferenceImages []string
-	FrameCount             int
-	Columns                int
-	FrameWidth             int
-	FrameHeight            int
+	// DerivationSourceImage is a complete chronological frame sheet for the
+	// source direction. When set, the video model receives it together with the
+	// target-direction prototype and retargets the action into that direction.
+	DerivationSourceImage string
+	TargetOrientation     string
+	SourceOrientation     string
+	FrameCount            int
+	Columns               int
+	FrameWidth            int
+	FrameHeight           int
 	// PrototypeWidth and PrototypeHeight describe the source prototype canvas.
 	// They let reference preparation add animation padding without reducing the
 	// subject relative to its prototype.
@@ -159,6 +142,9 @@ type AnimationGenerationRequest struct {
 	AspectRatio     string
 
 	continuityReferenceFrames []image.Image
+	matteColor                imageprocessor.MatteColor
+	matteColorSet             bool
+	matteColorSafe            bool
 }
 
 type AnimationGenerationResult struct {
@@ -241,6 +227,11 @@ func NewAnimationGenerationServiceWithDependencies(
 func newDefaultAnimationReferenceHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSHandshakeTimeout = defaultAnimationReferenceTimeout
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSClientConfig = &tls.Config{
+		NextProtos: []string{"http/1.1"},
+	}
+	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 	return &http.Client{
 		Transport: transport,
 		Timeout:   defaultAnimationReferenceTimeout,
@@ -296,41 +287,31 @@ func (s *animationGenerationService) Generate(
 			return nil, err
 		}
 	}
-	promptOptions := prompts.AnimationOptions{
-		Description:        options.Description,
-		Style:              options.Style,
-		Action:             options.Action,
-		OriginalAction:     options.OriginalAction,
-		FrameCount:         options.FrameCount,
-		PrototypeWidth:     options.PrototypeWidth,
-		PrototypeHeight:    options.PrototypeHeight,
-		FrameWidth:         options.FrameWidth,
-		FrameHeight:        options.FrameHeight,
-		LocalFrameEdit:     options.ReferenceImageContext,
-		TargetFrameIndices: options.TargetFrameIndices,
-	}
-	greenReference, err := s.prepareAnimationReference(
-		ctx,
-		options.ReferenceImage,
-		options.ReferenceImagePrepared,
-		options.PrototypeWidth,
-		options.PrototypeHeight,
-		options.FrameWidth,
-		options.FrameHeight,
+	greenReference, matte, matteSafe, err := s.prepareAdaptiveAnimationReference(
+		ctx, options.ReferenceImage, options.ReferenceImagePrepared,
+		options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
+		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
+	options.matteColor = matte
+	options.matteColorSet = true
+	options.matteColorSafe = matteSafe
+	promptOptions := prompts.AnimationOptions{
+		Description: options.Description, Style: options.Style, Action: options.Action,
+		OriginalAction: options.OriginalAction, FrameCount: options.FrameCount,
+		PrototypeWidth: options.PrototypeWidth, PrototypeHeight: options.PrototypeHeight,
+		FrameWidth: options.FrameWidth, FrameHeight: options.FrameHeight,
+		LocalFrameEdit: options.ReferenceImageContext, TargetFrameIndices: options.TargetFrameIndices,
+		MatteColor: imageprocessor.ColorToHex(matte),
+	}
 	var endReference *videoclient.ReferenceImage
 	if options.EndReferenceImage != "" {
-		greenEndReference, prepareErr := s.prepareAnimationReference(
-			ctx,
-			options.EndReferenceImage,
-			options.ReferenceImagePrepared,
-			options.PrototypeWidth,
-			options.PrototypeHeight,
-			options.FrameWidth,
-			options.FrameHeight,
+		greenEndReference, _, _, prepareErr := s.prepareAdaptiveAnimationReference(
+			ctx, options.EndReferenceImage, options.ReferenceImagePrepared,
+			options.PrototypeWidth, options.PrototypeHeight, options.FrameWidth, options.FrameHeight,
+			&matte,
 		)
 		if prepareErr != nil {
 			return nil, fmt.Errorf("generator: prepare end animation reference: %w", prepareErr)
@@ -343,18 +324,60 @@ func (s *animationGenerationService) Generate(
 	}
 	currentReferenceLongEdge := initialReferenceLongEdge
 
+	var referenceImages []videoclient.ReferenceImage
+	model := ""
+	videoAspectRatio := options.AspectRatio
 	baseVideoPrompt := prompts.BuildAnimationVideo(promptOptions)
+	if options.DerivationSourceImage != "" {
+		sourceReference, loadErr := s.loadAnimationReference(ctx, options.DerivationSourceImage)
+		if loadErr != nil {
+			return nil, fmt.Errorf("generator: load animation derivation source sheet: %w", loadErr)
+		}
+		sourceSheet, decodeErr := imageprocessor.DecodeBase64Image(sourceReference)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("generator: decode animation derivation source sheet: %w", decodeErr)
+		}
+		preparedSourceSheet := scaleAnimationDerivationReference(sourceSheet, animationDerivationReferenceMinEdge)
+		encodedSourceSheet, encodeErr := imageprocessor.EncodePNGBase64(preparedSourceSheet)
+		if encodeErr != nil {
+			return nil, fmt.Errorf("generator: encode animation derivation source sheet: %w", encodeErr)
+		}
+		referenceImages = []videoclient.ReferenceImage{
+			{Base64: greenReference, MediaType: "image/png"},
+			{Base64: encodedSourceSheet, MediaType: "image/png"},
+		}
+		baseVideoPrompt = prompts.BuildAnimationDerivationVideo(prompts.AnimationDerivationOptions{
+			Description:       options.Description,
+			Style:             options.Style,
+			Action:            options.Action,
+			TargetOrientation: options.TargetOrientation,
+			SourceOrientation: options.SourceOrientation,
+			FrameCount:        options.FrameCount,
+			FrameWidth:        options.FrameWidth,
+			FrameHeight:       options.FrameHeight,
+		})
+		model = animationDerivationVideoModel
+		videoAspectRatio = "adaptive"
+	} else if len(options.ContextReferenceImages) > 0 {
+		referenceImages = make([]videoclient.ReferenceImage, 0, 1+len(options.ContextReferenceImages))
+		referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"})
+		for _, ref := range options.ContextReferenceImages {
+			referenceImages = append(referenceImages, videoclient.ReferenceImage{Base64: ref, MediaType: "image/png"})
+		}
+	}
 	videoPrompt := baseVideoPrompt
 	var lastQualityError error
 	for attempt := 1; attempt <= animationVideoAttempts; attempt++ {
 		videoResult, generateErr := s.videos.Generate(ctx, &videoclient.GenerateRequest{
-			Prompt:        videoPrompt,
-			StartImage:    videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"},
-			EndImage:      endReference,
-			Resolution:    options.Resolution,
-			Duration:      options.Duration,
-			AspectRatio:   options.AspectRatio,
-			GenerateAudio: false,
+			Prompt:          videoPrompt,
+			Model:           model,
+			StartImage:      videoclient.ReferenceImage{Base64: greenReference, MediaType: "image/png"},
+			ReferenceImages: referenceImages,
+			EndImage:        endReference,
+			Resolution:      options.Resolution,
+			Duration:        options.Duration,
+			AspectRatio:     videoAspectRatio,
+			GenerateAudio:   false,
 		})
 		if generateErr != nil {
 			return nil, fmt.Errorf("generator: generate animation video: %w", generateErr)
@@ -370,6 +393,7 @@ func (s *animationGenerationService) Generate(
 		processed, processErr := s.processVideoWithSourceCellScale(
 			ctx,
 			video,
+			greenReference,
 			options,
 			sourceCellScaleMultiplier,
 		)
@@ -405,6 +429,9 @@ func (s *animationGenerationService) Generate(
 					return nil, fmt.Errorf("generator: expand animation end reference after framing failure: %w", err)
 				}
 			}
+			if len(referenceImages) > 0 {
+				referenceImages[0].Base64 = greenReference
+			}
 		}
 		videoPrompt = prompts.BuildAnimationVideoRetry(baseVideoPrompt, qualityError.Kind)
 	}
@@ -414,6 +441,7 @@ func (s *animationGenerationService) Generate(
 func (s *animationGenerationService) processVideoWithSourceCellScale(
 	ctx context.Context,
 	video []byte,
+	referenceBase64 string,
 	request AnimationGenerationRequest,
 	sourceCellScaleMultiplier float64,
 ) (*AnimationGenerationResult, error) {
@@ -422,6 +450,10 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 	}
 	var loop AnimationLoopSelection
 	chromaKey := animationVideoChromaKeyForFrame(request.FrameWidth, request.FrameHeight)
+	if request.matteColorSet {
+		chromaKey = videoprocessor.ChromaKeyForMatte(request.matteColor)
+		chromaKey.SafetyMarginRatio = animationFrameSafetyMarginRatio(request.FrameWidth, request.FrameHeight)
+	}
 	processed, err := s.videoProcessor.Process(ctx, video, videoprocessor.ProcessOptions{
 		AnalysisFPS: animationAnalysisFPS,
 		ChromaKey:   chromaKey,
@@ -452,9 +484,24 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		return nil, err
 	}
 	if request.ReferenceImageContext {
-		if err := validateEditFrameContinuity(request, processed.Frames); err != nil {
+		if err := validateEditFrameContinuity(request, processed.Frames, chromaKey); err != nil {
 			return nil, err
 		}
+	}
+	if referenceBase64 != "" {
+		subjectScaleReference, decodeErr := imageprocessor.DecodeBase64Image(referenceBase64)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("generator: decode animation subject-scale reference: %w", decodeErr)
+		}
+		subjectScaleMultiplier, measureErr := animationSubjectScaleMultiplier(
+			subjectScaleReference,
+			processed.Frames,
+			chromaKey,
+		)
+		if measureErr != nil {
+			return nil, measureErr
+		}
+		sourceCellScaleMultiplier *= subjectScaleMultiplier
 	}
 	rawFrames := make([]imageprocessor.ImageRegion, 0, len(processed.Frames))
 	for index, frame := range processed.Frames {
@@ -478,6 +525,17 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 	if math.Abs(sourceCellScaleMultiplier-1) > 1e-9 {
 		splitSourceCellScaleMultiplier = sourceCellScaleMultiplier
 	}
+	// Direct callers without a chosen matte retain the historical automatic,
+	// conservative keying mode. Generate always selects a matte and can safely
+	// key enclosed holes globally because that colour is subject-safe.
+	matteColor := "auto"
+	borderConnectedOnly := true
+	if request.matteColorSet && request.matteColorSafe {
+		matteColor = imageprocessor.ColorToHex(request.matteColor)
+		borderConnectedOnly = false
+	} else if request.matteColorSet {
+		matteColor = imageprocessor.ColorToHex(request.matteColor)
+	}
 	normalized, err := s.processor.SplitImage(ctx, &imageprocessor.SplitImageRequest{
 		ImageBase64:               encoded,
 		Mode:                      imageprocessor.ImageSplitModeAnimation,
@@ -493,14 +551,12 @@ func (s *animationGenerationService) processVideoWithSourceCellScale(
 		PreserveVerticalMotion:    true,
 		PreserveSourceCellScale:   true,
 		SourceCellScaleMultiplier: splitSourceCellScaleMultiplier,
-		// The video prompt asks for a matte, but providers can return a
-		// different (or compressed) background colour. Sample the frame
-		// borders instead of assuming an exact pure-green key; otherwise
-		// normalization may receive an entirely opaque sheet and cannot
-		// compute the character bounds.
+		// Generate carries one explicitly selected, subject-safe matte through
+		// the reference, prompt, analysis, and extraction paths. Legacy direct
+		// callers retain automatic border sampling and conservative keying.
 		Background: &imageprocessor.AnimationBackgroundOptions{
-			MatteColor:          "auto",
-			BorderConnectedOnly: true,
+			MatteColor:          matteColor,
+			BorderConnectedOnly: borderConnectedOnly,
 		},
 	})
 	if err != nil {
@@ -687,6 +743,7 @@ func animationFrameDimensions(asset assetdomain.Asset) (assetdomain.Size, error)
 }
 
 type generatedAnimationCandidate struct {
+	GroupID    uint                                   `json:"groupId,omitempty"`
 	Name       string                                 `json:"name"`
 	Frames     []assetdomain.Frame                    `json:"frames"`
 	Generation *assetdomain.AnimationGenerationConfig `json:"generation,omitempty"`

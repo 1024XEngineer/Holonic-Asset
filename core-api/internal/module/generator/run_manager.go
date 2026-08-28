@@ -427,6 +427,39 @@ func buildTaskPayload(request *Request) (any, error) {
 			payload.AssetID = *request.AssetID
 		}
 		return payload, nil
+	case DeriveAnimation:
+		parameters := struct {
+			SourceAnimationID uint     `json:"source_animation_id"`
+			TargetDirections  []string `json:"target_directions"`
+		}{}
+		if err := decodeStrictParameters(request, &parameters); err != nil {
+			return nil, err
+		}
+		if request.AssetID == nil || *request.AssetID == 0 {
+			return nil, fmt.Errorf("generator: asset id is required for %s", request.Kind)
+		}
+		selectedID, err := animationTargetFromPaths(request.TargetAssetPaths)
+		if err != nil {
+			return nil, invalidTaskPayload("%v", err)
+		}
+		if selectedID != 0 {
+			if parameters.SourceAnimationID != 0 && parameters.SourceAnimationID != selectedID {
+				return nil, invalidTaskPayload("source animation id conflicts with targetAssetPaths")
+			}
+			parameters.SourceAnimationID = selectedID
+		}
+		if parameters.SourceAnimationID == 0 {
+			return nil, invalidTaskPayload("source animation id is required for %s", request.Kind)
+		}
+		if len(parameters.TargetDirections) == 0 {
+			return nil, invalidTaskPayload("target directions are required for %s", request.Kind)
+		}
+		return DeriveAnimationPayload{
+			AssetID:           *request.AssetID,
+			ProjectID:         request.ProjectID,
+			SourceAnimationID: parameters.SourceAnimationID,
+			TargetDirections:  append([]string(nil), parameters.TargetDirections...),
+		}, nil
 	case EditAnimation:
 		payload := EditAnimationPayload{}
 		if err := decodeParameters(request, &payload); err != nil {
