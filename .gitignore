@@ -39,4 +39,3 @@ lerna-debug.log*
 # Local backend configuration
 /core-api/**/.env
 /core-api/**/config.yaml
-/core-api/docker-compose.yaml
