@@ -12,66 +12,106 @@
 </p>
 
 <p align="center">
-  <a href="#tech-stack">Tech stack</a> ·
-  <a href="#core-capabilities">Capabilities</a> ·
-  <a href="#domain-model">Domain model</a>
+  <a href="https://www.holonicasset.xyz/">Website</a> ·
+  <a href="#what-you-can-do-today">Capabilities</a> ·
+  <a href="#project-status">Project status</a> ·
+  <a href="#getting-started">Getting started</a>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React-19.2.7-149eca?logo=react&logoColor=61DAFB" alt="React 19.2.7">
-  <img src="https://img.shields.io/badge/TypeScript-6.0.x-3178C6?logo=typescript&logoColor=3178C6" alt="TypeScript 6.0.x">
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-4.3.3-06B6D4?logo=tailwindcss&logoColor=06B6D4" alt="Tailwind CSS 4.3.3">
-  <img src="https://img.shields.io/badge/TanStack-1.170.18-FF4154?logo=tanstack&logoColor=FF4154" alt="TanStack Router 1.170.18">
-  <a href="https://pixijs.com/"><img src="docs/image/badge/pixijs.svg" alt="PixiJS 8.19.0"></a>
-  <br>
-  <img src="https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=00ADD8" alt="Go 1.26.5">
-  <a href="https://www.postgresql.org/"><img src="docs/image/badge/postgresql.svg" alt="PostgreSQL 18.4"></a>
-  <br>
-  <img src="https://img.shields.io/badge/OpenAPI%20TypeScript-7.13.0-6BA539?logo=openapiinitiative&logoColor=6BA539" alt="OpenAPI TypeScript 7.13.0">
-  <a href="https://github.com/evilmartians/lefthook"><img src="docs/image/badge/lefthook.svg" alt="Lefthook 2.1.9"></a>
-</p>
+Holonic Asset brings AI generation into a project-based game asset workflow. It helps creators generate, organize, iterate on, version, and export related assets without reducing a game world to a collection of disconnected images.
 
-Holonic Asset brings AI generation into real-world game development workflows. Within a shared project context, creators can generate, iterate on, connect, manage, and export characters, objects, scenes, tilesets, and UI Set assets instead of ending up with isolated images.
+The project is built for indie game developers, small game teams, prototype developers, and pixel-art creators who need a repeatable path from a visual direction to usable game assets.
 
-## Who It Is For
+## What You Can Do Today
 
-Holonic Asset is built for:
+### Build a shared project context
 
-- Indie game developers and small game teams
-- Prototype developers who need to build game demos quickly
-- Pixel art and character design enthusiasts
+- Create a project from a guided brief, an initial idea, or a blank starting point.
+- Define the game type, visual style, target platform, camera perspective, and reference images.
+- Generate and regenerate a project preview that captures the intended gameplay and art direction.
+- Carry the same project context into subsequent asset generation.
 
-## Why Holonic Asset
+### Generate game assets
 
-General-purpose image generation tools often fail to address the key challenges of game asset production: assets lack a shared project context, revision history is difficult to track, and generated results still need to be sliced and converted before they can be imported into a game engine.
+- Generate and revise multi-direction character prototypes.
+- Create character animations and regenerate selected animation frames.
+- Generate and revise game objects while preserving their visual identity.
+- Generate scenery as separate, composable layers.
+- Generate tilesets, add new items, and revise an item or selected tiles.
+- Inspect queued generation work and retry or remove failed runs.
 
-Holonic Asset organizes asset production into a continuous workflow:
+### Organize an asset library
 
-Project setup → Asset generation and management → Continuous iteration → Batch processing → Export and game integration
+- Manage generated characters, objects, scenery, and tilesets inside a project.
+- Filter the library by asset type, name, version, or tags.
+- Edit asset names, descriptions, and tags.
+- Open an existing asset and continue working from its current state.
 
-Project-level visual direction, game genre, perspective, target platform, and reference images form a shared context that helps keep characters, scenes, UI Set, and objects consistent in style, proportions, and color palette.
+### Iterate without losing previous work
 
-## Core Capabilities
+- Review generated candidates before applying them to an asset.
+- Continue editing an existing result instead of starting over.
+- Use a canvas-based workspace for sprites, scenery, and tilesets.
+- Undo and redo changes made during an editing session.
+- Save confirmed changes as a new asset version.
 
-- **Project context**: Centrally manage visual direction and generation settings for a game, prototype, or themed asset pack.
-- **Multiple asset types**: Support characters, objects, UI Set, scenes, and tilesets.
-- **Continuous creation**: Repeatedly generate, partially redraw, and manually refine the same asset without losing its creative history.
-- **Version history**: Create a Record whenever a generation or edit is confirmed, making it possible to review the history and restore any version.
-- **Asset relationships and tags**: Track relationships between characters, animations, sound effects, scenes, and other assets while supporting search and batch operations.
-- **Production-ready exports**: Export PNG, GIF, spritesheet, tileset, JSON, and other formats according to asset type, with subsequent conversion for game engines such as Unity and Godot.
+### Review saved versions
 
-## Domain Model
+- Browse the revision history of an asset.
+- See which saved version is currently active.
+- Keep a traceable record of confirmed generation and editing decisions.
 
-![Asset Domain Model](./docs/image/Asset%20Domain%20Model.svg)
+### Export asset packages
+
+- Export Character, Object, Scenery, and Tileset assets.
+- Download a ZIP package containing PNG resources, structured asset data, and a manifest.
+- Export the asset's current saved version rather than an unconfirmed draft.
+
+## Supported Workflows
+
+| Asset type | Current support |
+| --- | --- |
+| Character | Multi-direction prototype generation, iterative editing, animation generation, frame editing, version history, and package export |
+| Object | Prototype generation, iterative editing, version history, and package export |
+| Scenery | Layered generation, canvas composition, version history, and package export |
+| Tileset | Generation, item creation, item and tile editing, version history, and package export |
+
+## Project Status
+
+Holonic Asset is under active development. The core game-asset production workflow is already implemented, but the project is not yet a complete SaaS product.
+
+The following SaaS capabilities are not currently available:
+
+- Self-service sign-up, email verification, and password recovery
+- Organizations, teams, member invitations, and collaborative permissions
+- Subscription plans, payments, invoices, usage quotas, and credit management
+- Shared review, comments, approval flows, and user notifications
+- A complete administration experience for operating a hosted service
+
+The current authentication flow expects accounts to be provisioned by the operator. The project should be treated as an actively developed application rather than a production-ready multi-tenant SaaS offering.
+
+## Core Concepts
 
 ### Project
 
-A Project represents a game, game prototype, or consistently themed asset pack. It stores information such as the game genre, visual style, target platform, description, camera perspective, and reference images while providing shared AI context and centralized asset management.
+A Project represents a game, prototype, or consistently themed asset pack. It holds the shared creative context used to organize and guide asset production.
 
 ### Asset
 
-An Asset is an independently created, iterated, and deliverable unit within a Project. A character, wooden chest, inventory interface, scene, or background music track can each be an Asset. Every asset type retains the structure it needs, such as character prototypes and animation frames, scene layers, or placeable Items and Tiles within a Tileset.
+An Asset is an independently editable and deliverable unit within a Project, such as a character, object, scene, tileset, interface, or audio track. Each asset type retains the structure needed by its workflow.
 
 ### Record
 
-A Record is a complete snapshot of an Asset after a creation or edit is confirmed. It makes generation history traceable, comparable, and reversible so users can confidently explore different creative directions.
+A Record is a saved snapshot of an Asset after a generation or edit is confirmed. Records make creative history traceable and allow an asset to return to an earlier state.
+
+![Asset Domain Model](./docs/image/Asset%20Domain%20Model.svg)
+
+## Getting Started
+
+Follow the [Quick Start guide](./docs/en/quick-start.md) to run Holonic Asset locally.
+
+For problems and feature requests, use the repository's [GitHub issue templates](https://github.com/1024XEngineer/Holonic-Asset/issues/new/choose).
+
+## License
+
+Holonic Asset is licensed under the [Apache License 2.0](./LICENSE).
